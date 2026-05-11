@@ -1,42 +1,53 @@
+"use client";
+
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/browser";
 
-export const metadata: Metadata = {
-  title: "สมัครสมาชิก — DopRent",
-  robots: { index: false },
-};
+export default function SignupPage() {
+  const router = useRouter();
+  const sp = useSearchParams();
+  const next = sp.get("next") || "/";
 
-async function signUpAction(formData: FormData) {
-  "use server";
-  const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
-  const fullName = String(formData.get("full_name") ?? "").trim();
-  const next = String(formData.get("next") ?? "/");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  if (password.length < 6) {
-    redirect(`/signup?error=${encodeURIComponent("รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร")}&next=${encodeURIComponent(next)}`);
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (password.length < 6) {
+      setError("รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร");
+      return;
+    }
+    setLoading(true);
+    const sb = createClient();
+    const { data, error } = await sb.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    });
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
+    // If email confirmation disabled, Supabase returns a session right away.
+    // If still off in Supabase config (no session), try a manual sign-in.
+    if (!data.session) {
+      const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
+      if (signInErr) {
+        setError(signInErr.message);
+        setLoading(false);
+        return;
+      }
+    }
+    window.location.href = next;
   }
 
-  const sb = createClient();
-  const { error } = await sb.auth.signUp({
-    email,
-    password,
-    options: { data: { full_name: fullName } },
-  });
-  if (error) {
-    redirect(`/signup?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`);
-  }
-  redirect(next);
-}
-
-export default function SignupPage({
-  searchParams,
-}: {
-  searchParams: { error?: string; next?: string };
-}) {
-  const next = searchParams.next ?? "/";
   return (
     <div className="shell" style={{ maxWidth: 460, margin: "0 auto", padding: "60px 24px 80px" }}>
       <h1 style={{ fontSize: 28, fontWeight: 600, marginBottom: 6 }}>สมัครสมาชิก</h1>
@@ -44,7 +55,7 @@ export default function SignupPage({
         บันทึกชุดที่ชอบ ติดตามการจอง
       </p>
 
-      {searchParams.error ? (
+      {error ? (
         <div
           style={{
             background: "#FEE2E2",
@@ -56,17 +67,27 @@ export default function SignupPage({
             marginBottom: 16,
           }}
         >
-          {searchParams.error}
+          {error}
         </div>
       ) : null}
 
-      <form action={signUpAction}>
-        <input type="hidden" name="next" value={next} />
-        <FormField label="ชื่อ" name="full_name" type="text" required />
-        <FormField label="อีเมล" name="email" type="email" required />
-        <FormField label="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)" name="password" type="password" required />
-        <button type="submit" className="btn btn-dark btn-block btn-lg" style={{ marginTop: 12 }}>
-          สร้างบัญชี
+      <form onSubmit={onSubmit}>
+        <Field label="ชื่อ" type="text" value={fullName} onChange={setFullName} required />
+        <Field label="อีเมล" type="email" value={email} onChange={setEmail} required />
+        <Field
+          label="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)"
+          type="password"
+          value={password}
+          onChange={setPassword}
+          required
+        />
+        <button
+          type="submit"
+          disabled={loading}
+          className="btn btn-dark btn-block btn-lg"
+          style={{ marginTop: 12, opacity: loading ? 0.6 : 1 }}
+        >
+          {loading ? "กำลังสร้างบัญชี..." : "สร้างบัญชี"}
         </button>
       </form>
 
@@ -83,15 +104,17 @@ export default function SignupPage({
   );
 }
 
-function FormField({
+function Field({
   label,
-  name,
   type,
+  value,
+  onChange,
   required,
 }: {
   label: string;
-  name: string;
   type: string;
+  value: string;
+  onChange: (v: string) => void;
   required?: boolean;
 }) {
   return (
@@ -101,7 +124,8 @@ function FormField({
       </label>
       <input
         type={type}
-        name={name}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
         required={required}
         style={{
           width: "100%",

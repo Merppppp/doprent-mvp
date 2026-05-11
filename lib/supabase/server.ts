@@ -1,9 +1,9 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 /**
  * Supabase client for Server Components / Route Handlers / Server Actions.
- * Reads/writes session cookies so auth state propagates across requests.
+ * Uses the modern getAll/setAll cookie API from @supabase/ssr >= 0.5.
  */
 export function createClient() {
   const cookieStore = cookies();
@@ -12,21 +12,16 @@ export function createClient() {
 
   return createServerClient(url, anon, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      getAll() {
+        return cookieStore.getAll();
       },
-      set(name: string, value: string, options: CookieOptions) {
+      setAll(cookiesToSet) {
         try {
-          cookieStore.set({ name, value, ...options });
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
         } catch {
           // Server Components can't set cookies. Middleware handles refresh.
-        }
-      },
-      remove(name: string, options: CookieOptions) {
-        try {
-          cookieStore.set({ name, value: "", ...options });
-        } catch {
-          /* noop */
         }
       },
     },
