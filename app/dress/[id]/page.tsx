@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { DressArt } from "@/components/DressArt";
 import LineButton from "@/components/LineButton";
 import DressCard from "@/components/DressCard";
+import SaveButton from "@/components/SaveButton";
+import { getCurrentUser } from "@/lib/auth";
 import {
   getBoutiqueBySlug,
   getDressBySlug,
@@ -40,11 +42,15 @@ export default async function DressPage({ params }: { params: Params }) {
   const dress = await getDressBySlug(params.id);
   if (!dress) notFound();
 
-  const [occasions, boutique, related] = await Promise.all([
+  const [occasions, boutique, related, user] = await Promise.all([
     listOccasions(),
     getBoutiqueBySlug(slugify(dress.boutique_name)).catch(() => null),
     listDresses({ limit: 4 }),
+    getCurrentUser().catch(() => null),
   ]);
+  const savedSet = new Set(user?.profile.saved_dress_ids ?? []);
+  const isLoggedIn = !!user;
+  const isSaved = savedSet.has(dress.id);
 
   const lineUrl = dress.line_url || boutique?.line_url || DEFAULT_LINE;
   const url = `${SITE}/dress/${dress.slug}`;
@@ -283,6 +289,12 @@ export default async function DressPage({ params }: { params: Params }) {
                 fullWidth
               />
             </div>
+            <SaveButton
+              dressId={dress.id}
+              initialSaved={isSaved}
+              isLoggedIn={isLoggedIn}
+              variant="detail"
+            />
           </div>
           <LineButton
             href={boutiqueLine}

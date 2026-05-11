@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import DressCard from "@/components/DressCard";
+import { getCurrentUser } from "@/lib/auth";
 import { listDresses, listOccasions } from "@/lib/dresses";
 import {
   COLOR_LABELS_TH,
@@ -44,7 +45,7 @@ export default async function BrowsePage({
     | "price-desc"
     | "name";
 
-  const [dresses, occasions] = await Promise.all([
+  const [dresses, occasions, user] = await Promise.all([
     listDresses({
       color: activeColor === "all" ? undefined : activeColor,
       occasions: activeOcc ? [activeOcc] : undefined,
@@ -53,7 +54,10 @@ export default async function BrowsePage({
       sort,
     }),
     listOccasions(),
+    getCurrentUser().catch(() => null),
   ]);
+  const savedSet = new Set(user?.profile.saved_dress_ids ?? []);
+  const isLoggedIn = !!user;
 
   function makeHref(overrides: Partial<SearchParams>) {
     const sp = new URLSearchParams();
@@ -240,7 +244,7 @@ export default async function BrowsePage({
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "24px 20px" }}>
               {dresses.map((d, i) => (
-                <DressCard key={d.id} dress={d} variant={i} />
+                <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
               ))}
             </div>
           )}

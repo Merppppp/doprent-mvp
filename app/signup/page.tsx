@@ -1,0 +1,116 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { createClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = {
+  title: "สมัครสมาชิก — DopRent",
+  robots: { index: false },
+};
+
+async function signUpAction(formData: FormData) {
+  "use server";
+  const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  const fullName = String(formData.get("full_name") ?? "").trim();
+  const next = String(formData.get("next") ?? "/");
+
+  if (password.length < 6) {
+    redirect(`/signup?error=${encodeURIComponent("รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร")}&next=${encodeURIComponent(next)}`);
+  }
+
+  const sb = createClient();
+  const { error } = await sb.auth.signUp({
+    email,
+    password,
+    options: { data: { full_name: fullName } },
+  });
+  if (error) {
+    redirect(`/signup?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`);
+  }
+  redirect(next);
+}
+
+export default function SignupPage({
+  searchParams,
+}: {
+  searchParams: { error?: string; next?: string };
+}) {
+  const next = searchParams.next ?? "/";
+  return (
+    <div className="shell" style={{ maxWidth: 460, margin: "0 auto", padding: "60px 24px 80px" }}>
+      <h1 style={{ fontSize: 28, fontWeight: 600, marginBottom: 6 }}>สมัครสมาชิก</h1>
+      <p style={{ color: "var(--ink-2)", fontSize: 14, marginBottom: 28 }}>
+        บันทึกชุดที่ชอบ ติดตามการจอง
+      </p>
+
+      {searchParams.error ? (
+        <div
+          style={{
+            background: "#FEE2E2",
+            border: "1px solid #FCA5A5",
+            color: "#991B1B",
+            padding: "10px 14px",
+            borderRadius: 6,
+            fontSize: 13,
+            marginBottom: 16,
+          }}
+        >
+          {searchParams.error}
+        </div>
+      ) : null}
+
+      <form action={signUpAction}>
+        <input type="hidden" name="next" value={next} />
+        <FormField label="ชื่อ" name="full_name" type="text" required />
+        <FormField label="อีเมล" name="email" type="email" required />
+        <FormField label="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)" name="password" type="password" required />
+        <button type="submit" className="btn btn-dark btn-block btn-lg" style={{ marginTop: 12 }}>
+          สร้างบัญชี
+        </button>
+      </form>
+
+      <div style={{ textAlign: "center", fontSize: 13, color: "var(--ink-2)", marginTop: 16 }}>
+        มีบัญชีอยู่แล้ว?{" "}
+        <Link
+          href={`/login?next=${encodeURIComponent(next)}`}
+          style={{ color: "var(--info)", fontWeight: 500 }}
+        >
+          เข้าสู่ระบบ
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function FormField({
+  label,
+  name,
+  type,
+  required,
+}: {
+  label: string;
+  name: string;
+  type: string;
+  required?: boolean;
+}) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+        {label}
+      </label>
+      <input
+        type={type}
+        name={name}
+        required={required}
+        style={{
+          width: "100%",
+          padding: "11px 14px",
+          border: "1px solid var(--line)",
+          borderRadius: 6,
+          fontSize: 14,
+        }}
+      />
+    </div>
+  );
+}
