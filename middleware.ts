@@ -1,5 +1,7 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+
+type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 /**
  * Refreshes Supabase session on every page request. Uses the modern
@@ -19,7 +21,7 @@ export async function middleware(req: NextRequest) {
         getAll() {
           return req.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: CookieToSet[]) {
           cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value));
           res = NextResponse.next({ request: { headers: req.headers } });
           cookiesToSet.forEach(({ name, value, options }) =>
@@ -29,7 +31,7 @@ export async function middleware(req: NextRequest) {
       },
     });
 
-    // IMPORTANT: getUser() refreshes the access token if expired
+    // Refresh access token if expired
     await supabase.auth.getUser();
   } catch (err) {
     console.error("[doprent] middleware error", err);
