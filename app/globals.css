@@ -1,0 +1,202 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   DopRent design tokens — ported from doprent-v0.1-demo.html
+   ============================================================ */
+:root {
+  --ink: #0A0A0A;
+  --ink-2: #4A4A4A;
+  --ink-3: #8A8A8A;
+  --line: #E5E5E5;
+  --line-2: #F0F0F0;
+  --bg: #FAFAFA;
+  --surface: #FFFFFF;
+  --warm: #F5F4F0;
+  --line-green: #06C755;
+  --danger: #DC2626;
+  --success: #059669;
+  --info: #2563EB;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Inter", "Sarabun", system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+::selection {
+  background: var(--ink);
+  color: #fff;
+}
+
+:where(a, button, [role="button"], input, select, textarea):focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ============================================================
+   Utility component classes (reusable across pages)
+   ============================================================ */
+.shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Buttons */
+.btn {
+  padding: 9px 18px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.15s;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
+  border: 1px solid transparent;
+}
+.btn-dark {
+  background: var(--ink);
+  color: #fff;
+}
+.btn-dark:hover {
+  background: #2a2a2a;
+}
+.btn-outline {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+.btn-outline:hover {
+  border-color: var(--ink);
+}
+.btn-line {
+  background: var(--line-green);
+  color: #fff;
+}
+.btn-line:hover {
+  opacity: 0.92;
+}
+.btn-block {
+  width: 100%;
+}
+.btn-lg {
+  padding: 13px 24px;
+  font-size: 15px;
+}
+
+/* Ad badges (Featured / Sponsored) */
+.ad-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ad-badge.featured {
+  background: #fef3c7;
+  color: #92400e;
+}
+.ad-badge.sponsored {
+  background: var(--ink);
+  color: #fff;
+}
+.ad-badge .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.status-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+}
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+.status-pending .dot {
+  background: #d97706;
+}
+.status-live {
+  background: #dcfce7;
+  color: #166534;
+}
+.status-live .dot {
+  background: var(--success);
+}
+.status-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.status-rejected .dot {
+  background: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

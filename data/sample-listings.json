@@ -1,0 +1,218 @@
+[
+  {
+    "id": "1",
+    "slug": "rose-silk-midi",
+    "name": "Rose Silk Midi Dress",
+    "designer": "Atelier Bangkok",
+    "boutique": "Siam Couture",
+    "size": "S",
+    "color": "rose",
+    "price_per_day": 1800,
+    "deposit": 8000,
+    "description": "ชุดเดรสผ้าซิลค์สีกุหลาบ ทรง midi คอวี เหมาะกับงานเลี้ยงค่ำ งานหมั้น หรือถ่ายภาพ pre-wedding",
+    "images": [
+      "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=1200",
+      "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=1200"
+    ],
+    "line_url": "https://line.me/R/ti/p/@siamcouture",
+    "available": true
+  },
+  {
+    "id": "2",
+    "slug": "ivory-pleated-gown",
+    "name": "Ivory Pleated Gown",
+    "designer": "Praewa Studio",
+    "boutique": "Thonglor Atelier",
+    "size": "M",
+    "color": "ivory",
+    "price_per_day": 2400,
+    "deposit": 12000,
+    "description": "ชุดราตรีสีงาช้าง ผ้าพลีทอัดร้อน ทรงยาวพื้น เหมาะกับงานแต่งงาน งานกาล่า",
+    "images": [
+      "https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=1200",
+      "https://images.unsplash.com/photo-1572804013427-4d7ca7268217?w=1200"
+    ],
+    "line_url": "https://line.me/R/ti/p/@thonglor",
+    "available": true
+  },
+  {
+    "id": "3",
+    "slug": "emerald-velvet-cocktail",
+    "name": "Emerald Velvet Cocktail",
+    "designer": "Asava",
+    "boutique": "Siam Couture",
+    "size": "S",
+    "color": "green",
+    "price_per_day": 2000,
+    "deposit": 10000,
+    "description": "เดรสผ้ากำมะหยี่สีมรกต ทรงเข้ารูป ความยาวเหนือเข่า เหมาะกับงานค็อกเทล",
+    "images": [
+      "https://images.unsplash.com/photo-1623609163859-ca93c959b98a?w=1200",
+      "https://images.unsplash.com/photo-1508162942367-e4500f3edd97?w=1200"
+    ],
+    "line_url": "https://line.me/R/ti/p/@siamcouture",
+    "available": true
+  },
+  {
+    "id": "4",
+    "slug": "noir-silk-slip",
+    "name": "Noir Silk Slip",
+    "designer": "Kloset",
+    "boutique": "Thonglor Atelier",
+    "size": "M",
+    "color": "black",
+    "price_per_day": 1600,
+    "deposit": 8000,
+    "description": "ชุดสลิปเดรสผ้าซิลค์สีดำ สายเดี่ยว ทรงเรียบหรู ใส่ได้หลายโอกาส",
+    "images": [
+      "https://images.unsplash.com/photo-1496217590455-aa63a8350eea?w=1200",
+      "https://images.unsplash.com/photo-1485518882345-15568b007407?w=1200"
+    ],
+    "line_url": "https://line.me/R/ti/p/@thonglor",
+    "available": true
+  },
+  {
+    "id": "5",
+    "slug": "blush-tulle-ball",
+    "name": "Blush Tulle Ball Gown",
+    "designer": "Theatre",
+    "boutique": "Siam Couture",
+    "size": "S",
+    "color": "rose",
+    "price_per_day": 3200,
+    "deposit": 15000,
+    "description": "ชุดบอลกาวน์ผ้าทูลล์สีชมพูบลัช กระโปรงพอง เหมาะกับงานหมั้น งานพรหมแดง",
+    "images": [
+      "https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=1200",
+      "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=1200"
+    ],
+    "line_url": "https://line.me/R/ti/p/@siamcouture",
+    "available": true
+  },
+  {
+    "id": "6",
+    "slug": "navy-sequin-mini",
+    "name": "Navy Sequin Mini",
+    "designer": "Disaya",
+    "boutique": "Thonglor Atelier",
+    "size": "S",
+    "color": "navy",
+    "price_per_day": 1900,
+    "deposit": 9000,
+    "description": "เดรสสั้นสีกรมท่า ผ้าปักเลื่อม ใส่ออกงานเลี้ยง งานปาร์ตี้ได้เก๋",
+    "images": [
+      "https://images.unsplash.com/photo-1572804013427-4d7ca7268217?w=1200",
+      "https://images.unsplash.com/photo-1618333258404-f509733839c4?w=1200"
+    ],
+    "line_url": "https://line.me/R/ti/p/@thonglor",
+    "available": true
+  },
+  {
+    "id": "7",
+    "slug": "champagne-lace-midi",
+    "name": "Champagne Lace Midi",
+    "designer": "Asava",
+    "boutique": "Siam Couture",
+    "size": "M",
+    "color": "ivory",
+    "price_per_day": 2200,
+    "deposit": 11000,
+    "description": "ชุดลูกไม้สีแชมเปญ ทรง midi แขนยาว ดูสุภาพหรูหรา เหมาะงานแต่งช่วงเช้า",
+    "images": [
+      "https://images.unsplash.com/photo-1566479179817-c48eb2dee3da?w=1200",
+      "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200"
+    ],
+    "line_url": "https://line.me/R/ti/p/@siamcouture",
+    "available": true
+  },
+  {
+    "id": "8",
+    "slug": "scarlet-satin-column",
+    "name": "Scarlet Satin Column",
+    "designer": "Kloset",
+    "boutique": "Thonglor Atelier",
+    "size": "S",
+    "color": "red",
+    "price_per_day": 2600,
+    "deposit": 13000,
+    "description": "ชุดราตรีผ้าซาตินสีแดงสด ทรงคอลัมน์ เปิดหลัง เหมาะกับงานค่ำสำคัญ",
+    "images": [
+      "https://images.unsplash.com/photo-1535443277090-5f2c0fe34b40?w=1200",
+      "https://images.unsplash.com/photo-1549062572-544a64fb0c56?w=1200"
+    ],
+    "line_url": "https://line.me/R/ti/p/@thonglor",
+    "available": true
+  },
+  {
+    "id": "9",
+    "slug": "powder-blue-tea",
+    "name": "Powder Blue Tea Dress",
+    "designer": "Theatre",
+    "boutique": "Siam Couture",
+    "size": "M",
+    "color": "blue",
+    "price_per_day": 1700,
+    "deposit": 8500,
+    "description": "เดรสสีฟ้าพาวเดอร์ ทรง tea length ผ้าชีฟอง บางเบา เหมาะกับงานช่วงบ่าย",
+    "images": [
+      "https://images.unsplash.com/photo-1583846783214-7229a91b20ed?w=1200",
+      "https://images.unsplash.com/photo-1542295669297-4d352b042bca?w=1200"
+    ],
+    "line_url": "https://line.me/R/ti/p/@siamcouture",
+    "available": true
+  },
+  {
+    "id": "10",
+    "slug": "onyx-tuxedo-jumpsuit",
+    "name": "Onyx Tuxedo Jumpsuit",
+    "designer": "Disaya",
+    "boutique": "Thonglor Atelier",
+    "size": "S",
+    "color": "black",
+    "price_per_day": 2100,
+    "deposit": 10000,
+    "description": "จัมป์สูทสีดำสไตล์ทักซิโด้ ตัดเย็บเข้ารูป โอกาสทางการ งานเลี้ยงในออฟฟิศ",
+    "images": [
+      "https://images.unsplash.com/photo-1529903384028-929ae5dccdf1?w=1200",
+      "https://images.unsplash.com/photo-1551803091-e20673f15770?w=1200"
+    ],
+    "line_url": "https://line.me/R/ti/p/@thonglor",
+    "available": true
+  },
+  {
+    "id": "11",
+    "slug": "lilac-organza-gown",
+    "name": "Lilac Organza Gown",
+    "designer": "Praewa Studio",
+    "boutique": "Siam Couture",
+    "size": "M",
+    "color": "purple",
+    "price_per_day": 2800,
+    "deposit": 13000,
+    "description": "ชุดราตรีผ้าออร์แกนซ่าสีม่วงไลแลค ทรงเอ-ไลน์ มีระบายชาย เหมาะกับงานหมั้น",
+    "images": [
+      "https://images.unsplash.com/photo-1587404818562-0c3a82e85e6c?w=1200",
+      "https://images.unsplash.com/photo-1596783074918-c84cb06531ca?w=1200"
+    ],
+    "line_url": "https://line.me/R/ti/p/@siamcouture",
+    "available": true
+  },
+  {
+    "id": "12",
+    "slug": "sage-linen-suit",
+    "name": "Sage Linen Suit Set",
+    "designer": "Asava",
+    "boutique": "Thonglor Atelier",
+    "size": "M",
+    "color": "green",
+    "price_per_day": 1500,
+    "deposit": 7500,
+    "description": "เซ็ตเสื้อเบลเซอร์กับกระโปรงผ้าลินินสีเสจ ใส่ทำงาน งานสัมมนา หรือเดทกลางวัน",
+    "images": [
+      "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=1200",
+      "https://images.unsplash.com/photo-1551803091-e20673f15770?w=1200"
+    ],
+    "line_url": "https://line.me/R/ti/p/@thonglor",
+    "available": true
+  }
+]

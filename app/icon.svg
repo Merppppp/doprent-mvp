@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="8" fill="#faf7f2"/>
+  <circle cx="11" cy="13" r="3" fill="#c98a8a"/>
+  <path d="M9 17 Q16 25 23 17 L21 28 H11 Z" fill="#1a1a1a"/>
+  <text x="16" y="11" font-family="Georgia, serif" font-size="9" font-weight="700" fill="#1a1a1a" text-anchor="middle">D</text>
+</svg>
