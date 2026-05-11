@@ -2,45 +2,47 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Refreshes Supabase session on every request so server components see the
- * latest auth state. See: https://supabase.com/docs/guides/auth/server-side/nextjs
+ * Refreshes Supabase session on every page request. Wrapped in try/catch so a
+ * Supabase outage or transient error never takes the whole site down.
  */
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: { headers: req.headers } });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) return res;
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !anon) return res;
 
-  const supabase = createServerClient(url, anon, {
-    cookies: {
-      get(name: string) {
-        return req.cookies.get(name)?.value;
+    const supabase = createServerClient(url, anon, {
+      cookies: {
+        get(name: string) {
+          return req.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          req.cookies.set({ name, value, ...options });
+          res = NextResponse.next({ request: { headers: req.headers } });
+          res.cookies.set({ name, value, ...options });
+        },
+        remove(name: string, options: CookieOptions) {
+          req.cookies.set({ name, value: "", ...options });
+          res = NextResponse.next({ request: { headers: req.headers } });
+          res.cookies.set({ name, value: "", ...options });
+        },
       },
-      set(name: string, value: string, options: CookieOptions) {
-        req.cookies.set({ name, value, ...options });
-        res = NextResponse.next({ request: { headers: req.headers } });
-        res.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options: CookieOptions) {
-        req.cookies.set({ name, value: "", ...options });
-        res = NextResponse.next({ request: { headers: req.headers } });
-        res.cookies.set({ name, value: "", ...options });
-      },
-    },
-  });
+    });
 
-  // IMPORTANT: getUser() refreshes the access token if expired
-  await supabase.auth.getUser();
+    await supabase.auth.getUser();
+  } catch (err) {
+    // Don't block the request if session refresh fails.
+    console.error("[doprent] middleware error", err);
+  }
 
   return res;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Skip static assets and image optimization endpoints.
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Run only on page navigations; skip API routes, static assets, OG images
+    "/((?!api/|_next/static|_next/image|favicon.ico|opengraph-image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
