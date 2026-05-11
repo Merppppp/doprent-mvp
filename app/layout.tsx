@@ -48,6 +48,10 @@ export const viewport: Viewport = {
   themeColor: "#FAFAFA",
 };
 
+// Force dynamic rendering so the auth-aware Header always reads the latest cookie state.
+// (Per-page revalidate caching makes Header render with stale auth state.)
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="th">
