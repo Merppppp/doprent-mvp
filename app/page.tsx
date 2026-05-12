@@ -31,20 +31,14 @@ export default async function HomePage() {
   return (
     <>
       {/* ========== HERO ========== */}
-      <section className="shell" style={{ padding: "60px 24px 80px" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1.1fr 1fr",
-            gap: 60,
-            alignItems: "center",
-          }}
-        >
+      <section className="shell section-pad" style={{ padding: "60px 0 80px" }}>
+        <div className="hero-grid">
           <div>
             <div style={{ fontSize: 12, color: "var(--info)", fontWeight: 500, marginBottom: 16 }}>
               Thailand rental store
             </div>
             <h1
+              className="hero-title"
               style={{
                 fontSize: 48,
                 fontWeight: 700,
@@ -58,6 +52,7 @@ export default async function HomePage() {
               เลือกง่าย จองตรงกับร้าน
             </h1>
             <p
+              className="hero-sub"
               style={{
                 fontSize: 17,
                 color: "var(--ink-2)",
@@ -68,7 +63,7 @@ export default async function HomePage() {
             >
               เห็นชุดที่ใช่ กดคุยกับร้านได้ทันที
             </p>
-            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <div className="hero-cta" style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <Link href="/browse" className="btn btn-dark btn-lg">
                 เริ่มเลือกชุด
               </Link>
@@ -77,12 +72,14 @@ export default async function HomePage() {
               </Link>
             </div>
             <div
+              className="hero-stats"
               style={{
                 display: "flex",
                 gap: 36,
                 marginTop: 40,
                 paddingTop: 24,
                 borderTop: "1px solid var(--line)",
+                flexWrap: "wrap",
               }}
             >
               <Stat num={String(stats.boutiques)} lbl="ร้าน" />
@@ -105,11 +102,9 @@ export default async function HomePage() {
         }}
       >
         <div
-          className="shell"
+          className="shell grid-4"
           style={{
-            padding: "18px 24px",
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
+            padding: "18px 0",
             gap: 18,
           }}
         >
@@ -121,10 +116,10 @@ export default async function HomePage() {
       </div>
 
       {/* ========== HOW IT WORKS ========== */}
-      <section style={{ background: "var(--warm)", padding: "60px 0" }}>
+      <section className="section-pad" style={{ background: "var(--warm)", padding: "60px 0" }}>
         <div className="shell">
           <h2 style={{ fontSize: 24, fontWeight: 600, marginBottom: 28 }}>วิธีใช้งาน</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 32 }}>
+          <div className="grid-3" style={{ gap: 24 }}>
             <Step n="1" t="เลือกชุด" d="กรองตามโอกาส สี ขนาด ราคา ดีไซเนอร์ ร้านเช่า หาชุดที่ใช่ภายในไม่กี่คลิก" />
             <Step n="2" t="แชต LINE กับร้าน" d="กดปุ่มเปิด LINE ตรงไปคุยกับร้านเช่า ตกลงวัน ราคา การส่ง" />
             <Step n="3" t="รับชุด ใส่ ส่งคืน" d="โอน PromptPay ตรงร้าน รับชุดผ่าน Grab ส่งคืนตามวันที่ตกลง" />
@@ -133,10 +128,10 @@ export default async function HomePage() {
       </section>
 
       {/* ========== OCCASIONS ========== */}
-      <section style={{ padding: "60px 0" }}>
+      <section className="section-pad" style={{ padding: "60px 0" }}>
         <div className="shell">
           <SectionHead title="เลือกตามโอกาส" linkText="ดูทั้งหมด →" linkHref="/browse" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+          <div className="grid-4" style={{ gap: 12 }}>
             {occasions.map((o) => (
               <Link
                 key={o.key}
@@ -182,10 +177,10 @@ export default async function HomePage() {
       </section>
 
       {/* ========== JUST IN (NEW) ========== */}
-      <section style={{ background: "var(--warm)", padding: "60px 0" }}>
+      <section className="section-pad" style={{ background: "var(--warm)", padding: "60px 0" }}>
         <div className="shell">
           <SectionHead title="มาใหม่" linkText={`ดูทั้งหมด ${stats.dresses} ชุด →`} linkHref="/browse" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
+          <div className="grid-4" style={{ gap: 20 }}>
             {dresses.slice(0, 8).map((d, i) => (
               <DressCard key={d.id} dress={d} variant={i} />
             ))}
@@ -194,29 +189,28 @@ export default async function HomePage() {
       </section>
 
       {/* ========== FEATURED BOUTIQUES ========== */}
-      <section style={{ padding: "60px 0" }}>
+      <section className="section-pad" style={{ padding: "60px 0" }}>
         <div className="shell">
           <SectionHead
             title="ร้านเช่าแนะนำ"
             linkText={`ดูร้านเช่าทั้งหมด ${stats.boutiques} ร้าน →`}
             linkHref="/boutiques"
           />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20 }}>
+          <div className="grid-2" style={{ gap: 20 }}>
             {boutiques.map((b) => (
               <Link
                 key={b.id}
                 href={`/boutique/${b.slug}`}
+                className="boutique-card"
                 style={{
                   background: "var(--surface)",
                   border: "1px solid var(--line)",
                   borderRadius: 8,
-                  display: "flex",
-                  overflow: "hidden",
                   cursor: "pointer",
                   transition: "border 0.15s",
                 }}
               >
-                <div style={{ width: 180, flexShrink: 0 }}>
+                <div className="cover">
                   <BoutiqueCover color={b.cover_color} />
                 </div>
                 <div style={{ padding: 22, flex: 1 }}>
@@ -349,11 +343,13 @@ function SectionHead({
 }) {
   return (
     <div
+      className="section-head"
       style={{
         display: "flex",
         justifyContent: "space-between",
         alignItems: "end",
         marginBottom: 28,
+        gap: 12,
       }}
     >
       <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.01em" }}>{title}</h2>

@@ -17,27 +17,26 @@ export default async function BoutiquesPage() {
   const boutiques = await listBoutiques({ featuredFirst: true });
 
   return (
-    <div className="shell" style={{ paddingTop: 36, paddingBottom: 80 }}>
-      <h1 style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.01em" }}>ร้านเช่าทั้งหมด</h1>
-      <div style={{ color: "var(--ink-3)", fontSize: 14, marginTop: 6, marginBottom: 28 }}>
+    <div className="shell boutiques-list" style={{ paddingTop: 28, paddingBottom: 80 }}>
+      <h1 className="page-title" style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.01em" }}>ร้านเช่าทั้งหมด</h1>
+      <div style={{ color: "var(--ink-3)", fontSize: 14, marginTop: 6, marginBottom: 24 }}>
         {boutiques.length} ร้านในกรุงเทพ
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div className="grid-2" style={{ gap: 20 }}>
         {boutiques.map((b) => (
           <Link
             key={b.id}
             href={`/boutique/${b.slug}`}
+            className="boutique-card"
             style={{
               background: "var(--surface)",
               border: `1px solid ${b.featured ? "#FCD34D" : "var(--line)"}`,
               borderRadius: 8,
-              display: "flex",
-              overflow: "hidden",
               cursor: "pointer",
             }}
           >
-            <div style={{ width: 160, flexShrink: 0 }}>
+            <div className="cover">
               <BoutiqueCover color={b.cover_color} />
             </div>
             <div style={{ padding: 22, flex: 1 }}>

@@ -1,8 +1,18 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
+import MobileMenu from "./MobileMenu";
 
 export default async function Header() {
   const user = await getCurrentUser().catch(() => null);
+
+  const fullName = user?.profile.full_name || user?.email.split("@")[0] || "";
+  const initials = fullName
+    .trim()
+    .split(/\s+/)
+    .map((s) => s[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <header
@@ -20,20 +30,27 @@ export default async function Header() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 24,
-          padding: "14px 24px",
+          gap: 16,
+          padding: "12px 0",
         }}
       >
-        <Link href="/" style={{ fontWeight: 700, fontSize: 20, letterSpacing: "-0.01em" }}>
+        <Link
+          href="/"
+          style={{ fontWeight: 700, fontSize: 20, letterSpacing: "-0.01em" }}
+        >
           DopRent
         </Link>
+
         <nav
+          className="nav-links"
           style={{
             display: "flex",
             alignItems: "center",
             gap: 24,
             fontSize: 14,
             color: "var(--ink-2)",
+            marginLeft: "auto",
+            marginRight: 24,
           }}
         >
           <Link href="/browse" style={{ padding: "6px 0" }}>
@@ -43,16 +60,25 @@ export default async function Header() {
             ร้านเช่า
           </Link>
         </nav>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+
+        <div
+          className="nav-cta-desktop"
+          style={{ display: "flex", gap: 8, alignItems: "center" }}
+        >
           {user ? (
             <UserMenu
-              fullName={user.profile.full_name || user.email.split("@")[0]}
+              fullName={fullName}
               email={user.email}
               isAdmin={user.profile.role === "admin"}
+              initials={initials}
             />
           ) : (
             <>
-              <Link href="/login" className="btn btn-outline" style={{ padding: "9px 14px" }}>
+              <Link
+                href="/login"
+                className="btn btn-outline"
+                style={{ padding: "9px 14px" }}
+              >
                 เข้าสู่ระบบ
               </Link>
               <Link href="/signup" className="btn btn-dark">
@@ -61,6 +87,20 @@ export default async function Header() {
             </>
           )}
         </div>
+
+        {/* Mobile hamburger — visibility controlled by CSS */}
+        <MobileMenu
+          user={
+            user
+              ? {
+                  fullName,
+                  email: user.email,
+                  isAdmin: user.profile.role === "admin",
+                  initials,
+                }
+              : null
+          }
+        />
       </div>
     </header>
   );
@@ -70,19 +110,13 @@ function UserMenu({
   fullName,
   email,
   isAdmin,
+  initials,
 }: {
   fullName: string;
   email: string;
   isAdmin: boolean;
+  initials: string;
 }) {
-  const initials = fullName
-    .trim()
-    .split(/\s+/)
-    .map((s) => s[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
   return (
     <details
       style={{ position: "relative" }}

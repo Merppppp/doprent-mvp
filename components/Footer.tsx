@@ -11,13 +11,8 @@ export default function Footer() {
       }}
     >
       <div
-        className="shell"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "2fr 1fr 1fr 1fr",
-          gap: 36,
-          marginBottom: 28,
-        }}
+        className="shell footer-grid"
+        style={{ marginBottom: 28 }}
       >
         <div>
           <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 10 }}>DopRent</div>
@@ -59,7 +54,7 @@ export default function Footer() {
         </div>
       </div>
       <div
-        className="shell"
+        className="shell footer-bottom"
         style={{
           borderTop: "1px solid var(--line)",
           paddingTop: 16,

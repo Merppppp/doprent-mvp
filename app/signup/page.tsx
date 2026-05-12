@@ -49,7 +49,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="shell" style={{ maxWidth: 460, margin: "0 auto", padding: "60px 24px 80px" }}>
+    <div style={{ maxWidth: 460, margin: "0 auto", padding: "48px 20px 80px", width: "100%" }}>
       <h1 style={{ fontSize: 28, fontWeight: 600, marginBottom: 6 }}>สมัครสมาชิก</h1>
       <p style={{ color: "var(--ink-2)", fontSize: 14, marginBottom: 28 }}>
         บันทึกชุดที่ชอบ ติดตามการจอง

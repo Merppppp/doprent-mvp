@@ -51,7 +51,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
       >
         <div>
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8 }}>{b.area_label}</div>
-          <h1 style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 8 }}>
+          <h1 className="page-title" style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 8 }}>
             {b.name}
           </h1>
           <div style={{ fontSize: 14, color: "var(--ink-2)", maxWidth: 600, lineHeight: 1.55 }}>
@@ -71,6 +71,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
 
       {/* Info grid */}
       <div
+        className="boutique-info-grid"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(4, 1fr)",
@@ -106,14 +107,16 @@ export default async function BoutiquePage({ params }: { params: Params }) {
 
       {/* Listings */}
       <div
+        className="section-head"
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "end",
           padding: "20px 0 14px",
+          gap: 8,
         }}
       >
-        <h2 style={{ fontSize: 24, fontWeight: 600 }}>ชุดทั้งหมดจาก {b.name}</h2>
+        <h2 style={{ fontSize: 22, fontWeight: 600 }}>ชุดทั้งหมดจาก {b.name}</h2>
         <span style={{ fontSize: 13, color: "var(--ink-3)" }}>{dresses.length} ชุด</span>
       </div>
 
@@ -131,7 +134,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
           ยังไม่มีชุดในร้านนี้ — ทักร้านสอบถามได้
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+        <div className="grid-3" style={{ gap: 20 }}>
           {dresses.map((d, i) => (
             <DressCard key={d.id} dress={d} variant={i} />
           ))}

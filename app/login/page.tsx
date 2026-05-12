@@ -32,8 +32,7 @@ export default function LoginPage() {
 
   return (
     <div
-      className="shell"
-      style={{ maxWidth: 460, margin: "0 auto", padding: "60px 24px 80px" }}
+      style={{ maxWidth: 460, margin: "0 auto", padding: "48px 20px 80px", width: "100%" }}
     >
       <h1 style={{ fontSize: 28, fontWeight: 600, marginBottom: 6 }}>เข้าสู่ระบบ</h1>
       <p style={{ color: "var(--ink-2)", fontSize: 14, marginBottom: 28 }}>ยินดีต้อนรับกลับ</p>

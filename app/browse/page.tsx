@@ -70,9 +70,9 @@ export default async function BrowsePage({
   }
 
   return (
-    <div className="shell" style={{ paddingTop: 36, paddingBottom: 80 }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.01em" }}>
+    <div className="shell" style={{ paddingTop: 28, paddingBottom: 80 }}>
+      <div style={{ marginBottom: 20 }}>
+        <h1 className="page-title" style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.01em" }}>
           {activeOcc
             ? occasions.find((o) => o.key === activeOcc)?.th || "ทั้งหมด"
             : "ทั้งหมด"}
@@ -82,13 +82,7 @@ export default async function BrowsePage({
         </div>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "240px 1fr",
-          gap: 32,
-        }}
-      >
+      <div className="browse-grid">
         {/* SIDEBAR */}
         <aside style={{ fontSize: 14 }}>
           {/* Search */}
@@ -242,7 +236,7 @@ export default async function BrowsePage({
               </Link>
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "24px 20px" }}>
+            <div className="grid-3" style={{ gap: "24px 20px" }}>
               {dresses.map((d, i) => (
                 <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
               ))}

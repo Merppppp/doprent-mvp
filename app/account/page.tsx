@@ -36,14 +36,8 @@ export default async function AccountPage() {
     .toUpperCase();
 
   return (
-    <div className="shell" style={{ padding: "36px 24px 80px" }}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "220px 1fr",
-          gap: 32,
-        }}
-      >
+    <div className="shell" style={{ padding: "28px 0 80px" }}>
+      <div className="account-grid">
         <aside>
           <div
             style={{
@@ -153,7 +147,7 @@ export default async function AccountPage() {
               </Link>
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+            <div className="grid-3" style={{ gap: 20 }}>
               {saved.map((d, i) => (
                 <DressCard
                   key={d.id}

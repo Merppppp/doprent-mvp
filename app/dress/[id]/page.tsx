@@ -92,12 +92,8 @@ export default async function DressPage({ params }: { params: Params }) {
       </div>
 
       <div
-        style={{
-          padding: "8px 0 60px",
-          display: "grid",
-          gridTemplateColumns: "1.1fr 1fr",
-          gap: 48,
-        }}
+        className="detail-grid"
+        style={{ padding: "8px 0 60px" }}
       >
         {/* GALLERY */}
         <div>
@@ -277,7 +273,7 @@ export default async function DressPage({ params }: { params: Params }) {
           </div>
 
           {/* CTA */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          <div className="detail-cta" style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "stretch" }}>
             <div style={{ flex: 1 }}>
               <LineButton
                 href={boutiqueLine}
@@ -328,11 +324,13 @@ export default async function DressPage({ params }: { params: Params }) {
       {/* RELATED */}
       <div style={{ paddingTop: 48, paddingBottom: 60, borderTop: "1px solid var(--line)" }}>
         <div
+          className="section-head"
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "end",
             marginBottom: 28,
+            gap: 12,
           }}
         >
           <h2 style={{ fontSize: 24, fontWeight: 600 }}>ชุดที่คล้ายกัน</h2>
@@ -340,7 +338,7 @@ export default async function DressPage({ params }: { params: Params }) {
             ดูทั้งหมด →
           </Link>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
+        <div className="grid-4" style={{ gap: 20 }}>
           {related.filter((d) => d.id !== dress.id).slice(0, 4).map((d, i) => (
             <DressCard key={d.id} dress={d} variant={i} />
           ))}
