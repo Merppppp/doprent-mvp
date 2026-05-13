@@ -307,10 +307,13 @@ export async function createDress(formData: FormData): Promise<{ ok: boolean; er
   if (!boutiqueId) return { ok: false, error: "ไม่พบร้าน" };
   const { data: b } = await sb
     .from("boutiques")
-    .select("id, owner_id, name, line_url")
+    .select("id, owner_id, name, line_url, kyc_status")
     .eq("id", boutiqueId)
     .maybeSingle();
   if (!b || b.owner_id !== user.id) return { ok: false, error: "ไม่มีสิทธิ์เพิ่มชุดในร้านนี้" };
+  if (b.kyc_status === "none" || b.kyc_status === "rejected") {
+    return { ok: false, error: "ต้องส่งเอกสาร KYC ก่อนถึงจะเพิ่มชุดได้" };
+  }
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { ok: false, error: "กรุณาใส่ชื่อชุด" };

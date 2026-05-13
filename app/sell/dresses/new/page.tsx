@@ -20,11 +20,15 @@ export default async function NewDressPage() {
   const sb = createClient();
   const { data: boutique } = await sb
     .from("boutiques")
-    .select("id, name, line_url")
+    .select("id, slug, name, line_url, kyc_status")
     .eq("owner_id", user.profile.id)
     .limit(1)
     .maybeSingle();
   if (!boutique) redirect("/sell/signup");
+  // Gate: KYC must be submitted (or verified) before listing dresses
+  if (boutique.kyc_status === "none" || boutique.kyc_status === "rejected") {
+    redirect(`/sell/kyc?slug=${boutique.slug}`);
+  }
 
   const occasions = await listOccasions();
 

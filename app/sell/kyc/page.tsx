@@ -35,8 +35,14 @@ export default async function KycPage({
       >
         ยืนยันตัวตน — {boutique.name}
       </h1>
-      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 28 }}>
+      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 14 }}>
         ขั้นที่ 2/3 — ส่งเอกสารยืนยันตัวตน ทีม DopRent ตรวจภายใน 24-72 ชม.
+      </p>
+      <p style={{ fontSize: 13, marginBottom: 28 }}>
+        ใส่ข้อมูลร้านผิด?{" "}
+        <a href="/sell/edit" style={{ color: "var(--info)", fontWeight: 500 }}>
+          แก้ข้อมูลร้านก่อน →
+        </a>
       </p>
 
       {boutique.kyc_status === "submitted" || boutique.kyc_status === "verified" ? (

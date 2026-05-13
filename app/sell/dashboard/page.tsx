@@ -50,6 +50,10 @@ export default async function SellerDashboard({
     .limit(1)
     .maybeSingle();
   if (!boutique) redirect("/sell/signup");
+  // Signup flow not complete — KYC never submitted (or was rejected) → force user back
+  if (boutique.kyc_status === "none" || boutique.kyc_status === "rejected") {
+    redirect(`/sell/kyc?slug=${boutique.slug}`);
+  }
 
   // Get dresses + click counts in parallel
   const [dressesRes, clicksRes] = await Promise.all([
@@ -84,6 +88,9 @@ export default async function SellerDashboard({
 
   const kyc = KYC_LABEL[boutique.kyc_status as keyof typeof KYC_LABEL] ?? KYC_LABEL.none;
   const justSubmitted = searchParams?.kyc === "submitted";
+  // Can add dresses only after KYC has been submitted (submitted or verified).
+  const canAddDress =
+    boutique.kyc_status === "submitted" || boutique.kyc_status === "verified";
 
   return (
     <div className="shell" style={{ paddingTop: 32, paddingBottom: 80 }}>
@@ -196,11 +203,49 @@ export default async function SellerDashboard({
           <Link href="/sell/edit" className="btn btn-outline" style={{ padding: "8px 14px", fontSize: 13 }}>
             แก้ไขข้อมูลร้าน
           </Link>
-          <Link href="/sell/dresses/new" className="btn btn-dark" style={{ padding: "8px 14px", fontSize: 13 }}>
-            + เพิ่มชุดใหม่
-          </Link>
+          {canAddDress ? (
+            <Link
+              href="/sell/dresses/new"
+              className="btn btn-dark"
+              style={{ padding: "8px 14px", fontSize: 13 }}
+            >
+              + เพิ่มชุดใหม่
+            </Link>
+          ) : (
+            <span
+              title="ต้องส่งเอกสาร KYC ก่อนจึงจะเพิ่มชุดได้"
+              style={{
+                padding: "8px 14px",
+                fontSize: 13,
+                background: "var(--bg)",
+                border: "1px dashed var(--line)",
+                color: "var(--ink-3)",
+                borderRadius: 6,
+                cursor: "not-allowed",
+              }}
+            >
+              + เพิ่มชุด (ล็อก — ส่ง KYC ก่อน)
+            </span>
+          )}
         </div>
       </div>
+
+      {!canAddDress ? (
+        <div
+          style={{
+            padding: 14,
+            background: "rgba(217,119,6,0.08)",
+            border: "1px solid rgba(217,119,6,0.3)",
+            borderRadius: 8,
+            marginBottom: 16,
+            fontSize: 13.5,
+            color: "var(--ink-2)",
+            lineHeight: 1.5,
+          }}
+        >
+          ⚠️ ต้อง <Link href={`/sell/kyc?slug=${boutique.slug}`} style={{ color: "#D97706", fontWeight: 600 }}>ส่งเอกสาร KYC →</Link> ก่อนถึงจะเพิ่มชุดได้
+        </div>
+      ) : null}
 
       {/* Dress list */}
       {dresses.length === 0 ? (

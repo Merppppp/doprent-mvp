@@ -21,11 +21,14 @@ export default async function EditDressPage({ params }: { params: { id: string }
   const sb = createClient();
   const { data: boutique } = await sb
     .from("boutiques")
-    .select("id, line_url")
+    .select("id, slug, line_url, kyc_status")
     .eq("owner_id", user.profile.id)
     .limit(1)
     .maybeSingle();
   if (!boutique) redirect("/sell/signup");
+  if (boutique.kyc_status === "none" || boutique.kyc_status === "rejected") {
+    redirect(`/sell/kyc?slug=${boutique.slug}`);
+  }
 
   const { data: dress } = await sb
     .from("dresses")
