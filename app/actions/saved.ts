@@ -38,5 +38,7 @@ export async function toggleSavedDress(dressId: string): Promise<{
 
   // Refresh server components that show saved state
   revalidatePath("/account");
+  // Refresh the root layout so the Header's saved-count badge updates everywhere
+  revalidatePath("/", "layout");
   return { ok: true, saved: !exists };
 }

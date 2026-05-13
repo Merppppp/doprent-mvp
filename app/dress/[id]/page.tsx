@@ -5,6 +5,7 @@ import { DressArt } from "@/components/DressArt";
 import LineButton from "@/components/LineButton";
 import DressCard from "@/components/DressCard";
 import SaveButton from "@/components/SaveButton";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getBoutiqueBySlug,
@@ -234,7 +235,10 @@ export default async function DressPage({ params }: { params: Params }) {
                 <DressArt color={boutique?.cover_color ?? dress.color} variant={0} />
               </div>
               <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{dress.boutique_name}</div>
+                <div style={{ fontWeight: 600, fontSize: 14, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  {dress.boutique_name}
+                  {boutique?.verified ? <VerifiedBadge size="sm" /> : null}
+                </div>
                 <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 1 }}>
                   {boutique?.area_label ?? ""}
                   {boutique?.since_year ? ` · ตั้งแต่ ${boutique.since_year}` : ""}

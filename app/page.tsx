@@ -1,6 +1,7 @@
 import Link from "next/link";
 import DressCard from "@/components/DressCard";
 import { DressArt, BoutiqueCover, OccasionTile } from "@/components/DressArt";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import { getStats, listBoutiques, listDresses, listOccasions } from "@/lib/dresses";
 
 export const revalidate = 60;
@@ -223,9 +224,14 @@ export default async function HomePage() {
                       fontWeight: 600,
                       marginBottom: 8,
                       letterSpacing: "-0.01em",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      flexWrap: "wrap",
                     }}
                   >
                     {b.name}
+                    {b.verified ? <VerifiedBadge size="sm" /> : null}
                   </h3>
                   <div
                     style={{

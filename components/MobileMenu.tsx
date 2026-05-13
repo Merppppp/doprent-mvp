@@ -10,6 +10,7 @@ type Props = {
     email: string;
     isAdmin: boolean;
     initials: string;
+    savedCount: number;
   } | null;
 };
 
@@ -196,6 +197,47 @@ export default function MobileMenu({ user }: Props) {
               </Link>
               {user ? (
                 <>
+                  <Link
+                    href="/account"
+                    style={{ ...drawerItem, display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <span style={{ display: "inline-flex", alignItems: "center" }}>
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill={user.savedCount > 0 ? "#E11D48" : "none"}
+                        stroke={user.savedCount > 0 ? "#E11D48" : "var(--ink)"}
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                      >
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                      </svg>
+                    </span>
+                    ชุดที่ถูกใจ
+                    {user.savedCount > 0 ? (
+                      <span
+                        style={{
+                          marginLeft: "auto",
+                          minWidth: 22,
+                          padding: "0 7px",
+                          height: 20,
+                          borderRadius: 999,
+                          background: "var(--ink)",
+                          color: "#fff",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {user.savedCount > 99 ? "99+" : user.savedCount}
+                      </span>
+                    ) : null}
+                  </Link>
                   <Link href="/account" style={drawerItem}>
                     บัญชีของฉัน
                   </Link>

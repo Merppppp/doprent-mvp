@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DressArt } from "./DressArt";
 import SaveButton from "./SaveButton";
+import VerifiedBadge from "./VerifiedBadge";
 import type { Dress } from "@/lib/types";
 
 type Props = {
@@ -83,6 +84,11 @@ export default function DressCard({ dress, variant = 0, savedSet, isLoggedIn }: 
             <span>
               Size {dress.size} ·{" "}
               <span style={{ color: "var(--ink-2)" }}>{dress.boutique_name}</span>
+              {dress.boutique_verified ? (
+                <span style={{ marginLeft: 4, display: "inline-flex", verticalAlign: "middle" }}>
+                  <VerifiedBadge size="sm" />
+                </span>
+              ) : null}
             </span>
             <span style={{ fontWeight: 600, color: "var(--ink)", whiteSpace: "nowrap", fontSize: 14 }}>
               ฿{dress.price_per_day.toLocaleString()}{" "}

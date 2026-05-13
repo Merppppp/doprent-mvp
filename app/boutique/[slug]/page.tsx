@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { BoutiqueCover } from "@/components/DressArt";
 import DressCard from "@/components/DressCard";
 import LineButton from "@/components/LineButton";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import { getBoutiqueBySlug, listDressesByBoutique } from "@/lib/dresses";
 
 export const revalidate = 60;
@@ -51,8 +52,9 @@ export default async function BoutiquePage({ params }: { params: Params }) {
       >
         <div>
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8 }}>{b.area_label}</div>
-          <h1 className="page-title" style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 8 }}>
+          <h1 className="page-title" style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 8, display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             {b.name}
+            {b.verified ? <VerifiedBadge size="md" withLabel /> : null}
           </h1>
           <div style={{ fontSize: 14, color: "var(--ink-2)", maxWidth: 600, lineHeight: 1.55 }}>
             {b.tag}

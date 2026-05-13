@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import DressCard from "@/components/DressCard";
 import { getCurrentUser } from "@/lib/auth";
-import { listDresses, listOccasions } from "@/lib/dresses";
+import { listDesigners, listDresses, listOccasions } from "@/lib/dresses";
 import {
   COLOR_LABELS_TH,
   COLOR_SWATCH,
@@ -26,6 +26,7 @@ type SearchParams = {
   color?: string;
   occasion?: string;
   size?: string;
+  designer?: string;
   q?: string;
   sort?: string;
 };
@@ -38,6 +39,7 @@ export default async function BrowsePage({
   const activeColor = (searchParams?.color ?? "all") as Color | "all";
   const activeOcc = searchParams?.occasion as OccasionKey | undefined;
   const activeSize = searchParams?.size;
+  const activeDesigner = searchParams?.designer?.trim() || undefined;
   const search = searchParams?.q?.trim() ?? "";
   const sort = (searchParams?.sort ?? "featured") as
     | "featured"
@@ -45,15 +47,17 @@ export default async function BrowsePage({
     | "price-desc"
     | "name";
 
-  const [dresses, occasions, user] = await Promise.all([
+  const [dresses, occasions, designers, user] = await Promise.all([
     listDresses({
       color: activeColor === "all" ? undefined : activeColor,
       occasions: activeOcc ? [activeOcc] : undefined,
       sizes: activeSize ? [activeSize] : undefined,
+      designers: activeDesigner ? [activeDesigner] : undefined,
       search: search || undefined,
       sort,
     }),
     listOccasions(),
+    listDesigners(),
     getCurrentUser().catch(() => null),
   ]);
   const savedSet = new Set(user?.profile.saved_dress_ids ?? []);
@@ -94,6 +98,7 @@ export default async function BrowsePage({
             ) : null}
             {activeOcc ? <input type="hidden" name="occasion" value={activeOcc} /> : null}
             {activeSize ? <input type="hidden" name="size" value={activeSize} /> : null}
+            {activeDesigner ? <input type="hidden" name="designer" value={activeDesigner} /> : null}
             <input
               type="search"
               name="q"
@@ -129,6 +134,17 @@ export default async function BrowsePage({
               </Link>
             ))}
           </FilterGroup>
+
+          {/* Designers */}
+          {designers.length > 0 ? (
+            <FilterGroup title="ดีไซเนอร์">
+              <DesignerFilter
+                designers={designers}
+                active={activeDesigner}
+                makeHref={makeHref}
+              />
+            </FilterGroup>
+          ) : null}
 
           {/* Color chips */}
           <FilterGroup title="สี">
@@ -178,7 +194,7 @@ export default async function BrowsePage({
             </div>
           </FilterGroup>
 
-          {(activeColor !== "all" || activeOcc || activeSize || search) && (
+          {(activeColor !== "all" || activeOcc || activeSize || activeDesigner || search) && (
             <div style={{ paddingTop: 12 }}>
               <Link
                 href="/browse"
@@ -245,6 +261,72 @@ export default async function BrowsePage({
         </main>
       </div>
     </div>
+  );
+}
+
+/**
+ * Designer filter. Shows first 6 inline; rest collapsed in <details>.
+ * "ทั้งหมด" chip clears the filter.
+ */
+function DesignerFilter({
+  designers,
+  active,
+  makeHref,
+}: {
+  designers: string[];
+  active: string | undefined;
+  makeHref: (overrides: Partial<SearchParams>) => string;
+}) {
+  const HEAD = 6;
+  const head = designers.slice(0, HEAD);
+  const rest = designers.slice(HEAD);
+
+  // Ensure active designer is always visible even if it'd be hidden behind expand
+  const activeInRest = active && rest.includes(active);
+
+  return (
+    <>
+      <Link
+        href={makeHref({ designer: undefined })}
+        style={chipBaseStyle(!active)}
+      >
+        ทั้งหมด
+      </Link>
+      {head.map((d) => (
+        <Link
+          key={d}
+          href={makeHref({ designer: active === d ? undefined : d })}
+          style={chipBaseStyle(active === d)}
+        >
+          {d}
+        </Link>
+      ))}
+      {rest.length > 0 ? (
+        <details open={!!activeInRest} style={{ marginTop: 2 }}>
+          <summary
+            style={{
+              listStyle: "none",
+              cursor: "pointer",
+              fontSize: 13,
+              color: "var(--ink-3)",
+              padding: "5px 0",
+              fontWeight: 500,
+            }}
+          >
+            ดูเพิ่ม ({rest.length})
+          </summary>
+          {rest.map((d) => (
+            <Link
+              key={d}
+              href={makeHref({ designer: active === d ? undefined : d })}
+              style={chipBaseStyle(active === d)}
+            >
+              {d}
+            </Link>
+          ))}
+        </details>
+      ) : null}
+    </>
   );
 }
 

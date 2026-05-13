@@ -38,6 +38,8 @@ export default function SaveButton({
         setSaved((s) => !s); // revert
       } else {
         setSaved(res.saved);
+        // Refresh server components so Header saved-count badge updates
+        router.refresh();
       }
     });
   }

@@ -61,6 +61,8 @@ export type Boutique = {
   tag: string | null;
   story: string | null;
   featured: boolean;
+  /** Admin-toggled trust mark (post-KYC). Defaults to false. */
+  verified: boolean;
   ads_tier: AdsTier;
   status: Status;
   reject_reason: string | null;
@@ -76,6 +78,8 @@ export type Dress = {
   designer: string | null;
   boutique_id: string;
   boutique_name: string;
+  /** Denormalized from boutiques.verified — populated by listDresses(). */
+  boutique_verified?: boolean;
   size: Size;
   color: Color;
   price_per_day: number;

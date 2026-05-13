@@ -13,6 +13,7 @@ export default async function Header() {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  const savedCount = user?.profile.saved_dress_ids?.length ?? 0;
 
   return (
     <header
@@ -66,12 +67,15 @@ export default async function Header() {
           style={{ display: "flex", gap: 8, alignItems: "center" }}
         >
           {user ? (
-            <UserMenu
-              fullName={fullName}
-              email={user.email}
-              isAdmin={user.profile.role === "admin"}
-              initials={initials}
-            />
+            <>
+              <SavedLink count={savedCount} />
+              <UserMenu
+                fullName={fullName}
+                email={user.email}
+                isAdmin={user.profile.role === "admin"}
+                initials={initials}
+              />
+            </>
           ) : (
             <>
               <Link
@@ -97,12 +101,73 @@ export default async function Header() {
                   email: user.email,
                   isAdmin: user.profile.role === "admin",
                   initials,
+                  savedCount,
                 }
               : null
           }
         />
       </div>
     </header>
+  );
+}
+
+function SavedLink({ count }: { count: number }) {
+  return (
+    <Link
+      href="/account"
+      aria-label={`ชุดที่ถูกใจ${count > 0 ? ` (${count})` : ""}`}
+      title="ชุดที่ถูกใจ"
+      style={{
+        position: "relative",
+        width: 38,
+        height: 38,
+        borderRadius: 999,
+        border: "1px solid var(--line)",
+        background: "var(--surface)",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "var(--ink)",
+      }}
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill={count > 0 ? "#E11D48" : "none"}
+        stroke={count > 0 ? "#E11D48" : "var(--ink)"}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+      </svg>
+      {count > 0 ? (
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: -4,
+            right: -4,
+            minWidth: 18,
+            height: 18,
+            padding: "0 5px",
+            borderRadius: 999,
+            background: "var(--ink)",
+            color: "#fff",
+            fontSize: 10,
+            fontWeight: 600,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            lineHeight: 1,
+          }}
+        >
+          {count > 99 ? "99+" : count}
+        </span>
+      ) : null}
+    </Link>
   );
 }
 

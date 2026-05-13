@@ -28,6 +28,21 @@ export type DressFilters = {
 const PUBLIC_DRESS_QUERY =
   "id,slug,name,designer,boutique_id,boutique_name,size,color,price_per_day,deposit,description,images,occasions,line_url,ads_tier,featured,sponsored,status,available,views,created_at,updated_at";
 
+/** Cache for verified boutique-ID lookup within a single request. */
+async function fetchVerifiedBoutiqueIds(): Promise<Set<string>> {
+  const sb = getSupabase();
+  if (!sb) return new Set();
+  const { data, error } = await sb
+    .from("boutiques")
+    .select("id")
+    .eq("verified", true);
+  if (error) {
+    // Column may not exist yet (pre-migration). Fail soft.
+    return new Set();
+  }
+  return new Set(((data ?? []) as Array<{ id: string }>).map((r) => r.id));
+}
+
 /** Fetch up to `limit` live, available dresses, ordered by ads tier then recency. */
 export async function listDresses(opts: DressFilters & { limit?: number } = {}): Promise<Dress[]> {
   const sb = getSupabase();
@@ -52,12 +67,18 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
   if (opts.occasions && opts.occasions.length) q = q.overlaps("occasions", opts.occasions);
   if (opts.limit) q = q.limit(opts.limit);
 
-  const { data, error } = await q;
+  const [{ data, error }, verifiedSet] = await Promise.all([
+    q,
+    fetchVerifiedBoutiqueIds(),
+  ]);
   if (error) {
     console.error("[doprent] supabase listDresses error", error);
     return [];
   }
-  let rows = (data ?? []) as Dress[];
+  let rows = ((data ?? []) as Dress[]).map((d) => ({
+    ...d,
+    boutique_verified: verifiedSet.has(d.boutique_id),
+  }));
 
   // Application-layer filters not supported cleanly by Supabase
   if (opts.search) {
@@ -87,6 +108,29 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
   }
 
   return rows;
+}
+
+/** Distinct designer names across live, available listings. Sorted A→Z. */
+export async function listDesigners(): Promise<string[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("dresses")
+    .select("designer")
+    .eq("status", "live")
+    .eq("available", true)
+    .not("designer", "is", null)
+    .neq("designer", "");
+  if (error) {
+    console.error("[doprent] supabase listDesigners error", error);
+    return [];
+  }
+  const set = new Set<string>();
+  ((data ?? []) as Array<{ designer: string | null }>).forEach((r) => {
+    const d = (r.designer ?? "").trim();
+    if (d) set.add(d);
+  });
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
 export async function getDressBySlug(slug: string): Promise<Dress | null> {
@@ -139,19 +183,25 @@ export async function getBoutiqueBySlug(slug: string): Promise<Boutique | null> 
 export async function listDressesByBoutique(boutiqueId: string): Promise<Dress[]> {
   const sb = getSupabase();
   if (!sb) return [];
-  const { data, error } = await sb
-    .from("dresses")
-    .select(PUBLIC_DRESS_QUERY)
-    .eq("boutique_id", boutiqueId)
-    .eq("status", "live")
-    .eq("available", true)
-    .order("featured", { ascending: false })
-    .order("created_at", { ascending: false });
+  const [{ data, error }, verifiedSet] = await Promise.all([
+    sb
+      .from("dresses")
+      .select(PUBLIC_DRESS_QUERY)
+      .eq("boutique_id", boutiqueId)
+      .eq("status", "live")
+      .eq("available", true)
+      .order("featured", { ascending: false })
+      .order("created_at", { ascending: false }),
+    fetchVerifiedBoutiqueIds(),
+  ]);
   if (error) {
     console.error("[doprent] supabase listDressesByBoutique error", error);
     return [];
   }
-  return (data ?? []) as Dress[];
+  return ((data ?? []) as Dress[]).map((d) => ({
+    ...d,
+    boutique_verified: verifiedSet.has(d.boutique_id),
+  }));
 }
 
 export async function listOccasions(): Promise<Occasion[]> {
