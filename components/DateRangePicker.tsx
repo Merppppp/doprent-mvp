@@ -340,13 +340,24 @@ const labelTextStyle: React.CSSProperties = {
   letterSpacing: "0.02em",
 };
 
+/**
+ * Explicit height + appearance reset so native iOS / Android date inputs render
+ * at the same compact size as text inputs across platforms. Font-size 16 prevents
+ * iOS auto-zoom on focus.
+ */
 const inputStyle: React.CSSProperties = {
-  padding: "9px 10px",
+  width: "100%",
+  height: 42,
+  padding: "0 12px",
   border: "1px solid var(--line)",
   borderRadius: 6,
-  fontSize: 14,
+  fontSize: 15,
   background: "var(--surface)",
   color: "var(--ink)",
   fontFamily: "inherit",
-  width: "100%",
+  lineHeight: 1.4,
+  boxSizing: "border-box",
+  WebkitAppearance: "none",
+  MozAppearance: "none",
+  appearance: "none",
 };

@@ -51,6 +51,29 @@ button {
   cursor: pointer;
 }
 
+/* iOS Safari + some Android browsers render native date inputs with extra
+   vertical padding making them taller than text inputs. Normalize via fixed
+   height + appearance reset so all inputs sit at the same baseline. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  min-height: 42px;
+}
+
+/* Prevent iOS Safari from zooming the viewport when the user focuses an input
+   whose computed font-size is below 16px. Apply on small viewports only so
+   desktop keeps its slightly tighter typography. */
+@media (max-width: 600px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 a {
   color: inherit;
   text-decoration: none;
