@@ -37,6 +37,7 @@ export async function createBoutique(formData: FormData): Promise<{
   const instagram = String(formData.get("instagram") ?? "").trim() || null;
   const tag = String(formData.get("tag") ?? "").trim() || null;
   const story = String(formData.get("story") ?? "").trim() || null;
+  const address = String(formData.get("address") ?? "").trim() || null;
   const sinceYearRaw = String(formData.get("since_year") ?? "").trim();
   const sinceYear = sinceYearRaw ? parseInt(sinceYearRaw, 10) : null;
   const coverColor = (String(formData.get("cover_color") ?? "rose") as Color) || "rose";
@@ -75,6 +76,7 @@ export async function createBoutique(formData: FormData): Promise<{
       owner_name: ownerName,
       area_key: areaKey,
       area_label: areaLabel,
+      address,
       line_url: lineUrl,
       instagram,
       tag,
