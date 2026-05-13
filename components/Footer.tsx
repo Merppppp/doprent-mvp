@@ -29,9 +29,10 @@ export default function Footer() {
           <FooterLink href="/browse?occasion=work">ชุดทำงาน</FooterLink>
         </div>
         <div>
-          <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>ค้นหา</h5>
+          <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>สำหรับร้านค้า</h5>
+          <FooterLink href="/sell">เปิดร้านบน DopRent</FooterLink>
+          <FooterLink href="/sell/dashboard">Dashboard ร้านของฉัน</FooterLink>
           <FooterLink href="/boutiques">ร้านเช่าทั้งหมด</FooterLink>
-          <FooterLink href="/browse">ดูชุดทั้งหมด</FooterLink>
         </div>
         <div>
           <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>ติดต่อ</h5>

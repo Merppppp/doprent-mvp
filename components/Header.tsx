@@ -73,6 +73,7 @@ export default async function Header() {
                 fullName={fullName}
                 email={user.email}
                 isAdmin={user.profile.role === "admin"}
+                isSeller={user.profile.role === "seller" || user.profile.role === "admin"}
                 initials={initials}
               />
             </>
@@ -100,6 +101,7 @@ export default async function Header() {
                   fullName,
                   email: user.email,
                   isAdmin: user.profile.role === "admin",
+                  isSeller: user.profile.role === "seller" || user.profile.role === "admin",
                   initials,
                   savedCount,
                 }
@@ -175,11 +177,13 @@ function UserMenu({
   fullName,
   email,
   isAdmin,
+  isSeller,
   initials,
 }: {
   fullName: string;
   email: string;
   isAdmin: boolean;
+  isSeller: boolean;
   initials: string;
 }) {
   return (
@@ -280,6 +284,16 @@ function UserMenu({
             Admin Dashboard
           </Link>
         ) : null}
+
+        {isSeller ? (
+          <Link href="/sell/dashboard" style={menuItemStyle}>
+            Dashboard ร้านของฉัน
+          </Link>
+        ) : (
+          <Link href="/sell" style={menuItemStyle}>
+            เปิดร้านบน DopRent
+          </Link>
+        )}
 
         <Link href="/account" style={menuItemStyle}>
           บัญชีของฉัน

@@ -1,0 +1,404 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/browser";
+import { createDress, updateDress } from "@/app/actions/seller";
+import type { Color, Occasion, OccasionKey, Size } from "@/lib/types";
+
+const COLORS: Color[] = ["rose", "ivory", "green", "black", "navy", "red", "blue", "purple"];
+const COLOR_TH: Record<Color, string> = {
+  rose: "กุหลาบ",
+  ivory: "งาช้าง",
+  green: "เขียว",
+  black: "ดำ",
+  navy: "กรมท่า",
+  red: "แดง",
+  blue: "ฟ้า",
+  purple: "ม่วง",
+};
+const SIZES: Size[] = ["XS", "S", "M", "L", "XL"];
+
+type Props =
+  | {
+      mode: "create";
+      boutiqueId: string;
+      defaultLineUrl: string;
+      occasions: Occasion[];
+    }
+  | {
+      mode: "edit";
+      dressId: string;
+      boutiqueId: string;
+      defaultLineUrl: string;
+      occasions: Occasion[];
+      initial: {
+        name: string;
+        designer: string | null;
+        size: Size;
+        color: Color;
+        price_per_day: number;
+        deposit: number;
+        description: string | null;
+        line_url: string;
+        images: string[];
+        occasions: OccasionKey[];
+        available: boolean;
+      };
+    };
+
+export default function DressForm(props: Props) {
+  const router = useRouter();
+  const isEdit = props.mode === "edit";
+  const initial = isEdit ? props.initial : null;
+
+  const [name, setName] = useState(initial?.name ?? "");
+  const [designer, setDesigner] = useState(initial?.designer ?? "");
+  const [size, setSize] = useState<Size>(initial?.size ?? "M");
+  const [color, setColor] = useState<Color>(initial?.color ?? "rose");
+  const [pricePerDay, setPricePerDay] = useState(initial?.price_per_day ?? 1500);
+  const [deposit, setDeposit] = useState(initial?.deposit ?? 3000);
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [lineUrl, setLineUrl] = useState(initial?.line_url ?? props.defaultLineUrl);
+  const [occasions, setOccasions] = useState<OccasionKey[]>(initial?.occasions ?? []);
+  const [images, setImages] = useState<string[]>(initial?.images ?? []);
+  const [available, setAvailable] = useState(initial?.available ?? true);
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  function toggleOccasion(k: OccasionKey) {
+    setOccasions((curr) =>
+      curr.includes(k) ? curr.filter((x) => x !== k) : [...curr, k],
+    );
+  }
+
+  async function uploadImages(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setError(null);
+    const sb = createClient();
+    const uploads: string[] = [];
+    setUploadingCount(files.length);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const ext = (f.name.split(".").pop() ?? "jpg").toLowerCase();
+        const path = `${props.boutiqueId}/${Date.now()}-${i}.${ext}`;
+        const { data, error: upErr } = await sb.storage
+          .from("dress-images")
+          .upload(path, f, { upsert: false, contentType: f.type || undefined });
+        if (upErr || !data) {
+          setError(`อัปโหลดรูปไม่สำเร็จ: ${upErr?.message ?? "unknown"}`);
+          break;
+        }
+        const { data: pub } = sb.storage.from("dress-images").getPublicUrl(data.path);
+        uploads.push(pub.publicUrl);
+      }
+      setImages((curr) => [...curr, ...uploads]);
+    } finally {
+      setUploadingCount(0);
+    }
+  }
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+
+    const fd = new FormData();
+    fd.set("boutique_id", props.boutiqueId);
+    fd.set("name", name);
+    fd.set("designer", designer);
+    fd.set("size", size);
+    fd.set("color", color);
+    fd.set("price_per_day", String(pricePerDay));
+    fd.set("deposit", String(deposit));
+    fd.set("description", description);
+    fd.set("line_url", lineUrl);
+    fd.set("images", images.join("\n"));
+    occasions.forEach((o) => fd.append("occasions", o));
+    fd.set("available", available ? "true" : "false");
+
+    try {
+      const res = isEdit
+        ? await updateDress(props.dressId, fd)
+        : await createDress(fd);
+      if (!res.ok) {
+        setError(res.error ?? "บันทึกไม่สำเร็จ");
+        setSubmitting(false);
+        return;
+      }
+      router.push("/sell/dashboard");
+    } catch (err) {
+      setError((err as Error).message);
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      {/* Images */}
+      <div>
+        <label style={labelStyle}>รูปชุด</label>
+        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8 }}>
+          อัปโหลดได้หลายรูป รูปแรกจะเป็นรูปหลัก
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+          {images.map((url, i) => (
+            <div
+              key={i}
+              style={{
+                position: "relative",
+                width: 80,
+                height: 100,
+                borderRadius: 6,
+                overflow: "hidden",
+                background: "var(--bg)",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <button
+                type="button"
+                onClick={() => setImages((c) => c.filter((_, idx) => idx !== i))}
+                aria-label="ลบรูป"
+                style={{
+                  position: "absolute",
+                  top: 2,
+                  right: 2,
+                  width: 22,
+                  height: 22,
+                  borderRadius: 999,
+                  background: "rgba(0,0,0,0.7)",
+                  color: "#fff",
+                  border: "none",
+                  fontSize: 11,
+                  cursor: "pointer",
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <label
+            style={{
+              width: 80,
+              height: 100,
+              borderRadius: 6,
+              border: "1px dashed var(--line)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              fontSize: 11,
+              color: "var(--ink-3)",
+              background: "var(--surface)",
+              textAlign: "center",
+              padding: 8,
+            }}
+          >
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => uploadImages(e.target.files)}
+              style={{ display: "none" }}
+            />
+            {uploadingCount > 0 ? `กำลังขึ้น... (${uploadingCount})` : "+ เพิ่มรูป"}
+          </label>
+        </div>
+      </div>
+
+      <Labeled label="ชื่อชุด *">
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          maxLength={80}
+          style={inputStyle}
+        />
+      </Labeled>
+
+      <Labeled label="แบรนด์/ดีไซเนอร์ (ไม่บังคับ)">
+        <input
+          type="text"
+          value={designer}
+          onChange={(e) => setDesigner(e.target.value)}
+          maxLength={60}
+          style={inputStyle}
+        />
+      </Labeled>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <Labeled label="ขนาด *">
+          <select value={size} onChange={(e) => setSize(e.target.value as Size)} style={inputStyle}>
+            {SIZES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </Labeled>
+        <Labeled label="สี *">
+          <select value={color} onChange={(e) => setColor(e.target.value as Color)} style={inputStyle}>
+            {COLORS.map((c) => (
+              <option key={c} value={c}>
+                {COLOR_TH[c]}
+              </option>
+            ))}
+          </select>
+        </Labeled>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <Labeled label="ค่าเช่า / วัน (฿) *">
+          <input
+            type="number"
+            min={100}
+            step={100}
+            value={pricePerDay}
+            onChange={(e) => setPricePerDay(parseInt(e.target.value) || 0)}
+            style={inputStyle}
+          />
+        </Labeled>
+        <Labeled label="ค่ามัดจำ (฿)">
+          <input
+            type="number"
+            min={0}
+            step={500}
+            value={deposit}
+            onChange={(e) => setDeposit(parseInt(e.target.value) || 0)}
+            style={inputStyle}
+          />
+        </Labeled>
+      </div>
+
+      <Labeled label="โอกาส (เลือกได้หลายอัน)">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+          {props.occasions.map((o) => {
+            const active = occasions.includes(o.key);
+            return (
+              <button
+                key={o.key}
+                type="button"
+                onClick={() => toggleOccasion(o.key)}
+                style={{
+                  padding: "6px 12px",
+                  fontSize: 13,
+                  border: `1px solid ${active ? "var(--ink)" : "var(--line)"}`,
+                  background: active ? "var(--ink)" : "var(--surface)",
+                  color: active ? "#fff" : "var(--ink)",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                }}
+              >
+                {o.th}
+              </button>
+            );
+          })}
+        </div>
+      </Labeled>
+
+      <Labeled label="รายละเอียดชุด">
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={4}
+          maxLength={500}
+          placeholder="เช่น ผ้าซาตินสีกุหลาบ ปักลูกไม้ตรงคอ จับจีบที่เอว ใส่กับเข็มขัดได้"
+          style={{ ...inputStyle, resize: "vertical" }}
+        />
+      </Labeled>
+
+      <Labeled label="LINE สำหรับชุดนี้" hint="ปล่อยว่างถ้าใช้ LINE หลักของร้าน">
+        <input
+          type="text"
+          value={lineUrl}
+          onChange={(e) => setLineUrl(e.target.value)}
+          style={inputStyle}
+        />
+      </Labeled>
+
+      {isEdit ? (
+        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={available}
+            onChange={(e) => setAvailable(e.target.checked)}
+          />
+          <span style={{ fontSize: 14 }}>เปิดให้เช่า (ติ๊กออกเพื่อหยุดให้บริการชุดนี้ชั่วคราว)</span>
+        </label>
+      ) : null}
+
+      {error ? (
+        <div
+          style={{
+            padding: 12,
+            background: "rgba(220,38,38,0.08)",
+            border: "1px solid rgba(220,38,38,0.3)",
+            borderRadius: 6,
+            color: "var(--danger)",
+            fontSize: 14,
+          }}
+        >
+          {error}
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", gap: 8, paddingTop: 6 }}>
+        <button
+          type="submit"
+          className="btn btn-dark"
+          disabled={submitting || uploadingCount > 0}
+          style={{ padding: "12px 22px" }}
+        >
+          {submitting ? "กำลังบันทึก…" : isEdit ? "บันทึกการแก้ไข" : "ส่งให้ admin อนุมัติ"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-outline"
+          onClick={() => router.push("/sell/dashboard")}
+          style={{ padding: "12px 22px" }}
+        >
+          ยกเลิก
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function Labeled({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label style={labelStyle}>{label}</label>
+      {hint ? <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6 }}>{hint}</div> : null}
+      {children}
+    </div>
+  );
+}
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: 14,
+  fontWeight: 500,
+  marginBottom: 6,
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "10px 12px",
+  border: "1px solid var(--line)",
+  borderRadius: 6,
+  background: "var(--surface)",
+  fontSize: 14,
+  fontFamily: "inherit",
+};

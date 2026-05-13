@@ -9,6 +9,7 @@ type Props = {
     fullName: string;
     email: string;
     isAdmin: boolean;
+    isSeller: boolean;
     initials: string;
     savedCount: number;
   } | null;
@@ -241,6 +242,15 @@ export default function MobileMenu({ user }: Props) {
                   <Link href="/account" style={drawerItem}>
                     บัญชีของฉัน
                   </Link>
+                  {user.isSeller ? (
+                    <Link href="/sell/dashboard" style={drawerItem}>
+                      Dashboard ร้านของฉัน
+                    </Link>
+                  ) : (
+                    <Link href="/sell" style={drawerItem}>
+                      เปิดร้านบน DopRent
+                    </Link>
+                  )}
                   {user.isAdmin ? (
                     <Link href="/admin" style={{ ...drawerItem, color: "var(--info)" }}>
                       Admin Dashboard
