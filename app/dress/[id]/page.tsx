@@ -11,6 +11,7 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   getBoutiqueBySlug,
   getDressBySlug,
+  listBlackouts,
   listDresses,
   listOccasions,
 } from "@/lib/dresses";
@@ -44,11 +45,12 @@ export default async function DressPage({ params }: { params: Params }) {
   const dress = await getDressBySlug(params.id);
   if (!dress) notFound();
 
-  const [occasions, boutique, related, user] = await Promise.all([
+  const [occasions, boutique, related, user, blackouts] = await Promise.all([
     listOccasions(),
     getBoutiqueBySlug(slugify(dress.boutique_name)).catch(() => null),
     listDresses({ limit: 4 }),
     getCurrentUser().catch(() => null),
+    listBlackouts(dress.id),
   ]);
   const savedSet = new Set(user?.profile.saved_dress_ids ?? []);
   const isLoggedIn = !!user;
@@ -282,6 +284,11 @@ export default async function DressPage({ params }: { params: Params }) {
             lineUrl={boutiqueLine}
             dressName={dress.name}
             boutiqueName={dress.boutique_name}
+            dressPageUrl={url}
+            dressImageUrl={dress.images?.[0]}
+            pricePerDay={dress.price_per_day}
+            deposit={dress.deposit}
+            blackouts={blackouts}
             dressId={dress.id}
             boutiqueId={dress.boutique_id}
           />

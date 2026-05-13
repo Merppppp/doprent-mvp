@@ -9,6 +9,16 @@ type Props = {
   dressName: string;
   /** Boutique name for the LINE message. */
   boutiqueName: string;
+  /** Public URL of the dress detail page (so seller can preview it). */
+  dressPageUrl?: string;
+  /** First image URL of the dress (sent as a link in LINE message). */
+  dressImageUrl?: string;
+  /** Per-day rental price (THB). */
+  pricePerDay?: number;
+  /** Deposit (THB). */
+  deposit?: number;
+  /** Unavailable dates as YYYY-MM-DD strings. Renter can't pick a range overlapping these. */
+  blackouts?: string[];
   /** Optional dress ID to be tracked in /api/track when user clicks LINE. */
   dressId?: string;
   boutiqueId?: string;
@@ -31,6 +41,24 @@ function nightsBetween(start: string, end: string): number {
   return Math.round((e - s) / 86_400_000) + 1;
 }
 
+/** Inclusive list of YYYY-MM-DD between start and end (assumes start ≤ end). */
+function rangeDates(start: string, end: string): string[] {
+  if (!start || !end) return [];
+  const result: string[] = [];
+  const s = new Date(start);
+  const e = new Date(end);
+  if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) return [];
+  const cur = new Date(s);
+  while (cur <= e) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, "0");
+    const d = String(cur.getDate()).padStart(2, "0");
+    result.push(`${y}-${m}-${d}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return result;
+}
+
 const TODAY = (() => {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -38,33 +66,80 @@ const TODAY = (() => {
 })();
 
 /**
- * Renter-side date range picker. Adds optional ?date= param to the LINE deep-link
- * and renders an auto-generated Thai pre-filled message preview.
+ * Renter-side date range picker. Blocks dates the seller has marked as unavailable
+ * and pre-fills a LINE message with image, link, dates and price.
  */
 export default function DateRangePicker({
   lineUrl,
   dressName,
   boutiqueName,
+  dressPageUrl,
+  dressImageUrl,
+  pricePerDay,
+  deposit,
+  blackouts = [],
   dressId,
   boutiqueId,
 }: Props) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
 
-  // Auto-bump end to >= start when user picks a start
+  const blackoutSet = useMemo(() => new Set(blackouts), [blackouts]);
   const minEnd = start || TODAY;
   const nights = nightsBetween(start, end);
 
+  // Conflict check: does the selected range hit any blackout?
+  const conflictDates = useMemo(() => {
+    if (!start || !end) return [];
+    return rangeDates(start, end).filter((d) => blackoutSet.has(d));
+  }, [start, end, blackoutSet]);
+
+  const hasConflict = conflictDates.length > 0;
+
+  // Up to 6 nearest future blackouts to show as warning
+  const nextBlackouts = useMemo(() => {
+    return blackouts
+      .filter((d) => d >= TODAY)
+      .sort()
+      .slice(0, 6);
+  }, [blackouts]);
+
   const lineHref = useMemo(() => {
-    if (!start || !end || nights === 0) return lineUrl;
-    // Encode date in LINE param (LINE auto-fills the message field on some clients)
-    const text = `สวัสดีค่ะ สนใจเช่าชุด "${dressName}" จากร้าน ${boutiqueName}\nวันที่: ${fmtThai(start)} — ${fmtThai(end)} (${nights} วัน)`;
+    if (!start || !end || nights === 0 || hasConflict) return lineUrl;
+    const lines = [
+      `สวัสดีค่ะ สนใจเช่าชุด "${dressName}"`,
+      `ร้าน: ${boutiqueName}`,
+      `วันที่: ${fmtThai(start)} — ${fmtThai(end)} (${nights} วัน)`,
+    ];
+    if (typeof pricePerDay === "number") {
+      const total = pricePerDay * nights;
+      lines.push(
+        `ราคา: ฿${pricePerDay.toLocaleString()}/วัน × ${nights} = ฿${total.toLocaleString()}`,
+      );
+    }
+    if (typeof deposit === "number" && deposit > 0) {
+      lines.push(`ค่ามัดจำ: ฿${deposit.toLocaleString()}`);
+    }
+    if (dressPageUrl) lines.push(`ลิงก์ชุด: ${dressPageUrl}`);
+    if (dressImageUrl) lines.push(`รูป: ${dressImageUrl}`);
+    const text = lines.join("\n");
     const sep = lineUrl.includes("?") ? "&" : "?";
     return `${lineUrl}${sep}text=${encodeURIComponent(text)}`;
-  }, [lineUrl, start, end, nights, dressName, boutiqueName]);
+  }, [
+    lineUrl,
+    start,
+    end,
+    nights,
+    hasConflict,
+    dressName,
+    boutiqueName,
+    pricePerDay,
+    deposit,
+    dressPageUrl,
+    dressImageUrl,
+  ]);
 
-  async function trackAndGo(e: React.MouseEvent<HTMLAnchorElement>) {
-    // Don't block the click; fire-and-forget tracking
+  function trackAndGo(e: React.MouseEvent<HTMLAnchorElement>) {
     if (dressId || boutiqueId) {
       try {
         const blob = new Blob(
@@ -77,15 +152,11 @@ export default function DateRangePicker({
           ],
           { type: "application/json" },
         );
-        // sendBeacon for async, ignored response
-        if (navigator.sendBeacon) {
-          navigator.sendBeacon("/api/track", blob);
-        }
+        if (navigator.sendBeacon) navigator.sendBeacon("/api/track", blob);
       } catch {
         // ignore
       }
     }
-    // Let the <a> proceed naturally
     void e;
   }
 
@@ -102,6 +173,7 @@ export default function DateRangePicker({
       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
         เลือกวันที่อยากเช่า (ไม่บังคับ)
       </div>
+
       <div
         className="date-row"
         style={{
@@ -137,7 +209,68 @@ export default function DateRangePicker({
         </label>
       </div>
 
-      {nights > 0 ? (
+      {/* Blackouts info — shown when there are any */}
+      {nextBlackouts.length > 0 ? (
+        <div
+          style={{
+            padding: "8px 10px",
+            background: "var(--surface)",
+            border: "1px solid var(--line)",
+            borderRadius: 6,
+            fontSize: 12,
+            color: "var(--ink-2)",
+            marginBottom: 10,
+            lineHeight: 1.5,
+          }}
+        >
+          <div style={{ color: "var(--ink)", fontWeight: 500, marginBottom: 3 }}>
+            วันที่ร้านไม่ว่าง:
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {nextBlackouts.map((d) => (
+              <span
+                key={d}
+                style={{
+                  padding: "2px 8px",
+                  background: "rgba(220,38,38,0.08)",
+                  color: "#DC2626",
+                  borderRadius: 4,
+                  fontSize: 11,
+                  fontWeight: 500,
+                }}
+              >
+                {fmtThai(d)}
+              </span>
+            ))}
+            {blackouts.filter((d) => d >= TODAY).length > nextBlackouts.length ? (
+              <span style={{ fontSize: 11, color: "var(--ink-3)" }}>
+                +{blackouts.filter((d) => d >= TODAY).length - nextBlackouts.length} วัน
+              </span>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Conflict warning */}
+      {hasConflict ? (
+        <div
+          style={{
+            padding: "10px 12px",
+            background: "rgba(220,38,38,0.08)",
+            border: "1px solid rgba(220,38,38,0.3)",
+            borderRadius: 6,
+            fontSize: 13,
+            color: "#DC2626",
+            marginBottom: 10,
+            lineHeight: 1.5,
+            fontWeight: 500,
+          }}
+        >
+          ⚠️ ช่วงวันที่เลือกชนกับวันที่ไม่ว่าง ({conflictDates.map(fmtThai).join(", ")}) กรุณาเลือกใหม่
+        </div>
+      ) : null}
+
+      {nights > 0 && !hasConflict ? (
         <div
           style={{
             padding: "8px 10px",
@@ -152,17 +285,23 @@ export default function DateRangePicker({
           <div style={{ fontWeight: 500, color: "var(--ink)" }}>
             ระยะเวลา: {nights} วัน ({fmtThai(start)} — {fmtThai(end)})
           </div>
+          {typeof pricePerDay === "number" ? (
+            <div style={{ marginTop: 2 }}>
+              ราคา: ฿{(pricePerDay * nights).toLocaleString()} ({nights} × ฿
+              {pricePerDay.toLocaleString()})
+            </div>
+          ) : null}
           <div style={{ marginTop: 2 }}>
-            วันที่จะถูกส่งให้ร้านอัตโนมัติเมื่อคุณทักทาย LINE
+            ข้อมูลทั้งหมดจะถูกส่งให้ร้านเมื่อกดทักทาย LINE
           </div>
         </div>
-      ) : (
+      ) : nights === 0 && !hasConflict ? (
         <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
           กรอกวันที่ก่อนเพื่อให้ร้านตอบเร็วขึ้น (หรือทักหาร้านได้เลยถ้ายังไม่แน่ใจ)
         </div>
-      )}
+      ) : null}
 
-      {nights > 0 ? (
+      {nights > 0 && !hasConflict ? (
         <a
           href={lineHref}
           target="_blank"

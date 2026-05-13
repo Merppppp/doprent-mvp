@@ -344,13 +344,20 @@ export default async function SellerDashboard({
                     <span style={{ fontSize: 11, color: "var(--ink-3)" }}>· {d.views} views</span>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
                   <Link
                     href={`/sell/dresses/${d.id}/edit`}
                     className="btn btn-outline"
                     style={{ padding: "6px 10px", fontSize: 12 }}
                   >
                     แก้ไข
+                  </Link>
+                  <Link
+                    href={`/sell/dresses/${d.id}/calendar`}
+                    className="btn btn-outline"
+                    style={{ padding: "6px 10px", fontSize: 12 }}
+                  >
+                    📅 ปฏิทิน
                   </Link>
                 </div>
               </div>

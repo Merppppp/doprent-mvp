@@ -215,6 +215,27 @@ export async function listOccasions(): Promise<Occasion[]> {
   return data as Occasion[];
 }
 
+/**
+ * Fetch all future blackout dates for a dress, sorted ascending.
+ * Returns array of YYYY-MM-DD date strings.
+ */
+export async function listBlackouts(dressId: string): Promise<string[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await sb
+    .from("dress_blackouts")
+    .select("date")
+    .eq("dress_id", dressId)
+    .gte("date", today)
+    .order("date", { ascending: true });
+  if (error) {
+    // Table may not exist yet (pre-migration). Fail soft.
+    return [];
+  }
+  return ((data ?? []) as Array<{ date: string }>).map((r) => r.date);
+}
+
 /** Lightweight count for landing page stats. */
 export async function getStats(): Promise<{ boutiques: number; dresses: number; minPrice: number }> {
   const sb = getSupabase();
