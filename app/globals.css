@@ -30,12 +30,17 @@ html,
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: "Inter", "Sarabun", system-ui, -apple-system, "Segoe UI",
-    Roboto, "Helvetica Neue", sans-serif;
+  /* IBM Plex Sans Thai Looped renders Thai crisply on all screens. Inter is the
+     Latin fallback (used for English words inside Thai sentences). */
+  font-family: "IBM Plex Sans Thai Looped", "Inter", system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern", "liga", "calt";
+  letter-spacing: 0.005em;
 }
 
 button {
