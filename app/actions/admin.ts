@@ -37,12 +37,20 @@ async function writeAudit(action: string, targetType: string, targetId: string |
   });
 }
 
-/** Approve a KYC submission: marks kyc verified + auto-flips boutiques.verified=true */
+/**
+ * Approve a KYC submission. Marks kyc verified + flips boutique status='live'.
+ * Sets `verified=true` ONLY for paid plans (Boost / Featured). Free-tier sellers
+ * pass KYC but don't get the public ✓ badge (per Prem 2026-05-13).
+ */
 export async function approveKyc(kycId: string, notes?: string): Promise<{ ok: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth;
   const sb = createClient();
-  const { data: kyc } = await sb.from("kyc_submissions").select("id, boutique_id").eq("id", kycId).maybeSingle();
+  const { data: kyc } = await sb
+    .from("kyc_submissions")
+    .select("id, boutique_id, plan")
+    .eq("id", kycId)
+    .maybeSingle();
   if (!kyc) return { ok: false, error: "ไม่พบ KYC" };
 
   await sb
@@ -55,12 +63,20 @@ export async function approveKyc(kycId: string, notes?: string): Promise<{ ok: b
     })
     .eq("id", kycId);
 
+  // Verified badge is a paid feature — only Boost/Featured get it.
+  const isPaidPlan = kyc.plan === "Boost" || kyc.plan === "Featured";
+
   await sb
     .from("boutiques")
-    .update({ kyc_status: "verified", verified: true, status: "live", updated_at: new Date().toISOString() })
+    .update({
+      kyc_status: "verified",
+      verified: isPaidPlan,
+      status: "live",
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", kyc.boutique_id);
 
-  await writeAudit("approve_kyc", "kyc", kycId, notes ?? null);
+  await writeAudit("approve_kyc", "kyc", kycId, notes ?? null, { plan: kyc.plan, verified: isPaidPlan });
   revalidatePath("/admin");
   revalidatePath("/admin/kyc");
   revalidatePath("/admin/boutiques");
