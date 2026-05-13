@@ -64,6 +64,8 @@ export default function DressForm(props: Props) {
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
   const [available, setAvailable] = useState(initial?.available ?? true);
   const [uploadingCount, setUploadingCount] = useState(0);
+  const [urlInput, setUrlInput] = useState("");
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -71,6 +73,21 @@ export default function DressForm(props: Props) {
     setOccasions((curr) =>
       curr.includes(k) ? curr.filter((x) => x !== k) : [...curr, k],
     );
+  }
+
+  function addUrlImage() {
+    const urls = urlInput
+      .split(/[\n,]/)
+      .map((s) => s.trim())
+      .filter((s) => /^https?:\/\//.test(s));
+    if (urls.length === 0) {
+      setError("ใส่ URL รูปที่ขึ้นต้นด้วย http:// หรือ https://");
+      return;
+    }
+    setImages((curr) => [...curr, ...urls]);
+    setUrlInput("");
+    setShowUrlInput(false);
+    setError(null);
   }
 
   async function uploadImages(files: FileList | null) {
@@ -204,9 +221,44 @@ export default function DressForm(props: Props) {
               onChange={(e) => uploadImages(e.target.files)}
               style={{ display: "none" }}
             />
-            {uploadingCount > 0 ? `กำลังขึ้น... (${uploadingCount})` : "+ เพิ่มรูป"}
+            {uploadingCount > 0 ? `กำลังขึ้น... (${uploadingCount})` : "+ อัปโหลด"}
           </label>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowUrlInput((s) => !s)}
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--ink-3)",
+            fontSize: 12,
+            textDecoration: "underline",
+            cursor: "pointer",
+            padding: 0,
+            marginTop: 4,
+          }}
+        >
+          {showUrlInput ? "↑ ซ่อน URL input" : "หรือใส่ลิงก์รูปจากเว็บอื่น (Unsplash, IG, ฯลฯ)"}
+        </button>
+        {showUrlInput ? (
+          <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "flex-start" }}>
+            <textarea
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="https://images.unsplash.com/photo-...&#10;https://..."
+              rows={3}
+              style={{ ...inputStyle, flex: 1, resize: "vertical", fontSize: 12 }}
+            />
+            <button
+              type="button"
+              onClick={addUrlImage}
+              className="btn btn-outline"
+              style={{ padding: "10px 14px", fontSize: 12, whiteSpace: "nowrap" }}
+            >
+              + เพิ่ม
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <Labeled label="ชื่อชุด *">

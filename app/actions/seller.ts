@@ -91,11 +91,18 @@ export async function createBoutique(formData: FormData): Promise<{
     return { ok: false, error: insertErr?.message ?? "สร้างร้านไม่สำเร็จ" };
   }
 
-  // Bump profile role to 'seller' (idempotent)
-  await sb
+  // Bump profile role to 'seller' (but NEVER downgrade admin → seller)
+  const { data: existingProfile } = await sb
     .from("profiles")
-    .update({ role: "seller", updated_at: new Date().toISOString() })
-    .eq("id", user.id);
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (existingProfile?.role !== "admin") {
+    await sb
+      .from("profiles")
+      .update({ role: "seller", updated_at: new Date().toISOString() })
+      .eq("id", user.id);
+  }
 
   revalidatePath("/", "layout");
   return { ok: true, slug: created.slug };
