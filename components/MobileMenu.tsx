@@ -246,11 +246,7 @@ export default function MobileMenu({ user }: Props) {
                     <Link href="/sell/dashboard" style={drawerItem}>
                       Dashboard ร้านของฉัน
                     </Link>
-                  ) : (
-                    <Link href="/sell" style={drawerItem}>
-                      เปิดร้านบน DopRent
-                    </Link>
-                  )}
+                  ) : null}
                   {user.isAdmin ? (
                     <Link href="/admin" style={{ ...drawerItem, color: "var(--info)" }}>
                       Admin Dashboard

@@ -289,11 +289,7 @@ function UserMenu({
           <Link href="/sell/dashboard" style={menuItemStyle}>
             Dashboard ร้านของฉัน
           </Link>
-        ) : (
-          <Link href="/sell" style={menuItemStyle}>
-            เปิดร้านบน DopRent
-          </Link>
-        )}
+        ) : null}
 
         <Link href="/account" style={menuItemStyle}>
           บัญชีของฉัน

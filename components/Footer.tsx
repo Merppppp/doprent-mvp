@@ -61,12 +61,19 @@ export default function Footer() {
           paddingTop: 16,
           display: "flex",
           justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
           fontSize: 12,
           color: "var(--ink-3)",
         }}
       >
         <div>© {new Date().getFullYear()} DopRent · Bangkok</div>
-        <div>ปลั๊กปลั่กออนไลน์</div>
+        <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+          <Link href="/sell" style={{ color: "var(--ink-3)" }}>
+            เปิดร้านขาย →
+          </Link>
+          <span>ปลั๊กปลั่กออนไลน์</span>
+        </div>
       </div>
     </footer>
   );
