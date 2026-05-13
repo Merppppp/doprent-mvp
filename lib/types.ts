@@ -51,6 +51,13 @@ export type Boutique = {
   area_key: string | null;
   area_label: string;
   address: string | null;
+  /** Structured Thai address (added 2026-05-13 for proper geocoding). */
+  house_no: string | null;
+  street: string | null;
+  subdistrict: string | null;
+  district: string | null;
+  province: string;
+  postal_code: string | null;
   lat: number | null;
   lng: number | null;
   hours: string | null;

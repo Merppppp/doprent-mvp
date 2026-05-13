@@ -37,14 +37,36 @@ export async function createBoutique(formData: FormData): Promise<{
   const instagram = String(formData.get("instagram") ?? "").trim() || null;
   const tag = String(formData.get("tag") ?? "").trim() || null;
   const story = String(formData.get("story") ?? "").trim() || null;
-  const address = String(formData.get("address") ?? "").trim() || null;
+
+  // Structured Thai address
+  const houseNo = String(formData.get("house_no") ?? "").trim();
+  const street = String(formData.get("street") ?? "").trim() || null;
+  const subdistrict = String(formData.get("subdistrict") ?? "").trim();
+  const district = String(formData.get("district") ?? "").trim();
+  const province = String(formData.get("province") ?? "กรุงเทพมหานคร").trim();
+  const postalCode = String(formData.get("postal_code") ?? "").trim() || null;
+
+  // Compose denormalized one-line address for display
+  const address = [
+    houseNo,
+    street,
+    subdistrict ? `แขวง${subdistrict}` : null,
+    district ? `เขต${district}` : null,
+    province,
+    postalCode,
+  ]
+    .filter(Boolean)
+    .join(" ") || null;
   const sinceYearRaw = String(formData.get("since_year") ?? "").trim();
   const sinceYear = sinceYearRaw ? parseInt(sinceYearRaw, 10) : null;
   const coverColor = (String(formData.get("cover_color") ?? "rose") as Color) || "rose";
   const ownerName = String(formData.get("owner_name") ?? "").trim() || null;
 
   if (!name) return { ok: false, error: "กรุณาใส่ชื่อร้าน" };
-  if (!areaLabel) return { ok: false, error: "กรุณาเลือกย่าน" };
+  if (!houseNo) return { ok: false, error: "กรุณาใส่บ้านเลขที่" };
+  if (!district) return { ok: false, error: "กรุณาเลือกเขต" };
+  if (!subdistrict) return { ok: false, error: "กรุณาเลือกแขวง" };
+  if (!areaLabel) return { ok: false, error: "ที่อยู่ไม่ถูกต้อง" };
   if (!lineUrl) return { ok: false, error: "กรุณาใส่ลิงก์ LINE" };
   if (
     sinceYear !== null &&
@@ -77,6 +99,12 @@ export async function createBoutique(formData: FormData): Promise<{
       area_key: areaKey,
       area_label: areaLabel,
       address,
+      house_no: houseNo,
+      street,
+      subdistrict,
+      district,
+      province,
+      postal_code: postalCode,
       line_url: lineUrl,
       instagram,
       tag,

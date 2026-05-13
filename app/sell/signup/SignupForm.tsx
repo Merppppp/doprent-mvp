@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createBoutique } from "@/app/actions/seller";
+import { BANGKOK_DISTRICTS, findDistrict, PROVINCE_TH } from "@/lib/bangkok-districts";
 
 const COLORS = [
   { key: "rose", label: "กุหลาบ" },
@@ -15,76 +16,67 @@ const COLORS = [
   { key: "purple", label: "ม่วง" },
 ] as const;
 
-/** Fallback list of Bangkok areas — used when DB areas table is empty. */
-const FALLBACK_AREAS: Array<{ key: string; th: string }> = [
-  { key: "Siam", th: "สยาม" },
-  { key: "Chitlom", th: "ชิดลม" },
-  { key: "Ploenchit", th: "เพลินจิต" },
-  { key: "Wireless", th: "วิทยุ" },
-  { key: "Asok", th: "อโศก" },
-  { key: "Sukhumvit 11", th: "สุขุมวิท 11" },
-  { key: "Phrom Phong", th: "พร้อมพงษ์" },
-  { key: "Thonglor", th: "ทองหล่อ" },
-  { key: "Ekkamai", th: "เอกมัย" },
-  { key: "Phra Khanong", th: "พระโขนง" },
-  { key: "Onnut", th: "อ่อนนุช" },
-  { key: "Watthana", th: "วัฒนา" },
-  { key: "Ari", th: "อารีย์" },
-  { key: "Sathorn", th: "สาทร" },
-  { key: "Silom", th: "สีลม" },
-  { key: "Sala Daeng", th: "ศาลาแดง" },
-  { key: "Surawong", th: "สุรวงศ์" },
-  { key: "Bangrak", th: "บางรัก" },
-  { key: "Charoenkrung", th: "เจริญกรุง" },
-  { key: "Yaowarat", th: "เยาวราช" },
-  { key: "Pratunam", th: "ประตูน้ำ" },
-  { key: "Lumpini", th: "ลุมพินี" },
-  { key: "Phaya Thai", th: "พญาไท" },
-  { key: "Ratchadaphisek", th: "รัชดาภิเษก" },
-  { key: "Bang Na", th: "บางนา" },
-];
-
-const CUSTOM_AREA_VALUE = "__custom__";
-
+// Props type kept for API compatibility but areas dropdown is replaced by the
+// district / subdistrict cascading select from `bangkok-districts.ts`.
 type Props = {
   areas: Array<{ key: string; th: string }>;
 };
 
-export default function SignupForm({ areas }: Props) {
-  // Use DB areas if seeded; otherwise fall back to hardcoded list
-  const areasToShow = areas.length > 0 ? areas : FALLBACK_AREAS;
-  const [areaKey, setAreaKey] = useState("");
-  const [customArea, setCustomArea] = useState("");
+export default function SignupForm(_props: Props) {
+  void _props;
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Address state
+  const [district, setDistrict] = useState("");
+  const [subdistrict, setSubdistrict] = useState("");
+  const [postal, setPostal] = useState("");
+
+  const subdistricts = useMemo(() => {
+    const d = findDistrict(district);
+    return d?.subdistricts ?? [];
+  }, [district]);
+
+  function onDistrictChange(v: string) {
+    setDistrict(v);
+    setSubdistrict("");
+    setPostal("");
+  }
+
+  function onSubdistrictChange(v: string) {
+    setSubdistrict(v);
+    const d = findDistrict(district);
+    const sub = d?.subdistricts.find((s) => s.th === v);
+    if (sub) setPostal(sub.postal);
+  }
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+
+    if (!district) {
+      setError("กรุณาเลือกเขต");
+      return;
+    }
+    if (!subdistrict) {
+      setError("กรุณาเลือกแขวง/ตำบล");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const formData = new FormData(e.currentTarget);
-      // Derive area_label from selection
-      if (areaKey === CUSTOM_AREA_VALUE) {
-        const c = customArea.trim();
-        if (!c) {
-          setError("กรุณาใส่ชื่อย่าน");
-          setSubmitting(false);
-          return;
-        }
-        formData.set("area_key", "");
-        formData.set("area_label", c);
-      } else if (areaKey) {
-        const matched = areasToShow.find((a) => a.key === areaKey);
-        if (matched) {
-          formData.set("area_key", matched.key);
-          formData.set("area_label", `${matched.key} · ${matched.th}`);
-        }
-      } else {
-        setError("กรุณาเลือกย่าน");
-        setSubmitting(false);
-        return;
+      // Override / set address fields explicitly
+      formData.set("district", district);
+      formData.set("subdistrict", subdistrict);
+      formData.set("province", PROVINCE_TH);
+      formData.set("postal_code", postal);
+      // Derive area_key + area_label from district for backward-compat filters
+      const d = findDistrict(district);
+      if (d) {
+        formData.set("area_key", d.en);
+        formData.set("area_label", `เขต${d.th} · กรุงเทพ`);
       }
 
       const res = await createBoutique(formData);
@@ -93,7 +85,6 @@ export default function SignupForm({ areas }: Props) {
         setSubmitting(false);
         return;
       }
-      // Push to KYC wizard
       router.push(`/sell/kyc?slug=${encodeURIComponent(res.slug ?? "")}`);
     } catch (err) {
       setError((err as Error).message);
@@ -111,47 +102,102 @@ export default function SignupForm({ areas }: Props) {
         <input type="text" name="owner_name" maxLength={50} style={inputStyle} />
       </Field>
 
-      <Field label="ย่าน *" hint="ที่ลูกค้าจะมารับชุด/นัดเจอ — เลือก &ldquo;ย่านอื่น&rdquo; เพื่อพิมพ์เอง">
-        <select
-          name="area_key_select"
-          value={areaKey}
-          onChange={(e) => setAreaKey(e.target.value)}
-          style={inputStyle}
-        >
-          <option value="">— เลือกย่าน —</option>
-          {areasToShow.map((a) => (
-            <option key={a.key} value={a.key}>
-              {a.th} ({a.key})
-            </option>
-          ))}
-          <option value={CUSTOM_AREA_VALUE}>+ ย่านอื่น (พิมพ์เอง)</option>
-        </select>
-        {areaKey === CUSTOM_AREA_VALUE ? (
-          <input
-            type="text"
-            value={customArea}
-            onChange={(e) => setCustomArea(e.target.value)}
-            placeholder='เช่น "เพชรเกษม" หรือ "ลาดพร้าว"'
-            maxLength={50}
-            style={{ ...inputStyle, marginTop: 8 }}
-          />
-        ) : null}
-        <input type="hidden" name="area_key" />
-        <input type="hidden" name="area_label" />
-      </Field>
-
-      <Field
-        label="ที่อยู่ร้าน (ไม่บังคับ)"
-        hint="ที่อยู่จริงสำหรับลูกค้าที่ยอมรับนัดเจอ ปล่อยว่างได้ถ้ายังไม่อยากเปิดเผย"
+      {/* ==== ADDRESS SECTION ==== */}
+      <div
+        style={{
+          padding: 16,
+          background: "var(--bg)",
+          border: "1px solid var(--line)",
+          borderRadius: 8,
+        }}
       >
-        <textarea
-          name="address"
-          rows={2}
-          maxLength={200}
-          placeholder="เช่น 88/8 ซ.ทองหล่อ 9, สุขุมวิท 55, วัฒนา กทม. 10110"
-          style={{ ...inputStyle, resize: "vertical" }}
-        />
-      </Field>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>ที่อยู่ร้าน</div>
+        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 14 }}>
+          สำหรับให้ลูกค้าหาทาง + ระบบหาพิกัดอัตโนมัติในอนาคต
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Field label="บ้านเลขที่ / อาคาร / ชั้น *">
+            <input
+              type="text"
+              name="house_no"
+              required
+              maxLength={80}
+              placeholder="เช่น 88/8 ชั้น 2"
+              style={inputStyle}
+            />
+          </Field>
+
+          <Field label="ถนน / ซอย (ไม่บังคับ)">
+            <input
+              type="text"
+              name="street"
+              maxLength={80}
+              placeholder="เช่น ซ.ทองหล่อ 9, ถ.สุขุมวิท 55"
+              style={inputStyle}
+            />
+          </Field>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="เขต *">
+              <select
+                value={district}
+                onChange={(e) => onDistrictChange(e.target.value)}
+                required
+                style={inputStyle}
+              >
+                <option value="">— เลือกเขต —</option>
+                {BANGKOK_DISTRICTS.map((d) => (
+                  <option key={d.th} value={d.th}>
+                    {d.th}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="แขวง / ตำบล *">
+              <select
+                value={subdistrict}
+                onChange={(e) => onSubdistrictChange(e.target.value)}
+                required
+                disabled={!district}
+                style={{ ...inputStyle, opacity: !district ? 0.5 : 1 }}
+              >
+                <option value="">
+                  {district ? "— เลือกแขวง —" : "เลือกเขตก่อน"}
+                </option>
+                {subdistricts.map((s) => (
+                  <option key={s.th} value={s.th}>
+                    {s.th}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="จังหวัด">
+              <input
+                type="text"
+                value={PROVINCE_TH}
+                disabled
+                style={{ ...inputStyle, background: "var(--bg)", color: "var(--ink-3)" }}
+              />
+            </Field>
+            <Field label="รหัสไปรษณีย์">
+              <input
+                type="text"
+                value={postal}
+                onChange={(e) => setPostal(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                maxLength={5}
+                placeholder="—"
+                inputMode="numeric"
+                style={inputStyle}
+              />
+            </Field>
+          </div>
+        </div>
+      </div>
 
       <Field label="ลิงก์ LINE Official *" hint='เช่น https://line.me/R/ti/p/@yourshop หรือ @yourshop'>
         <input
@@ -178,12 +224,20 @@ export default function SignupForm({ areas }: Props) {
         />
       </Field>
 
-      <Field label="Tagline (ไม่บังคับ)" hint='ประโยคสั้นๆ ใต้ชื่อร้าน ไม่เกิน 80 ตัว เช่น "เดรสงานหมั้น handcrafted lace"'>
+      <Field
+        label="Tagline (ไม่บังคับ)"
+        hint='ประโยคสั้นๆ ใต้ชื่อร้าน ไม่เกิน 80 ตัว เช่น "เดรสงานหมั้น handcrafted lace"'
+      >
         <input type="text" name="tag" maxLength={80} style={inputStyle} />
       </Field>
 
       <Field label="เกี่ยวกับร้าน (ไม่บังคับ)" hint="แนะนำตัวร้าน 2-3 ประโยค ใช้ได้ทั้งไทย/อังกฤษ">
-        <textarea name="story" maxLength={500} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+        <textarea
+          name="story"
+          maxLength={500}
+          rows={3}
+          style={{ ...inputStyle, resize: "vertical" }}
+        />
       </Field>
 
       <Field label="สีหลักของร้าน" hint="ใช้กับ cover ตอนยังไม่มีรูป">
@@ -195,6 +249,10 @@ export default function SignupForm({ areas }: Props) {
           ))}
         </select>
       </Field>
+
+      {/* Hidden inputs that createBoutique reads */}
+      <input type="hidden" name="area_key" />
+      <input type="hidden" name="area_label" />
 
       {error ? (
         <div
