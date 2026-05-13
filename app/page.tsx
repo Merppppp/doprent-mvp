@@ -2,22 +2,28 @@ import Link from "next/link";
 import DressCard from "@/components/DressCard";
 import { DressArt, BoutiqueCover, OccasionTile } from "@/components/DressArt";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import { getCurrentUser } from "@/lib/auth";
 import { getStats, listBoutiques, listDresses, listOccasions } from "@/lib/dresses";
 
-export const revalidate = 60;
+// Force dynamic so DressCard receives correct per-user isLoggedIn / savedSet
+// (otherwise Next ISR caches one version and serves it to everyone)
+export const dynamic = "force-dynamic";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 const LINE_URL =
   process.env.NEXT_PUBLIC_DEFAULT_LINE_URL ?? "https://line.me/R/ti/p/@doprent";
 
 export default async function HomePage() {
-  const [dresses, boutiques, occasions, stats] = await Promise.all([
+  const [dresses, boutiques, occasions, stats, user] = await Promise.all([
     listDresses({ limit: 8 }),
     listBoutiques({ featuredFirst: true, limit: 4 }),
     listOccasions(),
     getStats(),
+    getCurrentUser().catch(() => null),
   ]);
   const heroDress = dresses[0];
+  const savedSet = new Set(user?.profile.saved_dress_ids ?? []);
+  const isLoggedIn = !!user;
 
   const orgLd = {
     "@context": "https://schema.org",
@@ -183,7 +189,7 @@ export default async function HomePage() {
           <SectionHead title="มาใหม่" linkText={`ดูทั้งหมด ${stats.dresses} ชุด →`} linkHref="/browse" />
           <div className="grid-4" style={{ gap: 20 }}>
             {dresses.slice(0, 8).map((d, i) => (
-              <DressCard key={d.id} dress={d} variant={i} />
+              <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
             ))}
           </div>
         </div>

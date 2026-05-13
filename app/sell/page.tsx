@@ -104,11 +104,11 @@ export default async function SellLanding() {
           </Link>
         ) : (
           <Link
-            href={user ? "/sell/signup" : `/login?next=${encodeURIComponent("/sell/signup")}`}
+            href="/sell/signup"
             className="btn btn-dark"
             style={{ padding: "12px 22px" }}
           >
-            {user ? "เปิดร้านได้เลย" : "เริ่มต้นฟรี — เข้าสู่ระบบก่อน"}
+            เปิดร้านได้เลย
           </Link>
         )}
       </div>
@@ -196,7 +196,7 @@ export default async function SellLanding() {
                 ))}
               </ul>
               <Link
-                href={user ? t.href : `/login?next=${encodeURIComponent(t.href)}`}
+                href={t.href}
                 className={t.accent ? "btn btn-dark" : "btn btn-outline"}
                 style={{ width: "100%", display: "block", textAlign: "center" }}
               >

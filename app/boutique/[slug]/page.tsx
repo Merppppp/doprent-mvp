@@ -5,9 +5,10 @@ import { BoutiqueCover } from "@/components/DressArt";
 import DressCard from "@/components/DressCard";
 import LineButton from "@/components/LineButton";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import { getCurrentUser } from "@/lib/auth";
 import { getBoutiqueBySlug, listDressesByBoutique } from "@/lib/dresses";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 
@@ -26,7 +27,12 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function BoutiquePage({ params }: { params: Params }) {
   const b = await getBoutiqueBySlug(params.slug);
   if (!b) notFound();
-  const dresses = await listDressesByBoutique(b.id);
+  const [dresses, user] = await Promise.all([
+    listDressesByBoutique(b.id),
+    getCurrentUser().catch(() => null),
+  ]);
+  const savedSet = new Set(user?.profile.saved_dress_ids ?? []);
+  const isLoggedIn = !!user;
 
   return (
     <div className="shell" style={{ paddingBottom: 80 }}>
@@ -138,7 +144,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
       ) : (
         <div className="grid-3" style={{ gap: 20 }}>
           {dresses.map((d, i) => (
-            <DressCard key={d.id} dress={d} variant={i} />
+            <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
           ))}
         </div>
       )}

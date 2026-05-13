@@ -16,7 +16,7 @@ import {
 } from "@/lib/dresses";
 import { COLOR_LABELS_TH } from "@/lib/types";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 type Params = { id: string }; // route param is actually slug (folder name kept for compat)
 
@@ -354,7 +354,7 @@ export default async function DressPage({ params }: { params: Params }) {
         </div>
         <div className="grid-4" style={{ gap: 20 }}>
           {related.filter((d) => d.id !== dress.id).slice(0, 4).map((d, i) => (
-            <DressCard key={d.id} dress={d} variant={i} />
+            <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
           ))}
         </div>
       </div>
