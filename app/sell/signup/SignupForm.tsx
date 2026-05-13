@@ -199,12 +199,20 @@ export default function SignupForm(_props: Props) {
         </div>
       </div>
 
-      <Field label="ลิงก์ LINE Official *" hint='เช่น https://line.me/R/ti/p/@yourshop หรือ @yourshop'>
+      <Field
+        label="LINE สำหรับลูกค้าทักร้าน *"
+        hint={
+          "ใส่ได้หลายแบบ:\n" +
+          "• LINE Official: @yourshop หรือชื่อโดยไม่มี @\n" +
+          "• LINE ส่วนตัว: ต้องใช้ลิงก์เต็ม (LINE → โปรไฟล์ → กดที่ ID → คัดลอกลิงก์)\n" +
+          "• หรือลิงก์เชิญ https://lin.ee/..."
+        }
+      >
         <input
           type="text"
           name="line_url"
           required
-          placeholder="https://line.me/R/ti/p/@..."
+          placeholder="@yourshop, https://line.me/..., หรือ https://lin.ee/..."
           style={inputStyle}
         />
       </Field>
@@ -300,7 +308,7 @@ function Field({
         {label}
       </label>
       {hint ? (
-        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6 }}>{hint}</div>
+        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6, whiteSpace: "pre-line", lineHeight: 1.5 }}>{hint}</div>
       ) : null}
       {children}
     </div>

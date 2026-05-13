@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { isValidLineContact, normalizeLineUrl } from "@/lib/line";
 import type { Color } from "@/lib/types";
 
 /** Convert a Thai/English name to a URL slug. */
@@ -33,7 +34,8 @@ export async function createBoutique(formData: FormData): Promise<{
   const name = String(formData.get("name") ?? "").trim();
   const areaLabel = String(formData.get("area_label") ?? "").trim();
   const areaKey = String(formData.get("area_key") ?? "").trim() || null;
-  const lineUrl = String(formData.get("line_url") ?? "").trim();
+  const lineUrlRaw = String(formData.get("line_url") ?? "").trim();
+  const lineUrl = normalizeLineUrl(lineUrlRaw);
   const instagram = String(formData.get("instagram") ?? "").trim() || null;
   const tag = String(formData.get("tag") ?? "").trim() || null;
   const story = String(formData.get("story") ?? "").trim() || null;
@@ -67,7 +69,12 @@ export async function createBoutique(formData: FormData): Promise<{
   if (!district) return { ok: false, error: "กรุณาเลือกเขต" };
   if (!subdistrict) return { ok: false, error: "กรุณาเลือกแขวง" };
   if (!areaLabel) return { ok: false, error: "ที่อยู่ไม่ถูกต้อง" };
-  if (!lineUrl) return { ok: false, error: "กรุณาใส่ลิงก์ LINE" };
+  if (!isValidLineContact(lineUrlRaw)) {
+    return {
+      ok: false,
+      error: "ลิงก์ LINE ไม่ถูกต้อง — ใส่ @ชื่อ, ชื่อ, หรือลิงก์เต็มจาก LINE",
+    };
+  }
   if (
     sinceYear !== null &&
     (isNaN(sinceYear) || sinceYear < 1980 || sinceYear > new Date().getFullYear())
@@ -166,7 +173,6 @@ export async function updateBoutique(
     "name",
     "area_label",
     "area_key",
-    "line_url",
     "instagram",
     "tag",
     "story",
@@ -180,6 +186,15 @@ export async function updateBoutique(
     if (v !== null) {
       const s = String(v).trim();
       updates[f] = s || null;
+    }
+  }
+  // line_url has special normalization
+  const lineRaw = formData.get("line_url");
+  if (lineRaw !== null) {
+    const s = String(lineRaw).trim();
+    if (s) {
+      if (!isValidLineContact(s)) return { ok: false, error: "ลิงก์ LINE ไม่ถูกต้อง" };
+      updates.line_url = normalizeLineUrl(s);
     }
   }
   const sinceYearRaw = String(formData.get("since_year") ?? "").trim();
@@ -305,7 +320,8 @@ export async function createDress(formData: FormData): Promise<{ ok: boolean; er
   const pricePerDay = parseInt(String(formData.get("price_per_day") ?? "0"), 10);
   const deposit = parseInt(String(formData.get("deposit") ?? "0"), 10);
   const description = String(formData.get("description") ?? "").trim() || null;
-  const lineUrl = String(formData.get("line_url") ?? "").trim() || b.line_url;
+  const lineUrlRawDress = String(formData.get("line_url") ?? "").trim();
+  const lineUrl = lineUrlRawDress ? normalizeLineUrl(lineUrlRawDress) : b.line_url;
   const imagesRaw = String(formData.get("images") ?? "").trim();
   const images: string[] = imagesRaw ? imagesRaw.split("\n").map((s) => s.trim()).filter(Boolean) : [];
   const occasionsRaw = formData.getAll("occasions").map((v) => String(v)).filter(Boolean);
@@ -366,10 +382,19 @@ export async function updateDress(
   const updates: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   };
-  const fields = ["name", "designer", "size", "color", "description", "line_url"];
+  const fields = ["name", "designer", "size", "color", "description"];
   for (const f of fields) {
     const v = formData.get(f);
     if (v !== null) updates[f] = String(v).trim() || null;
+  }
+  // line_url normalized
+  const lineRaw = formData.get("line_url");
+  if (lineRaw !== null) {
+    const s = String(lineRaw).trim();
+    if (s) {
+      if (!isValidLineContact(s)) return { ok: false, error: "ลิงก์ LINE ไม่ถูกต้อง" };
+      updates.line_url = normalizeLineUrl(s);
+    }
   }
   const ppd = formData.get("price_per_day");
   if (ppd !== null) {
