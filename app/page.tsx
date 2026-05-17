@@ -38,64 +38,75 @@ export default async function HomePage() {
   return (
     <>
       {/* ========== HERO ========== */}
-      <section className="shell section-pad" style={{ padding: "60px 0 80px" }}>
-        <div className="hero-grid">
-          <div>
-            <div style={{ fontSize: 12, color: "var(--info)", fontWeight: 500, marginBottom: 16 }}>
-              Thailand rental store
+      {/* Committed register: hero lives on --warm (champagne) — the surface
+          itself carries brand color, not relying on the dress art to do it. */}
+      <section
+        className="section-pad"
+        style={{ background: "var(--warm)", padding: "72px 0 96px" }}
+      >
+        <div className="shell">
+          <div className="hero-grid">
+            <div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--accent)",
+                  fontWeight: 600,
+                  marginBottom: 20,
+                  letterSpacing: "0.02em",
+                }}
+              >
+                ร้านเช่าชุดในกรุงเทพ
+              </div>
+              <h1
+                className="hero-title"
+                style={{
+                  marginBottom: 22,
+                }}
+              >
+                เช่าชุดจากร้านที่ไว้ใจได้
+                <br />
+                เลือกง่าย จองตรงกับร้าน
+              </h1>
+              <p
+                className="hero-sub"
+                style={{
+                  fontSize: 18,
+                  color: "var(--ink-2)",
+                  maxWidth: 480,
+                  marginBottom: 32,
+                  lineHeight: 1.55,
+                }}
+              >
+                เห็นชุดที่ใช่ กดคุยกับร้านได้ทันที
+              </p>
+              <div className="hero-cta" style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <Link href="/browse" className="btn btn-dark btn-lg">
+                  เริ่มเลือกชุด
+                </Link>
+                <Link href="/boutiques" className="btn btn-outline btn-lg">
+                  ดูร้านทั้งหมด
+                </Link>
+              </div>
+              <div
+                className="hero-stats"
+                style={{
+                  display: "flex",
+                  gap: 48,
+                  marginTop: 48,
+                  paddingTop: 28,
+                  borderTop: "1px solid var(--line)",
+                  flexWrap: "wrap",
+                }}
+              >
+                <Stat num={String(stats.boutiques)} lbl="ร้าน" />
+                <Stat num={String(stats.dresses)} lbl="ชุด" />
+                <Stat num={`฿${stats.minPrice.toLocaleString()}`} lbl="เริ่มต้น/วัน" />
+              </div>
             </div>
-            <h1
-              className="hero-title"
-              style={{
-                fontSize: 48,
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                lineHeight: 1.1,
-                marginBottom: 18,
-              }}
-            >
-              เช่าชุดจากร้านที่ไว้ใจได้
-              <br />
-              เลือกง่าย จองตรงกับร้าน
-            </h1>
-            <p
-              className="hero-sub"
-              style={{
-                fontSize: 17,
-                color: "var(--ink-2)",
-                maxWidth: 480,
-                marginBottom: 28,
-                lineHeight: 1.55,
-              }}
-            >
-              เห็นชุดที่ใช่ กดคุยกับร้านได้ทันที
-            </p>
-            <div className="hero-cta" style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <Link href="/browse" className="btn btn-dark btn-lg">
-                เริ่มเลือกชุด
-              </Link>
-              <Link href="/boutiques" className="btn btn-outline btn-lg">
-                ดูร้านทั้งหมด
-              </Link>
+            <div style={{ aspectRatio: "4/5", borderRadius: 12, overflow: "hidden" }}>
+              {heroDress ? <DressArt color={heroDress.color} variant={1} /> : null}
             </div>
-            <div
-              className="hero-stats"
-              style={{
-                display: "flex",
-                gap: 36,
-                marginTop: 40,
-                paddingTop: 24,
-                borderTop: "1px solid var(--line)",
-                flexWrap: "wrap",
-              }}
-            >
-              <Stat num={String(stats.boutiques)} lbl="ร้าน" />
-              <Stat num={String(stats.dresses)} lbl="ชุด" />
-              <Stat num={`฿${stats.minPrice.toLocaleString()}`} lbl="เริ่มต้น/วัน" />
-            </div>
-          </div>
-          <div style={{ aspectRatio: "4/5", borderRadius: 8, overflow: "hidden" }}>
-            {heroDress ? <DressArt color={heroDress.color} variant={1} /> : null}
           </div>
         </div>
       </section>
@@ -123,9 +134,18 @@ export default async function HomePage() {
       </div>
 
       {/* ========== HOW IT WORKS ========== */}
-      <section className="section-pad" style={{ background: "var(--warm)", padding: "60px 0" }}>
+      <section className="section-pad" style={{ background: "var(--bg)", padding: "72px 0" }}>
         <div className="shell">
-          <h2 style={{ fontSize: 24, fontWeight: 600, marginBottom: 28 }}>วิธีใช้งาน</h2>
+          <h2
+            style={{
+              fontSize: 32,
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
+              marginBottom: 36,
+            }}
+          >
+            วิธีใช้งาน
+          </h2>
           <div className="grid-3" style={{ gap: 24 }}>
             <Step n="1" t="เลือกชุด" d="กรองตามโอกาส สี ขนาด ราคา ดีไซเนอร์ ร้านเช่า หาชุดที่ใช่ภายในไม่กี่คลิก" />
             <Step n="2" t="แชต LINE กับร้าน" d="กดปุ่มเปิด LINE ตรงไปคุยกับร้านเช่า ตกลงวัน ราคา การส่ง" />
@@ -184,7 +204,7 @@ export default async function HomePage() {
       </section>
 
       {/* ========== JUST IN (NEW) ========== */}
-      <section className="section-pad" style={{ background: "var(--warm)", padding: "60px 0" }}>
+      <section className="section-pad" style={{ background: "var(--warm)", padding: "72px 0" }}>
         <div className="shell">
           <SectionHead title="มาใหม่" linkText={`ดูทั้งหมด ${stats.dresses} ชุด →`} linkHref="/browse" />
           <div className="grid-4" style={{ gap: 20 }}>
@@ -278,8 +298,10 @@ export default async function HomePage() {
 function Stat({ num, lbl }: { num: string; lbl: string }) {
   return (
     <div>
-      <div style={{ fontSize: 24, fontWeight: 600 }}>{num}</div>
-      <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{lbl}</div>
+      <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1 }}>
+        {num}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 6 }}>{lbl}</div>
     </div>
   );
 }
@@ -344,6 +366,7 @@ function Step({ n, t, d }: { n: string; t: string; d: string }) {
   );
 }
 
+// SectionHead component
 function SectionHead({
   title,
   linkText,
@@ -364,7 +387,16 @@ function SectionHead({
         gap: 12,
       }}
     >
-      <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.01em" }}>{title}</h2>
+      <h2
+        style={{
+          fontSize: 32,
+          fontWeight: 700,
+          letterSpacing: "-0.02em",
+          lineHeight: 1.1,
+        }}
+      >
+        {title}
+      </h2>
       <Link href={linkHref} style={{ fontSize: 14, color: "var(--ink-2)", padding: "6px 0" }}>
         {linkText}
       </Link>

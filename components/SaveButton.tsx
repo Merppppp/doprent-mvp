@@ -54,13 +54,13 @@ export default function SaveButton({
         style={{
           width: 48,
           padding: 0,
-          border: `1px solid ${saved ? "var(--danger)" : "var(--line)"}`,
+          border: `1px solid ${saved ? "var(--accent)" : "var(--line)"}`,
           background: "var(--surface)",
           borderRadius: 6,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: saved ? "var(--danger)" : "var(--ink-2)",
+          color: saved ? "var(--accent)" : "var(--ink-2)",
           cursor: isPending ? "wait" : "pointer",
         }}
       >
@@ -83,11 +83,12 @@ export default function SaveButton({
         width: 32,
         height: 32,
         borderRadius: 999,
-        background: "rgba(255,255,255,0.92)",
+        background: "oklch(0.99 0.005 35 / 0.93)",
+        backdropFilter: "blur(6px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: saved ? "var(--danger)" : "var(--ink-2)",
+        color: saved ? "var(--accent)" : "var(--ink-2)",
         cursor: isPending ? "wait" : "pointer",
         zIndex: 2,
       }}

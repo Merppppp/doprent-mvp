@@ -4,23 +4,33 @@
 
 /* ============================================================
    DopRent design tokens
-   All neutrals tinted toward the brand hue (warm rose, ~30°).
-   Chroma 0.003–0.014 — invisible per-token, cohesive in aggregate.
+   Warm-rose neutrals (hue ~30°), visible champagne warmth on
+   ambient surfaces. Bolder than the polish pass: chroma pushed
+   from 0.005-0.008 to 0.015-0.025 so the tint is perceivable
+   on a single screen, not just in aggregate.
    ============================================================ */
 :root {
   /* Neutrals — warm-rose tinted, never pure black/white */
-  --ink: oklch(0.18 0.008 30);
-  --ink-2: oklch(0.42 0.008 30);
-  --ink-3: oklch(0.62 0.008 30);
-  --line: oklch(0.92 0.006 30);
-  --line-2: oklch(0.955 0.005 30);
-  --bg: oklch(0.985 0.005 35);
-  --surface: oklch(0.995 0.003 35);
-  --warm: oklch(0.965 0.014 60);
+  --ink: oklch(0.18 0.015 30);
+  --ink-2: oklch(0.42 0.012 30);
+  --ink-3: oklch(0.62 0.012 30);
+  --line: oklch(0.9 0.015 35);
+  --line-2: oklch(0.94 0.012 35);
+  --bg: oklch(0.98 0.01 40);
+  --surface: oklch(0.995 0.005 35);
+
+  /* Ambient warm surface — visibly champagne now. Used for hero,
+     how-it-works, just-in sections. */
+  --warm: oklch(0.93 0.03 70);
+
+  /* Brand accent — warm terracotta/rust. The DopRent brand color
+     of record. Use sparingly: hero eyebrow, save heart, key CTAs. */
+  --accent: oklch(0.6 0.16 25);
+  --accent-2: oklch(0.5 0.18 25); /* darker hover state */
 
   /* For text/icons on dark ink surfaces — slightly warm off-white,
      never raw #fff. Use this instead of "#fff" everywhere. */
-  --on-dark: oklch(0.985 0.005 35);
+  --on-dark: oklch(0.99 0.008 35);
 
   /* Accent / functional */
   --line-green: #06C755; /* LINE's actual brand color — keep exact */
@@ -49,7 +59,21 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: "kern", "liga", "calt";
-  letter-spacing: 0.005em;
+}
+
+/* Display sizes — used by .hero-title and .page-title via inline styles.
+   Default values here apply on desktop; mobile overrides live in the
+   @media (max-width: 600px) block below. */
+.hero-title {
+  font-size: 64px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.035em !important;
+  line-height: 1.02 !important;
+}
+.page-title {
+  font-size: 40px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
 }
 
 button {

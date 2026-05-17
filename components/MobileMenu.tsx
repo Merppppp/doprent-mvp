@@ -207,8 +207,8 @@ export default function MobileMenu({ user }: Props) {
                         width="18"
                         height="18"
                         viewBox="0 0 24 24"
-                        fill={user.savedCount > 0 ? "#E11D48" : "none"}
-                        stroke={user.savedCount > 0 ? "#E11D48" : "var(--ink)"}
+                        fill={user.savedCount > 0 ? "var(--accent)" : "none"}
+                        stroke={user.savedCount > 0 ? "var(--accent)" : "var(--ink)"}
                         strokeWidth="1.8"
                         strokeLinecap="round"
                         strokeLinejoin="round"

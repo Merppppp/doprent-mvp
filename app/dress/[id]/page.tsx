@@ -357,7 +357,7 @@ export default async function DressPage({ params }: { params: Params }) {
             gap: 12,
           }}
         >
-          <h2 style={{ fontSize: 24, fontWeight: 600 }}>ชุดที่คล้ายกัน</h2>
+          <h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>ชุดที่คล้ายกัน</h2>
           <Link href="/browse" style={{ fontSize: 14, color: "var(--ink-2)" }}>
             ดูทั้งหมด →
           </Link>
