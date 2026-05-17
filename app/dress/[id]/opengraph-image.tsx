@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { getDressBySlug } from "@/lib/dresses";
 
 export const runtime = "edge";
-export const alt = "DopRent — Bangkok boutique rental";
+export const alt = "DopRent · Bangkok boutique rental";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -38,7 +38,7 @@ export default async function OG({ params }: { params: { id: string } }) {
               borderRadius: 999
             }}
           />
-          <div style={{ fontSize: 28, letterSpacing: 2, textTransform: "uppercase" }}>DopRent</div>
+          <div style={{ fontSize: 28, letterSpacing: 1, fontWeight: 600 }}>DopRent</div>
         </div>
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>

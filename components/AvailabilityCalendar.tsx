@@ -193,13 +193,13 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
               aria-label={`${cell.date.getDate()} ${MONTHS_TH[viewMonth]}${isBlocked ? " (ไม่ว่าง)" : " (ว่าง)"}`}
               style={{
                 aspectRatio: "1/1",
-                border: `1px solid ${isBlocked ? "#DC2626" : isToday ? "var(--ink)" : "var(--line)"}`,
+                border: `1px solid ${isBlocked ? "var(--danger)" : isToday ? "var(--ink)" : "var(--line)"}`,
                 background: isBlocked
-                  ? "#DC2626"
+                  ? "var(--danger)"
                   : isPast
                     ? "var(--bg)"
                     : "var(--surface)",
-                color: isBlocked ? "#fff" : isPast ? "var(--ink-3)" : "var(--ink)",
+                color: isBlocked ? "var(--on-dark)" : isPast ? "var(--ink-3)" : "var(--ink)",
                 borderRadius: 6,
                 cursor: isPast ? "not-allowed" : pending ? "wait" : "pointer",
                 fontSize: 14,

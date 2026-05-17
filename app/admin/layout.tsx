@@ -33,12 +33,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <span
           style={{
             background: "var(--info)",
-            color: "#fff",
-            fontSize: 10,
-            padding: "3px 8px",
-            borderRadius: 3,
-            letterSpacing: "0.05em",
-            textTransform: "uppercase",
+            color: "var(--on-dark)",
+            fontSize: 11,
+            padding: "3px 9px",
+            borderRadius: 999,
             fontWeight: 600,
             alignSelf: "center",
             marginRight: 6,

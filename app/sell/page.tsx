@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 
 export const metadata: Metadata = {
-  title: "เปิดร้านบน DopRent — ขายชุดเช่าไม่มีค่าธรรมเนียม",
+  title: "เปิดร้านบน DopRent",
   description:
     "ร้านเช่าชุดในกรุงเทพฯ ลงประกาศฟรี · ลูกค้าทักร้านผ่าน LINE ตรง · DopRent ไม่หักเปอร์เซ็นต์",
   alternates: { canonical: `${SITE}/sell` },
@@ -169,7 +169,7 @@ export default async function SellLanding() {
                     top: -10,
                     right: 16,
                     background: "var(--ink)",
-                    color: "#fff",
+                    color: "var(--on-dark)",
                     fontSize: 10,
                     fontWeight: 600,
                     padding: "3px 8px",
@@ -223,9 +223,9 @@ export default async function SellLanding() {
         </h2>
         <Faq q="DopRent หักค่าธรรมเนียมจากการเช่ามั้ย?" a="ไม่หัก ลูกค้าโอนตรงให้ร้าน DopRent ไม่เก็บเงิน เราคิดค่าบริการเฉพาะแพ็กเกจ Boost/Featured เป็นรายเดือน" />
         <Faq q="ต้องมีหน้าร้านมั้ย?" a="ไม่จำเป็น Home studio / Online-only ใช้บริการเราได้เลย แต่ต้องระบุย่านบริการ เช่น ทองหล่อ / สยาม" />
-        <Faq q="ลูกค้าจ่ายเงินยังไง?" a="ตกลงกับลูกค้าใน LINE — โอนผ่าน PromptPay หรือธนาคาร ค่ามัดจำคุณกำหนดเอง" />
+        <Faq q="ลูกค้าจ่ายเงินยังไง?" a="ตกลงกับลูกค้าใน LINE โอนผ่าน PromptPay หรือธนาคาร ค่ามัดจำคุณกำหนดเอง" />
         <Faq q="KYC คืออะไร?" a="ขั้นตอนยืนยันตัวตน ส่งบัตรประชาชน/หนังสือรับรองบริษัท + เลขบัญชีธนาคาร ใช้เวลา 24-72 ชม. ทุกร้านต้องทำเพื่อให้ admin อนุมัติร้านขึ้นออนไลน์ — แต่ ✓ verified badge จะแสดงเฉพาะร้านที่อยู่แพ็กเกจ Boost หรือ Featured" />
-        <Faq q="ถ้าอยากเลิกขาย?" a="แจ้งทีม DopRent ผ่าน LINE ทางการ — ปิดร้านได้ทันที ไม่มีค่าธรรมเนียม" />
+        <Faq q="ถ้าอยากเลิกขาย?" a="แจ้งทีม DopRent ผ่าน LINE ทางการ ปิดร้านได้ทันที ไม่มีค่าธรรมเนียม" />
       </div>
     </div>
   );

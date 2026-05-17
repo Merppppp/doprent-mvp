@@ -28,9 +28,9 @@ const DEFAULT_LINE =
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const dress = await getDressBySlug(params.id);
   if (!dress) {
-    return { title: "ไม่พบชุด — DopRent", robots: { index: false, follow: true } };
+    return { title: "ไม่พบชุด", robots: { index: false, follow: true } };
   }
-  const title = `${dress.name} · ${dress.designer ?? ""} — DopRent`;
+  const title = dress.designer ? `${dress.name} · ${dress.designer}` : dress.name;
   const description = `${dress.description ?? dress.name} ค่าเช่า ฿${dress.price_per_day.toLocaleString()}/วัน · จองผ่าน LINE กับ ${dress.boutique_name}`;
   const url = `${SITE}/dress/${dress.slug}`;
   return {
@@ -269,7 +269,10 @@ export default async function DressPage({ params }: { params: Params }) {
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
-              marginBottom: 20,
+              rowGap: 14,
+              columnGap: 24,
+              marginBottom: 24,
+              paddingTop: 18,
               borderTop: "1px solid var(--line)",
             }}
           >
@@ -298,7 +301,7 @@ export default async function DressPage({ params }: { params: Params }) {
             <div style={{ flex: 1 }}>
               <LineButton
                 href={boutiqueLine}
-                label={`จองผ่าน LINE — ${dress.boutique_name}`}
+                label={`จองผ่าน LINE · ${dress.boutique_name}`}
                 variant="primary"
                 source="detail_primary"
                 dressId={dress.id}
@@ -337,7 +340,7 @@ export default async function DressPage({ params }: { params: Params }) {
             <strong style={{ color: "var(--ink)", display: "block", marginBottom: 4 }}>
               ขั้นตอนต่อจากนี้
             </strong>
-            ตกลงวันใส่ ราคา การส่ง — คุยกับร้านโดยตรงทาง LINE จ่ายผ่าน PromptPay หรือโอนตรงให้ร้าน DopRent ไม่เก็บเงิน
+            ตกลงวันใส่ ราคา การส่ง คุยกับร้านโดยตรงทาง LINE จ่ายผ่าน PromptPay หรือโอนตรงให้ร้าน DopRent ไม่เก็บเงิน
           </div>
         </div>
       </div>
@@ -377,9 +380,11 @@ export default async function DressPage({ params }: { params: Params }) {
 
 function Spec({ lbl, val }: { lbl: string; val: string }) {
   return (
-    <div style={{ padding: "12px 16px 12px 0", borderBottom: "1px solid var(--line)" }}>
-      <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 3 }}>{lbl}</div>
-      <div style={{ fontSize: 14, fontWeight: 500 }}>{val}</div>
+    <div>
+      <div style={{ fontSize: 11, color: "var(--ink-3)", marginBottom: 4, letterSpacing: "0.02em" }}>
+        {lbl}
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 500 }}>{val}</div>
     </div>
   );
 }

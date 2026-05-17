@@ -72,7 +72,7 @@ export async function createBoutique(formData: FormData): Promise<{
   if (!isValidLineContact(lineUrlRaw)) {
     return {
       ok: false,
-      error: "ลิงก์ LINE ไม่ถูกต้อง — ใส่ @ชื่อ, ชื่อ, หรือลิงก์เต็มจาก LINE",
+      error: "ลิงก์ LINE ไม่ถูกต้อง: ใส่ @ชื่อ, ชื่อ, หรือลิงก์เต็มจาก LINE",
     };
   }
   if (

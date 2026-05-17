@@ -5,7 +5,7 @@ import DressRow from "./DressRow";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Dresses — DopRent Admin",
+  title: "Dresses · Admin",
   robots: { index: false, follow: false },
 };
 
@@ -67,10 +67,8 @@ export default async function DressesAdmin({
               border: `1px solid ${activeStatus === s ? "var(--ink)" : "var(--line)"}`,
               borderRadius: 6,
               background: activeStatus === s ? "var(--ink)" : "var(--surface)",
-              color: activeStatus === s ? "#fff" : "var(--ink)",
-              fontWeight: activeStatus === s ? 600 : 400,
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
+              color: activeStatus === s ? "var(--on-dark)" : "var(--ink)",
+              fontWeight: activeStatus === s ? 600 : 500,
             }}
           >
             {s}

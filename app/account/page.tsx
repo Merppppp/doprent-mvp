@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Dress } from "@/lib/types";
 
-export const metadata: Metadata = { title: "บัญชีของฉัน — DopRent", robots: { index: false } };
+export const metadata: Metadata = { title: "บัญชีของฉัน", robots: { index: false } };
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +54,7 @@ export default async function AccountPage() {
                 height: 48,
                 borderRadius: 999,
                 background: "var(--ink)",
-                color: "#fff",
+                color: "var(--on-dark)",
                 fontSize: 18,
                 fontWeight: 600,
                 display: "flex",
@@ -71,7 +71,7 @@ export default async function AccountPage() {
                 <span
                   style={{
                     background: "var(--info)",
-                    color: "#fff",
+                    color: "var(--on-dark)",
                     fontSize: 10,
                     padding: "2px 6px",
                     borderRadius: 3,
@@ -98,7 +98,7 @@ export default async function AccountPage() {
                 borderRadius: 6,
                 fontSize: 14,
                 background: "var(--info)",
-                color: "#fff",
+                color: "var(--on-dark)",
                 fontWeight: 500,
                 textAlign: "center",
                 marginBottom: 8,

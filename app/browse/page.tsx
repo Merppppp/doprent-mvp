@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 
 export const metadata: Metadata = {
-  title: "ดูชุดทั้งหมด — DopRent",
+  title: "ดูชุดทั้งหมด",
   description: "เลือกดูชุดเดรสเช่าจากร้านในกรุงเทพฯ กรองตามสี โอกาส ขนาด ทักร้านผ่าน LINE ได้ทันที",
   alternates: { canonical: `${SITE}/browse` },
 };
@@ -82,7 +82,7 @@ export default async function BrowsePage({
             : "ทั้งหมด"}
         </h1>
         <div style={{ color: "var(--ink-3)", fontSize: 14, marginTop: 6 }}>
-          คัดจากร้านเช่าในกรุงเทพ — กดเข้าไปดูแล้วทักร้านผ่าน LINE
+          คัดจากร้านเช่าในกรุงเทพ กดเข้าไปดูแล้วทักร้านผ่าน LINE
         </div>
       </div>
 
@@ -331,9 +331,20 @@ function DesignerFilter({
 }
 
 function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  // Spacing-only separation between filter groups — borders between every group
+  // creates visual fatigue in a narrow sidebar.
   return (
-    <div style={{ padding: "18px 0", borderTop: "1px solid var(--line)" }}>
-      <div style={{ fontSize: 13, marginBottom: 10, fontWeight: 600 }}>{title}</div>
+    <div style={{ padding: "20px 0 4px" }}>
+      <div
+        style={{
+          fontSize: 12,
+          marginBottom: 10,
+          fontWeight: 600,
+          color: "var(--ink-3)",
+        }}
+      >
+        {title}
+      </div>
       {children}
     </div>
   );
@@ -356,7 +367,7 @@ function colorChipStyle(active: boolean): React.CSSProperties {
     borderRadius: 6,
     fontSize: 12,
     background: active ? "var(--ink)" : "var(--surface)",
-    color: active ? "#fff" : "var(--ink)",
+    color: active ? "var(--on-dark)" : "var(--ink)",
     display: "inline-flex",
     alignItems: "center",
     cursor: "pointer",
@@ -369,7 +380,7 @@ function sizeBtnStyle(active: boolean): React.CSSProperties {
     border: `1px solid ${active ? "var(--ink)" : "var(--line)"}`,
     borderRadius: 6,
     background: active ? "var(--ink)" : "var(--surface)",
-    color: active ? "#fff" : "var(--ink)",
+    color: active ? "var(--on-dark)" : "var(--ink)",
     fontSize: 13,
     flex: 1,
     fontWeight: 500,

@@ -10,7 +10,7 @@ import type { Color, OccasionKey, Size } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "แก้ไขชุด — DopRent",
+  title: "แก้ไขชุด",
   robots: { index: false, follow: false },
 };
 
@@ -45,7 +45,7 @@ export default async function EditDressPage({ params }: { params: { id: string }
         ← กลับ Dashboard
       </Link>
       <h1 className="page-title" style={{ fontSize: 28, fontWeight: 600, margin: "12px 0 24px" }}>
-        แก้ไขชุด — {dress.name}
+        แก้ไขชุด · {dress.name}
       </h1>
       <DressForm
         mode="edit"

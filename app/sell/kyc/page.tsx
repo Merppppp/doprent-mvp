@@ -7,7 +7,7 @@ import KycWizard from "./KycWizard";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "ยืนยันตัวตน — DopRent",
+  title: "ยืนยันตัวตน",
   robots: { index: false, follow: false },
 };
 
@@ -33,10 +33,10 @@ export default async function KycPage({
         className="page-title"
         style={{ fontSize: 30, fontWeight: 600, marginBottom: 6, letterSpacing: "-0.01em" }}
       >
-        ยืนยันตัวตน — {boutique.name}
+        ยืนยันตัวตน · {boutique.name}
       </h1>
       <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 14 }}>
-        ขั้นที่ 2/3 — ส่งเอกสารยืนยันตัวตน ทีม DopRent ตรวจภายใน 24-72 ชม.
+        ขั้นที่ 2/3 · ส่งเอกสารยืนยันตัวตน ทีม DopRent ตรวจภายใน 24-72 ชม.
       </p>
       <p style={{ fontSize: 13, marginBottom: 28 }}>
         ใส่ข้อมูลร้านผิด?{" "}
@@ -58,7 +58,7 @@ export default async function KycPage({
           <div style={{ fontWeight: 600, marginBottom: 4 }}>
             {boutique.kyc_status === "verified"
               ? "✓ KYC ผ่านแล้ว"
-              : "⏳ ส่งเอกสารแล้ว — รอตรวจ"}
+              : "⏳ ส่งเอกสารแล้ว · รอตรวจ"}
           </div>
           <div style={{ fontSize: 13, color: "var(--ink-2)" }}>
             {boutique.kyc_status === "verified"

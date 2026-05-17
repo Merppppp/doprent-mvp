@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "DopRent — เช่าชุดดีไซเนอร์ในกรุงเทพฯ";
+export const alt = "DopRent · เช่าชุดดีไซเนอร์ในกรุงเทพฯ";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -22,7 +22,7 @@ export default function OG() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 14, height: 14, background: "#c98a8a", borderRadius: 999 }} />
-          <div style={{ fontSize: 28, letterSpacing: 2, textTransform: "uppercase" }}>DopRent</div>
+          <div style={{ fontSize: 28, letterSpacing: 1, fontWeight: 600 }}>DopRent</div>
         </div>
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>

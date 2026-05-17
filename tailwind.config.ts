@@ -4,19 +4,24 @@ const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      // Tailwind color tokens kept in sync with the CSS custom properties
+      // in app/globals.css (which are the source of truth — OKLCH, warm-tinted).
+      // Tailwind doesn't accept oklch() in arbitrary contexts pre-v4, so we
+      // reference the vars directly. Use `bg-ink`, `text-ink-2`, etc. as before.
       colors: {
-        ink: "#0A0A0A",
-        "ink-2": "#4A4A4A",
-        "ink-3": "#8A8A8A",
-        line: "#E5E5E5",
-        "line-2": "#F0F0F0",
-        bg: "#FAFAFA",
-        surface: "#FFFFFF",
-        warm: "#F5F4F0",
-        "line-green": "#06C755",
-        danger: "#DC2626",
-        success: "#059669",
-        info: "#2563EB",
+        ink: "var(--ink)",
+        "ink-2": "var(--ink-2)",
+        "ink-3": "var(--ink-3)",
+        line: "var(--line)",
+        "line-2": "var(--line-2)",
+        bg: "var(--bg)",
+        surface: "var(--surface)",
+        warm: "var(--warm)",
+        "on-dark": "var(--on-dark)",
+        "line-green": "var(--line-green)",
+        danger: "var(--danger)",
+        success: "var(--success)",
+        info: "var(--info)",
       },
       fontFamily: {
         sans: [

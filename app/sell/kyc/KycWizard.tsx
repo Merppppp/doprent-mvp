@@ -158,7 +158,7 @@ export default function KycWizard({ boutiqueId }: Props) {
                 height: 26,
                 borderRadius: 999,
                 background: step >= s.id ? "var(--ink)" : "var(--bg)",
-                color: step >= s.id ? "#fff" : "var(--ink-3)",
+                color: step >= s.id ? "var(--on-dark)" : "var(--ink-3)",
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -416,7 +416,7 @@ function Step2(props: {
       <h2 style={sectionTitle}>เอกสารยืนยันตัวตน</h2>
       <FileSlot
         label={isCompany ? "หน้าบัตรประชาชนกรรมการ *" : "หน้าบัตรประชาชน *"}
-        hint="JPG / PNG / PDF — ใช้สำหรับยืนยันตัวตนเท่านั้น เก็บเป็นความลับ"
+        hint="JPG / PNG / PDF · ใช้สำหรับยืนยันตัวตนเท่านั้น เก็บเป็นความลับ"
         url={props.idCardUrl}
         field="id_card"
         uploading={props.uploading}

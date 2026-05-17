@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 type Props = {
   /** Base LINE URL (without our query params). */
@@ -109,7 +109,7 @@ export default function DateRangePicker({
     const lines = [
       `สวัสดีค่ะ สนใจเช่าชุด "${dressName}"`,
       `ร้าน: ${boutiqueName}`,
-      `วันที่: ${fmtThai(start)} — ${fmtThai(end)} (${nights} วัน)`,
+      `วันที่: ${fmtThai(start)} ถึง ${fmtThai(end)} (${nights} วัน)`,
     ];
     if (typeof pricePerDay === "number") {
       const total = pricePerDay * nights;
@@ -283,7 +283,7 @@ export default function DateRangePicker({
           }}
         >
           <div style={{ fontWeight: 500, color: "var(--ink)" }}>
-            ระยะเวลา: {nights} วัน ({fmtThai(start)} — {fmtThai(end)})
+            ระยะเวลา: {nights} วัน ({fmtThai(start)} ถึง {fmtThai(end)})
           </div>
           {typeof pricePerDay === "number" ? (
             <div style={{ marginTop: 2 }}>
@@ -311,8 +311,8 @@ export default function DateRangePicker({
             display: "block",
             marginTop: 12,
             padding: "12px 16px",
-            background: "#06C755",
-            color: "#fff",
+            background: "var(--line-green)",
+            color: "var(--on-dark)",
             borderRadius: 6,
             textAlign: "center",
             fontSize: 14,
@@ -320,7 +320,7 @@ export default function DateRangePicker({
             textDecoration: "none",
           }}
         >
-          จองวันนี้ผ่าน LINE — {nights} วัน
+          จองวันนี้ผ่าน LINE · {nights} วัน
         </a>
       ) : null}
     </div>

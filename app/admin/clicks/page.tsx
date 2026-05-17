@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "LINE Clicks — DopRent Admin",
+  title: "LINE Clicks · Admin",
   robots: { index: false, follow: false },
 };
 
@@ -119,7 +119,7 @@ export default async function ClicksAdmin({
               border: `1px solid ${activeRange === r.key ? "var(--ink)" : "var(--line)"}`,
               borderRadius: 6,
               background: activeRange === r.key ? "var(--ink)" : "var(--surface)",
-              color: activeRange === r.key ? "#fff" : "var(--ink)",
+              color: activeRange === r.key ? "var(--on-dark)" : "var(--ink)",
               fontWeight: activeRange === r.key ? 600 : 400,
             }}
           >

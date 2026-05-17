@@ -157,7 +157,7 @@ function SavedLink({ count }: { count: number }) {
             padding: "0 5px",
             borderRadius: 999,
             background: "var(--ink)",
-            color: "#fff",
+            color: "var(--on-dark)",
             fontSize: 10,
             fontWeight: 600,
             display: "inline-flex",
@@ -210,7 +210,7 @@ function UserMenu({
             height: 28,
             borderRadius: 999,
             background: "var(--ink)",
-            color: "#fff",
+            color: "var(--on-dark)",
             fontSize: 11,
             fontWeight: 600,
             display: "flex",
@@ -254,7 +254,7 @@ function UserMenu({
               <span
                 style={{
                   background: "var(--info)",
-                  color: "#fff",
+                  color: "var(--on-dark)",
                   fontSize: 10,
                   padding: "2px 6px",
                   borderRadius: 3,

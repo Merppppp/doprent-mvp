@@ -5,7 +5,7 @@ import KycRow from "./KycRow";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "KYC Review — DopRent Admin",
+  title: "KYC Review · Admin",
   robots: { index: false, follow: false },
 };
 
@@ -70,10 +70,8 @@ export default async function KycReviewPage({
               border: `1px solid ${activeStatus === s ? "var(--ink)" : "var(--line)"}`,
               borderRadius: 6,
               background: activeStatus === s ? "var(--ink)" : "var(--surface)",
-              color: activeStatus === s ? "#fff" : "var(--ink)",
-              fontWeight: activeStatus === s ? 600 : 400,
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
+              color: activeStatus === s ? "var(--on-dark)" : "var(--ink)",
+              fontWeight: activeStatus === s ? 600 : 500,
             }}
           >
             {s}

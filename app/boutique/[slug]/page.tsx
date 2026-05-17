@@ -16,9 +16,9 @@ type Params = { slug: string };
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const b = await getBoutiqueBySlug(params.slug);
-  if (!b) return { title: "ไม่พบร้าน — DopRent", robots: { index: false } };
+  if (!b) return { title: "ไม่พบร้าน", robots: { index: false } };
   return {
-    title: `${b.name} — DopRent`,
+    title: b.name,
     description: b.tag ?? `${b.name} · ${b.area_label}`,
     alternates: { canonical: `${SITE}/boutique/${b.slug}` },
   };
@@ -139,7 +139,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
             borderRadius: 8,
           }}
         >
-          ยังไม่มีชุดในร้านนี้ — ทักร้านสอบถามได้
+          ยังไม่มีชุดในร้านนี้ ทักร้านสอบถามได้
         </div>
       ) : (
         <div className="grid-3" style={{ gap: 20 }}>

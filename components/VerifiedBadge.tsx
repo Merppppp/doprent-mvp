@@ -37,7 +37,7 @@ export default function VerifiedBadge({ size = "sm", withLabel = false }: Props)
         />
         <path
           d="M6.5 10.5L9 13L13.5 7.5"
-          stroke="#fff"
+          stroke="oklch(0.985 0.005 35)"
           strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"

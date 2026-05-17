@@ -8,7 +8,7 @@ import AvailabilityCalendar from "@/components/AvailabilityCalendar";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "ปฏิทินวันว่าง — DopRent",
+  title: "ปฏิทินวันว่าง",
   robots: { index: false, follow: false },
 };
 
@@ -51,10 +51,10 @@ export default async function DressCalendarPage({ params }: { params: { id: stri
         ← กลับ Dashboard
       </Link>
       <h1 className="page-title" style={{ fontSize: 26, fontWeight: 600, margin: "12px 0 4px" }}>
-        ปฏิทินวันว่าง — {dress.name}
+        ปฏิทินวันว่าง · {dress.name}
       </h1>
       <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
-        กดที่วันที่ที่ชุดนี้ <b>ไม่ว่าง</b> (เช่น มีลูกค้าจองอยู่แล้ว) — ระบบจะบล็อกไม่ให้ลูกค้าเลือกวันนั้น
+        กดที่วันที่ที่ชุดนี้ <b>ไม่ว่าง</b> (เช่น มีลูกค้าจองอยู่แล้ว) ระบบจะบล็อกไม่ให้ลูกค้าเลือกวันนั้น
       </p>
 
       <div
@@ -69,7 +69,7 @@ export default async function DressCalendarPage({ params }: { params: { id: stri
       </div>
 
       <div style={{ marginTop: 20, fontSize: 13, color: "var(--ink-3)", lineHeight: 1.6 }}>
-        เคล็ดลับ: อัปเดตปฏิทินทุกครั้งหลังจบงานลูกค้า — ลูกค้าใหม่จะเห็นวันที่จองชุดได้ทันที
+        เคล็ดลับ: อัปเดตปฏิทินทุกครั้งหลังจบงานลูกค้า ลูกค้าใหม่จะเห็นวันที่จองชุดได้ทันที
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Admin Overview — DopRent",
+  title: "Admin Overview",
   robots: { index: false, follow: false },
 };
 

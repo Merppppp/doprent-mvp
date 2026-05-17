@@ -9,7 +9,7 @@ import DressForm from "../DressForm";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "เพิ่มชุดใหม่ — DopRent",
+  title: "เพิ่มชุดใหม่",
   robots: { index: false, follow: false },
 };
 

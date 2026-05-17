@@ -7,7 +7,7 @@ import SignupForm from "./SignupForm";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "สมัครเปิดร้าน — DopRent",
+  title: "สมัครเปิดร้าน",
   robots: { index: false, follow: false },
 };
 
@@ -41,7 +41,7 @@ export default async function SellSignupPage() {
         เปิดร้านของคุณ
       </h1>
       <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 28 }}>
-        ขั้นที่ 1/3 — กรอกข้อมูลร้าน (ขั้น 2: KYC, ขั้น 3: เพิ่มชุดแรก)
+        ขั้นที่ 1/3 · กรอกข้อมูลร้าน (ขั้น 2: KYC, ขั้น 3: เพิ่มชุดแรก)
       </p>
 
       <SignupForm areas={areas} />

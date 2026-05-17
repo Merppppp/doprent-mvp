@@ -3,21 +3,30 @@
 @tailwind utilities;
 
 /* ============================================================
-   DopRent design tokens — ported from doprent-v0.1-demo.html
+   DopRent design tokens
+   All neutrals tinted toward the brand hue (warm rose, ~30°).
+   Chroma 0.003–0.014 — invisible per-token, cohesive in aggregate.
    ============================================================ */
 :root {
-  --ink: #0A0A0A;
-  --ink-2: #4A4A4A;
-  --ink-3: #8A8A8A;
-  --line: #E5E5E5;
-  --line-2: #F0F0F0;
-  --bg: #FAFAFA;
-  --surface: #FFFFFF;
-  --warm: #F5F4F0;
-  --line-green: #06C755;
-  --danger: #DC2626;
-  --success: #059669;
-  --info: #2563EB;
+  /* Neutrals — warm-rose tinted, never pure black/white */
+  --ink: oklch(0.18 0.008 30);
+  --ink-2: oklch(0.42 0.008 30);
+  --ink-3: oklch(0.62 0.008 30);
+  --line: oklch(0.92 0.006 30);
+  --line-2: oklch(0.955 0.005 30);
+  --bg: oklch(0.985 0.005 35);
+  --surface: oklch(0.995 0.003 35);
+  --warm: oklch(0.965 0.014 60);
+
+  /* For text/icons on dark ink surfaces — slightly warm off-white,
+     never raw #fff. Use this instead of "#fff" everywhere. */
+  --on-dark: oklch(0.985 0.005 35);
+
+  /* Accent / functional */
+  --line-green: #06C755; /* LINE's actual brand color — keep exact */
+  --danger: oklch(0.55 0.16 25);
+  --success: oklch(0.55 0.13 150);
+  --info: oklch(0.55 0.12 240);
 }
 
 *,
@@ -86,7 +95,7 @@ img {
 
 ::selection {
   background: var(--ink);
-  color: #fff;
+  color: var(--on-dark);
 }
 
 :where(a, button, [role="button"], input, select, textarea):focus-visible {
@@ -349,10 +358,10 @@ img {
 }
 .btn-dark {
   background: var(--ink);
-  color: #fff;
+  color: var(--on-dark);
 }
 .btn-dark:hover {
-  background: #2a2a2a;
+  background: oklch(0.26 0.01 30);
 }
 .btn-outline {
   border: 1px solid var(--line);
@@ -364,7 +373,7 @@ img {
 }
 .btn-line {
   background: var(--line-green);
-  color: #fff;
+  color: var(--on-dark);
 }
 .btn-line:hover {
   opacity: 0.92;
@@ -377,31 +386,32 @@ img {
   font-size: 15px;
 }
 
-/* Ad badges (Featured / Sponsored) */
+/* Ad badges (Featured / Sponsored) — brand-tinted, no uppercase shouting */
 .ad-badge {
   position: absolute;
   top: 10px;
   left: 10px;
   z-index: 2;
-  background: rgba(255, 255, 255, 0.95);
+  background: oklch(0.99 0.005 35 / 0.94);
   color: var(--ink);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 4px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 999px;
+  letter-spacing: 0;
+  text-transform: none;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  backdrop-filter: blur(6px);
 }
 .ad-badge.featured {
-  background: #fef3c7;
-  color: #92400e;
+  background: oklch(0.94 0.04 75);
+  color: oklch(0.38 0.07 60);
 }
 .ad-badge.sponsored {
   background: var(--ink);
-  color: #fff;
+  color: var(--on-dark);
 }
 .ad-badge .dot {
   width: 5px;
@@ -427,22 +437,22 @@ img {
   border-radius: 999px;
 }
 .status-pending {
-  background: #fef3c7;
-  color: #92400e;
+  background: oklch(0.93 0.04 75);
+  color: oklch(0.4 0.08 60);
 }
 .status-pending .dot {
-  background: #d97706;
+  background: oklch(0.6 0.13 60);
 }
 .status-live {
-  background: #dcfce7;
-  color: #166534;
+  background: oklch(0.93 0.04 150);
+  color: oklch(0.4 0.08 150);
 }
 .status-live .dot {
   background: var(--success);
 }
 .status-rejected {
-  background: #fee2e2;
-  color: #991b1b;
+  background: oklch(0.92 0.04 25);
+  color: oklch(0.45 0.11 25);
 }
 .status-rejected .dot {
   background: var(--danger);

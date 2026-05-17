@@ -9,7 +9,7 @@ export const revalidate = 60;
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 
 export const metadata: Metadata = {
-  title: "ร้านเช่าทั้งหมด — DopRent",
+  title: "ร้านเช่าทั้งหมด",
   description: "รวมร้านเช่าชุดในกรุงเทพฯ ทักร้านผ่าน LINE ได้โดยตรง",
   alternates: { canonical: `${SITE}/boutiques` },
 };

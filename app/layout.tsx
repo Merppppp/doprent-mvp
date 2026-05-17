@@ -8,11 +8,11 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
   title: {
-    default: "DopRent — เช่าชุดดีไซเนอร์ในกรุงเทพฯ",
+    default: "DopRent · เช่าชุดดีไซเนอร์ในกรุงเทพฯ",
     template: "%s · DopRent",
   },
   description:
-    "DopRent — แคตตาล็อกชุดเช่าจากร้านในกรุงเทพฯ ติดต่อจองผ่าน LINE โดยตรงกับร้าน",
+    "DopRent · แคตตาล็อกชุดเช่าจากร้านในกรุงเทพฯ ติดต่อจองผ่าน LINE โดยตรงกับร้าน",
   keywords: [
     "เช่าชุด",
     "ชุดเช่ากรุงเทพ",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "DopRent",
-    title: "DopRent — เช่าชุดดีไซเนอร์ในกรุงเทพฯ",
+    title: "DopRent · เช่าชุดดีไซเนอร์ในกรุงเทพฯ",
     description:
       "แคตตาล็อกชุดเช่าจากร้านในกรุงเทพฯ ติดต่อจองผ่าน LINE โดยตรงกับร้าน",
     url: SITE,
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "DopRent — เช่าชุดดีไซเนอร์ในกรุงเทพฯ",
+    title: "DopRent · เช่าชุดดีไซเนอร์ในกรุงเทพฯ",
     description:
       "แคตตาล็อกชุดเช่าจากร้านในกรุงเทพฯ ติดต่อจองผ่าน LINE โดยตรงกับร้าน",
   },

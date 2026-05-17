@@ -9,7 +9,7 @@ import { DressArt } from "@/components/DressArt";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Dashboard ร้านของฉัน — DopRent",
+  title: "Dashboard ร้านของฉัน",
   robots: { index: false, follow: false },
 };
 
@@ -29,9 +29,9 @@ const STATUS_COLOR: Record<string, string> = {
 
 const KYC_LABEL: Record<string, { text: string; color: string }> = {
   none: { text: "ยังไม่ส่ง KYC", color: "#D97706" },
-  submitted: { text: "ส่ง KYC แล้ว — รอตรวจ", color: "#1F6FEB" },
+  submitted: { text: "ส่ง KYC แล้ว · รอตรวจ", color: "#1F6FEB" },
   verified: { text: "✓ ผ่าน KYC", color: "#15803D" },
-  rejected: { text: "KYC ตีกลับ — กรุณาส่งใหม่", color: "#DC2626" },
+  rejected: { text: "KYC ตีกลับ · กรุณาส่งใหม่", color: "#DC2626" },
 };
 
 export default async function SellerDashboard({
@@ -224,7 +224,7 @@ export default async function SellerDashboard({
                 cursor: "not-allowed",
               }}
             >
-              + เพิ่มชุด (ล็อก — ส่ง KYC ก่อน)
+              + เพิ่มชุด (ล็อก · ส่ง KYC ก่อน)
             </span>
           )}
         </div>

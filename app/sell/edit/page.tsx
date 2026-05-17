@@ -8,7 +8,7 @@ import EditBoutiqueForm from "./EditBoutiqueForm";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "แก้ไขข้อมูลร้าน — DopRent",
+  title: "แก้ไขข้อมูลร้าน",
   robots: { index: false, follow: false },
 };
 
