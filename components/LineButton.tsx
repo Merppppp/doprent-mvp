@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback } from "react";
 
-type Variant = "primary" | "secondary";
+type Variant = "primary" | "secondary" | "inline";
 
 type Props = {
   /** LINE deep link. Only used when isLoggedIn === true; ignored otherwise. */
@@ -63,11 +63,28 @@ export default function LineButton({
     }
   }, [source, dressId, boutiqueId]);
 
-  const buttonClass = `btn ${variant === "primary" ? "btn-line" : "btn-outline"}`;
-  const buttonStyle = {
-    ...(fullWidth ? { width: "100%" } : {}),
-    ...(variant === "primary" ? { fontWeight: 600, padding: "14px" } : {}),
-  } as React.CSSProperties;
+  // "inline" is a low-visual-weight link with icon — used when LineButton
+  // is a SECONDARY action (e.g., "ask shop") that shouldn't compete with
+  // a primary date-picker booking CTA above/below it.
+  const isInline = variant === "inline";
+  const buttonClass = isInline
+    ? "" // no btn class — we want a text-link, not a button shape
+    : `btn ${variant === "primary" ? "btn-line" : "btn-outline"}`;
+  const buttonStyle = isInline
+    ? ({
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        fontSize: 13,
+        fontWeight: 500,
+        color: "var(--line-green)",
+        padding: "4px 0",
+        textDecoration: "none",
+      } as React.CSSProperties)
+    : ({
+        ...(fullWidth ? { width: "100%" } : {}),
+        ...(variant === "primary" ? { fontWeight: 600, padding: "14px" } : {}),
+      } as React.CSSProperties);
 
   // --- Anonymous path: never expose the LINE href ---
   if (!isLoggedIn || !href) {

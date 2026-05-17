@@ -153,9 +153,28 @@ export default async function DressPage({ params }: { params: Params }) {
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8, fontWeight: 500 }}>
             {dress.designer || "—"}
           </div>
-          <h1 style={{ fontSize: 28, fontWeight: 600, marginBottom: 14, lineHeight: 1.2 }}>
-            {dress.name}
-          </h1>
+          {/* H1 + Save heart in a row — moved up here from the bottom CTA
+              section so it doesn't compete with the date-picker booking
+              button. Standard ecommerce pattern (heart-near-title). */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 12,
+              marginBottom: 14,
+            }}
+          >
+            <h1 style={{ fontSize: 28, fontWeight: 600, lineHeight: 1.2, flex: 1 }}>
+              {dress.name}
+            </h1>
+            <SaveButton
+              dressId={dress.id}
+              initialSaved={isSaved}
+              isLoggedIn={isLoggedIn}
+              variant="detail"
+            />
+          </div>
           <div
             style={{
               display: "flex",
@@ -219,7 +238,11 @@ export default async function DressPage({ params }: { params: Params }) {
             })}
           </div>
 
-          {/* Boutique mini */}
+          {/* Boutique mini — primary discoverability hook for the boutique
+              behind this listing. The small "ติดต่อร้านสอบถาม" link below it
+              is the ONLY general-contact path on this page; all other LINE
+              CTAs are gated behind the date picker (so renters commit to
+              dates before booking). */}
           {boutiqueSlug ? (
             <Link
               href={`/boutique/${boutiqueSlug}`}
@@ -230,7 +253,7 @@ export default async function DressPage({ params }: { params: Params }) {
                 padding: 12,
                 border: "1px solid var(--line)",
                 borderRadius: 8,
-                marginBottom: 22,
+                marginBottom: 8,
                 cursor: "pointer",
               }}
             >
@@ -255,7 +278,7 @@ export default async function DressPage({ params }: { params: Params }) {
                 padding: 12,
                 border: "1px solid var(--line)",
                 borderRadius: 8,
-                marginBottom: 22,
+                marginBottom: 8,
                 fontSize: 14,
                 color: "var(--ink-2)",
               }}
@@ -263,6 +286,23 @@ export default async function DressPage({ params }: { params: Params }) {
               ร้าน: <b>{dress.boutique_name}</b>
             </div>
           )}
+
+          {/* Small inline contact link — for renters who want to ask general
+              questions ("ชุดยังว่างมั้ย? ส่ง Grab ได้มั้ย?") without committing
+              to dates yet. Low visual weight so it doesn't compete with the
+              date-picker booking flow below. */}
+          <div style={{ marginBottom: 22, paddingLeft: 4 }}>
+            <LineButton
+              href={isLoggedIn ? boutiqueLine : null}
+              label="ติดต่อร้านสอบถาม"
+              variant="inline"
+              source="detail_inline_ask"
+              dressId={dress.id}
+              boutiqueId={dress.boutique_id}
+              isLoggedIn={isLoggedIn}
+              loginNext={`/dress/${dress.slug}`}
+            />
+          </div>
 
           {/* Specs */}
           <div
@@ -300,45 +340,10 @@ export default async function DressPage({ params }: { params: Params }) {
             loginNext={`/dress/${dress.slug}`}
           />
 
-          {/* CTA — anonymous viewers see a login redirect instead of a LINE
-              link (per product requirement: no LINE contact without auth). */}
-          <div className="detail-cta" style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "stretch" }}>
-            <div style={{ flex: 1 }}>
-              <LineButton
-                href={isLoggedIn ? boutiqueLine : null}
-                label={`จองผ่าน LINE · ${dress.boutique_name}`}
-                variant="primary"
-                source="detail_primary"
-                dressId={dress.id}
-                boutiqueId={dress.boutique_id}
-                fullWidth
-                isLoggedIn={isLoggedIn}
-                loginNext={`/dress/${dress.slug}`}
-              />
-            </div>
-            <SaveButton
-              dressId={dress.id}
-              initialSaved={isSaved}
-              isLoggedIn={isLoggedIn}
-              variant="detail"
-            />
-          </div>
-          {/* Secondary "ask more" CTA only for authenticated users — anon
-              already has one "login to contact" button above; showing a
-              second identical one would be visual noise. */}
-          {isLoggedIn ? (
-            <LineButton
-              href={boutiqueLine}
-              label="ถามรายละเอียดเพิ่มเติม"
-              variant="secondary"
-              source="detail_secondary"
-              dressId={dress.id}
-              boutiqueId={dress.boutique_id}
-              fullWidth
-              isLoggedIn={isLoggedIn}
-              loginNext={`/dress/${dress.slug}`}
-            />
-          ) : null}
+          {/* (CTA stack removed — date picker above is the only booking
+              path; Save heart moved up to H1 row; small inline "ติดต่อ
+              ร้านสอบถาม" lives under the boutique card. This eliminates
+              the 3-stacked-LINE-buttons problem.) */}
 
           <div
             style={{
