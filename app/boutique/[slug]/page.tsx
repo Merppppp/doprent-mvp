@@ -77,7 +77,13 @@ export default async function BoutiquePage({ params }: { params: Params }) {
         </div>
       </div>
 
-      {/* Info grid */}
+      {/* Info grid
+          ⚠️ PRIVACY: never render b.address (full street/house number) here —
+          this page is public. Show only b.area_label (district) so renters
+          can gauge convenience without exposing the boutique's exact location.
+          Full address stays in DB and is visible to the owner in /sell/edit
+          and to admins in /admin/boutiques. The seller will share their
+          pickup address with confirmed renters privately via LINE. */}
       <div
         className="boutique-info-grid"
         style={{
@@ -90,7 +96,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
           margin: "20px 0 28px",
         }}
       >
-        {b.address ? <InfoCell k="ที่ตั้ง" v={b.address} /> : null}
+        <InfoCell k="ย่าน" v={b.area_label} />
         {b.hours ? <InfoCell k="เวลาทำการ" v={b.hours} /> : null}
         {b.instagram ? <InfoCell k="Instagram" v={b.instagram} /> : null}
         {b.since_year ? (

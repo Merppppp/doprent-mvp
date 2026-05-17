@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 export default function SignupPage() {
-  const router = useRouter();
   const sp = useSearchParams();
   const next = sp.get("next") || "/";
 
@@ -15,6 +15,13 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // After successful signup when email confirmation is ON, we show a
+  // "check your email" pending state instead of redirecting. Keeps the user
+  // on this page and gives them clear next steps (verify, resend, etc.).
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "sent">(
+    "idle",
+  );
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,29 +32,156 @@ export default function SignupPage() {
     }
     setLoading(true);
     const sb = createClient();
+    const siteUrl =
+      (typeof window !== "undefined" && window.location.origin) ||
+      "https://doprent.com";
     const { data, error } = await sb.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName },
+        // Where Supabase should redirect after the user clicks the email link.
+        emailRedirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(next)}`,
+      },
     });
     if (error) {
       setError(error.message);
       setLoading(false);
       return;
     }
-    // If email confirmation disabled, Supabase returns a session right away.
-    // If still off in Supabase config (no session), try a manual sign-in.
-    if (!data.session) {
-      const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
-      if (signInErr) {
-        setError(signInErr.message);
-        setLoading(false);
-        return;
-      }
+    // When email confirmation is ON in Supabase:
+    //   data.user exists, data.session is null → show pending screen.
+    // When email confirmation is OFF (legacy pilot config):
+    //   data.session exists → just navigate, user is logged in.
+    if (data.session) {
+      window.location.href = next;
+      return;
     }
-    window.location.href = next;
+    setPendingEmail(email);
+    setLoading(false);
   }
 
+  async function resendVerification() {
+    if (!pendingEmail) return;
+    setResendStatus("sending");
+    const sb = createClient();
+    const siteUrl =
+      (typeof window !== "undefined" && window.location.origin) ||
+      "https://doprent.com";
+    const { error } = await sb.auth.resend({
+      type: "signup",
+      email: pendingEmail,
+      options: {
+        emailRedirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(next)}`,
+      },
+    });
+    if (error) {
+      setError(error.message);
+      setResendStatus("idle");
+      return;
+    }
+    setResendStatus("sent");
+  }
+
+  // ----- Pending verification screen -----
+  if (pendingEmail) {
+    return (
+      <div
+        style={{
+          maxWidth: 460,
+          margin: "0 auto",
+          padding: "64px 20px 80px",
+          width: "100%",
+          textAlign: "center",
+        }}
+      >
+        <div
+          aria-hidden
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: 999,
+            background: "var(--warm)",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 28,
+            marginBottom: 20,
+          }}
+        >
+          ✉️
+        </div>
+        <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 10 }}>
+          เช็คอีเมลของคุณ
+        </h1>
+        <p
+          style={{
+            fontSize: 15,
+            color: "var(--ink-2)",
+            lineHeight: 1.6,
+            marginBottom: 24,
+          }}
+        >
+          ส่งลิงก์ยืนยันไปที่{" "}
+          <strong style={{ color: "var(--ink)" }}>{pendingEmail}</strong> แล้ว
+          กดลิงก์ในอีเมลเพื่อยืนยันบัญชีก่อนเข้าใช้งาน
+        </p>
+
+        <div
+          style={{
+            padding: 14,
+            background: "var(--warm)",
+            borderRadius: 8,
+            fontSize: 13,
+            color: "var(--ink-2)",
+            lineHeight: 1.55,
+            marginBottom: 24,
+            textAlign: "left",
+          }}
+        >
+          <strong style={{ color: "var(--ink)", display: "block", marginBottom: 4 }}>
+            ไม่เห็นอีเมล?
+          </strong>
+          เช็คใน Spam / Promotions หรือรอสักครู่ ถ้ายังไม่ได้กดปุ่มข้างล่างเพื่อส่งใหม่
+        </div>
+
+        <button
+          type="button"
+          onClick={resendVerification}
+          disabled={resendStatus !== "idle"}
+          className="btn btn-outline btn-block"
+          style={{ marginBottom: 10 }}
+        >
+          {resendStatus === "sending"
+            ? "กำลังส่ง..."
+            : resendStatus === "sent"
+              ? "✓ ส่งอีเมลใหม่แล้ว"
+              : "ส่งอีเมลยืนยันใหม่"}
+        </button>
+
+        <Link
+          href={`/login?next=${encodeURIComponent(next)}`}
+          className="btn btn-dark btn-block"
+        >
+          กลับไปเข้าสู่ระบบ
+        </Link>
+
+        {error ? (
+          <div
+            style={{
+              marginTop: 14,
+              color: "var(--danger)",
+              fontSize: 13,
+            }}
+          >
+            {error}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  // ----- Signup form -----
   return (
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "48px 20px 80px", width: "100%" }}>
       <h1 style={{ fontSize: 28, fontWeight: 600, marginBottom: 6 }}>สมัครสมาชิก</h1>
@@ -58,9 +192,9 @@ export default function SignupPage() {
       {error ? (
         <div
           style={{
-            background: "#FEE2E2",
-            border: "1px solid #FCA5A5",
-            color: "#991B1B",
+            background: "oklch(0.92 0.04 25)",
+            border: "1px solid oklch(0.78 0.12 25)",
+            color: "oklch(0.4 0.13 25)",
             padding: "10px 14px",
             borderRadius: 6,
             fontSize: 13,
@@ -70,6 +204,25 @@ export default function SignupPage() {
           {error}
         </div>
       ) : null}
+
+      {/* Google sign-up — primary path, lowers friction for Thai users with
+          existing Google accounts. Same OAuth flow as login. */}
+      <GoogleSignInButton next={next} label="สมัครด้วย Google" onError={setError} />
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          margin: "18px 0",
+          color: "var(--ink-3)",
+          fontSize: 12,
+        }}
+      >
+        <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+        <span>หรือใช้อีเมล</span>
+        <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+      </div>
 
       <form onSubmit={onSubmit}>
         <Field label="ชื่อ" type="text" value={fullName} onChange={setFullName} required />
@@ -95,7 +248,7 @@ export default function SignupPage() {
         มีบัญชีอยู่แล้ว?{" "}
         <Link
           href={`/login?next=${encodeURIComponent(next)}`}
-          style={{ color: "var(--info)", fontWeight: 500 }}
+          style={{ color: "var(--accent)", fontWeight: 500 }}
         >
           เข้าสู่ระบบ
         </Link>

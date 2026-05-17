@@ -28,6 +28,13 @@ export type DressFilters = {
 const PUBLIC_DRESS_QUERY =
   "id,slug,name,designer,boutique_id,boutique_name,size,color,price_per_day,deposit,description,images,occasions,line_url,ads_tier,featured,sponsored,status,available,views,created_at,updated_at";
 
+// Public-safe column allowlist for boutiques. Mirrors the column-level GRANT
+// in migration 2026-05-18_boutique_address_privacy.sql — DO NOT add address,
+// lat, lng, house_no, street, subdistrict, or postal_code here. Those are
+// owner-only and reading them as anon will 403 post-migration.
+const PUBLIC_BOUTIQUE_QUERY =
+  "id,slug,name,owner_id,owner_name,area_key,area_label,hours,line_url,instagram,since_year,cover_color,tag,story,featured,ads_tier,status,kyc_status,verified,district,province,created_at,updated_at";
+
 /** Cache for verified boutique-ID lookup within a single request. */
 async function fetchVerifiedBoutiqueIds(): Promise<Set<string>> {
   const sb = getSupabase();
@@ -153,7 +160,7 @@ export async function listBoutiques(opts: { limit?: number; featuredFirst?: bool
 > {
   const sb = getSupabase();
   if (!sb) return [];
-  let q = sb.from("boutiques").select("*").eq("status", "live");
+  let q = sb.from("boutiques").select(PUBLIC_BOUTIQUE_QUERY).eq("status", "live");
   if (opts.featuredFirst) q = q.order("featured", { ascending: false });
   q = q.order("name", { ascending: true });
   if (opts.limit) q = q.limit(opts.limit);
@@ -170,7 +177,7 @@ export async function getBoutiqueBySlug(slug: string): Promise<Boutique | null> 
   if (!sb) return null;
   const { data, error } = await sb
     .from("boutiques")
-    .select("*")
+    .select(PUBLIC_BOUTIQUE_QUERY)
     .eq("slug", slug)
     .maybeSingle();
   if (error) {
