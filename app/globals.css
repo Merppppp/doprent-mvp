@@ -61,17 +61,25 @@ body {
   font-feature-settings: "kern", "liga", "calt";
 }
 
+/* Editorial display family — IBM Plex Serif Thai pairs natively with the
+   Sans Thai Looped body, so they share metrics and OpenType features.
+   Use for hero headlines and page titles where editorial weight matters. */
+.display-serif {
+  font-family: "IBM Plex Serif Thai", "IBM Plex Serif", "Georgia", "Charter",
+    "Times New Roman", serif;
+  font-feature-settings: "kern", "liga", "calt";
+}
+
 /* Display sizes — used by .hero-title and .page-title via inline styles.
-   Thai script is fundamentally different from Latin: tone marks + vowels
-   stack vertically and need ~20-30% more line-height. Heavy weights (800+)
-   crush the diacritics. Caps and tight tracking don't apply.
-   These sizes are tuned for IBM Plex Sans Thai Looped specifically.
+   Thai serif at display size wants weight 400-500, NOT bold — bold serif
+   Thai crushes the curved strokes. Negative letter-spacing also fights
+   the natural rhythm; use neutral or very slight negative tracking.
    Mobile overrides live in the @media blocks below. */
 .hero-title {
-  font-size: 52px !important;
-  font-weight: 700 !important;
-  letter-spacing: -0.015em !important;
-  line-height: 1.18 !important;
+  font-size: 72px !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.01em !important;
+  line-height: 1.1 !important;
   text-wrap: balance;
 }
 .page-title {
@@ -266,10 +274,10 @@ img {
   .mobile-menu-toggle {
     display: inline-flex !important;
   }
-  /* Tablet hero — between phone and desktop, dial down from 52px */
+  /* Tablet hero — between phone and desktop */
   .hero-title {
-    font-size: 40px !important;
-    line-height: 1.2 !important;
+    font-size: 56px !important;
+    line-height: 1.12 !important;
   }
   .page-title {
     font-size: 30px !important;
@@ -308,12 +316,16 @@ img {
   .section-pad {
     padding: 40px 0 !important;
   }
-  /* Hero text scales down on phone — Thai needs more line-height than Latin */
+  /* Hero text scales down on phone — Thai serif needs more line-height */
   .hero-title {
-    font-size: 32px !important;
-    font-weight: 700 !important;
-    line-height: 1.25 !important;
+    font-size: 40px !important;
+    font-weight: 400 !important;
+    line-height: 1.15 !important;
     letter-spacing: -0.01em !important;
+  }
+  /* Editorial hero — tighter padding on phone */
+  .hero-editorial {
+    padding: 64px 0 40px !important;
   }
   .hero-sub {
     font-size: 15px !important;

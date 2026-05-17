@@ -37,78 +37,133 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* ========== HERO ========== */}
-      {/* Committed register: hero lives on --warm (champagne) — the surface
-          itself carries brand color, not relying on the dress art to do it. */}
+      {/* ========== HERO ==========
+          Editorial cover composition: single column, centered, serif display.
+          No right-column "dress art" placeholder (real photos aren't ready,
+          and a colored gradient block earns nothing). Typography + negative
+          space do the work. Inspired by editorial fashion brands (Toteme,
+          The Row) where the brand IS the wordmark + a single phrase. */}
       <section
-        className="section-pad"
-        style={{ background: "var(--warm)", padding: "72px 0 96px" }}
+        className="section-pad hero-editorial"
+        style={{
+          background: "var(--warm)",
+          padding: "120px 0 80px",
+          position: "relative",
+        }}
       >
-        <div className="shell">
-          <div className="hero-grid">
-            <div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--accent)",
-                  fontWeight: 600,
-                  marginBottom: 20,
-                  letterSpacing: "0.02em",
-                }}
-              >
-                ร้านเช่าชุดในกรุงเทพ
-              </div>
-              <h1
-                className="hero-title"
-                style={{
-                  marginBottom: 20,
-                  maxWidth: "13ch",
-                }}
-              >
-                เช่าชุดจากร้านที่ไว้ใจได้
-              </h1>
-              <p
-                className="hero-sub"
-                style={{
-                  fontSize: 18,
-                  color: "var(--ink-2)",
-                  maxWidth: 440,
-                  marginBottom: 32,
-                  lineHeight: 1.55,
-                }}
-              >
-                เลือกง่าย จองตรงกับร้าน เห็นชุดที่ใช่ ทักได้ทันทีผ่าน LINE
-              </p>
-              <div className="hero-cta" style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <Link href="/browse" className="btn btn-dark btn-lg">
-                  เริ่มเลือกชุด
-                </Link>
-                <Link href="/boutiques" className="btn btn-outline btn-lg">
-                  ดูร้านทั้งหมด
-                </Link>
-              </div>
-              <div
-                className="hero-stats"
-                style={{
-                  display: "flex",
-                  gap: 48,
-                  marginTop: 48,
-                  paddingTop: 28,
-                  borderTop: "1px solid var(--line)",
-                  flexWrap: "wrap",
-                }}
-              >
-                <Stat num={String(stats.boutiques)} lbl="ร้าน" />
-                <Stat num={String(stats.dresses)} lbl="ชุด" />
-                <Stat num={`฿${stats.minPrice.toLocaleString()}`} lbl="เริ่มต้น/วัน" />
-              </div>
-            </div>
-            <div style={{ aspectRatio: "4/5", borderRadius: 12, overflow: "hidden" }}>
-              {heroDress ? <DressArt color={heroDress.color} variant={1} /> : null}
-            </div>
+        {/* Tiny ornamental brand mark — a single rust dot to break the
+            symmetry without adding visual noise. */}
+        <div
+          aria-hidden
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: 999,
+            background: "var(--accent)",
+            margin: "0 auto 32px",
+          }}
+        />
+
+        <div
+          className="shell"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--ink-3)",
+              fontWeight: 500,
+              marginBottom: 28,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+            }}
+          >
+            Bangkok &nbsp;·&nbsp; Boutique Rental
           </div>
+
+          <h1
+            className="hero-title display-serif"
+            style={{
+              marginBottom: 28,
+              maxWidth: "14ch",
+            }}
+          >
+            เช่าชุดจาก ร้านที่ไว้ใจได้
+          </h1>
+
+          <p
+            className="hero-sub"
+            style={{
+              fontSize: 17,
+              color: "var(--ink-2)",
+              maxWidth: 460,
+              marginBottom: 40,
+              lineHeight: 1.6,
+            }}
+          >
+            แคตตาล็อกชุดเช่าจากร้านในกรุงเทพ ทักร้านผ่าน LINE โดยตรง
+          </p>
+
+          <Link
+            href="/browse"
+            className="btn btn-dark btn-lg"
+            style={{ padding: "16px 28px", fontSize: 15 }}
+          >
+            เริ่มเลือกชุด
+            <span aria-hidden style={{ marginLeft: 4, fontSize: 16, lineHeight: 1 }}>
+              →
+            </span>
+          </Link>
+
+          <Link
+            href="/boutiques"
+            style={{
+              marginTop: 18,
+              fontSize: 13,
+              color: "var(--ink-2)",
+              borderBottom: "1px solid var(--ink-3)",
+              paddingBottom: 1,
+            }}
+          >
+            หรือดูร้านทั้งหมด
+          </Link>
         </div>
       </section>
+
+      {/* ========== STATS CAPTION ==========
+          Pilot scale shown as a single editorial caption line, no boxes,
+          no big numbers. Sits on --warm continuation just below the hero
+          so it feels like part of the same composition, not a SaaS metric row. */}
+      <div
+        style={{
+          background: "var(--warm)",
+          paddingBottom: 40,
+        }}
+      >
+        <div
+          className="shell"
+          style={{
+            textAlign: "center",
+            fontSize: 12,
+            color: "var(--ink-3)",
+            letterSpacing: "0.06em",
+          }}
+        >
+          <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>{stats.boutiques}</span>{" "}
+          ร้าน &nbsp;·&nbsp;{" "}
+          <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>{stats.dresses}</span>{" "}
+          ชุด &nbsp;·&nbsp; เริ่มต้น{" "}
+          <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>
+            ฿{stats.minPrice.toLocaleString()}
+          </span>{" "}
+          / วัน
+        </div>
+      </div>
 
       {/* ========== TRUST ========== */}
       <div
