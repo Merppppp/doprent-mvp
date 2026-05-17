@@ -68,11 +68,13 @@ export default async function BoutiquePage({ params }: { params: Params }) {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <LineButton
-            href={b.line_url}
+            href={isLoggedIn ? b.line_url : null}
             label="ทักร้านทาง LINE"
             variant="primary"
             source="boutique_primary"
             boutiqueId={b.id}
+            isLoggedIn={isLoggedIn}
+            loginNext={`/boutique/${b.slug}`}
           />
         </div>
       </div>

@@ -1,19 +1,42 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback } from "react";
 
 type Variant = "primary" | "secondary";
 
 type Props = {
-  href: string;
+  /** LINE deep link. Only used when isLoggedIn === true; ignored otherwise. */
+  href?: string | null;
   label: string;
   variant?: Variant;
   source?: string;
   dressId?: string;
   boutiqueId?: string;
   fullWidth?: boolean;
+  /**
+   * Whether the viewer is signed in. Strictly gates contact: when false,
+   * the button renders as a login-redirect link and the LINE URL is
+   * never sent to the browser (caller should pass href={null} for anon).
+   */
+  isLoggedIn?: boolean;
+  /** Where to return after login. Required when !isLoggedIn. */
+  loginNext?: string;
 };
 
+/**
+ * LineButton — primary contact CTA.
+ *
+ * IMPORTANT (per product requirement): anonymous users may NOT initiate
+ * contact with boutiques via LINE. When `isLoggedIn` is false, this
+ * component:
+ *   1) Does NOT render the LINE href anywhere in the DOM.
+ *   2) Replaces the LINE click with a Next.js Link to /login?next=...
+ *   3) The caller should also pass href={null} so the URL never reaches
+ *      the client JS bundle in the first place.
+ *
+ * After login the user lands back on loginNext and the button works normally.
+ */
 export default function LineButton({
   href,
   label,
@@ -22,8 +45,11 @@ export default function LineButton({
   dressId,
   boutiqueId,
   fullWidth,
+  isLoggedIn,
+  loginNext,
 }: Props) {
-  const onClick = useCallback(() => {
+  // useCallback must always run (rules of hooks) — kept outside the branch.
+  const trackClick = useCallback(() => {
     try {
       const payload = JSON.stringify({ source, dress_id: dressId, boutique_id: boutiqueId });
       if (typeof navigator !== "undefined" && "sendBeacon" in navigator) {
@@ -37,18 +63,38 @@ export default function LineButton({
     }
   }, [source, dressId, boutiqueId]);
 
+  const buttonClass = `btn ${variant === "primary" ? "btn-line" : "btn-outline"}`;
+  const buttonStyle = {
+    ...(fullWidth ? { width: "100%" } : {}),
+    ...(variant === "primary" ? { fontWeight: 600, padding: "14px" } : {}),
+  } as React.CSSProperties;
+
+  // --- Anonymous path: never expose the LINE href ---
+  if (!isLoggedIn || !href) {
+    const next = loginNext || "/";
+    return (
+      <Link
+        href={`/login?next=${encodeURIComponent(next)}`}
+        aria-label="เข้าสู่ระบบเพื่อทักร้านทาง LINE"
+        className={buttonClass}
+        style={buttonStyle}
+      >
+        <LineIcon />
+        เข้าสู่ระบบเพื่อทักร้าน
+      </Link>
+    );
+  }
+
+  // --- Authenticated path: real LINE deep link ---
   return (
     <a
       href={href}
       target="_blank"
       rel="noreferrer noopener"
-      onClick={onClick}
+      onClick={trackClick}
       aria-label={`${label} (เปิดหน้าต่าง LINE ใหม่)`}
-      className={`btn ${variant === "primary" ? "btn-line" : "btn-outline"}`}
-      style={{
-        ...(fullWidth ? { width: "100%" } : {}),
-        ...(variant === "primary" ? { fontWeight: 600, padding: "14px" } : {}),
-      }}
+      className={buttonClass}
+      style={buttonStyle}
     >
       <LineIcon />
       {label}

@@ -1,9 +1,14 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 
 type Props = {
-  /** Base LINE URL (without our query params). */
+  /**
+   * Base LINE URL (without our query params). Pass empty string "" for
+   * anonymous viewers — when isLoggedIn is false, the LINE href is
+   * never built or rendered.
+   */
   lineUrl: string;
   /** Dress display name (used in pre-filled LINE message). */
   dressName: string;
@@ -22,6 +27,14 @@ type Props = {
   /** Optional dress ID to be tracked in /api/track when user clicks LINE. */
   dressId?: string;
   boutiqueId?: string;
+  /**
+   * Strict contact gate. When false (default), the LINE booking button
+   * is replaced with a login redirect and the LINE URL is never used.
+   * Caller should also pass lineUrl="" for anon to avoid leaking it.
+   */
+  isLoggedIn?: boolean;
+  /** Where to redirect back after login. Required when !isLoggedIn. */
+  loginNext?: string;
 };
 
 /** Convert YYYY-MM-DD → "DD/MM/YYYY" Thai display format. */
@@ -80,6 +93,8 @@ export default function DateRangePicker({
   blackouts = [],
   dressId,
   boutiqueId,
+  isLoggedIn,
+  loginNext,
 }: Props) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
@@ -104,7 +119,11 @@ export default function DateRangePicker({
       .slice(0, 6);
   }, [blackouts]);
 
+  // Skip building the LINE URL entirely for anonymous viewers. Even though
+  // the parent passes lineUrl="" in that case, this is belt-and-suspenders —
+  // the LINE deep link never exists in the client's JS state for anon.
   const lineHref = useMemo(() => {
+    if (!isLoggedIn || !lineUrl) return "";
     if (!start || !end || nights === 0 || hasConflict) return lineUrl;
     const lines = [
       `สวัสดีค่ะ สนใจเช่าชุด "${dressName}"`,
@@ -126,6 +145,7 @@ export default function DateRangePicker({
     const sep = lineUrl.includes("?") ? "&" : "?";
     return `${lineUrl}${sep}text=${encodeURIComponent(text)}`;
   }, [
+    isLoggedIn,
     lineUrl,
     start,
     end,
@@ -302,26 +322,47 @@ export default function DateRangePicker({
       ) : null}
 
       {nights > 0 && !hasConflict ? (
-        <a
-          href={lineHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={trackAndGo}
-          style={{
-            display: "block",
-            marginTop: 12,
-            padding: "12px 16px",
-            background: "var(--line-green)",
-            color: "var(--on-dark)",
-            borderRadius: 6,
-            textAlign: "center",
-            fontSize: 14,
-            fontWeight: 600,
-            textDecoration: "none",
-          }}
-        >
-          จองวันนี้ผ่าน LINE · {nights} วัน
-        </a>
+        isLoggedIn && lineHref ? (
+          <a
+            href={lineHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={trackAndGo}
+            style={{
+              display: "block",
+              marginTop: 12,
+              padding: "12px 16px",
+              background: "var(--line-green)",
+              color: "var(--on-dark)",
+              borderRadius: 6,
+              textAlign: "center",
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            จองวันนี้ผ่าน LINE · {nights} วัน
+          </a>
+        ) : (
+          // Anonymous viewer — bounce to login, never expose LINE URL.
+          <Link
+            href={`/login?next=${encodeURIComponent(loginNext || "/")}`}
+            style={{
+              display: "block",
+              marginTop: 12,
+              padding: "12px 16px",
+              background: "var(--ink)",
+              color: "var(--on-dark)",
+              borderRadius: 6,
+              textAlign: "center",
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            เข้าสู่ระบบเพื่อจอง · {nights} วัน
+          </Link>
+        )
       ) : null}
     </div>
   );

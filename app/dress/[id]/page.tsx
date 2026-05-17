@@ -282,9 +282,11 @@ export default async function DressPage({ params }: { params: Params }) {
             <Spec lbl="ดีไซเนอร์" val={dress.designer ?? "—"} />
           </div>
 
-          {/* Date picker (renter) */}
+          {/* Date picker (renter). LINE href and pre-filled message are
+              omitted entirely for anonymous viewers — they see a login CTA
+              instead of the booking button. */}
           <DateRangePicker
-            lineUrl={boutiqueLine}
+            lineUrl={isLoggedIn ? boutiqueLine : ""}
             dressName={dress.name}
             boutiqueName={dress.boutique_name}
             dressPageUrl={url}
@@ -294,19 +296,24 @@ export default async function DressPage({ params }: { params: Params }) {
             blackouts={blackouts}
             dressId={dress.id}
             boutiqueId={dress.boutique_id}
+            isLoggedIn={isLoggedIn}
+            loginNext={`/dress/${dress.slug}`}
           />
 
-          {/* CTA */}
+          {/* CTA — anonymous viewers see a login redirect instead of a LINE
+              link (per product requirement: no LINE contact without auth). */}
           <div className="detail-cta" style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "stretch" }}>
             <div style={{ flex: 1 }}>
               <LineButton
-                href={boutiqueLine}
+                href={isLoggedIn ? boutiqueLine : null}
                 label={`จองผ่าน LINE · ${dress.boutique_name}`}
                 variant="primary"
                 source="detail_primary"
                 dressId={dress.id}
                 boutiqueId={dress.boutique_id}
                 fullWidth
+                isLoggedIn={isLoggedIn}
+                loginNext={`/dress/${dress.slug}`}
               />
             </div>
             <SaveButton
@@ -316,15 +323,22 @@ export default async function DressPage({ params }: { params: Params }) {
               variant="detail"
             />
           </div>
-          <LineButton
-            href={boutiqueLine}
-            label="ถามรายละเอียดเพิ่มเติม"
-            variant="secondary"
-            source="detail_secondary"
-            dressId={dress.id}
-            boutiqueId={dress.boutique_id}
-            fullWidth
-          />
+          {/* Secondary "ask more" CTA only for authenticated users — anon
+              already has one "login to contact" button above; showing a
+              second identical one would be visual noise. */}
+          {isLoggedIn ? (
+            <LineButton
+              href={boutiqueLine}
+              label="ถามรายละเอียดเพิ่มเติม"
+              variant="secondary"
+              source="detail_secondary"
+              dressId={dress.id}
+              boutiqueId={dress.boutique_id}
+              fullWidth
+              isLoggedIn={isLoggedIn}
+              loginNext={`/dress/${dress.slug}`}
+            />
+          ) : null}
 
           <div
             style={{
