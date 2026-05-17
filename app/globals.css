@@ -62,18 +62,23 @@ body {
 }
 
 /* Display sizes — used by .hero-title and .page-title via inline styles.
-   Default values here apply on desktop; mobile overrides live in the
-   @media (max-width: 600px) block below. */
+   Thai script is fundamentally different from Latin: tone marks + vowels
+   stack vertically and need ~20-30% more line-height. Heavy weights (800+)
+   crush the diacritics. Caps and tight tracking don't apply.
+   These sizes are tuned for IBM Plex Sans Thai Looped specifically.
+   Mobile overrides live in the @media blocks below. */
 .hero-title {
-  font-size: 64px !important;
-  font-weight: 800 !important;
-  letter-spacing: -0.035em !important;
-  line-height: 1.02 !important;
+  font-size: 52px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.015em !important;
+  line-height: 1.18 !important;
+  text-wrap: balance;
 }
 .page-title {
-  font-size: 40px !important;
+  font-size: 36px !important;
   font-weight: 700 !important;
-  letter-spacing: -0.02em !important;
+  letter-spacing: -0.015em !important;
+  line-height: 1.2 !important;
 }
 
 button {
@@ -261,6 +266,14 @@ img {
   .mobile-menu-toggle {
     display: inline-flex !important;
   }
+  /* Tablet hero — between phone and desktop, dial down from 52px */
+  .hero-title {
+    font-size: 40px !important;
+    line-height: 1.2 !important;
+  }
+  .page-title {
+    font-size: 30px !important;
+  }
 }
 
 /* ============================================================
@@ -295,10 +308,12 @@ img {
   .section-pad {
     padding: 40px 0 !important;
   }
-  /* Hero text scales down */
+  /* Hero text scales down on phone — Thai needs more line-height than Latin */
   .hero-title {
     font-size: 32px !important;
-    line-height: 1.15 !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
+    letter-spacing: -0.01em !important;
   }
   .hero-sub {
     font-size: 15px !important;
@@ -307,11 +322,13 @@ img {
     flex-wrap: wrap;
   }
   .hero-stats {
-    gap: 20px !important;
+    gap: 24px !important;
+    margin-top: 32px !important;
   }
   /* Page H1 */
   .page-title {
-    font-size: 24px !important;
+    font-size: 26px !important;
+    line-height: 1.2 !important;
   }
   /* Section heads stack on mobile */
   .section-head {

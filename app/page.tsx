@@ -61,24 +61,23 @@ export default async function HomePage() {
               <h1
                 className="hero-title"
                 style={{
-                  marginBottom: 22,
+                  marginBottom: 20,
+                  maxWidth: "13ch",
                 }}
               >
                 เช่าชุดจากร้านที่ไว้ใจได้
-                <br />
-                เลือกง่าย จองตรงกับร้าน
               </h1>
               <p
                 className="hero-sub"
                 style={{
                   fontSize: 18,
                   color: "var(--ink-2)",
-                  maxWidth: 480,
+                  maxWidth: 440,
                   marginBottom: 32,
                   lineHeight: 1.55,
                 }}
               >
-                เห็นชุดที่ใช่ กดคุยกับร้านได้ทันที
+                เลือกง่าย จองตรงกับร้าน เห็นชุดที่ใช่ ทักได้ทันทีผ่าน LINE
               </p>
               <div className="hero-cta" style={{ display: "flex", gap: 12, alignItems: "center" }}>
                 <Link href="/browse" className="btn btn-dark btn-lg">
