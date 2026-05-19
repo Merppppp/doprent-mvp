@@ -1,7 +1,27 @@
+# Dependencies
 node_modules
+
+# Next.js build output
 .next
 out
+build
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment / secrets — never commit
 .env
 .env.local
-.DS_Store
+.env.*.local
+
+# Tooling state (Vercel / Supabase CLI link artifacts)
+.vercel
+supabase/.temp
+supabase/.branches
+
+# Logs / OS / editor
 *.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

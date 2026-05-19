@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import DressCard from "@/components/DressCard";
+import DressCard from "@/components/dress/DressCard";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Dress } from "@/lib/types";

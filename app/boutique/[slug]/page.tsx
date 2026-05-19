@@ -1,10 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { BoutiqueCover } from "@/components/DressArt";
-import DressCard from "@/components/DressCard";
-import LineButton from "@/components/LineButton";
-import VerifiedBadge from "@/components/VerifiedBadge";
+import { BoutiqueCover } from "@/components/dress/DressArt";
+import DressCard from "@/components/dress/DressCard";
+import LineButton from "@/components/booking/LineButton";
+import VerifiedBadge from "@/components/ui/VerifiedBadge";
 import { getCurrentUser } from "@/lib/auth";
 import { getBoutiqueBySlug, listDressesByBoutique } from "@/lib/dresses";
 

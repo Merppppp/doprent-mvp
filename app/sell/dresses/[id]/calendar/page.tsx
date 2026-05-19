@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import AvailabilityCalendar from "@/components/AvailabilityCalendar";
+import AvailabilityCalendar from "@/components/booking/AvailabilityCalendar";
 
 export const dynamic = "force-dynamic";
 

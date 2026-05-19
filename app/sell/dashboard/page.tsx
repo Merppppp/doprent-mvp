@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import VerifiedBadge from "@/components/VerifiedBadge";
-import { DressArt } from "@/components/DressArt";
+import VerifiedBadge from "@/components/ui/VerifiedBadge";
+import { DressArt } from "@/components/dress/DressArt";
 
 export const dynamic = "force-dynamic";
 

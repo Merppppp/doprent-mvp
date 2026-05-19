@@ -1,7 +1,7 @@
 import Link from "next/link";
-import DressCard from "@/components/DressCard";
-import { DressArt, BoutiqueCover, OccasionTile } from "@/components/DressArt";
-import VerifiedBadge from "@/components/VerifiedBadge";
+import DressCard from "@/components/dress/DressCard";
+import { DressArt, BoutiqueCover, OccasionTile } from "@/components/dress/DressArt";
+import VerifiedBadge from "@/components/ui/VerifiedBadge";
 import { getCurrentUser } from "@/lib/auth";
 import { getStats, listBoutiques, listDresses, listOccasions } from "@/lib/dresses";
 
