@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { setDressStatus, toggleDressFeatured } from "@/app/actions/admin";
-import { DressArt } from "@/components/DressArt";
+import { DressArt } from "@/components/dress/DressArt";
 import type { Color } from "@/lib/types";
 
 type D = {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { DressArt } from "./DressArt";
 import SaveButton from "./SaveButton";
-import VerifiedBadge from "./VerifiedBadge";
+import VerifiedBadge from "@/components/ui/VerifiedBadge";
 import type { Dress } from "@/lib/types";
 
 type Props = {

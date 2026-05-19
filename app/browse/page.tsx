@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import DressCard from "@/components/DressCard";
+import DressCard from "@/components/dress/DressCard";
 import { getCurrentUser } from "@/lib/auth";
 import { listDesigners, listDresses, listOccasions } from "@/lib/dresses";
 import {

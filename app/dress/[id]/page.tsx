@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { DressArt } from "@/components/DressArt";
-import LineButton from "@/components/LineButton";
-import DressCard from "@/components/DressCard";
-import SaveButton from "@/components/SaveButton";
-import VerifiedBadge from "@/components/VerifiedBadge";
-import DateRangePicker from "@/components/DateRangePicker";
+import { DressArt } from "@/components/dress/DressArt";
+import LineButton from "@/components/booking/LineButton";
+import DressCard from "@/components/dress/DressCard";
+import SaveButton from "@/components/dress/SaveButton";
+import VerifiedBadge from "@/components/ui/VerifiedBadge";
+import DateRangePicker from "@/components/booking/DateRangePicker";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getBoutiqueBySlug,

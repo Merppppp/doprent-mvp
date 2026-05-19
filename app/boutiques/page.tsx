@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { BoutiqueCover } from "@/components/DressArt";
-import VerifiedBadge from "@/components/VerifiedBadge";
+import { BoutiqueCover } from "@/components/dress/DressArt";
+import VerifiedBadge from "@/components/ui/VerifiedBadge";
 import { listBoutiques } from "@/lib/dresses";
 
 export const revalidate = 60;
