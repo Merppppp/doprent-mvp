@@ -39,6 +39,7 @@ export async function createBoutique(formData: FormData): Promise<{
   const instagram = String(formData.get("instagram") ?? "").trim() || null;
   const tag = String(formData.get("tag") ?? "").trim() || null;
   const story = String(formData.get("story") ?? "").trim() || null;
+  const deliveryInfo = String(formData.get("delivery_info") ?? "").trim() || null;
 
   // Structured Thai address
   const houseNo = String(formData.get("house_no") ?? "").trim();
@@ -118,6 +119,7 @@ export async function createBoutique(formData: FormData): Promise<{
       story,
       since_year: sinceYear,
       cover_color: coverColor,
+      delivery_info: deliveryInfo,
       status: "pending", // admin must approve
       kyc_status: "none",
     })
@@ -176,6 +178,7 @@ export async function updateBoutique(
     "instagram",
     "tag",
     "story",
+    "delivery_info",
     "owner_name",
     "address",
     "hours",

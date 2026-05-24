@@ -67,6 +67,7 @@ export type Boutique = {
   cover_color: Color;
   tag: string | null;
   story: string | null;
+  delivery_info: string | null;
   featured: boolean;
   /** Admin-toggled trust mark (post-KYC). Defaults to false. */
   verified: boolean;
