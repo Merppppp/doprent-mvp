@@ -33,7 +33,7 @@ const PUBLIC_DRESS_QUERY =
 // lat, lng, house_no, street, subdistrict, or postal_code here. Those are
 // owner-only and reading them as anon will 403 post-migration.
 const PUBLIC_BOUTIQUE_QUERY =
-  "id,slug,name,owner_id,owner_name,area_key,area_label,hours,line_url,instagram,since_year,cover_color,tag,story,featured,ads_tier,status,kyc_status,verified,district,province,created_at,updated_at";
+  "id,slug,name,owner_id,owner_name,area_key,area_label,hours,line_url,instagram,since_year,cover_color,tag,story,delivery_info,featured,ads_tier,status,kyc_status,verified,district,province,created_at,updated_at";
 
 /** Cache for verified boutique-ID lookup within a single request. */
 async function fetchVerifiedBoutiqueIds(): Promise<Set<string>> {
