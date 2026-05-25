@@ -1,5 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from "./supabase";
-import type { Boutique, Color, Dress, Occasion, OccasionKey } from "./types";
+import type { Blackout, Boutique, Color, Dress, Occasion, OccasionKey } from "./types";
 
 /** Hard-coded occasions in case occasions table isn't seeded yet */
 const FALLBACK_OCCASIONS: Occasion[] = [
@@ -264,6 +264,18 @@ export async function getStats(): Promise<{ boutiques: number; dresses: number; 
     dresses: dRes.count ?? 0,
     minPrice,
   };
+}
+
+export async function getBlackoutsByDress(dressId: string): Promise<Blackout[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("dress_blackouts")
+    .select("dress_id,date,created_at")
+    .eq("dress_id", dressId)
+    .order("date", { ascending: true });
+  if (error) return [];
+  return (data as Blackout[]) ?? [];
 }
 
 export { isSupabaseConfigured };

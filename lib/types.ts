@@ -112,6 +112,12 @@ export type DressWithBoutique = Dress & {
   boutique: Boutique;
 };
 
+export type Blackout = {
+  dress_id: string;
+  date: string;
+  created_at: string;
+};
+
 export type Profile = {
   id: string;
   email: string | null;
