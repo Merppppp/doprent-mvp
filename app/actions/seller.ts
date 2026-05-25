@@ -33,7 +33,17 @@ export async function createBoutique(formData: FormData): Promise<{
 
   const name = String(formData.get("name") ?? "").trim();
   const areaLabel = String(formData.get("area_label") ?? "").trim();
-  const areaKey = String(formData.get("area_key") ?? "").trim() || null;
+  const areaKeyRaw = String(formData.get("area_key") ?? "").trim() || null;
+  // Validate area_key exists in areas table before insert to avoid FK violation
+  let areaKey: string | null = null;
+  if (areaKeyRaw) {
+    const { data: areaExists } = await sb
+      .from("areas")
+      .select("key")
+      .eq("key", areaKeyRaw)
+      .maybeSingle();
+    areaKey = areaExists ? areaKeyRaw : null;
+  }
   const lineUrlRaw = String(formData.get("line_url") ?? "").trim();
   const lineUrl = normalizeLineUrl(lineUrlRaw);
   const instagram = String(formData.get("instagram") ?? "").trim() || null;
