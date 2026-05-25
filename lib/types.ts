@@ -82,6 +82,7 @@ export type Boutique = {
 export type Dress = {
   id: string;
   slug: string;
+  tag_code: string;
   name: string;
   designer: string | null;
   boutique_id: string;

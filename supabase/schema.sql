@@ -147,9 +147,12 @@ create index if not exists idx_boutiques_status_created on boutiques (status, cr
 -- 4) DRESSES
 -- ===========================================================
 
+create sequence if not exists dress_tag_seq start 1;
+
 create table if not exists dresses (
   id            uuid primary key default uuid_generate_v4(),
   slug          text unique not null,
+  tag_code      text unique not null default 'DR' || lpad(nextval('dress_tag_seq')::text, 4, '0'),
   name          text not null,
   designer      text,
   boutique_id   uuid not null references boutiques(id) on delete cascade,
