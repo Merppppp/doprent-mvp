@@ -264,8 +264,12 @@ export async function submitKyc(formData: FormData): Promise<{ ok: boolean; erro
 
   if (!legalName) return { ok: false, error: "กรุณาใส่ชื่อตามบัตรประชาชน/นิติบุคคล" };
   if (!taxId) return { ok: false, error: "กรุณาใส่เลขประจำตัวผู้เสียภาษี/บัตรประชาชน" };
+  if (!/^[0-9]{13}$/.test(taxId))
+    return { ok: false, error: "เลขประจำตัวผู้เสียภาษี/บัตรประชาชนต้องเป็นตัวเลข 13 หลัก" };
   if (!bankName || !bankAccNo || !bankAccName)
     return { ok: false, error: "กรุณาใส่ข้อมูลบัญชีธนาคารให้ครบ" };
+  if (!/^[0-9]+$/.test(bankAccNo))
+    return { ok: false, error: "เลขที่บัญชีต้องเป็นตัวเลขเท่านั้น" };
 
   const { error: insertErr } = await sb.from("kyc_submissions").insert({
     boutique_id: boutiqueId,

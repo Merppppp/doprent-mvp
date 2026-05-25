@@ -23,9 +23,14 @@ export default function SignupPage() {
     "idle",
   );
 
-  async function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    const form = e.currentTarget;
+    if (!form.reportValidity()) {
+      setError("กรุณาตรวจสอบข้อมูลให้ครบถ้วน");
+      return;
+    }
     if (password.length < 6) {
       setError("รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร");
       return;
@@ -233,6 +238,7 @@ export default function SignupPage() {
           value={password}
           onChange={setPassword}
           required
+          minLength={6}
         />
         <button
           type="submit"
@@ -263,12 +269,14 @@ function Field({
   value,
   onChange,
   required,
+  minLength,
 }: {
   label: string;
   type: string;
   value: string;
   onChange: (v: string) => void;
   required?: boolean;
+  minLength?: number;
 }) {
   return (
     <div style={{ marginBottom: 14 }}>
@@ -280,6 +288,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
+        minLength={minLength}
         style={{
           width: "100%",
           padding: "11px 14px",
