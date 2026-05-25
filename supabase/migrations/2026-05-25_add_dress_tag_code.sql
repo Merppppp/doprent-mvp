@@ -10,6 +10,8 @@
 
 create sequence if not exists dress_tag_seq start 1;
 
+grant usage on sequence dress_tag_seq to authenticated;
+
 alter table dresses
   add column if not exists tag_code text unique
     default 'DR' || lpad(nextval('dress_tag_seq')::text, 4, '0');
