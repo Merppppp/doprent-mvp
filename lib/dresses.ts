@@ -278,4 +278,25 @@ export async function getBlackoutsByDress(dressId: string): Promise<Blackout[]> 
   return (data as Blackout[]) ?? [];
 }
 
+/** Fetch blackouts for multiple dresses within a calendar month (YYYY-MM). */
+export async function getBlackoutsByMonth(
+  dressIds: string[],
+  month: string, // YYYY-MM
+): Promise<Array<{ dress_id: string; date: string }>> {
+  if (!dressIds.length) return [];
+  const sb = getSupabase();
+  if (!sb) return [];
+  const [year, mon] = month.split("-").map(Number);
+  const monthStart = `${month}-01`;
+  const monthEnd = `${month}-${String(new Date(year, mon, 0).getDate()).padStart(2, "0")}`;
+  const { data, error } = await sb
+    .from("dress_blackouts")
+    .select("dress_id,date")
+    .in("dress_id", dressIds)
+    .gte("date", monthStart)
+    .lte("date", monthEnd);
+  if (error) return [];
+  return (data ?? []) as Array<{ dress_id: string; date: string }>;
+}
+
 export { isSupabaseConfigured };
