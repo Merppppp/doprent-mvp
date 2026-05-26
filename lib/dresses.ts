@@ -74,6 +74,7 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
   }
   if (typeof opts.priceMax === "number") q = q.lte("price_per_day", opts.priceMax);
   if (opts.occasions && opts.occasions.length) q = q.overlaps("occasions", opts.occasions);
+  if (opts.search) q = q.textSearch("search_vector", opts.search, { type: "plain", config: "simple" });
 
   // Exclude dresses that have any blackout date within the requested range
   if (opts.dateFrom && opts.dateTo) {
@@ -101,15 +102,6 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
     boutique_verified: verifiedSet.has(d.boutique_id),
   }));
 
-  // Application-layer filters not supported cleanly by Supabase
-  if (opts.search) {
-    const needle = opts.search.toLowerCase();
-    rows = rows.filter((d) =>
-      `${d.name} ${d.designer ?? ""} ${d.boutique_name} ${d.color} ${d.description ?? ""}`
-        .toLowerCase()
-        .includes(needle),
-    );
-  }
   if (opts.designers && opts.designers.length) {
     rows = rows.filter((d) => opts.designers!.includes(d.designer ?? ""));
   }
