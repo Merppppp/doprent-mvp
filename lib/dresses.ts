@@ -23,6 +23,8 @@ export type DressFilters = {
   priceMax?: number;
   search?: string;
   sort?: "featured" | "price-asc" | "price-desc" | "name";
+  dateFrom?: string; // YYYY-MM-DD
+  dateTo?: string;   // YYYY-MM-DD
 };
 
 const PUBLIC_DRESS_QUERY =
@@ -72,6 +74,18 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
   }
   if (typeof opts.priceMax === "number") q = q.lte("price_per_day", opts.priceMax);
   if (opts.occasions && opts.occasions.length) q = q.overlaps("occasions", opts.occasions);
+
+  // Exclude dresses that have any blackout date within the requested range
+  if (opts.dateFrom && opts.dateTo) {
+    const { data: blocked } = await sb
+      .from("dress_blackouts")
+      .select("dress_id")
+      .gte("date", opts.dateFrom)
+      .lte("date", opts.dateTo);
+    const blockedIds = [...new Set((blocked ?? []).map((r: { dress_id: string }) => r.dress_id))];
+    if (blockedIds.length > 0) q = q.not("id", "in", `(${blockedIds.join(",")})`);
+  }
+
   if (opts.limit) q = q.limit(opts.limit);
 
   const [{ data, error }, verifiedSet] = await Promise.all([
