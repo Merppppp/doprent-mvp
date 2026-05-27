@@ -29,6 +29,8 @@ type SearchParams = {
   designer?: string;
   q?: string;
   sort?: string;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export default async function BrowsePage({
@@ -41,6 +43,9 @@ export default async function BrowsePage({
   const activeSize = searchParams?.size;
   const activeDesigner = searchParams?.designer?.trim() || undefined;
   const search = searchParams?.q?.trim() ?? "";
+  const activeDateFrom = searchParams?.dateFrom?.trim() || undefined;
+  const activeDateTo = searchParams?.dateTo?.trim() || undefined;
+  const today = new Date().toISOString().slice(0, 10);
   const sort = (searchParams?.sort ?? "featured") as
     | "featured"
     | "price-asc"
@@ -55,6 +60,8 @@ export default async function BrowsePage({
       designers: activeDesigner ? [activeDesigner] : undefined,
       search: search || undefined,
       sort,
+      dateFrom: activeDateFrom,
+      dateTo: activeDateTo,
     }),
     listOccasions(),
     listDesigners(),
@@ -254,7 +261,72 @@ export default async function BrowsePage({
             </div>
           </FilterGroup>
 
-          {(activeColor !== "all" || activeOcc || activeSize || activeDesigner || search) && (
+          <form method="get" style={{ paddingBottom: 18, marginTop: 14 }}>
+            {activeColor !== "all" ? (
+              <input type="hidden" name="color" value={activeColor} />
+            ) : null}
+            {activeOcc ? <input type="hidden" name="occasion" value={activeOcc} /> : null}
+            {activeSize ? <input type="hidden" name="size" value={activeSize} /> : null}
+            {activeDesigner ? <input type="hidden" name="designer" value={activeDesigner} /> : null}
+            {search ? <input type="hidden" name="q" value={search} /> : null}
+            {sort ? <input type="hidden" name="sort" value={sort} /> : null}
+            <div style={{ display: "grid", gap: 12 }}>
+              <label style={{ display: "block", fontSize: 13, color: "var(--ink-3)" }}>
+                วันที่เช่าเริ่มต้น
+                <input
+                  type="date"
+                  name="dateFrom"
+                  defaultValue={activeDateFrom}
+                  min={today}
+                  style={{
+                    width: "100%",
+                    marginTop: 6,
+                    padding: "9px 12px",
+                    border: "1px solid var(--line)",
+                    borderRadius: 6,
+                    background: "var(--surface)",
+                    fontSize: 14,
+                  }}
+                />
+              </label>
+              <label style={{ display: "block", fontSize: 13, color: "var(--ink-3)" }}>
+                วันที่เช่าสิ้นสุด
+                <input
+                  type="date"
+                  name="dateTo"
+                  defaultValue={activeDateTo}
+                  min={activeDateFrom ?? today}
+                  style={{
+                    width: "100%",
+                    marginTop: 6,
+                    padding: "9px 12px",
+                    border: "1px solid var(--line)",
+                    borderRadius: 6,
+                    background: "var(--surface)",
+                    fontSize: 14,
+                  }}
+                />
+              </label>
+              <button
+                type="submit"
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "var(--ink)",
+                  color: "var(--on-dark)",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                กรองวันที่
+              </button>
+            </div>
+          </form>
+
+          {(activeColor !== "all" || activeOcc || activeSize || activeDesigner || search || activeDateFrom || activeDateTo) && (
             <div style={{ paddingTop: 12 }}>
               <Link
                 href="/browse"

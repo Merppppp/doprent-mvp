@@ -77,12 +77,11 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
   if (opts.search) q = q.textSearch("search_vector", opts.search, { type: "plain", config: "simple" });
 
   // Exclude dresses that have any blackout date within the requested range
-  if (opts.dateFrom && opts.dateTo) {
-    const { data: blocked } = await sb
-      .from("dress_blackouts")
-      .select("dress_id")
-      .gte("date", opts.dateFrom)
-      .lte("date", opts.dateTo);
+  if (opts.dateFrom || opts.dateTo) {
+    let blackoutQuery = sb.from("dress_blackouts").select("dress_id");
+    if (opts.dateFrom) blackoutQuery = blackoutQuery.gte("date", opts.dateFrom);
+    if (opts.dateTo) blackoutQuery = blackoutQuery.lte("date", opts.dateTo);
+    const { data: blocked } = await blackoutQuery;
     const blockedIds = [...new Set((blocked ?? []).map((r: { dress_id: string }) => r.dress_id))];
     if (blockedIds.length > 0) q = q.not("id", "in", `(${blockedIds.join(",")})`);
   }
