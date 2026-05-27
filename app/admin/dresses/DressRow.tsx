@@ -10,6 +10,7 @@ import type { Color } from "@/lib/types";
 type D = {
   id: string;
   slug: string;
+  tag_code: string;
   name: string;
   designer: string | null;
   boutique_name: string;
@@ -78,7 +79,7 @@ export default function DressRow({ d }: { d: D }) {
           {d.name}
         </Link>
         <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>
-          {d.designer || "—"} · Size {d.size} · ฿{d.price_per_day.toLocaleString()}/วัน · {d.boutique_name}
+          {d.tag_code} · {d.designer || "—"} · Size {d.size} · ฿{d.price_per_day.toLocaleString()}/วัน · {d.boutique_name}
         </div>
         <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
           <Badge

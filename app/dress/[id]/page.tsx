@@ -153,6 +153,11 @@ export default async function DressPage({ params }: { params: Params }) {
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8, fontWeight: 500 }}>
             {dress.designer || "—"}
           </div>
+          {dress.tag_code ? (
+            <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 18 }}>
+              รหัสชุด: {dress.tag_code}
+            </div>
+          ) : null}
           {/* H1 + Save heart in a row — moved up here from the bottom CTA
               section so it doesn't compete with the date-picker booking
               button. Standard ecommerce pattern (heart-near-title). */}

@@ -59,7 +59,7 @@ export default async function SellerDashboard({
   const [dressesRes, clicksRes] = await Promise.all([
     sb
       .from("dresses")
-      .select("*")
+      .select("id, slug, tag_code, name, designer, size, color, price_per_day, status, available, views, images, created_at")
       .eq("boutique_id", boutique.id)
       .order("created_at", { ascending: false }),
     sb
@@ -71,6 +71,7 @@ export default async function SellerDashboard({
   const dresses = (dressesRes.data ?? []) as Array<{
     id: string;
     slug: string;
+    tag_code: string;
     name: string;
     designer: string | null;
     size: string;
@@ -323,7 +324,7 @@ export default async function SellerDashboard({
                     {d.name}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6 }}>
-                    {d.designer || "—"} · Size {d.size} · ฿{d.price_per_day.toLocaleString()}/วัน
+                    {d.tag_code ? `รหัสชุด: ${d.tag_code} · ` : ""}{d.designer || "—"} · Size {d.size} · ฿{d.price_per_day.toLocaleString()}/วัน
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                     <span
