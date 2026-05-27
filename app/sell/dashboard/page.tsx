@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { DressArt } from "@/components/DressArt";
+import SellerDashboardCalendarPanel from "@/components/SellerDashboardCalendarPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -187,6 +188,19 @@ export default async function SellerDashboard({
         <StatCard label="รออนุมัติ" value={pendingCount} sub="ทีม DopRent กำลังตรวจ" />
         <StatCard label="LINE clicks ทั้งหมด" value={totalClicks} sub="ลูกค้าทักร้าน" />
       </div>
+
+      {dresses.length > 0 ? (
+        <SellerDashboardCalendarPanel
+          dresses={dresses.map((d) => ({
+            id: d.id,
+            name: d.name,
+            designer: d.designer,
+            tag_code: d.tag_code,
+            size: d.size,
+            price_per_day: d.price_per_day,
+          }))}
+        />
+      ) : null}
 
       {/* Actions */}
       <div

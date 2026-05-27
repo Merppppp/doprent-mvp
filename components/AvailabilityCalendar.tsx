@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toggleBlackout } from "@/app/actions/availability";
 
@@ -8,6 +8,12 @@ type Props = {
   dressId: string;
   /** Existing blackout dates as YYYY-MM-DD strings. */
   initialBlackouts: string[];
+  /** Optional parent-controlled year for the calendar view. */
+  selectedYear?: number;
+  /** Optional parent-controlled month for the calendar view (0-11). */
+  selectedMonth?: number;
+  /** Callback when the calendar changes month. */
+  onMonthChange?: (year: number, month: number) => void;
 };
 
 const DAYS_TH = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
@@ -36,7 +42,13 @@ function toLocalDateString(d: Date): string {
 
 const TODAY_STR = toLocalDateString(new Date());
 
-export default function AvailabilityCalendar({ dressId, initialBlackouts }: Props) {
+export default function AvailabilityCalendar({
+  dressId,
+  initialBlackouts,
+  selectedYear,
+  selectedMonth,
+  onMonthChange,
+}: Props) {
   const router = useRouter();
   const [blackouts, setBlackouts] = useState<Set<string>>(new Set(initialBlackouts));
   const [pending, startTransition] = useTransition();
@@ -44,8 +56,24 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
 
   // Calendar view state (which month is displayed)
   const today = new Date();
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-11
+  const [viewYear, setViewYear] = useState(selectedYear ?? today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(selectedMonth ?? today.getMonth()); // 0-11
+
+  useEffect(() => {
+    setBlackouts(new Set(initialBlackouts));
+  }, [dressId, initialBlackouts.join(",")]);
+
+  useEffect(() => {
+    if (typeof selectedYear === "number" && selectedYear !== viewYear) {
+      setViewYear(selectedYear);
+    }
+  }, [selectedYear]);
+
+  useEffect(() => {
+    if (typeof selectedMonth === "number" && selectedMonth !== viewMonth) {
+      setViewMonth(selectedMonth);
+    }
+  }, [selectedMonth]);
 
   const firstDay = new Date(viewYear, viewMonth, 1);
   const startWeekday = firstDay.getDay(); // 0 (Sun) - 6 (Sat)
@@ -60,20 +88,18 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
   while (cells.length < 42) cells.push(null);
 
   function prevMonth() {
-    if (viewMonth === 0) {
-      setViewYear(viewYear - 1);
-      setViewMonth(11);
-    } else {
-      setViewMonth(viewMonth - 1);
-    }
+    const nextYear = viewMonth === 0 ? viewYear - 1 : viewYear;
+    const nextMonth = viewMonth === 0 ? 11 : viewMonth - 1;
+    setViewYear(nextYear);
+    setViewMonth(nextMonth);
+    onMonthChange?.(nextYear, nextMonth);
   }
   function nextMonth() {
-    if (viewMonth === 11) {
-      setViewYear(viewYear + 1);
-      setViewMonth(0);
-    } else {
-      setViewMonth(viewMonth + 1);
-    }
+    const nextYear = viewMonth === 11 ? viewYear + 1 : viewYear;
+    const nextMonth = viewMonth === 11 ? 0 : viewMonth + 1;
+    setViewYear(nextYear);
+    setViewMonth(nextMonth);
+    onMonthChange?.(nextYear, nextMonth);
   }
 
   function onDateClick(date: Date) {
@@ -113,7 +139,6 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
       return parseInt(y) === viewYear && parseInt(m) - 1 === viewMonth;
     })
     .sort();
-  const blockedFutureCount = Array.from(blackouts).filter((d) => d >= TODAY_STR).length;
 
   return (
     <div>
@@ -123,8 +148,8 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: 14,
-          gap: 12,
+          marginBottom: 12,
+          gap: 10,
         }}
       >
         <button
@@ -135,7 +160,7 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
         >
           ←
         </button>
-        <div style={{ fontWeight: 600, fontSize: 17 }}>
+        <div style={{ fontWeight: 600, fontSize: 15 }}>
           {MONTHS_TH[viewMonth]} {viewYear + 543}
         </div>
         <button type="button" onClick={nextMonth} style={navBtnStyle} aria-label="เดือนถัดไป">
@@ -148,8 +173,8 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
-          gap: 4,
-          marginBottom: 8,
+          gap: 3,
+          marginBottom: 6,
         }}
       >
         {DAYS_TH.map((d) => (
@@ -157,10 +182,10 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
             key={d}
             style={{
               textAlign: "center",
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: 600,
               color: "var(--ink-3)",
-              padding: "4px 0",
+              padding: "3px 0",
             }}
           >
             {d}
@@ -173,7 +198,7 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
-          gap: 4,
+          gap: 3,
         }}
       >
         {cells.map((cell, i) => {
@@ -202,7 +227,7 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
                 color: isBlocked ? "var(--on-dark)" : isPast ? "var(--ink-3)" : "var(--ink)",
                 borderRadius: 6,
                 cursor: isPast ? "not-allowed" : pending ? "wait" : "pointer",
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: isToday ? 700 : 400,
                 position: "relative",
                 opacity: isPast ? 0.4 : 1,
@@ -218,12 +243,12 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
       {/* Legend + summary */}
       <div
         style={{
-          marginTop: 18,
-          padding: 12,
+          marginTop: 16,
+          padding: 10,
           background: "var(--bg)",
           border: "1px solid var(--line)",
           borderRadius: 8,
-          fontSize: 13,
+          fontSize: 12,
         }}
       >
         <div style={{ display: "flex", gap: 14, marginBottom: 10, flexWrap: "wrap" }}>
@@ -235,8 +260,6 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
           {blockedThisMonth.length > 0
             ? `เดือนนี้: ปิด ${blockedThisMonth.length} วัน`
             : "เดือนนี้: ยังไม่ปิดวันไหน"}
-          {" · "}
-          ปิดล่วงหน้าทั้งหมด {blockedFutureCount} วัน
         </div>
       </div>
 
@@ -257,7 +280,7 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
       ) : null}
 
       {pending ? (
-        <div style={{ marginTop: 10, fontSize: 12, color: "var(--ink-3)" }}>กำลังบันทึก…</div>
+        <div style={{ marginTop: 10, fontSize: 11, color: "var(--ink-3)" }}>กำลังบันทึก…</div>
       ) : null}
     </div>
   );
@@ -290,11 +313,11 @@ function Legend({
 }
 
 const navBtnStyle: React.CSSProperties = {
-  width: 36,
-  height: 36,
+  width: 32,
+  height: 32,
   borderRadius: 6,
   border: "1px solid var(--line)",
   background: "var(--surface)",
-  fontSize: 16,
+  fontSize: 14,
   cursor: "pointer",
 };
