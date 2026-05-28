@@ -304,4 +304,56 @@ export async function getBlackoutsByMonth(
   return (data ?? []) as Array<{ dress_id: string; date: string }>;
 }
 
+export async function listSimilarDresses(seed: Dress, limit = 4): Promise<Dress[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+
+  const [{ data, error }, verifiedSet] = await Promise.all([
+    sb
+      .from("dresses")
+      .select(PUBLIC_DRESS_QUERY)
+      .eq("status", "live")
+      .eq("available", true)
+      .neq("id", seed.id)
+      .order("featured", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(60),
+    fetchVerifiedBoutiqueIds(),
+  ]);
+
+  if (error) {
+    console.error("[doprent] supabase listSimilarDresses error", error);
+    return [];
+  }
+
+  const pool = ((data ?? []) as Dress[]).map((d) => ({
+    ...d,
+    boutique_verified: verifiedSet.has(d.boutique_id),
+  }));
+
+  const seedOccasions = new Set(seed.occasions ?? []);
+
+  function score(d: Dress): number {
+    let s = 0;
+    const dOccasions = new Set(d.occasions ?? []);
+    const intersection = [...seedOccasions].filter((o) => dOccasions.has(o)).length;
+    const union = new Set([...seedOccasions, ...dOccasions]).size;
+    if (union > 0) s += (intersection / union) * 5;
+    if (d.color === seed.color) s += 3;
+    if (d.size === seed.size) s += 3;
+    const lo = seed.price_per_day * 0.7;
+    const hi = seed.price_per_day * 1.3;
+    if (d.price_per_day >= lo && d.price_per_day <= hi) s += 2;
+    if (seed.designer && d.designer === seed.designer) s += 2;
+    if (d.boutique_id === seed.boutique_id) s += 1;
+    return s;
+  }
+
+  return pool
+    .map((d) => ({ d, s: score(d) }))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, limit)
+    .map(({ d }) => d);
+}
+
 export { isSupabaseConfigured };

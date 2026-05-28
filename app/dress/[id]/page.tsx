@@ -12,8 +12,8 @@ import {
   getBoutiqueBySlug,
   getDressBySlug,
   listBlackouts,
-  listDresses,
   listOccasions,
+  listSimilarDresses,
 } from "@/lib/dresses";
 import { COLOR_LABELS_TH } from "@/lib/types";
 
@@ -48,7 +48,7 @@ export default async function DressPage({ params }: { params: Params }) {
   const [occasions, boutique, related, user, blackouts] = await Promise.all([
     listOccasions(),
     getBoutiqueBySlug(slugify(dress.boutique_name)).catch(() => null),
-    listDresses({ limit: 4 }),
+    listSimilarDresses(dress, 4),
     getCurrentUser().catch(() => null),
     listBlackouts(dress.id),
   ]);
