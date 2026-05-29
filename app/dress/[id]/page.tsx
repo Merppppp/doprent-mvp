@@ -7,6 +7,7 @@ import DressCard from "@/components/DressCard";
 import SaveButton from "@/components/SaveButton";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import DateRangePicker from "@/components/DateRangePicker";
+import DressAvailabilityCalendar from "@/components/DressAvailabilityCalendar";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getBoutiqueBySlug,
@@ -326,6 +327,9 @@ export default async function DressPage({ params }: { params: Params }) {
             <Spec lbl="ร้านเช่า" val={dress.boutique_name} />
             <Spec lbl="ดีไซเนอร์" val={dress.designer ?? "—"} />
           </div>
+
+          {/* Availability calendar */}
+          <DressAvailabilityCalendar blackouts={blackouts} />
 
           {/* Date picker (renter). LINE href and pre-filled message are
               omitted entirely for anonymous viewers — they see a login CTA
