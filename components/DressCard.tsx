@@ -68,11 +68,6 @@ export default function DressCard({ dress, variant = 0, savedSet, isLoggedIn }: 
           >
             {dress.designer || "—"}
           </div>
-          {dress.tag_code ? (
-            <div style={{ fontSize: 11, color: "var(--ink-3)", marginBottom: 4, fontWeight: 500 }}>
-              รหัสชุด: {dress.tag_code}
-            </div>
-          ) : null}
           <div style={{ fontSize: 15, fontWeight: 500, lineHeight: 1.3, marginBottom: 4 }}>
             {dress.name}
           </div>

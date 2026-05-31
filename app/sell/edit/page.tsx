@@ -51,7 +51,6 @@ export default async function EditBoutiquePage() {
           since_year: boutique.since_year,
           tag: boutique.tag,
           story: boutique.story,
-          delivery_info: boutique.delivery_info,
           owner_name: boutique.owner_name,
           address: boutique.address,
           hours: boutique.hours,

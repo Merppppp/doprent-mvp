@@ -13,7 +13,6 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // Set true when Supabase responds with "Email not confirmed" — UI then
@@ -222,9 +221,6 @@ export default function LoginPage() {
           value={password}
           onChange={setPassword}
           required
-          showToggle
-          showPassword={showPassword}
-          onToggleShowPassword={() => setShowPassword((prev) => !prev)}
         />
         <button
           type="submit"
@@ -255,61 +251,31 @@ function Field({
   value,
   onChange,
   required,
-  showToggle,
-  showPassword,
-  onToggleShowPassword,
 }: {
   label: string;
   type: string;
   value: string;
   onChange: (v: string) => void;
   required?: boolean;
-  showToggle?: boolean;
-  showPassword?: boolean;
-  onToggleShowPassword?: () => void;
 }) {
-  const actualType = showToggle && type === "password" ? (showPassword ? "text" : "password") : type;
-
   return (
     <div style={{ marginBottom: 14 }}>
       <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
         {label}
       </label>
-      <div style={{ position: "relative" }}>
-        <input
-          type={actualType}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          required={required}
-          style={{
-            width: "100%",
-            padding: showToggle ? "11px 44px 11px 14px" : "11px 14px",
-            border: "1px solid var(--line)",
-            borderRadius: 6,
-            fontSize: 14,
-          }}
-        />
-        {showToggle ? (
-          <button
-            type="button"
-            onClick={onToggleShowPassword}
-            style={{
-              position: "absolute",
-              top: "50%",
-              right: 10,
-              transform: "translateY(-50%)",
-              background: "none",
-              border: "none",
-              color: "var(--ink-3)",
-              fontSize: 13,
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            {showPassword ? "ซ่อน" : "แสดง"}
-          </button>
-        ) : null}
-      </div>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        required={required}
+        style={{
+          width: "100%",
+          padding: "11px 14px",
+          border: "1px solid var(--line)",
+          borderRadius: 6,
+          fontSize: 14,
+        }}
+      />
     </div>
   );
 }

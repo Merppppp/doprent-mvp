@@ -7,15 +7,13 @@ import DressCard from "@/components/DressCard";
 import SaveButton from "@/components/SaveButton";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import DateRangePicker from "@/components/DateRangePicker";
-import DressAvailabilityCalendar from "@/components/DressAvailabilityCalendar";
-import LineMessageCopyBox from "@/components/LineMessageCopyBox";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getBoutiqueBySlug,
   getDressBySlug,
   listBlackouts,
+  listDresses,
   listOccasions,
-  listSimilarDresses,
 } from "@/lib/dresses";
 import { COLOR_LABELS_TH } from "@/lib/types";
 
@@ -50,7 +48,7 @@ export default async function DressPage({ params }: { params: Params }) {
   const [occasions, boutique, related, user, blackouts] = await Promise.all([
     listOccasions(),
     getBoutiqueBySlug(slugify(dress.boutique_name)).catch(() => null),
-    listSimilarDresses(dress, 4),
+    listDresses({ limit: 4 }),
     getCurrentUser().catch(() => null),
     listBlackouts(dress.id),
   ]);
@@ -155,11 +153,6 @@ export default async function DressPage({ params }: { params: Params }) {
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8, fontWeight: 500 }}>
             {dress.designer || "—"}
           </div>
-          {dress.tag_code ? (
-            <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 18 }}>
-              รหัสชุด: {dress.tag_code}
-            </div>
-          ) : null}
           {/* H1 + Save heart in a row — moved up here from the bottom CTA
               section so it doesn't compete with the date-picker booking
               button. Standard ecommerce pattern (heart-near-title). */}
@@ -329,9 +322,6 @@ export default async function DressPage({ params }: { params: Params }) {
             <Spec lbl="ดีไซเนอร์" val={dress.designer ?? "—"} />
           </div>
 
-          {/* Availability calendar */}
-          <DressAvailabilityCalendar blackouts={blackouts} />
-
           {/* Date picker (renter). LINE href and pre-filled message are
               omitted entirely for anonymous viewers — they see a login CTA
               instead of the booking button. */}
@@ -348,13 +338,6 @@ export default async function DressPage({ params }: { params: Params }) {
             boutiqueId={dress.boutique_id}
             isLoggedIn={isLoggedIn}
             loginNext={`/dress/${dress.slug}`}
-          />
-
-          <LineMessageCopyBox
-            dressName={dress.name}
-            boutiqueName={dress.boutique_name}
-            pricePerDay={dress.price_per_day}
-            dressPageUrl={url}
           />
 
           {/* (CTA stack removed — date picker above is the only booking

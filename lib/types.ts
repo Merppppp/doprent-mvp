@@ -67,7 +67,6 @@ export type Boutique = {
   cover_color: Color;
   tag: string | null;
   story: string | null;
-  delivery_info: string | null;
   featured: boolean;
   /** Admin-toggled trust mark (post-KYC). Defaults to false. */
   verified: boolean;
@@ -82,7 +81,6 @@ export type Boutique = {
 export type Dress = {
   id: string;
   slug: string;
-  tag_code: string;
   name: string;
   designer: string | null;
   boutique_id: string;
@@ -110,12 +108,6 @@ export type Dress = {
 
 export type DressWithBoutique = Dress & {
   boutique: Boutique;
-};
-
-export type Blackout = {
-  dress_id: string;
-  date: string;
-  created_at: string;
 };
 
 export type Profile = {

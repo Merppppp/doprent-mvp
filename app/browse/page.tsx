@@ -29,8 +29,6 @@ type SearchParams = {
   designer?: string;
   q?: string;
   sort?: string;
-  dateFrom?: string;
-  dateTo?: string;
 };
 
 export default async function BrowsePage({
@@ -43,9 +41,6 @@ export default async function BrowsePage({
   const activeSize = searchParams?.size;
   const activeDesigner = searchParams?.designer?.trim() || undefined;
   const search = searchParams?.q?.trim() ?? "";
-  const activeDateFrom = searchParams?.dateFrom?.trim() || undefined;
-  const activeDateTo = searchParams?.dateTo?.trim() || undefined;
-  const today = new Date().toISOString().slice(0, 10);
   const sort = (searchParams?.sort ?? "featured") as
     | "featured"
     | "price-asc"
@@ -60,8 +55,6 @@ export default async function BrowsePage({
       designers: activeDesigner ? [activeDesigner] : undefined,
       search: search || undefined,
       sort,
-      dateFrom: activeDateFrom,
-      dateTo: activeDateTo,
     }),
     listOccasions(),
     listDesigners(),
@@ -124,105 +117,41 @@ export default async function BrowsePage({
 
           {/* Occasions */}
           <FilterGroup title="โอกาส">
-            <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={makeHref({ occasion: undefined })}
+              className="check-row"
+              style={chipBaseStyle(!activeOcc)}
+            >
+              ทั้งหมด
+            </Link>
+            {occasions.map((o) => (
               <Link
-                href={makeHref({ occasion: undefined })}
-                className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                  !activeOcc
-                    ? "border-ink bg-ink/10 text-ink"
-                    : "border-ink/15 bg-white text-ink hover:border-ink/40"
-                }`}
+                key={o.key}
+                href={makeHref({ occasion: o.key })}
+                style={chipBaseStyle(activeOcc === o.key)}
               >
-                ทั้งหมด
+                {o.th}
               </Link>
-              {occasions.map((o) => (
-                <Link
-                  key={o.key}
-                  href={makeHref({ occasion: o.key })}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                    activeOcc === o.key
-                      ? "border-ink bg-ink/10 text-ink"
-                      : "border-ink/15 bg-white text-ink hover:border-ink/40"
-                  }`}
-                >
-                  {o.th}
-                </Link>
-              ))}
-            </div>
+            ))}
           </FilterGroup>
 
           {/* Designers */}
           {designers.length > 0 ? (
             <FilterGroup title="ดีไซเนอร์">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  href={makeHref({ designer: undefined })}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                    !activeDesigner
-                      ? "border-ink bg-ink/10 text-ink"
-                      : "border-ink/15 bg-white text-ink hover:border-ink/40"
-                  }`}
-                >
-                  ทั้งหมด
-                </Link>
-                {designers.slice(0, 6).map((d) => (
-                  <Link
-                    key={d}
-                    href={makeHref({ designer: activeDesigner === d ? undefined : d })}
-                    className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                      activeDesigner === d
-                        ? "border-ink bg-ink/10 text-ink"
-                        : "border-ink/15 bg-white text-ink hover:border-ink/40"
-                    }`}
-                  >
-                    {d}
-                  </Link>
-                ))}
-                {designers.length > 6 ? (
-                  <details open={designers.slice(6).includes(activeDesigner || "")} style={{ marginTop: 2 }}>
-                    <summary
-                      style={{
-                        listStyle: "none",
-                        cursor: "pointer",
-                        fontSize: 13,
-                        color: "var(--ink-3)",
-                        padding: "5px 0",
-                        fontWeight: 500,
-                      }}
-                    >
-                      ดูเพิ่ม ({designers.length - 6})
-                    </summary>
-                    <div className="flex flex-wrap items-center gap-2" style={{ marginTop: 8 }}>
-                      {designers.slice(6).map((d) => (
-                        <Link
-                          key={d}
-                          href={makeHref({ designer: activeDesigner === d ? undefined : d })}
-                          className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                            activeDesigner === d
-                              ? "border-ink bg-ink/10 text-ink"
-                              : "border-ink/15 bg-white text-ink hover:border-ink/40"
-                          }`}
-                        >
-                          {d}
-                        </Link>
-                      ))}
-                    </div>
-                  </details>
-                ) : null}
-              </div>
+              <DesignerFilter
+                designers={designers}
+                active={activeDesigner}
+                makeHref={makeHref}
+              />
             </FilterGroup>
           ) : null}
 
           {/* Color chips */}
           <FilterGroup title="สี">
-            <div className="flex flex-wrap items-center gap-2">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               <Link
                 href={makeHref({ color: undefined })}
-                className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                  activeColor === "all"
-                    ? "border-ink bg-ink/10 text-ink"
-                    : "border-ink/15 bg-white text-ink hover:border-ink/40"
-                }`}
+                style={colorChipStyle(activeColor === "all")}
               >
                 ทั้งหมด
               </Link>
@@ -230,15 +159,19 @@ export default async function BrowsePage({
                 <Link
                   key={c}
                   href={makeHref({ color: c })}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition flex items-center gap-2 ${
-                    activeColor === c
-                      ? "border-ink bg-ink/10 text-ink"
-                      : "border-ink/15 bg-white text-ink hover:border-ink/40"
-                  }`}
+                  style={colorChipStyle(activeColor === c)}
                 >
                   <span
-                    className="h-3 w-3 rounded-full ring-1 ring-black/10"
-                    style={{ background: COLOR_SWATCH[c] }}
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 999,
+                      background: COLOR_SWATCH[c],
+                      border: "1px solid rgba(0,0,0,0.1)",
+                      display: "inline-block",
+                      marginRight: 6,
+                      verticalAlign: "middle",
+                    }}
                   />
                   {COLOR_LABELS_TH[c]}
                 </Link>
@@ -261,72 +194,7 @@ export default async function BrowsePage({
             </div>
           </FilterGroup>
 
-          <form method="get" style={{ paddingBottom: 18, marginTop: 14 }}>
-            {activeColor !== "all" ? (
-              <input type="hidden" name="color" value={activeColor} />
-            ) : null}
-            {activeOcc ? <input type="hidden" name="occasion" value={activeOcc} /> : null}
-            {activeSize ? <input type="hidden" name="size" value={activeSize} /> : null}
-            {activeDesigner ? <input type="hidden" name="designer" value={activeDesigner} /> : null}
-            {search ? <input type="hidden" name="q" value={search} /> : null}
-            {sort ? <input type="hidden" name="sort" value={sort} /> : null}
-            <div style={{ display: "grid", gap: 12 }}>
-              <label style={{ display: "block", fontSize: 13, color: "var(--ink-3)" }}>
-                วันที่เช่าเริ่มต้น
-                <input
-                  type="date"
-                  name="dateFrom"
-                  defaultValue={activeDateFrom}
-                  min={today}
-                  style={{
-                    width: "100%",
-                    marginTop: 6,
-                    padding: "9px 12px",
-                    border: "1px solid var(--line)",
-                    borderRadius: 6,
-                    background: "var(--surface)",
-                    fontSize: 14,
-                  }}
-                />
-              </label>
-              <label style={{ display: "block", fontSize: 13, color: "var(--ink-3)" }}>
-                วันที่เช่าสิ้นสุด
-                <input
-                  type="date"
-                  name="dateTo"
-                  defaultValue={activeDateTo}
-                  min={activeDateFrom ?? today}
-                  style={{
-                    width: "100%",
-                    marginTop: 6,
-                    padding: "9px 12px",
-                    border: "1px solid var(--line)",
-                    borderRadius: 6,
-                    background: "var(--surface)",
-                    fontSize: 14,
-                  }}
-                />
-              </label>
-              <button
-                type="submit"
-                style={{
-                  width: "100%",
-                  padding: "10px 14px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: "var(--ink)",
-                  color: "var(--on-dark)",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                กรองวันที่
-              </button>
-            </div>
-          </form>
-
-          {(activeColor !== "all" || activeOcc || activeSize || activeDesigner || search || activeDateFrom || activeDateTo) && (
+          {(activeColor !== "all" || activeOcc || activeSize || activeDesigner || search) && (
             <div style={{ paddingTop: 12 }}>
               <Link
                 href="/browse"
@@ -396,6 +264,72 @@ export default async function BrowsePage({
   );
 }
 
+/**
+ * Designer filter. Shows first 6 inline; rest collapsed in <details>.
+ * "ทั้งหมด" chip clears the filter.
+ */
+function DesignerFilter({
+  designers,
+  active,
+  makeHref,
+}: {
+  designers: string[];
+  active: string | undefined;
+  makeHref: (overrides: Partial<SearchParams>) => string;
+}) {
+  const HEAD = 6;
+  const head = designers.slice(0, HEAD);
+  const rest = designers.slice(HEAD);
+
+  // Ensure active designer is always visible even if it'd be hidden behind expand
+  const activeInRest = active && rest.includes(active);
+
+  return (
+    <>
+      <Link
+        href={makeHref({ designer: undefined })}
+        style={chipBaseStyle(!active)}
+      >
+        ทั้งหมด
+      </Link>
+      {head.map((d) => (
+        <Link
+          key={d}
+          href={makeHref({ designer: active === d ? undefined : d })}
+          style={chipBaseStyle(active === d)}
+        >
+          {d}
+        </Link>
+      ))}
+      {rest.length > 0 ? (
+        <details open={!!activeInRest} style={{ marginTop: 2 }}>
+          <summary
+            style={{
+              listStyle: "none",
+              cursor: "pointer",
+              fontSize: 13,
+              color: "var(--ink-3)",
+              padding: "5px 0",
+              fontWeight: 500,
+            }}
+          >
+            ดูเพิ่ม ({rest.length})
+          </summary>
+          {rest.map((d) => (
+            <Link
+              key={d}
+              href={makeHref({ designer: active === d ? undefined : d })}
+              style={chipBaseStyle(active === d)}
+            >
+              {d}
+            </Link>
+          ))}
+        </details>
+      ) : null}
+    </>
+  );
+}
+
 function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
   // Spacing-only separation between filter groups — borders between every group
   // creates visual fatigue in a narrow sidebar.
@@ -414,6 +348,30 @@ function FilterGroup({ title, children }: { title: string; children: React.React
       {children}
     </div>
   );
+}
+
+function chipBaseStyle(active: boolean): React.CSSProperties {
+  return {
+    display: "block",
+    padding: "5px 0",
+    fontSize: 14,
+    color: active ? "var(--ink)" : "var(--ink-2)",
+    fontWeight: active ? 600 : 400,
+  };
+}
+
+function colorChipStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: "5px 11px",
+    border: `1px solid ${active ? "var(--ink)" : "var(--line)"}`,
+    borderRadius: 6,
+    fontSize: 12,
+    background: active ? "var(--ink)" : "var(--surface)",
+    color: active ? "var(--on-dark)" : "var(--ink)",
+    display: "inline-flex",
+    alignItems: "center",
+    cursor: "pointer",
+  };
 }
 
 function sizeBtnStyle(active: boolean): React.CSSProperties {

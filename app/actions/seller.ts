@@ -33,23 +33,12 @@ export async function createBoutique(formData: FormData): Promise<{
 
   const name = String(formData.get("name") ?? "").trim();
   const areaLabel = String(formData.get("area_label") ?? "").trim();
-  const areaKeyRaw = String(formData.get("area_key") ?? "").trim() || null;
-  // Validate area_key exists in areas table before insert to avoid FK violation
-  let areaKey: string | null = null;
-  if (areaKeyRaw) {
-    const { data: areaExists } = await sb
-      .from("areas")
-      .select("key")
-      .eq("key", areaKeyRaw)
-      .maybeSingle();
-    areaKey = areaExists ? areaKeyRaw : null;
-  }
+  const areaKey = String(formData.get("area_key") ?? "").trim() || null;
   const lineUrlRaw = String(formData.get("line_url") ?? "").trim();
   const lineUrl = normalizeLineUrl(lineUrlRaw);
   const instagram = String(formData.get("instagram") ?? "").trim() || null;
   const tag = String(formData.get("tag") ?? "").trim() || null;
   const story = String(formData.get("story") ?? "").trim() || null;
-  const deliveryInfo = String(formData.get("delivery_info") ?? "").trim() || null;
 
   // Structured Thai address
   const houseNo = String(formData.get("house_no") ?? "").trim();
@@ -129,7 +118,6 @@ export async function createBoutique(formData: FormData): Promise<{
       story,
       since_year: sinceYear,
       cover_color: coverColor,
-      delivery_info: deliveryInfo,
       status: "pending", // admin must approve
       kyc_status: "none",
     })
@@ -188,7 +176,6 @@ export async function updateBoutique(
     "instagram",
     "tag",
     "story",
-    "delivery_info",
     "owner_name",
     "address",
     "hours",
@@ -264,12 +251,8 @@ export async function submitKyc(formData: FormData): Promise<{ ok: boolean; erro
 
   if (!legalName) return { ok: false, error: "กรุณาใส่ชื่อตามบัตรประชาชน/นิติบุคคล" };
   if (!taxId) return { ok: false, error: "กรุณาใส่เลขประจำตัวผู้เสียภาษี/บัตรประชาชน" };
-  if (!/^[0-9]{13}$/.test(taxId))
-    return { ok: false, error: "เลขประจำตัวผู้เสียภาษี/บัตรประชาชนต้องเป็นตัวเลข 13 หลัก" };
   if (!bankName || !bankAccNo || !bankAccName)
     return { ok: false, error: "กรุณาใส่ข้อมูลบัญชีธนาคารให้ครบ" };
-  if (!/^[0-9]+$/.test(bankAccNo))
-    return { ok: false, error: "เลขที่บัญชีต้องเป็นตัวเลขเท่านั้น" };
 
   const { error: insertErr } = await sb.from("kyc_submissions").insert({
     boutique_id: boutiqueId,

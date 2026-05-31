@@ -32,7 +32,7 @@ export default async function Header() {
           alignItems: "center",
           justifyContent: "space-between",
           gap: 16,
-          padding: "12px 16px",
+          padding: "12px 0",
         }}
       >
         <Link

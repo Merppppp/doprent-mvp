@@ -24,7 +24,7 @@ export default async function DressesAdmin({
   const sb = createClient();
   let q = sb
     .from("dresses")
-    .select("id, slug, tag_code, name, designer, boutique_name, size, color, price_per_day, status, available, featured, sponsored, images, created_at, views")
+    .select("id, slug, name, designer, boutique_name, size, color, price_per_day, status, available, featured, sponsored, images, created_at, views")
     .order("created_at", { ascending: false });
   if (activeStatus !== "all") q = q.eq("status", activeStatus);
   const { data, error } = await q;
@@ -32,7 +32,6 @@ export default async function DressesAdmin({
   const rows = (data ?? []) as Array<{
     id: string;
     slug: string;
-    tag_code: string;
     name: string;
     designer: string | null;
     boutique_name: string;

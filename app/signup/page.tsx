@@ -13,8 +13,6 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // After successful signup when email confirmation is ON, we show a
@@ -25,20 +23,11 @@ export default function SignupPage() {
     "idle",
   );
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const form = e.currentTarget;
-    if (!form.reportValidity()) {
-      setError("กรุณาตรวจสอบข้อมูลให้ครบถ้วน");
-      return;
-    }
     if (password.length < 6) {
       setError("รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("รหัสผ่านทั้งสองช่องไม่ตรงกัน");
       return;
     }
     setLoading(true);
@@ -244,21 +233,6 @@ export default function SignupPage() {
           value={password}
           onChange={setPassword}
           required
-          minLength={6}
-          showToggle
-          showPassword={showPassword}
-          onToggleShowPassword={() => setShowPassword((prev) => !prev)}
-        />
-        <Field
-          label="ยืนยันรหัสผ่าน"
-          type="password"
-          value={confirmPassword}
-          onChange={setConfirmPassword}
-          required
-          minLength={6}
-          showToggle
-          showPassword={showPassword}
-          onToggleShowPassword={() => setShowPassword((prev) => !prev)}
         />
         <button
           type="submit"
@@ -289,64 +263,31 @@ function Field({
   value,
   onChange,
   required,
-  minLength,
-  showToggle,
-  showPassword,
-  onToggleShowPassword,
 }: {
   label: string;
   type: string;
   value: string;
   onChange: (v: string) => void;
   required?: boolean;
-  minLength?: number;
-  showToggle?: boolean;
-  showPassword?: boolean;
-  onToggleShowPassword?: () => void;
 }) {
-  const actualType = showToggle && type === "password" ? (showPassword ? "text" : "password") : type;
-
   return (
     <div style={{ marginBottom: 14 }}>
       <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
         {label}
       </label>
-      <div style={{ position: "relative" }}>
-        <input
-          type={actualType}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          required={required}
-          minLength={minLength}
-          style={{
-            width: "100%",
-            padding: showToggle ? "11px 44px 11px 14px" : "11px 14px",
-            border: "1px solid var(--line)",
-            borderRadius: 6,
-            fontSize: 14,
-          }}
-        />
-        {showToggle ? (
-          <button
-            type="button"
-            onClick={onToggleShowPassword}
-            style={{
-              position: "absolute",
-              top: "50%",
-              right: 10,
-              transform: "translateY(-50%)",
-              background: "none",
-              border: "none",
-              color: "var(--ink-3)",
-              fontSize: 13,
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            {showPassword ? "ซ่อน" : "แสดง"}
-          </button>
-        ) : null}
-      </div>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        required={required}
+        style={{
+          width: "100%",
+          padding: "11px 14px",
+          border: "1px solid var(--line)",
+          borderRadius: 6,
+          fontSize: 14,
+        }}
+      />
     </div>
   );
 }

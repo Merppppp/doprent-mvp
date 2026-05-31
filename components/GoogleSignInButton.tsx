@@ -42,7 +42,6 @@ export default function GoogleSignInButton({
       provider: "google",
       options: {
         redirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(next)}`,
-        queryParams: { prompt: "select_account" },
       },
     });
     if (error) {
