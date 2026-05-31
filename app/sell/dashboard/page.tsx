@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { DressArt } from "@/components/DressArt";
+import SellerDashboardCalendarPanel from "@/components/SellerDashboardCalendarPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,7 @@ export default async function SellerDashboard({
   const [dressesRes, clicksRes] = await Promise.all([
     sb
       .from("dresses")
-      .select("*")
+      .select("id, slug, tag_code, name, designer, size, color, price_per_day, status, available, views, images, created_at")
       .eq("boutique_id", boutique.id)
       .order("created_at", { ascending: false }),
     sb
@@ -71,6 +72,7 @@ export default async function SellerDashboard({
   const dresses = (dressesRes.data ?? []) as Array<{
     id: string;
     slug: string;
+    tag_code: string;
     name: string;
     designer: string | null;
     size: string;
@@ -186,6 +188,19 @@ export default async function SellerDashboard({
         <StatCard label="รออนุมัติ" value={pendingCount} sub="ทีม DopRent กำลังตรวจ" />
         <StatCard label="LINE clicks ทั้งหมด" value={totalClicks} sub="ลูกค้าทักร้าน" />
       </div>
+
+      {dresses.length > 0 ? (
+        <SellerDashboardCalendarPanel
+          dresses={dresses.map((d) => ({
+            id: d.id,
+            name: d.name,
+            designer: d.designer,
+            tag_code: d.tag_code,
+            size: d.size,
+            price_per_day: d.price_per_day,
+          }))}
+        />
+      ) : null}
 
       {/* Actions */}
       <div
@@ -323,7 +338,7 @@ export default async function SellerDashboard({
                     {d.name}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6 }}>
-                    {d.designer || "—"} · Size {d.size} · ฿{d.price_per_day.toLocaleString()}/วัน
+                    {d.tag_code ? `รหัสชุด: ${d.tag_code} · ` : ""}{d.designer || "—"} · Size {d.size} · ฿{d.price_per_day.toLocaleString()}/วัน
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                     <span

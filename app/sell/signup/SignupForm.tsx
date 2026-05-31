@@ -248,6 +248,15 @@ export default function SignupForm(_props: Props) {
         />
       </Field>
 
+      <Field label="ข้อมูลการจัดส่ง" hint="เช่น ส่งฟรีในกรุงเทพฯ, จัดส่งทั่วประเทศโดย Kerry, หรือรับสินค้าที่ร้าน">
+        <textarea
+          name="delivery_info"
+          maxLength={250}
+          rows={3}
+          style={{ ...inputStyle, resize: "vertical" }}
+        />
+      </Field>
+
       <Field label="สีหลักของร้าน" hint="ใช้กับ cover ตอนยังไม่มีรูป">
         <select name="cover_color" style={inputStyle} defaultValue="rose">
           {COLORS.map((c) => (

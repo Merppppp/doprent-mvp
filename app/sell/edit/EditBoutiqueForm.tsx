@@ -28,6 +28,7 @@ type Props = {
     since_year: number | null;
     tag: string | null;
     story: string | null;
+    delivery_info: string | null;
     owner_name: string | null;
     address: string | null;
     hours: string | null;
@@ -123,6 +124,15 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
           defaultValue={boutique.story ?? ""}
           rows={4}
           maxLength={500}
+          style={{ ...inputStyle, resize: "vertical" }}
+        />
+      </Labeled>
+      <Labeled label="ข้อมูลการจัดส่ง">
+        <textarea
+          name="delivery_info"
+          defaultValue={boutique.delivery_info ?? ""}
+          rows={3}
+          maxLength={250}
           style={{ ...inputStyle, resize: "vertical" }}
         />
       </Labeled>

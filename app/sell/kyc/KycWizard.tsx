@@ -86,6 +86,7 @@ export default function KycWizard({ boutiqueId }: Props) {
     if (s === 2) {
       if (!legalName.trim()) return "กรุณาใส่ชื่อตามเอกสาร";
       if (!taxId.trim()) return "กรุณาใส่เลขบัตรประชาชน/เลขผู้เสียภาษี";
+      if (!/^[0-9]{13}$/.test(taxId)) return "เลขบัตรประชาชน/เลขผู้เสียภาษีต้องเป็นตัวเลข 13 หลัก";
       if (!idCardUrl) return "กรุณาอัปโหลดบัตรประชาชน";
       if (businessType === "company" && !dbdDocUrl) return "กรุณาอัปโหลดหนังสือรับรองบริษัท";
       return null;
@@ -473,6 +474,7 @@ function Step3(props: {
             value={props.bankAccNo}
             onChange={(e) => props.setBankAccNo(e.target.value.replace(/\D/g, ""))}
             inputMode="numeric"
+            pattern="[0-9]*"
             style={inputStyle}
           />
         </Labeled>

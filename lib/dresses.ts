@@ -1,5 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from "./supabase";
-import type { Boutique, Color, Dress, Occasion, OccasionKey } from "./types";
+import type { Blackout, Boutique, Color, Dress, Occasion, OccasionKey } from "./types";
 
 /** Hard-coded occasions in case occasions table isn't seeded yet */
 const FALLBACK_OCCASIONS: Occasion[] = [
@@ -23,17 +23,19 @@ export type DressFilters = {
   priceMax?: number;
   search?: string;
   sort?: "featured" | "price-asc" | "price-desc" | "name";
+  dateFrom?: string; // YYYY-MM-DD
+  dateTo?: string;   // YYYY-MM-DD
 };
 
 const PUBLIC_DRESS_QUERY =
-  "id,slug,name,designer,boutique_id,boutique_name,size,color,price_per_day,deposit,description,images,occasions,line_url,ads_tier,featured,sponsored,status,available,views,created_at,updated_at";
+  "id,slug,tag_code,name,designer,boutique_id,boutique_name,size,color,price_per_day,deposit,description,images,occasions,line_url,ads_tier,featured,sponsored,status,available,views,created_at,updated_at";
 
 // Public-safe column allowlist for boutiques. Mirrors the column-level GRANT
 // in migration 2026-05-18_boutique_address_privacy.sql — DO NOT add address,
 // lat, lng, house_no, street, subdistrict, or postal_code here. Those are
 // owner-only and reading them as anon will 403 post-migration.
 const PUBLIC_BOUTIQUE_QUERY =
-  "id,slug,name,owner_id,owner_name,area_key,area_label,hours,line_url,instagram,since_year,cover_color,tag,story,featured,ads_tier,status,kyc_status,verified,district,province,created_at,updated_at";
+  "id,slug,name,owner_id,owner_name,area_key,area_label,hours,line_url,instagram,since_year,cover_color,tag,story,delivery_info,featured,ads_tier,status,kyc_status,verified,district,province,created_at,updated_at";
 
 /** Cache for verified boutique-ID lookup within a single request. */
 async function fetchVerifiedBoutiqueIds(): Promise<Set<string>> {
@@ -72,6 +74,18 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
   }
   if (typeof opts.priceMax === "number") q = q.lte("price_per_day", opts.priceMax);
   if (opts.occasions && opts.occasions.length) q = q.overlaps("occasions", opts.occasions);
+  if (opts.search) q = q.textSearch("search_vector", opts.search, { type: "plain", config: "simple" });
+
+  // Exclude dresses that have any blackout date within the requested range
+  if (opts.dateFrom || opts.dateTo) {
+    let blackoutQuery = sb.from("dress_blackouts").select("dress_id");
+    if (opts.dateFrom) blackoutQuery = blackoutQuery.gte("date", opts.dateFrom);
+    if (opts.dateTo) blackoutQuery = blackoutQuery.lte("date", opts.dateTo);
+    const { data: blocked } = await blackoutQuery;
+    const blockedIds = [...new Set((blocked ?? []).map((r: { dress_id: string }) => r.dress_id))];
+    if (blockedIds.length > 0) q = q.not("id", "in", `(${blockedIds.join(",")})`);
+  }
+
   if (opts.limit) q = q.limit(opts.limit);
 
   const [{ data, error }, verifiedSet] = await Promise.all([
@@ -87,15 +101,6 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
     boutique_verified: verifiedSet.has(d.boutique_id),
   }));
 
-  // Application-layer filters not supported cleanly by Supabase
-  if (opts.search) {
-    const needle = opts.search.toLowerCase();
-    rows = rows.filter((d) =>
-      `${d.name} ${d.designer ?? ""} ${d.boutique_name} ${d.color} ${d.description ?? ""}`
-        .toLowerCase()
-        .includes(needle),
-    );
-  }
   if (opts.designers && opts.designers.length) {
     rows = rows.filter((d) => opts.designers!.includes(d.designer ?? ""));
   }
@@ -264,6 +269,91 @@ export async function getStats(): Promise<{ boutiques: number; dresses: number; 
     dresses: dRes.count ?? 0,
     minPrice,
   };
+}
+
+export async function getBlackoutsByDress(dressId: string): Promise<Blackout[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("dress_blackouts")
+    .select("dress_id,date,created_at")
+    .eq("dress_id", dressId)
+    .order("date", { ascending: true });
+  if (error) return [];
+  return (data as Blackout[]) ?? [];
+}
+
+/** Fetch blackouts for multiple dresses within a calendar month (YYYY-MM). */
+export async function getBlackoutsByMonth(
+  dressIds: string[],
+  month: string, // YYYY-MM
+): Promise<Array<{ dress_id: string; date: string }>> {
+  if (!dressIds.length) return [];
+  const sb = getSupabase();
+  if (!sb) return [];
+  const [year, mon] = month.split("-").map(Number);
+  const monthStart = `${month}-01`;
+  const monthEnd = `${month}-${String(new Date(year, mon, 0).getDate()).padStart(2, "0")}`;
+  const { data, error } = await sb
+    .from("dress_blackouts")
+    .select("dress_id,date")
+    .in("dress_id", dressIds)
+    .gte("date", monthStart)
+    .lte("date", monthEnd);
+  if (error) return [];
+  return (data ?? []) as Array<{ dress_id: string; date: string }>;
+}
+
+export async function listSimilarDresses(seed: Dress, limit = 4): Promise<Dress[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+
+  const [{ data, error }, verifiedSet] = await Promise.all([
+    sb
+      .from("dresses")
+      .select(PUBLIC_DRESS_QUERY)
+      .eq("status", "live")
+      .eq("available", true)
+      .neq("id", seed.id)
+      .order("featured", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(60),
+    fetchVerifiedBoutiqueIds(),
+  ]);
+
+  if (error) {
+    console.error("[doprent] supabase listSimilarDresses error", error);
+    return [];
+  }
+
+  const pool = ((data ?? []) as Dress[]).map((d) => ({
+    ...d,
+    boutique_verified: verifiedSet.has(d.boutique_id),
+  }));
+
+  const seedOccasions = new Set(seed.occasions ?? []);
+
+  function score(d: Dress): number {
+    let s = 0;
+    const dOccasions = new Set(d.occasions ?? []);
+    const intersection = [...seedOccasions].filter((o) => dOccasions.has(o)).length;
+    const union = new Set([...seedOccasions, ...dOccasions]).size;
+    if (union > 0) s += (intersection / union) * 5;
+    if (d.color === seed.color) s += 3;
+    if (d.size === seed.size) s += 3;
+    const lo = seed.price_per_day * 0.7;
+    const hi = seed.price_per_day * 1.3;
+    if (d.price_per_day >= lo && d.price_per_day <= hi) s += 2;
+    if (seed.designer && d.designer === seed.designer) s += 2;
+    if (d.boutique_id === seed.boutique_id) s += 1;
+    return s;
+  }
+
+  return pool
+    .map((d) => ({ d, s: score(d) }))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, limit)
+    .map(({ d }) => d);
 }
 
 export { isSupabaseConfigured };
