@@ -254,22 +254,22 @@ export async function submitKyc(formData: FormData): Promise<{ ok: boolean; erro
   const legalName = String(formData.get("legal_name") ?? "").trim();
   const taxId = String(formData.get("tax_id") ?? "").trim();
   const dbdRegNo = String(formData.get("dbd_reg_no") ?? "").trim() || null;
-  const bankName = String(formData.get("bank_name") ?? "").trim();
-  const bankAccNo = String(formData.get("bank_acc_no") ?? "").trim();
-  const bankAccName = String(formData.get("bank_acc_name") ?? "").trim();
+  // Bank account fields are optional / commented out for now
+  // const bankName = String(formData.get("bank_name") ?? "").trim() || null;
+  // const bankAccNo = String(formData.get("bank_acc_no") ?? "").trim() || null;
+  // const bankAccName = String(formData.get("bank_acc_name") ?? "").trim() || null;
   const idCardUrl = String(formData.get("id_card_url") ?? "").trim() || null;
   const dbdDocUrl = String(formData.get("dbd_doc_url") ?? "").trim() || null;
-  const bookBankUrl = String(formData.get("book_bank_url") ?? "").trim() || null;
+  // const bookBankUrl = String(formData.get("book_bank_url") ?? "").trim() || null;
   const plan = String(formData.get("plan") ?? "Free").trim();
 
   if (!legalName) return { ok: false, error: "กรุณาใส่ชื่อตามบัตรประชาชน/นิติบุคคล" };
   if (!taxId) return { ok: false, error: "กรุณาใส่เลขประจำตัวผู้เสียภาษี/บัตรประชาชน" };
   if (!/^[0-9]{13}$/.test(taxId))
     return { ok: false, error: "เลขประจำตัวผู้เสียภาษี/บัตรประชาชนต้องเป็นตัวเลข 13 หลัก" };
-  if (!bankName || !bankAccNo || !bankAccName)
-    return { ok: false, error: "กรุณาใส่ข้อมูลบัญชีธนาคารให้ครบ" };
-  if (!/^[0-9]+$/.test(bankAccNo))
-    return { ok: false, error: "เลขที่บัญชีต้องเป็นตัวเลขเท่านั้น" };
+  // Bank account validation removed because it's optional
+  // if (bankAccNo && !/^[0-9]+$/.test(bankAccNo))
+  //   return { ok: false, error: "เลขที่บัญชีต้องเป็นตัวเลขเท่านั้น" };
 
   const { error: insertErr } = await sb.from("kyc_submissions").insert({
     boutique_id: boutiqueId,
@@ -278,12 +278,12 @@ export async function submitKyc(formData: FormData): Promise<{ ok: boolean; erro
     legal_name: legalName,
     tax_id: taxId,
     dbd_reg_no: dbdRegNo,
-    bank_name: bankName,
-    bank_acc_no: bankAccNo,
-    bank_acc_name: bankAccName,
+    // bank_name: bankName,
+    // bank_acc_no: bankAccNo,
+    // bank_acc_name: bankAccName,
     id_card_url: idCardUrl,
     dbd_doc_url: dbdDocUrl,
-    book_bank_url: bookBankUrl,
+    // book_bank_url: bookBankUrl,
     plan: ["Free", "Boost", "Featured"].includes(plan) ? plan : "Free",
     status: "pending",
   });

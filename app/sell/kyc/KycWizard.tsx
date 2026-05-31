@@ -8,13 +8,12 @@ import { submitKyc } from "@/app/actions/seller";
 type BusinessType = "individual" | "company";
 type Plan = "Free" | "Boost" | "Featured";
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3;
 
 const STEPS: Array<{ id: Step; label: string }> = [
   { id: 1, label: "ประเภทธุรกิจ" },
   { id: 2, label: "เอกสาร" },
-  { id: 3, label: "บัญชีธนาคาร" },
-  { id: 4, label: "ตรวจสอบ" },
+  { id: 3, label: "ตรวจสอบ" },
 ];
 
 const BANKS = [
@@ -44,9 +43,10 @@ export default function KycWizard({ boutiqueId }: Props) {
   const [legalName, setLegalName] = useState("");
   const [taxId, setTaxId] = useState("");
   const [dbdRegNo, setDbdRegNo] = useState("");
-  const [bankName, setBankName] = useState(BANKS[0]);
-  const [bankAccNo, setBankAccNo] = useState("");
-  const [bankAccName, setBankAccName] = useState("");
+  // bank account fields are optional / commented out for now
+  // const [bankName, setBankName] = useState(BANKS[0]);
+  // const [bankAccNo, setBankAccNo] = useState("");
+  // const [bankAccName, setBankAccName] = useState("");
   const [idCardUrl, setIdCardUrl] = useState("");
   const [dbdDocUrl, setDbdDocUrl] = useState("");
   const [bookBankUrl, setBookBankUrl] = useState("");
@@ -92,8 +92,6 @@ export default function KycWizard({ boutiqueId }: Props) {
       return null;
     }
     if (s === 3) {
-      if (!bankAccNo.trim() || !bankAccName.trim()) return "กรุณาใส่ข้อมูลบัญชีธนาคาร";
-      if (!bookBankUrl) return "กรุณาอัปโหลดสมุดบัญชีธนาคาร";
       return null;
     }
     return null;
@@ -106,7 +104,7 @@ export default function KycWizard({ boutiqueId }: Props) {
       return;
     }
     setError(null);
-    setStep((s) => (s < 4 ? ((s + 1) as Step) : s));
+    setStep((s) => (s < 3 ? ((s + 1) as Step) : s));
   }
 
   function prevStep() {
@@ -123,12 +121,13 @@ export default function KycWizard({ boutiqueId }: Props) {
     fd.set("legal_name", legalName);
     fd.set("tax_id", taxId);
     if (dbdRegNo) fd.set("dbd_reg_no", dbdRegNo);
-    fd.set("bank_name", bankName);
-    fd.set("bank_acc_no", bankAccNo);
-    fd.set("bank_acc_name", bankAccName);
+    // Bank account data is optional / removed from submission
+    // fd.set("bank_name", bankName);
+    // fd.set("bank_acc_no", bankAccNo);
+    // fd.set("bank_acc_name", bankAccName);
     fd.set("id_card_url", idCardUrl);
     if (dbdDocUrl) fd.set("dbd_doc_url", dbdDocUrl);
-    fd.set("book_bank_url", bookBankUrl);
+    // fd.set("book_bank_url", bookBankUrl);
     fd.set("plan", plan);
     const res = await submitKyc(fd);
     if (!res.ok) {
@@ -214,28 +213,12 @@ export default function KycWizard({ boutiqueId }: Props) {
         />
       ) : null}
       {step === 3 ? (
-        <Step3
-          bankName={bankName}
-          setBankName={setBankName}
-          bankAccNo={bankAccNo}
-          setBankAccNo={setBankAccNo}
-          bankAccName={bankAccName}
-          setBankAccName={setBankAccName}
-          bookBankUrl={bookBankUrl}
-          uploading={uploading}
-          uploadFile={uploadFile}
-        />
-      ) : null}
-      {step === 4 ? (
         <Step4
           businessType={businessType}
           plan={plan}
           legalName={legalName}
           taxId={taxId}
           dbdRegNo={dbdRegNo}
-          bankName={bankName}
-          bankAccNo={bankAccNo}
-          bankAccName={bankAccName}
           idCardUrl={idCardUrl}
           dbdDocUrl={dbdDocUrl}
           bookBankUrl={bookBankUrl}
@@ -269,7 +252,7 @@ export default function KycWizard({ boutiqueId }: Props) {
         >
           ← ย้อนกลับ
         </button>
-        {step < 4 ? (
+        {step < 3 ? (
           <button type="button" className="btn btn-dark" onClick={nextStep}>
             ถัดไป →
           </button>
@@ -452,10 +435,10 @@ function Step3(props: {
     <div>
       <h2 style={sectionTitle}>บัญชีรับเงิน</h2>
       <p style={{ fontSize: 13, color: "var(--ink-3)", marginBottom: 18 }}>
-        ลูกค้าจะโอนเงินตรงให้บัญชีนี้ (DopRent ไม่หักเงิน) ใช้เพื่อยืนยันว่าเป็นบัญชีจริง
+        ลูกค้าจะโอนเงินตรงให้บัญชีนี้ (DopRent ไม่หักเงิน) หากยังไม่พร้อมสามารถเว้นไว้ก่อนแล้วส่งได้
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 24 }}>
-        <Labeled label="ธนาคาร *">
+        <Labeled label="ธนาคาร">
           <select
             value={props.bankName}
             onChange={(e) => props.setBankName(e.target.value)}
@@ -468,7 +451,7 @@ function Step3(props: {
             ))}
           </select>
         </Labeled>
-        <Labeled label="เลขที่บัญชี *">
+        <Labeled label="เลขที่บัญชี">
           <input
             type="text"
             value={props.bankAccNo}
@@ -478,7 +461,7 @@ function Step3(props: {
             style={inputStyle}
           />
         </Labeled>
-        <Labeled label="ชื่อบัญชี *">
+        <Labeled label="ชื่อบัญชี">
           <input
             type="text"
             value={props.bankAccName}
@@ -489,8 +472,8 @@ function Step3(props: {
       </div>
 
       <FileSlot
-        label="หน้าสมุดบัญชีธนาคาร *"
-        hint="หน้าที่มีชื่อบัญชี + เลขบัญชี ปิดส่วนอื่นได้"
+        label="หน้าสมุดบัญชีธนาคาร"
+        hint="หากมี ให้แนบหน้าที่มีชื่อบัญชีและเลขบัญชี"
         url={props.bookBankUrl}
         field="book_bank"
         uploading={props.uploading}
@@ -506,9 +489,6 @@ function Step4(props: {
   legalName: string;
   taxId: string;
   dbdRegNo: string;
-  bankName: string;
-  bankAccNo: string;
-  bankAccName: string;
   idCardUrl: string;
   dbdDocUrl: string;
   bookBankUrl: string;
@@ -528,10 +508,8 @@ function Step4(props: {
       {props.businessType === "company" ? (
         <ReviewRow label="หนังสือรับรอง" value={props.dbdDocUrl ? "✓ อัปโหลดแล้ว" : "—"} />
       ) : null}
-      <ReviewRow label="ธนาคาร" value={props.bankName} />
-      <ReviewRow label="ชื่อบัญชี" value={props.bankAccName} />
-      <ReviewRow label="เลขบัญชี" value={props.bankAccNo.replace(/.(?=.{4})/g, "•")} />
-      <ReviewRow label="สมุดบัญชี" value={props.bookBankUrl ? "✓ อัปโหลดแล้ว" : "✗"} />
+      {/* Bank account section hidden as requested */}
+      {/* <ReviewRow label="สมุดบัญชี" value={props.bookBankUrl ? "✓ อัปโหลดแล้ว" : "✗"} /> */}
     </div>
   );
 }

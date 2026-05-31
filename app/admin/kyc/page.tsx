@@ -37,9 +37,9 @@ export default async function KycReviewPage({
     legal_name: string;
     tax_id: string;
     dbd_reg_no: string | null;
-    bank_name: string;
-    bank_acc_no: string;
-    bank_acc_name: string;
+    bank_name: string | null;
+    bank_acc_no: string | null;
+    bank_acc_name: string | null;
     id_card_url: string | null;
     dbd_doc_url: string | null;
     book_bank_url: string | null;
