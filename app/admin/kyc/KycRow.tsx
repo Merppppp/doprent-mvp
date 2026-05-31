@@ -12,9 +12,9 @@ type Kyc = {
   legal_name: string;
   tax_id: string;
   dbd_reg_no: string | null;
-  bank_name: string;
-  bank_acc_no: string;
-  bank_acc_name: string;
+  bank_name: string | null;
+  bank_acc_no: string | null;
+  bank_acc_name: string | null;
   id_card_url: string | null;
   dbd_doc_url: string | null;
   book_bank_url: string | null;
@@ -117,9 +117,9 @@ export default function KycRow({ kyc }: { kyc: Kyc }) {
         <Info label="ชื่อตามเอกสาร" value={kyc.legal_name} />
         <Info label="เลขประจำตัว" value={kyc.tax_id} />
         {kyc.dbd_reg_no ? <Info label="DBD" value={kyc.dbd_reg_no} /> : null}
-        <Info label="ธนาคาร" value={kyc.bank_name} />
-        <Info label="ชื่อบัญชี" value={kyc.bank_acc_name} />
-        <Info label="เลขบัญชี" value={kyc.bank_acc_no} />
+        {kyc.bank_name ? <Info label="ธนาคาร" value={kyc.bank_name} /> : null}
+        {kyc.bank_acc_name ? <Info label="ชื่อบัญชี" value={kyc.bank_acc_name} /> : null}
+        {kyc.bank_acc_no ? <Info label="เลขบัญชี" value={kyc.bank_acc_no} /> : null}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
