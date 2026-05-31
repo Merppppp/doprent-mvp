@@ -28,7 +28,7 @@ export type DressFilters = {
 };
 
 const PUBLIC_DRESS_QUERY =
-  "id,slug,tag_code,name,designer,boutique_id,boutique_name,size,color,price_per_day,deposit,description,images,occasions,line_url,ads_tier,featured,sponsored,status,available,views,created_at,updated_at";
+  "id,slug,tag_code,name,designer,boutique_id,boutique_name,size,color,price_per_day,deposit,price_tiers,description,images,occasions,line_url,ads_tier,featured,sponsored,status,available,views,created_at,updated_at";
 
 // Public-safe column allowlist for boutiques. Mirrors the column-level GRANT
 // in migration 2026-05-18_boutique_address_privacy.sql — DO NOT add address,

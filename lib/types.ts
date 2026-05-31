@@ -79,6 +79,11 @@ export type Boutique = {
   updated_at: string;
 };
 
+export type PriceTier = {
+  days: number;
+  price: number;
+};
+
 export type Dress = {
   id: string;
   slug: string;
@@ -93,6 +98,7 @@ export type Dress = {
   color: Color;
   price_per_day: number;
   deposit: number;
+  price_tiers: PriceTier[];
   description: string | null;
   images: string[];
   occasions: OccasionKey[];
