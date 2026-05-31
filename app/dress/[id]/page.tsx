@@ -342,6 +342,7 @@ export default async function DressPage({ params }: { params: Params }) {
             dressPageUrl={url}
             dressImageUrl={dress.images?.[0]}
             pricePerDay={dress.price_per_day}
+            priceTiers={dress.price_tiers}
             deposit={dress.deposit}
             blackouts={blackouts}
             dressId={dress.id}

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { calcRentalPrice } from "@/lib/pricing";
+import type { PriceTier } from "@/lib/types";
 import LineMessageCopyBox from "@/components/LineMessageCopyBox";
 
 type Props = {
@@ -21,6 +23,8 @@ type Props = {
   dressImageUrl?: string;
   /** Per-day rental price (THB). */
   pricePerDay?: number;
+  /** Tiered pricing — overrides pricePerDay when present. */
+  priceTiers?: PriceTier[];
   /** Deposit (THB). */
   deposit?: number;
   /** Unavailable dates as YYYY-MM-DD strings. Renter can't pick a range overlapping these. */
@@ -92,6 +96,7 @@ export default function DateRangePicker({
   dressPageUrl,
   dressImageUrl,
   pricePerDay,
+  priceTiers,
   deposit,
   blackouts = [],
   dressId,
@@ -135,9 +140,12 @@ export default function DateRangePicker({
       `วันที่: ${fmtThai(start)} ถึง ${fmtThai(end)} (${nights} วัน)`,
     ];
     if (typeof pricePerDay === "number") {
-      const total = pricePerDay * nights;
+      const total = priceTiers?.length
+        ? calcRentalPrice(priceTiers, nights, pricePerDay)
+        : pricePerDay * nights;
+      const ratePerDay = Math.round(total / nights);
       lines.push(
-        `ราคา: ฿${pricePerDay.toLocaleString()}/วัน × ${nights} = ฿${total.toLocaleString()}`,
+        `ราคา: ฿${ratePerDay.toLocaleString()}/วัน × ${nights} = ฿${total.toLocaleString()}`,
       );
     }
     if (typeof deposit === "number" && deposit > 0) {
@@ -309,12 +317,17 @@ export default function DateRangePicker({
           <div style={{ fontWeight: 500, color: "var(--ink)" }}>
             ระยะเวลา: {nights} วัน ({fmtThai(start)} ถึง {fmtThai(end)})
           </div>
-          {typeof pricePerDay === "number" ? (
-            <div style={{ marginTop: 2 }}>
-              ราคา: ฿{(pricePerDay * nights).toLocaleString()} ({nights} × ฿
-              {pricePerDay.toLocaleString()})
-            </div>
-          ) : null}
+          {typeof pricePerDay === "number" ? (() => {
+            const total = priceTiers?.length
+              ? calcRentalPrice(priceTiers, nights, pricePerDay)
+              : pricePerDay * nights;
+            const rate = Math.round(total / nights);
+            return (
+              <div style={{ marginTop: 2 }}>
+                ราคา: ฿{rate.toLocaleString()}/วัน × {nights} = ฿{total.toLocaleString()}
+              </div>
+            );
+          })() : null}
           <div style={{ marginTop: 2 }}>
             ข้อมูลทั้งหมดจะถูกส่งให้ร้านเมื่อกดทักทาย LINE
           </div>

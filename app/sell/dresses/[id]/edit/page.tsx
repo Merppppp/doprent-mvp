@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { listOccasions } from "@/lib/dresses";
 import DressForm from "../../DressForm";
-import type { Color, OccasionKey, Size } from "@/lib/types";
+import type { Color, OccasionKey, PriceTier, Size } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +32,7 @@ export default async function EditDressPage({ params }: { params: { id: string }
 
   const { data: dress } = await sb
     .from("dresses")
-    .select("id, name, designer, size, color, price_per_day, deposit, description, line_url, images, occasions, available, boutique_id")
+    .select("id, name, designer, size, color, price_per_day, deposit, price_tiers, description, line_url, images, occasions, available, boutique_id")
     .eq("id", params.id)
     .maybeSingle();
   if (!dress || dress.boutique_id !== boutique.id) notFound();
@@ -65,6 +65,7 @@ export default async function EditDressPage({ params }: { params: { id: string }
           images: (dress.images ?? []) as string[],
           occasions: (dress.occasions ?? []) as OccasionKey[],
           available: dress.available,
+          price_tiers: (dress.price_tiers ?? []) as PriceTier[],
         }}
       />
     </div>

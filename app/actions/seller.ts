@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isValidLineContact, normalizeLineUrl } from "@/lib/line";
-import type { Color } from "@/lib/types";
+import type { Color, PriceTier } from "@/lib/types";
 
 /** Convert a Thai/English name to a URL slug. */
 function slugify(s: string): string {
@@ -313,7 +313,7 @@ function dressSlug(name: string): string {
 }
 
 /** Create a new dress listing in the seller's boutique. Starts as 'pending' for admin review. */
-export async function createDress(formData: FormData): Promise<{ ok: boolean; error?: string; slug?: string }> {
+export async function createDress(formData: FormData): Promise<{ ok: boolean; error?: string; slug?: string; id?: string }> {
   const sb = createClient();
   const {
     data: { user },
@@ -367,14 +367,14 @@ export async function createDress(formData: FormData): Promise<{ ok: boolean; er
       status: "pending",
       available: true,
     })
-    .select("slug")
+    .select("id,slug")
     .maybeSingle();
 
   if (insertErr) return { ok: false, error: insertErr.message };
 
   revalidatePath("/sell/dashboard");
   revalidatePath("/admin/dresses");
-  return { ok: true, slug: created?.slug };
+  return { ok: true, slug: created?.slug, id: created?.id };
 }
 
 /** Update a dress (seller can edit own). */
@@ -443,6 +443,43 @@ export async function updateDress(
 
   revalidatePath("/sell/dashboard");
   revalidatePath(`/dress/${dress.id}`);
+  return { ok: true };
+}
+
+export async function updateDressPriceTiers(
+  dressId: string,
+  tiers: PriceTier[],
+): Promise<{ ok: boolean; error?: string }> {
+  if (!Array.isArray(tiers)) return { ok: false, error: "รูปแบบข้อมูลไม่ถูกต้อง" };
+  for (const t of tiers) {
+    if (!Number.isInteger(t.days) || t.days <= 0) return { ok: false, error: "จำนวนวันต้องเป็นจำนวนเต็มที่มากกว่า 0" };
+    if (!Number.isInteger(t.price) || t.price <= 0) return { ok: false, error: "ราคาต้องเป็นจำนวนเต็มที่มากกว่า 0" };
+  }
+  const days = tiers.map((t) => t.days);
+  if (new Set(days).size !== days.length) return { ok: false, error: "จำนวนวันต้องไม่ซ้ำกัน" };
+
+  const sb = createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const { data: dress } = await sb
+    .from("dresses")
+    .select("id, boutiques!inner(owner_id)")
+    .eq("id", dressId)
+    .maybeSingle();
+  const ownerId = (dress as unknown as { boutiques: { owner_id: string } } | null)?.boutiques?.owner_id;
+  if (!dress || ownerId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์แก้ไขชุดนี้" };
+
+  const { error } = await sb
+    .from("dresses")
+    .update({ price_tiers: tiers, updated_at: new Date().toISOString() })
+    .eq("id", dressId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/sell/dashboard");
+  revalidatePath(`/dress/${dressId}`);
   return { ok: true };
 }
 
