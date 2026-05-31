@@ -5,27 +5,60 @@ import { useMemo, useState } from "react";
 type Props = {
   dressName: string;
   boutiqueName: string;
-  pricePerDay: number;
+  pricePerDay?: number;
   dressPageUrl: string;
+  dateFrom?: string;
+  dateTo?: string;
+  tagCode?: string;
 };
+
+function fmtThai(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-");
+  if (!y || !m || !d) return dateStr;
+  return `${d}/${m}/${y}`;
+}
 
 export default function LineMessageCopyBox({
   dressName,
   boutiqueName,
   pricePerDay,
   dressPageUrl,
+  dateFrom,
+  dateTo,
+  tagCode,
 }: Props) {
   const [copied, setCopied] = useState(false);
 
   const message = useMemo(() => {
-    return [
-      "สวัสดีค่ะ/ครับ",
-      `สนใจเช่าชุด \"${dressName}\" จากร้าน ${boutiqueName}`,
-      `ราคา ${pricePerDay.toLocaleString()} บาท/วัน`,
-      "รบกวนช่วยแจ้งรายละเอียดการเช่า วันว่าง และค่าจัดส่งให้ด้วยค่ะ/ครับ",
-      dressPageUrl,
-    ].join("\n");
-  }, [dressName, boutiqueName, pricePerDay, dressPageUrl]);
+    const lines = ["สวัสดีค่ะ/ครับ"];
+
+    if (dressName || boutiqueName) {
+      lines.push(`สนใจเช่าชุด "${dressName}" จากร้าน ${boutiqueName}`);
+    }
+
+    if (dateFrom || dateTo) {
+      if (dateFrom && dateTo) {
+        lines.push(`วันที่: ${fmtThai(dateFrom)} ถึง ${fmtThai(dateTo)}`);
+      } else if (dateFrom) {
+        lines.push(`วันที่เริ่ม: ${fmtThai(dateFrom)}`);
+      } else if (dateTo) {
+        lines.push(`วันที่สิ้นสุด: ${fmtThai(dateTo)}`);
+      }
+    }
+
+    if (typeof pricePerDay === "number" && pricePerDay > 0) {
+      lines.push(`ราคา ${pricePerDay.toLocaleString()} บาท/วัน`);
+    }
+
+    if (tagCode) {
+      lines.push(`รหัสชุด: ${tagCode}`);
+    }
+
+    lines.push("รบกวนช่วยแจ้งรายละเอียดการเช่า วันว่าง และค่าจัดส่งให้ด้วยค่ะ/ครับ");
+    if (dressPageUrl) lines.push(dressPageUrl);
+
+    return lines.join("\n");
+  }, [dressName, boutiqueName, pricePerDay, dressPageUrl, dateFrom, dateTo]);
 
   const copyToClipboard = async () => {
     try {

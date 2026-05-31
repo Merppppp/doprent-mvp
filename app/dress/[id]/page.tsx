@@ -346,16 +346,11 @@ export default async function DressPage({ params }: { params: Params }) {
             blackouts={blackouts}
             dressId={dress.id}
             boutiqueId={dress.boutique_id}
+            dressTagCode={dress.tag_code}
             isLoggedIn={isLoggedIn}
             loginNext={`/dress/${dress.slug}`}
           />
 
-          <LineMessageCopyBox
-            dressName={dress.name}
-            boutiqueName={dress.boutique_name}
-            pricePerDay={dress.price_per_day}
-            dressPageUrl={url}
-          />
 
           {/* (CTA stack removed — date picker above is the only booking
               path; Save heart moved up to H1 row; small inline "ติดต่อ

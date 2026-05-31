@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import LineMessageCopyBox from "@/components/LineMessageCopyBox";
 
 type Props = {
   /**
@@ -27,6 +28,8 @@ type Props = {
   /** Optional dress ID to be tracked in /api/track when user clicks LINE. */
   dressId?: string;
   boutiqueId?: string;
+  /** Optional dress tag code (e.g. internal SKU) to include in LINE message */
+  dressTagCode?: string;
   /**
    * Strict contact gate. When false (default), the LINE booking button
    * is replaced with a login redirect and the LINE URL is never used.
@@ -93,6 +96,7 @@ export default function DateRangePicker({
   blackouts = [],
   dressId,
   boutiqueId,
+  dressTagCode,
   isLoggedIn,
   loginNext,
 }: Props) {
@@ -363,6 +367,21 @@ export default function DateRangePicker({
             เข้าสู่ระบบเพื่อจอง · {nights} วัน
           </Link>
         )
+      ) : null}
+
+      {/* Show copy box only when a valid range is selected */}
+      {start && end && !hasConflict ? (
+        <div style={{ marginTop: 12 }}>
+          <LineMessageCopyBox
+            dressName={dressName}
+            boutiqueName={boutiqueName}
+            pricePerDay={pricePerDay}
+            dressPageUrl={dressPageUrl ?? ""}
+            dateFrom={start}
+            dateTo={end}
+            tagCode={dressTagCode}
+          />
+        </div>
       ) : null}
     </div>
   );

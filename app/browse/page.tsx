@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import DressCard from "@/components/DressCard";
+import LineMessageCopyBox from "@/components/LineMessageCopyBox";
 import { getCurrentUser } from "@/lib/auth";
 import { listDesigners, listDresses, listOccasions } from "@/lib/dresses";
 import {
@@ -325,6 +326,18 @@ export default async function BrowsePage({
               </button>
             </div>
           </form>
+
+          {activeDateFrom && activeDateTo ? (
+            <div style={{ marginTop: 16 }}>
+              <LineMessageCopyBox
+                dressName="ชุดที่สนใจ"
+                boutiqueName="ร้านเช่า"
+                dressPageUrl={makeHref({})}
+                dateFrom={activeDateFrom}
+                dateTo={activeDateTo}
+              />
+            </div>
+          ) : null}
 
           {(activeColor !== "all" || activeOcc || activeSize || activeDesigner || search || activeDateFrom || activeDateTo) && (
             <div style={{ paddingTop: 12 }}>
