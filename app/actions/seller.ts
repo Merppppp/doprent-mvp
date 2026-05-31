@@ -313,7 +313,7 @@ function dressSlug(name: string): string {
 }
 
 /** Create a new dress listing in the seller's boutique. Starts as 'pending' for admin review. */
-export async function createDress(formData: FormData): Promise<{ ok: boolean; error?: string; slug?: string }> {
+export async function createDress(formData: FormData): Promise<{ ok: boolean; error?: string; slug?: string; id?: string }> {
   const sb = createClient();
   const {
     data: { user },
@@ -367,14 +367,14 @@ export async function createDress(formData: FormData): Promise<{ ok: boolean; er
       status: "pending",
       available: true,
     })
-    .select("slug")
+    .select("id,slug")
     .maybeSingle();
 
   if (insertErr) return { ok: false, error: insertErr.message };
 
   revalidatePath("/sell/dashboard");
   revalidatePath("/admin/dresses");
-  return { ok: true, slug: created?.slug };
+  return { ok: true, slug: created?.slug, id: created?.id };
 }
 
 /** Update a dress (seller can edit own). */
