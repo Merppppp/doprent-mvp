@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/browser";
+// TODO Phase 2: replace with R2 upload client
 import { createDress, updateDress, updateDressPriceTiers } from "@/app/actions/seller";
 import type { Color, Occasion, OccasionKey, PriceTier, Size } from "@/lib/types";
 
@@ -92,28 +92,25 @@ export default function DressForm(props: Props) {
     setError(null);
   }
 
+  // Phase 2: upload to R2 via /api/upload (implemented in Phase 2/3)
   async function uploadImages(files: FileList | null) {
     if (!files || files.length === 0) return;
     setError(null);
-    const sb = createClient();
     const uploads: string[] = [];
     setUploadingCount(files.length);
     try {
       for (let i = 0; i < files.length; i++) {
-        const f = files[i];
-        const ext = (f.name.split(".").pop() ?? "jpg").toLowerCase();
-        const path = `${props.boutiqueId}/${Date.now()}-${i}.${ext}`;
-        const { data, error: upErr } = await sb.storage
-          .from("dress-images")
-          .upload(path, f, { upsert: false, contentType: f.type || undefined });
-        if (upErr || !data) {
-          setError(`อัปโหลดรูปไม่สำเร็จ: ${upErr?.message ?? "unknown"}`);
+        const fd = new FormData();
+        fd.append("file", files[i]);
+        const res = await fetch("/api/upload", { method: "POST", body: fd });
+        if (!res.ok) {
+          setError("อัปโหลดรูปไม่สำเร็จ — ระบบ storage ยังไม่พร้อม");
           break;
         }
-        const { data: pub } = sb.storage.from("dress-images").getPublicUrl(data.path);
-        uploads.push(pub.publicUrl);
+        const json = await res.json();
+        uploads.push(json.urls?.large ?? json.url ?? "");
       }
-      setImages((curr) => [...curr, ...uploads]);
+      setImages((curr) => [...curr, ...uploads.filter(Boolean)]);
     } finally {
       setUploadingCount(0);
     }

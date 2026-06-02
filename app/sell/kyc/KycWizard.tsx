@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/browser";
+// TODO Phase 2: replace with R2 upload client
 import { submitKyc } from "@/app/actions/seller";
 
 type BusinessType = "individual" | "company";
@@ -51,26 +51,21 @@ export default function KycWizard({ boutiqueId }: Props) {
   const [dbdDocUrl, setDbdDocUrl] = useState("");
   const [bookBankUrl, setBookBankUrl] = useState("");
 
+  // Phase 2: upload to R2 via /api/upload (implemented in Phase 2/3)
   async function uploadFile(field: "id_card" | "dbd_doc" | "book_bank", file: File) {
     setError(null);
     setUploading({ field, pct: 1 });
     try {
-      const sb = createClient();
-      const ext = (file.name.split(".").pop() ?? "bin").toLowerCase();
-      const path = `${boutiqueId}/${field}-${Date.now()}.${ext}`;
-      const { data, error: upErr } = await sb.storage
-        .from("kyc-docs")
-        .upload(path, file, { upsert: false, contentType: file.type || undefined });
-      if (upErr || !data) {
-        setError(`อัปโหลดไม่สำเร็จ: ${upErr?.message ?? "unknown"}`);
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      if (!res.ok) {
+        setError("อัปโหลดไม่สำเร็จ — ระบบ storage ยังไม่พร้อม");
         setUploading(null);
         return;
       }
-      // Signed URL valid 7 days for admin to view; real URL stays in private bucket
-      const { data: signed } = await sb.storage
-        .from("kyc-docs")
-        .createSignedUrl(data.path, 60 * 60 * 24 * 7);
-      const url = signed?.signedUrl ?? data.path;
+      const json = await res.json();
+      const url = json.urls?.large ?? json.url ?? "";
       if (field === "id_card") setIdCardUrl(url);
       if (field === "dbd_doc") setDbdDocUrl(url);
       if (field === "book_bank") setBookBankUrl(url);

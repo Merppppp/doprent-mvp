@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import DressRow from "./DressRow";
 
 export const dynamic = "force-dynamic";
@@ -21,32 +21,19 @@ export default async function DressesAdmin({
     ? (searchParams!.status as StatusOpt)
     : "pending";
 
-  const sb = createClient();
-  let q = sb
-    .from("dresses")
-    .select("id, slug, tag_code, name, designer, boutique_name, size, color, price_per_day, status, available, featured, sponsored, images, created_at, views")
-    .order("created_at", { ascending: false });
-  if (activeStatus !== "all") q = q.eq("status", activeStatus);
-  const { data, error } = await q;
+  const rawRows = await db.dress.findMany({
+    where: activeStatus !== "all" ? { status: activeStatus } : undefined,
+    orderBy: { createdAt: "desc" },
+    select: { id: true, slug: true, tagCode: true, name: true, designer: true, boutiqueName: true, size: true, color: true, pricePerDay: true, status: true, available: true, featured: true, sponsored: true, images: true, createdAt: true, views: true },
+  });
 
-  const rows = (data ?? []) as Array<{
-    id: string;
-    slug: string;
-    tag_code: string;
-    name: string;
-    designer: string | null;
-    boutique_name: string;
-    size: string;
-    color: string;
-    price_per_day: number;
-    status: string;
-    available: boolean;
-    featured: boolean;
-    sponsored: boolean;
-    images: string[];
-    created_at: string;
-    views: number;
-  }>;
+  const rows = rawRows.map((d) => ({
+    id: d.id, slug: d.slug, tag_code: d.tagCode, name: d.name, designer: d.designer,
+    boutique_name: d.boutiqueName, size: d.size, color: d.color, price_per_day: d.pricePerDay,
+    status: d.status, available: d.available, featured: d.featured, sponsored: d.sponsored,
+    images: d.images as string[], created_at: d.createdAt.toISOString(), views: d.views,
+  }));
+  const error = null;
 
   return (
     <div>

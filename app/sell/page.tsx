@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -69,14 +69,10 @@ export default async function SellLanding() {
   // If already a seller with a boutique, send them to their dashboard
   let existingBoutique: { slug: string } | null = null;
   if (user) {
-    const sb = createClient();
-    const { data } = await sb
-      .from("boutiques")
-      .select("slug")
-      .eq("owner_id", user.profile.id)
-      .limit(1)
-      .maybeSingle();
-    existingBoutique = data;
+    existingBoutique = await db.boutique.findFirst({
+      where: { ownerId: user.id },
+      select: { slug: true },
+    });
   }
 
   return (

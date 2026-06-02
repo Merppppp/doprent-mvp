@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import DressCard from "@/components/DressCard";
 import { getCurrentUser } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import type { Dress } from "@/lib/types";
 
 export const metadata: Metadata = { title: "บัญชีของฉัน", robots: { index: false } };
@@ -14,23 +14,29 @@ export default async function AccountPage() {
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent("/account")}`);
 
-  const { profile, email } = user;
-  const sb = createClient();
-
   let saved: Dress[] = [];
-  if (profile.saved_dress_ids && profile.saved_dress_ids.length > 0) {
-    const { data } = await sb
-      .from("dresses")
-      .select("*")
-      .in("id", profile.saved_dress_ids)
-      .eq("status", "live");
-    saved = (data ?? []) as Dress[];
+  if (user.savedDressIds.length > 0) {
+    const rows = await db.dress.findMany({
+      where: { id: { in: user.savedDressIds }, status: "live" },
+    });
+    type Row = (typeof rows)[number];
+    saved = rows.map((d: Row) => ({
+      id: d.id, slug: d.slug, tag_code: d.tagCode, name: d.name, designer: d.designer,
+      boutique_id: d.boutiqueId, boutique_name: d.boutiqueName, size: d.size as Dress["size"],
+      color: d.color as Dress["color"], price_per_day: d.pricePerDay, deposit: d.deposit,
+      price_tiers: d.priceTiers as Dress["price_tiers"], description: d.description,
+      images: d.images as string[], occasions: d.occasions as Dress["occasions"],
+      line_url: d.lineUrl, ads_tier: d.adsTier as Dress["ads_tier"],
+      featured: d.featured, sponsored: d.sponsored, status: d.status as Dress["status"],
+      reject_reason: d.rejectReason, available: d.available, views: d.views,
+      created_at: d.createdAt.toISOString(), updated_at: d.updatedAt.toISOString(),
+    }));
   }
 
-  const initials = (profile.full_name || email)
+  const initials = (user.fullName || user.email)
     .trim()
     .split(/\s+/)
-    .map((s) => s[0])
+    .map((s: string) => s[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
@@ -66,8 +72,8 @@ export default async function AccountPage() {
               {initials || "?"}
             </div>
             <div style={{ fontWeight: 600, fontSize: 15 }}>
-              {profile.full_name || email.split("@")[0]}
-              {profile.role === "admin" ? (
+              {user.fullName || user.email.split("@")[0]}
+              {user.role === "admin" ? (
                 <span
                   style={{
                     background: "var(--info)",
@@ -85,11 +91,11 @@ export default async function AccountPage() {
               ) : null}
             </div>
             <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2, wordBreak: "break-all" }}>
-              {email}
+              {user.email}
             </div>
           </div>
 
-          {profile.role === "admin" ? (
+          {user.role === "admin" ? (
             <Link
               href="/admin"
               style={{
@@ -153,7 +159,7 @@ export default async function AccountPage() {
                   key={d.id}
                   dress={d}
                   variant={i}
-                  savedSet={new Set(profile.saved_dress_ids)}
+                  savedSet={new Set(user.savedDressIds)}
                   isLoggedIn={true}
                 />
               ))}

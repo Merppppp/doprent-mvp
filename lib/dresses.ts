@@ -1,19 +1,26 @@
-import { getSupabase, isSupabaseConfigured } from "./supabase";
-import type { Blackout, Boutique, Color, Dress, Occasion, OccasionKey } from "./types";
+import { db } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
+import type { Blackout, Boutique, Color, Dress, Occasion, OccasionKey, PriceTier, AdsTier, Status, KycStatus, Size } from "./types";
 
-/** Hard-coded occasions in case occasions table isn't seeded yet */
+// ---------------------------------------------------------------------------
+// Fallback data
+// ---------------------------------------------------------------------------
+
 const FALLBACK_OCCASIONS: Occasion[] = [
   { key: "engagement", th: "งานหมั้น", en: "Engagement", color_token: "rose", sort_order: 1 },
-  { key: "wedding", th: "งานแต่ง", en: "Wedding", color_token: "ivory", sort_order: 2 },
-  { key: "cocktail", th: "ค็อกเทล", en: "Cocktail", color_token: "green", sort_order: 3 },
-  { key: "evening", th: "ราตรี", en: "Evening", color_token: "navy", sort_order: 4 },
-  { key: "gala", th: "กาล่า", en: "Gala", color_token: "red", sort_order: 5 },
-  { key: "party", th: "ปาร์ตี้", en: "Party", color_token: "purple", sort_order: 6 },
-  { key: "work", th: "ทำงาน", en: "Work", color_token: "black", sort_order: 7 },
-  { key: "casual", th: "ลำลอง", en: "Casual", color_token: "blue", sort_order: 8 },
+  { key: "wedding",    th: "งานแต่ง",  en: "Wedding",    color_token: "ivory", sort_order: 2 },
+  { key: "cocktail",   th: "ค็อกเทล",  en: "Cocktail",   color_token: "green", sort_order: 3 },
+  { key: "evening",    th: "ราตรี",    en: "Evening",    color_token: "navy",  sort_order: 4 },
+  { key: "gala",       th: "กาล่า",   en: "Gala",       color_token: "red",   sort_order: 5 },
+  { key: "party",      th: "ปาร์ตี้",  en: "Party",      color_token: "purple",sort_order: 6 },
+  { key: "work",       th: "ทำงาน",   en: "Work",       color_token: "black", sort_order: 7 },
+  { key: "casual",     th: "ลำลอง",   en: "Casual",     color_token: "blue",  sort_order: 8 },
 ];
 
-/** Filter shape used by the Browse page. */
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 export type DressFilters = {
   color?: Color | "all";
   sizes?: string[];
@@ -27,322 +34,293 @@ export type DressFilters = {
   dateTo?: string;   // YYYY-MM-DD
 };
 
-const PUBLIC_DRESS_QUERY =
-  "id,slug,tag_code,name,designer,boutique_id,boutique_name,size,color,price_per_day,deposit,price_tiers,description,images,occasions,line_url,ads_tier,featured,sponsored,status,available,views,created_at,updated_at";
+// ---------------------------------------------------------------------------
+// Mappers  (Prisma camelCase → TypeScript snake_case)
+// ---------------------------------------------------------------------------
 
-// Public-safe column allowlist for boutiques. Mirrors the column-level GRANT
-// in migration 2026-05-18_boutique_address_privacy.sql — DO NOT add address,
-// lat, lng, house_no, street, subdistrict, or postal_code here. Those are
-// owner-only and reading them as anon will 403 post-migration.
-const PUBLIC_BOUTIQUE_QUERY =
-  "id,slug,name,owner_id,owner_name,area_key,area_label,hours,line_url,instagram,since_year,cover_color,tag,story,delivery_info,featured,ads_tier,status,kyc_status,verified,district,province,created_at,updated_at";
+type PrismaDress = Prisma.DressGetPayload<Record<string, never>>;
+type PrismaBoutique = Prisma.BoutiqueGetPayload<Record<string, never>>;
 
-/** Cache for verified boutique-ID lookup within a single request. */
-async function fetchVerifiedBoutiqueIds(): Promise<Set<string>> {
-  const sb = getSupabase();
-  if (!sb) return new Set();
-  const { data, error } = await sb
-    .from("boutiques")
-    .select("id")
-    .eq("verified", true);
-  if (error) {
-    // Column may not exist yet (pre-migration). Fail soft.
-    return new Set();
-  }
-  return new Set(((data ?? []) as Array<{ id: string }>).map((r) => r.id));
-}
-
-/** Fetch up to `limit` live, available dresses, ordered by ads tier then recency. */
-export async function listDresses(opts: DressFilters & { limit?: number } = {}): Promise<Dress[]> {
-  const sb = getSupabase();
-  if (!sb) return [];
-
-  let q = sb
-    .from("dresses")
-    .select(PUBLIC_DRESS_QUERY)
-    .eq("status", "live")
-    .eq("available", true)
-    .order("featured", { ascending: false })
-    .order("sponsored", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  if (opts.color && opts.color !== "all") q = q.eq("color", opts.color);
-  if (opts.sizes && opts.sizes.length) q = q.in("size", opts.sizes);
-  if (opts.boutiqueSlugs && opts.boutiqueSlugs.length) {
-    // We have boutique_name denormalized; join via boutiques table would be ideal,
-    // but for performance we'll filter at the application layer for now.
-  }
-  if (typeof opts.priceMax === "number") q = q.lte("price_per_day", opts.priceMax);
-  if (opts.occasions && opts.occasions.length) q = q.overlaps("occasions", opts.occasions);
-  if (opts.search) q = q.textSearch("search_vector", opts.search, { type: "plain", config: "simple" });
-
-  // Exclude dresses that have any blackout date within the requested range
-  if (opts.dateFrom || opts.dateTo) {
-    let blackoutQuery = sb.from("dress_blackouts").select("dress_id");
-    if (opts.dateFrom) blackoutQuery = blackoutQuery.gte("date", opts.dateFrom);
-    if (opts.dateTo) blackoutQuery = blackoutQuery.lte("date", opts.dateTo);
-    const { data: blocked } = await blackoutQuery;
-    const blockedIds = [...new Set((blocked ?? []).map((r: { dress_id: string }) => r.dress_id))];
-    if (blockedIds.length > 0) q = q.not("id", "in", `(${blockedIds.join(",")})`);
-  }
-
-  if (opts.limit) q = q.limit(opts.limit);
-
-  const [{ data, error }, verifiedSet] = await Promise.all([
-    q,
-    fetchVerifiedBoutiqueIds(),
-  ]);
-  if (error) {
-    console.error("[doprent] supabase listDresses error", error);
-    return [];
-  }
-  let rows = ((data ?? []) as Dress[]).map((d) => ({
-    ...d,
-    boutique_verified: verifiedSet.has(d.boutique_id),
-  }));
-
-  if (opts.designers && opts.designers.length) {
-    rows = rows.filter((d) => opts.designers!.includes(d.designer ?? ""));
-  }
-
-  switch (opts.sort) {
-    case "price-asc":
-      rows.sort((a, b) => a.price_per_day - b.price_per_day);
-      break;
-    case "price-desc":
-      rows.sort((a, b) => b.price_per_day - a.price_per_day);
-      break;
-    case "name":
-      rows.sort((a, b) => a.name.localeCompare(b.name));
-      break;
-    default:
-      break;
-  }
-
-  return rows;
-}
-
-/** Distinct designer names across live, available listings. Sorted A→Z. */
-export async function listDesigners(): Promise<string[]> {
-  const sb = getSupabase();
-  if (!sb) return [];
-  const { data, error } = await sb
-    .from("dresses")
-    .select("designer")
-    .eq("status", "live")
-    .eq("available", true)
-    .not("designer", "is", null)
-    .neq("designer", "");
-  if (error) {
-    console.error("[doprent] supabase listDesigners error", error);
-    return [];
-  }
-  const set = new Set<string>();
-  ((data ?? []) as Array<{ designer: string | null }>).forEach((r) => {
-    const d = (r.designer ?? "").trim();
-    if (d) set.add(d);
-  });
-  return Array.from(set).sort((a, b) => a.localeCompare(b));
-}
-
-export async function getDressBySlug(slug: string): Promise<Dress | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
-  const { data, error } = await sb
-    .from("dresses")
-    .select(PUBLIC_DRESS_QUERY)
-    .eq("slug", slug)
-    .maybeSingle();
-  if (error) {
-    console.error("[doprent] supabase getDressBySlug error", error);
-    return null;
-  }
-  return (data as Dress) ?? null;
-}
-
-export async function listBoutiques(opts: { limit?: number; featuredFirst?: boolean } = {}): Promise<
-  Boutique[]
-> {
-  const sb = getSupabase();
-  if (!sb) return [];
-  let q = sb.from("boutiques").select(PUBLIC_BOUTIQUE_QUERY).eq("status", "live");
-  if (opts.featuredFirst) q = q.order("featured", { ascending: false });
-  q = q.order("name", { ascending: true });
-  if (opts.limit) q = q.limit(opts.limit);
-  const { data, error } = await q;
-  if (error) {
-    console.error("[doprent] supabase listBoutiques error", error);
-    return [];
-  }
-  return (data ?? []) as Boutique[];
-}
-
-export async function getBoutiqueBySlug(slug: string): Promise<Boutique | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
-  const { data, error } = await sb
-    .from("boutiques")
-    .select(PUBLIC_BOUTIQUE_QUERY)
-    .eq("slug", slug)
-    .maybeSingle();
-  if (error) {
-    console.error("[doprent] supabase getBoutiqueBySlug error", error);
-    return null;
-  }
-  return (data as Boutique) ?? null;
-}
-
-export async function listDressesByBoutique(boutiqueId: string): Promise<Dress[]> {
-  const sb = getSupabase();
-  if (!sb) return [];
-  const [{ data, error }, verifiedSet] = await Promise.all([
-    sb
-      .from("dresses")
-      .select(PUBLIC_DRESS_QUERY)
-      .eq("boutique_id", boutiqueId)
-      .eq("status", "live")
-      .eq("available", true)
-      .order("featured", { ascending: false })
-      .order("created_at", { ascending: false }),
-    fetchVerifiedBoutiqueIds(),
-  ]);
-  if (error) {
-    console.error("[doprent] supabase listDressesByBoutique error", error);
-    return [];
-  }
-  return ((data ?? []) as Dress[]).map((d) => ({
-    ...d,
-    boutique_verified: verifiedSet.has(d.boutique_id),
-  }));
-}
-
-export async function listOccasions(): Promise<Occasion[]> {
-  const sb = getSupabase();
-  if (!sb) return FALLBACK_OCCASIONS;
-  const { data, error } = await sb
-    .from("occasions")
-    .select("*")
-    .order("sort_order", { ascending: true });
-  if (error || !data || data.length === 0) return FALLBACK_OCCASIONS;
-  return data as Occasion[];
-}
-
-/**
- * Fetch all future blackout dates for a dress, sorted ascending.
- * Returns array of YYYY-MM-DD date strings.
- */
-export async function listBlackouts(dressId: string): Promise<string[]> {
-  const sb = getSupabase();
-  if (!sb) return [];
-  const today = new Date().toISOString().slice(0, 10);
-  const { data, error } = await sb
-    .from("dress_blackouts")
-    .select("date")
-    .eq("dress_id", dressId)
-    .gte("date", today)
-    .order("date", { ascending: true });
-  if (error) {
-    // Table may not exist yet (pre-migration). Fail soft.
-    return [];
-  }
-  return ((data ?? []) as Array<{ date: string }>).map((r) => r.date);
-}
-
-/** Lightweight count for landing page stats. */
-export async function getStats(): Promise<{ boutiques: number; dresses: number; minPrice: number }> {
-  const sb = getSupabase();
-  if (!sb) return { boutiques: 0, dresses: 0, minPrice: 1500 };
-  const [bRes, dRes, pRes] = await Promise.all([
-    sb.from("boutiques").select("id", { count: "exact", head: true }).eq("status", "live"),
-    sb.from("dresses").select("id", { count: "exact", head: true }).eq("status", "live").eq("available", true),
-    sb
-      .from("dresses")
-      .select("price_per_day")
-      .eq("status", "live")
-      .eq("available", true)
-      .order("price_per_day", { ascending: true })
-      .limit(1),
-  ]);
-  const minPrice = (pRes.data?.[0] as { price_per_day?: number } | undefined)?.price_per_day ?? 1500;
+function mapDress(d: PrismaDress, boutiqueVerified = false): Dress {
   return {
-    boutiques: bRes.count ?? 0,
-    dresses: dRes.count ?? 0,
-    minPrice,
+    id: d.id,
+    slug: d.slug,
+    tag_code: d.tagCode,
+    name: d.name,
+    designer: d.designer,
+    boutique_id: d.boutiqueId,
+    boutique_name: d.boutiqueName,
+    size: d.size as Size,
+    color: d.color as Color,
+    price_per_day: d.pricePerDay,
+    deposit: d.deposit,
+    price_tiers: (d.priceTiers ?? []) as PriceTier[],
+    description: d.description,
+    images: (d.images ?? []) as string[],
+    occasions: d.occasions as OccasionKey[],
+    line_url: d.lineUrl,
+    ads_tier: d.adsTier as AdsTier,
+    featured: d.featured,
+    sponsored: d.sponsored,
+    status: d.status as Status,
+    reject_reason: d.rejectReason,
+    available: d.available,
+    views: d.views,
+    created_at: d.createdAt.toISOString(),
+    updated_at: d.updatedAt.toISOString(),
+    boutique_verified: boutiqueVerified,
   };
 }
 
-export async function getBlackoutsByDress(dressId: string): Promise<Blackout[]> {
-  const sb = getSupabase();
-  if (!sb) return [];
-  const { data, error } = await sb
-    .from("dress_blackouts")
-    .select("dress_id,date,created_at")
-    .eq("dress_id", dressId)
-    .order("date", { ascending: true });
-  if (error) return [];
-  return (data as Blackout[]) ?? [];
+function mapBoutique(b: PrismaBoutique): Boutique {
+  return {
+    id: b.id,
+    slug: b.slug,
+    name: b.name,
+    owner_id: b.ownerId,
+    owner_name: b.ownerName,
+    area_key: b.areaKey,
+    area_label: b.areaLabel,
+    address: b.address,
+    house_no: b.houseNo,
+    street: b.street,
+    subdistrict: b.subdistrict,
+    district: b.district,
+    province: b.province,
+    postal_code: b.postalCode,
+    lat: b.lat !== null ? Number(b.lat) : null,
+    lng: b.lng !== null ? Number(b.lng) : null,
+    hours: b.hours,
+    line_url: b.lineUrl,
+    instagram: b.instagram,
+    since_year: b.sinceYear,
+    cover_color: b.coverColor as Color,
+    tag: b.tag,
+    story: b.story,
+    delivery_info: b.deliveryInfo,
+    featured: b.featured,
+    ads_tier: b.adsTier as AdsTier,
+    verified: b.verified,
+    status: b.status as Status,
+    reject_reason: b.rejectReason,
+    kyc_status: b.kycStatus as KycStatus,
+    created_at: b.createdAt.toISOString(),
+    updated_at: b.updatedAt.toISOString(),
+  };
 }
 
-/** Fetch blackouts for multiple dresses within a calendar month (YYYY-MM). */
+// ---------------------------------------------------------------------------
+// Public queries
+// ---------------------------------------------------------------------------
+
+export async function listDresses(opts: DressFilters & { limit?: number } = {}): Promise<Dress[]> {
+  // Build where clause
+  const where: Prisma.DressWhereInput = {
+    status: "live",
+    available: true,
+  };
+
+  if (opts.color && opts.color !== "all") where.color = opts.color;
+  if (opts.sizes?.length) where.size = { in: opts.sizes as string[] };
+  if (typeof opts.priceMax === "number") where.pricePerDay = { lte: opts.priceMax };
+  if (opts.occasions?.length) where.occasions = { hasSome: opts.occasions };
+  if (opts.search) {
+    where.OR = [
+      { name: { contains: opts.search, mode: "insensitive" } },
+      { designer: { contains: opts.search, mode: "insensitive" } },
+      { boutiqueName: { contains: opts.search, mode: "insensitive" } },
+      { description: { contains: opts.search, mode: "insensitive" } },
+    ];
+  }
+
+  // Date range: exclude dresses with any blackout in range
+  if (opts.dateFrom || opts.dateTo) {
+    const blocked = await db.dressBlackout.findMany({
+      where: {
+        date: {
+          gte: opts.dateFrom ? new Date(opts.dateFrom) : undefined,
+          lte: opts.dateTo ? new Date(opts.dateTo) : undefined,
+        },
+      },
+      select: { dressId: true },
+    });
+    const blockedIds = [...new Set(blocked.map((b) => b.dressId))];
+    if (blockedIds.length > 0) where.id = { notIn: blockedIds };
+  }
+
+  const [rows, verifiedBoutiqueIds] = await Promise.all([
+    db.dress.findMany({
+      where,
+      orderBy: [{ featured: "desc" }, { sponsored: "desc" }, { createdAt: "desc" }],
+      take: opts.limit,
+    }),
+    db.boutique.findMany({
+      where: { verified: true },
+      select: { id: true },
+    }).then((bs) => new Set(bs.map((b) => b.id))),
+  ]);
+
+  let dresses = rows.map((d) => mapDress(d, verifiedBoutiqueIds.has(d.boutiqueId)));
+
+  // Application-layer filters
+  if (opts.designers?.length) {
+    dresses = dresses.filter((d) => opts.designers!.includes(d.designer ?? ""));
+  }
+  if (opts.boutiqueSlugs?.length) {
+    const slugSet = new Set(opts.boutiqueSlugs);
+    const boutiques = await db.boutique.findMany({
+      where: { slug: { in: opts.boutiqueSlugs } },
+      select: { id: true },
+    });
+    const boutiquesIds = new Set(boutiques.map((b) => b.id));
+    dresses = dresses.filter((d) => boutiquesIds.has(d.boutique_id));
+    void slugSet; // suppress unused warning
+  }
+
+  switch (opts.sort) {
+    case "price-asc":  dresses.sort((a, b) => a.price_per_day - b.price_per_day); break;
+    case "price-desc": dresses.sort((a, b) => b.price_per_day - a.price_per_day); break;
+    case "name":       dresses.sort((a, b) => a.name.localeCompare(b.name)); break;
+  }
+
+  return dresses;
+}
+
+export async function listDesigners(): Promise<string[]> {
+  const rows = await db.dress.findMany({
+    where: { status: "live", available: true, designer: { not: null } },
+    select: { designer: true },
+    distinct: ["designer"],
+  });
+  return rows
+    .map((r) => r.designer?.trim() ?? "")
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+export async function getDressBySlug(slug: string): Promise<Dress | null> {
+  const d = await db.dress.findUnique({ where: { slug } });
+  if (!d) return null;
+  const boutique = await db.boutique.findUnique({ where: { id: d.boutiqueId }, select: { verified: true } });
+  return mapDress(d, boutique?.verified ?? false);
+}
+
+export async function listBoutiques(opts: { limit?: number; featuredFirst?: boolean } = {}): Promise<Boutique[]> {
+  const rows = await db.boutique.findMany({
+    where: { status: "live" },
+    orderBy: [
+      ...(opts.featuredFirst ? [{ featured: "desc" as const }] : []),
+      { name: "asc" },
+    ],
+    take: opts.limit,
+  });
+  return rows.map(mapBoutique);
+}
+
+export async function getBoutiqueBySlug(slug: string): Promise<Boutique | null> {
+  const b = await db.boutique.findUnique({ where: { slug } });
+  return b ? mapBoutique(b) : null;
+}
+
+export async function listDressesByBoutique(boutiqueId: string): Promise<Dress[]> {
+  const [rows, boutique] = await Promise.all([
+    db.dress.findMany({
+      where: { boutiqueId, status: "live", available: true },
+      orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
+    }),
+    db.boutique.findUnique({ where: { id: boutiqueId }, select: { verified: true } }),
+  ]);
+  const verified = boutique?.verified ?? false;
+  return rows.map((d) => mapDress(d, verified));
+}
+
+export async function listOccasions(): Promise<Occasion[]> {
+  const rows = await db.occasion.findMany({ orderBy: { sortOrder: "asc" } });
+  if (!rows.length) return FALLBACK_OCCASIONS;
+  return rows.map((r) => ({
+    key: r.key as OccasionKey,
+    th: r.th,
+    en: r.en,
+    color_token: r.colorToken as Color,
+    sort_order: r.sortOrder,
+  }));
+}
+
+export async function listBlackouts(dressId: string): Promise<string[]> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const rows = await db.dressBlackout.findMany({
+    where: { dressId, date: { gte: today } },
+    orderBy: { date: "asc" },
+  });
+  return rows.map((r) => r.date.toISOString().slice(0, 10));
+}
+
+export async function getStats(): Promise<{ boutiques: number; dresses: number; minPrice: number }> {
+  const [boutiques, dresses, cheapest] = await Promise.all([
+    db.boutique.count({ where: { status: "live" } }),
+    db.dress.count({ where: { status: "live", available: true } }),
+    db.dress.findFirst({
+      where: { status: "live", available: true },
+      orderBy: { pricePerDay: "asc" },
+      select: { pricePerDay: true },
+    }),
+  ]);
+  return { boutiques, dresses, minPrice: cheapest?.pricePerDay ?? 1500 };
+}
+
+export async function getBlackoutsByDress(dressId: string): Promise<Blackout[]> {
+  const rows = await db.dressBlackout.findMany({
+    where: { dressId },
+    orderBy: { date: "asc" },
+  });
+  return rows.map((r) => ({
+    dress_id: r.dressId,
+    date: r.date.toISOString().slice(0, 10),
+    created_at: r.createdAt.toISOString(),
+  }));
+}
+
 export async function getBlackoutsByMonth(
   dressIds: string[],
   month: string, // YYYY-MM
 ): Promise<Array<{ dress_id: string; date: string }>> {
   if (!dressIds.length) return [];
-  const sb = getSupabase();
-  if (!sb) return [];
   const [year, mon] = month.split("-").map(Number);
-  const monthStart = `${month}-01`;
-  const monthEnd = `${month}-${String(new Date(year, mon, 0).getDate()).padStart(2, "0")}`;
-  const { data, error } = await sb
-    .from("dress_blackouts")
-    .select("dress_id,date")
-    .in("dress_id", dressIds)
-    .gte("date", monthStart)
-    .lte("date", monthEnd);
-  if (error) return [];
-  return (data ?? []) as Array<{ dress_id: string; date: string }>;
+  const monthStart = new Date(year, mon - 1, 1);
+  const monthEnd = new Date(year, mon, 0); // last day
+  const rows = await db.dressBlackout.findMany({
+    where: { dressId: { in: dressIds }, date: { gte: monthStart, lte: monthEnd } },
+  });
+  return rows.map((r) => ({
+    dress_id: r.dressId,
+    date: r.date.toISOString().slice(0, 10),
+  }));
 }
 
 export async function listSimilarDresses(seed: Dress, limit = 4): Promise<Dress[]> {
-  const sb = getSupabase();
-  if (!sb) return [];
-
-  const [{ data, error }, verifiedSet] = await Promise.all([
-    sb
-      .from("dresses")
-      .select(PUBLIC_DRESS_QUERY)
-      .eq("status", "live")
-      .eq("available", true)
-      .neq("id", seed.id)
-      .order("featured", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(60),
-    fetchVerifiedBoutiqueIds(),
+  const [rows, verifiedSet] = await Promise.all([
+    db.dress.findMany({
+      where: { status: "live", available: true, NOT: { id: seed.id } },
+      orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
+      take: 60,
+    }),
+    db.boutique.findMany({ where: { verified: true }, select: { id: true } })
+      .then((bs) => new Set(bs.map((b) => b.id))),
   ]);
 
-  if (error) {
-    console.error("[doprent] supabase listSimilarDresses error", error);
-    return [];
-  }
-
-  const pool = ((data ?? []) as Dress[]).map((d) => ({
-    ...d,
-    boutique_verified: verifiedSet.has(d.boutique_id),
-  }));
-
+  const pool = rows.map((d) => mapDress(d, verifiedSet.has(d.boutiqueId)));
   const seedOccasions = new Set(seed.occasions ?? []);
 
   function score(d: Dress): number {
     let s = 0;
-    const dOccasions = new Set(d.occasions ?? []);
-    const intersection = [...seedOccasions].filter((o) => dOccasions.has(o)).length;
-    const union = new Set([...seedOccasions, ...dOccasions]).size;
+    const dOcc = new Set(d.occasions ?? []);
+    const intersection = [...seedOccasions].filter((o) => dOcc.has(o)).length;
+    const union = new Set([...seedOccasions, ...dOcc]).size;
     if (union > 0) s += (intersection / union) * 5;
     if (d.color === seed.color) s += 3;
     if (d.size === seed.size) s += 3;
-    const lo = seed.price_per_day * 0.7;
-    const hi = seed.price_per_day * 1.3;
+    const lo = seed.price_per_day * 0.7, hi = seed.price_per_day * 1.3;
     if (d.price_per_day >= lo && d.price_per_day <= hi) s += 2;
     if (seed.designer && d.designer === seed.designer) s += 2;
     if (d.boutique_id === seed.boutique_id) s += 1;
@@ -356,4 +334,4 @@ export async function listSimilarDresses(seed: Dress, limit = 4): Promise<Dress[
     .map(({ d }) => d);
 }
 
-export { isSupabaseConfigured };
+export const isSupabaseConfigured = false;
