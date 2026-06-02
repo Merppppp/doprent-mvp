@@ -54,7 +54,7 @@ export default async function DressPage({ params }: { params: Params }) {
     getCurrentUser().catch(() => null),
     listBlackouts(dress.id),
   ]);
-  const savedSet = new Set(user?.profile.saved_dress_ids ?? []);
+  const savedSet = new Set<string>(user?.savedDressIds ?? []);
   const isLoggedIn = !!user;
   const isSaved = savedSet.has(dress.id);
 

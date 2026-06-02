@@ -8,9 +8,9 @@ const ADMIN_EMAILS = ["admin@doprent.com", "prem@doprent.com", "hgcovuf@gmail.co
 const TOKEN_EXPIRY_HOURS = 24;
 
 export async function POST(req: NextRequest) {
-  const { email, password, fullName } = await req.json();
+  const { email, password, name } = await req.json();
 
-  if (!email || !password || !fullName) {
+  if (!email || !password || !name) {
     return NextResponse.json({ error: "กรุณากรอกข้อมูลให้ครบ" }, { status: 400 });
   }
   if (password.length < 6) {
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   const passwordHash = await bcrypt.hash(password, 12);
 
   await db.user.create({
-    data: { email, passwordHash, fullName, role },
+    data: { email, passwordHash, name, role },
   });
 
   // Create verification token (expires in 24h)

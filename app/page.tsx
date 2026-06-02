@@ -22,7 +22,7 @@ export default async function HomePage() {
     getCurrentUser().catch(() => null),
   ]);
   const heroDress = dresses[0];
-  const savedSet = new Set(user?.profile.saved_dress_ids ?? []);
+  const savedSet = new Set<string>(user?.savedDressIds ?? []);
   const isLoggedIn = !!user;
 
   const orgLd = {

@@ -1,9 +1,11 @@
 import NextAuth, { CredentialsSignin } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import type { Role } from "@prisma/client";
 
 const ADMIN_EMAILS = ["admin@doprent.com", "prem@doprent.com", "hgcovuf@gmail.com"];
 
@@ -17,11 +19,14 @@ class EmailNotVerifiedError extends CredentialsSignin {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
-  session: { strategy: "database" },
+  // JWT strategy: session lives in a cookie — no DB call needed in middleware
+  // Prisma adapter still handles OAuth accounts + user storage
+  session: { strategy: "jwt" },
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: true,
     }),
     Credentials({
       credentials: {
@@ -35,7 +40,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const user = await db.user.findUnique({ where: { email } });
         if (!user || !user.passwordHash) throw new InvalidCredentialsError();
-
         if (!user.emailVerified) throw new EmailNotVerifiedError();
 
         const valid = await bcrypt.compare(password, user.passwordHash);
@@ -58,10 +62,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return true;
     },
-    async session({ session, user }) {
-      session.user.id = user.id;
-      // @ts-expect-error role is a custom field
-      session.user.role = user.role;
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.role = (user as { role?: Role }).role ?? "customer";
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      const t = token as JWT & { id?: string; role?: Role };
+      if (t.id) session.user.id = t.id;
+      if (t.role) session.user.role = t.role;
       return session;
     },
   },

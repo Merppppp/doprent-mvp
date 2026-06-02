@@ -13,7 +13,7 @@ export default async function DebugPage() {
   if (session?.user?.id) {
     dbUser = await db.user.findUnique({
       where: { id: session.user.id },
-      select: { id: true, email: true, fullName: true, role: true, emailVerified: true, savedDressIds: true },
+      select: { id: true, email: true, name: true,role: true, emailVerified: true, savedDressIds: true },
     });
   }
 

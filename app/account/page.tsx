@@ -33,7 +33,7 @@ export default async function AccountPage() {
     }));
   }
 
-  const initials = (user.fullName || user.email)
+  const initials = (user.name || user.email)
     .trim()
     .split(/\s+/)
     .map((s: string) => s[0])
@@ -72,7 +72,7 @@ export default async function AccountPage() {
               {initials || "?"}
             </div>
             <div style={{ fontWeight: 600, fontSize: 15 }}>
-              {user.fullName || user.email.split("@")[0]}
+              {user.name || user.email.split("@")[0]}
               {user.role === "admin" ? (
                 <span
                   style={{
