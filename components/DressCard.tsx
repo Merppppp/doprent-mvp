@@ -30,16 +30,16 @@ export default function DressCard({ dress, variant = 0, savedSet, isLoggedIn }: 
   const isSaved = savedSet ? savedSet.has(dress.id) : false;
 
   return (
-    <div className="card" style={{ position: "relative" }}>
+    <div className="card hover-lift" style={{ position: "relative" }}>
       <Link href={`/dress/${dress.slug}`} style={{ display: "block", cursor: "pointer" }}>
         <div
+          className="media"
           style={{
             aspectRatio: "3/4",
-            borderRadius: 8,
+            borderRadius: 10,
             overflow: "hidden",
             marginBottom: 10,
             position: "relative",
-            transition: "transform 0.2s",
           }}
         >
           {hasImg ? (

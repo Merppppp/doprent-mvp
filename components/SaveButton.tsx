@@ -19,6 +19,7 @@ export default function SaveButton({
 }: Props) {
   const router = useRouter();
   const [saved, setSaved] = useState(initialSaved);
+  const [bump, setBump] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function onClick(e: React.MouseEvent) {
@@ -31,7 +32,10 @@ export default function SaveButton({
     }
 
     // optimistic
-    setSaved((s) => !s);
+    setSaved((s) => {
+      if (!s) setBump(true); // pop only when newly saved
+      return !s;
+    });
     startTransition(async () => {
       const res = await toggleSavedDress(dressId);
       if (!res.ok) {
@@ -54,17 +58,25 @@ export default function SaveButton({
         style={{
           width: 48,
           padding: 0,
-          border: `1px solid ${saved ? "var(--accent)" : "var(--line)"}`,
+          border: `1px solid ${saved ? "var(--cobalt)" : "var(--line)"}`,
           background: "var(--surface)",
-          borderRadius: 6,
+          borderRadius: 8,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: saved ? "var(--accent)" : "var(--ink-2)",
+          color: saved ? "var(--cobalt)" : "var(--ink-2)",
           cursor: isPending ? "wait" : "pointer",
+          transition:
+            "color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease)",
         }}
       >
-        <HeartIcon filled={saved} size={18} />
+        <span
+          className={bump ? "pop" : undefined}
+          onAnimationEnd={() => setBump(false)}
+          style={{ display: "inline-flex" }}
+        >
+          <HeartIcon filled={saved} size={18} />
+        </span>
       </button>
     );
   }
@@ -83,17 +95,24 @@ export default function SaveButton({
         width: 32,
         height: 32,
         borderRadius: 999,
-        background: "oklch(0.99 0.005 35 / 0.93)",
+        background: "oklch(0.99 0.007 88 / 0.93)",
         backdropFilter: "blur(6px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: saved ? "var(--accent)" : "var(--ink-2)",
+        color: saved ? "var(--cobalt)" : "var(--ink-2)",
         cursor: isPending ? "wait" : "pointer",
         zIndex: 2,
+        transition: "color var(--dur-1) var(--ease)",
       }}
     >
-      <HeartIcon filled={saved} size={16} />
+      <span
+        className={bump ? "pop" : undefined}
+        onAnimationEnd={() => setBump(false)}
+        style={{ display: "inline-flex" }}
+      >
+        <HeartIcon filled={saved} size={16} />
+      </span>
     </button>
   );
 }

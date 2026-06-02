@@ -136,8 +136,8 @@ function SavedLink({ count }: { count: number }) {
         width="18"
         height="18"
         viewBox="0 0 24 24"
-        fill={count > 0 ? "var(--accent)" : "none"}
-        stroke={count > 0 ? "var(--accent)" : "var(--ink)"}
+        fill={count > 0 ? "var(--cobalt)" : "none"}
+        stroke={count > 0 ? "var(--cobalt)" : "var(--ink)"}
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"

@@ -3,63 +3,52 @@
 @tailwind utilities;
 
 /* ============================================================
-   DopRent design tokens — "Verde · Blush · Gold" (2026-06 refresh)
+   DopRent design tokens — "Charcoal · Butter · Cobalt"
    ------------------------------------------------------------
-   CI of record: warm charcoal ink on a warm cream page, a deep
-   teal/emerald brand accent (trust, calm, not corporate) warmed by
-   a blush + soft gold for editorial accents. Token NAMES are kept
-   identical to the previous "Charcoal·Butter·Cobalt" set so every
-   component that reads var(--accent) / var(--cobalt) adopts the new
-   theme automatically — only the VALUES changed. Revert = restore
-   _backups/globals.css.bak. All OKLCH, never pure #000 / #fff.
+   CI of record: warm charcoal ink on a cream page, a butter-gold
+   brand accent (playful, memorable) cut with a cobalt blue for
+   trust signals (links, verified, info, focus). Neutrals are
+   warm-tinted (hue ~85°) toward the cream so nothing reads as a
+   dead grey prototype. Never pure #000 / #fff.
+   All hand-authored in OKLCH; chroma stays low on inks, real on
+   the brand colors. Tailwind tokens mirror these in tailwind.config.ts.
    ============================================================ */
 :root {
   /* Neutrals — warm charcoal → cream, never pure black/white */
-  --ink: oklch(0.235 0.018 70);   /* warm charcoal, near-black */
-  --ink-2: oklch(0.47 0.014 72);  /* secondary text */
-  --ink-3: oklch(0.62 0.012 74);  /* tertiary / captions */
-  --line: oklch(0.885 0.012 78);  /* hairline on cream */
-  --line-2: oklch(0.93 0.010 80);
-  --bg: oklch(0.982 0.009 85);    /* warm cream page background */
-  --surface: oklch(0.962 0.012 82); /* soft cream card surface */
+  --ink: oklch(0.23 0.012 85);   /* warm charcoal, near-black */
+  --ink-2: oklch(0.45 0.011 85); /* secondary text */
+  --ink-3: oklch(0.64 0.010 85); /* tertiary / captions */
+  --line: oklch(0.9 0.013 88);   /* hairline on cream */
+  --line-2: oklch(0.94 0.011 88);
+  --bg: oklch(0.965 0.018 88);   /* cream page background */
+  --surface: oklch(0.995 0.007 88); /* warm near-white card surface */
 
   /* Ambient deeper-cream surface — used for hero, how-it-works,
      just-in sections so they read as one editorial composition. */
-  --warm: oklch(0.945 0.014 80);
+  --warm: oklch(0.945 0.03 88);
 
-  /* Brand accent — deep teal / emerald. The DopRent signature.
-     Carries CTAs, brand mark, verified/trust. Pair with --accent-ink
-     for text on top (now a warm near-white — teal is dark). */
-  --accent: oklch(0.45 0.085 168);
-  --accent-2: oklch(0.33 0.072 168); /* darker hover state / deep */
-  --accent-soft: oklch(0.93 0.03 168); /* tint for badge / wash fills */
-  --accent-ink: oklch(0.985 0.012 168);  /* warm near-white text on teal */
+  /* Brand accent — butter / golden yellow. The DopRent signature.
+     Carries CTAs, brand mark, featured highlights. Always pair with
+     --accent-ink for text on top (never white — fails contrast). */
+  --accent: oklch(0.845 0.135 92);
+  --accent-2: oklch(0.785 0.145 90); /* darker hover state */
+  --accent-soft: oklch(0.945 0.055 92); /* tint for badge / wash fills */
+  --accent-ink: oklch(0.3 0.05 80);  /* deep gold-brown text on yellow */
 
-  /* Cobalt slot — now the same teal family so links / verified badge /
-     info / focus / saved state read on-brand. (name kept for compat) */
-  --cobalt: oklch(0.40 0.082 168);
-  --cobalt-2: oklch(0.32 0.072 168);  /* darker hover */
-  --cobalt-soft: oklch(0.93 0.03 168); /* tint fill */
-
-  /* Editorial warm accents — used by the home art / avatars. */
-  --blush: oklch(0.9 0.042 28);
-  --gold: oklch(0.76 0.095 82);
+  /* Cobalt — the trust cut. Links, verified badge, info, focus ring,
+     saved state, secondary CTA. Confident, not corporate-navy. */
+  --cobalt: oklch(0.52 0.17 262);
+  --cobalt-2: oklch(0.44 0.16 262);  /* darker hover */
+  --cobalt-soft: oklch(0.95 0.03 262); /* tint fill */
 
   /* For text/icons on dark ink surfaces — warm off-white, never #fff */
   --on-dark: oklch(0.98 0.012 90);
 
-  /* Functional — semantic status. Solid for text/icons, -soft for
-     warm-tinted background washes (replaces ad-hoc rgba alpha fills so
-     status chips stay on-theme, never pure saturated web colors). */
+  /* Functional */
   --line-green: #06C755; /* LINE's actual brand color — keep exact */
   --danger: oklch(0.55 0.16 25);
-  --danger-soft: oklch(0.94 0.035 25);
   --success: oklch(0.55 0.13 150);
-  --success-soft: oklch(0.94 0.03 150);
-  --warn: oklch(0.62 0.12 70);        /* amber, warm-tinted */
-  --warn-soft: oklch(0.94 0.04 75);
-  --info: var(--cobalt);              /* teal family — was blue */
-  --info-soft: var(--cobalt-soft);
+  --info: var(--cobalt);
 
   /* Motion — exponential ease-out, no bounce. Durations tuned for
      "refined", not flashy. prefers-reduced-motion neutralises all. */
@@ -85,10 +74,10 @@ html,
 body {
   background: var(--bg);
   color: var(--ink);
-  /* Anuphan is the body face (crisp Thai + Latin). IBM Plex Sans Thai Looped
-     and Inter remain as fallbacks if the webfont hasn't loaded yet. */
-  font-family: "Anuphan", "IBM Plex Sans Thai Looped", "Inter", system-ui,
-    -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  /* IBM Plex Sans Thai Looped renders Thai crisply on all screens. Inter is the
+     Latin fallback (used for English words inside Thai sentences). */
+  font-family: "IBM Plex Sans Thai Looped", "Inter", system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -101,16 +90,9 @@ body {
    Sans Thai Looped body, so they share metrics and OpenType features.
    Use for hero headlines and page titles where editorial weight matters. */
 .display-serif {
-  font-family: "Bai Jamjuree", "IBM Plex Serif Thai", "Georgia", "Charter",
+  font-family: "IBM Plex Serif Thai", "IBM Plex Serif", "Georgia", "Charter",
     "Times New Roman", serif;
   font-feature-settings: "kern", "liga", "calt";
-}
-
-/* Display/heading face — Bai Jamjuree carries headings site-wide.
-   (Body stays Anuphan.) Keeps the editorial weight of the refresh. */
-h1, h2, h3 {
-  font-family: "Bai Jamjuree", "IBM Plex Serif Thai", "Georgia", serif;
-  letter-spacing: -0.01em;
 }
 
 /* Display sizes — used by .hero-title and .page-title via inline styles.
