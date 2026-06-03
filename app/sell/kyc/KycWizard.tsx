@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-// TODO Phase 2: replace with R2 upload client
 import { submitKyc } from "@/app/actions/seller";
 
 type BusinessType = "individual" | "company";
@@ -51,7 +50,6 @@ export default function KycWizard({ boutiqueId }: Props) {
   const [dbdDocUrl, setDbdDocUrl] = useState("");
   const [bookBankUrl, setBookBankUrl] = useState("");
 
-  // Phase 2: upload to R2 via /api/upload (implemented in Phase 2/3)
   async function uploadFile(field: "id_card" | "dbd_doc" | "book_bank", file: File) {
     setError(null);
     setUploading({ field, pct: 1 });
@@ -60,7 +58,7 @@ export default function KycWizard({ boutiqueId }: Props) {
       fd.append("file", file);
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       if (!res.ok) {
-        setError("อัปโหลดไม่สำเร็จ — ระบบ storage ยังไม่พร้อม");
+        setError("อัปโหลดไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง");
         setUploading(null);
         return;
       }

@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-// TODO Phase 2: replace with R2 upload client
 import { createDress, updateDress, updateDressPriceTiers } from "@/app/actions/seller";
 import type { Color, Occasion, OccasionKey, PriceTier, Size } from "@/lib/types";
 
@@ -92,7 +91,6 @@ export default function DressForm(props: Props) {
     setError(null);
   }
 
-  // Phase 2: upload to R2 via /api/upload (implemented in Phase 2/3)
   async function uploadImages(files: FileList | null) {
     if (!files || files.length === 0) return;
     setError(null);
@@ -104,7 +102,7 @@ export default function DressForm(props: Props) {
         fd.append("file", files[i]);
         const res = await fetch("/api/upload", { method: "POST", body: fd });
         if (!res.ok) {
-          setError("อัปโหลดรูปไม่สำเร็จ — ระบบ storage ยังไม่พร้อม");
+          setError("อัปโหลดรูปไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง");
           break;
         }
         const json = await res.json();
