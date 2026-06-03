@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import sharp from "sharp";
 import { auth } from "@/auth";
 import { uploadToR2 } from "@/lib/r2";
 
@@ -53,10 +54,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid file type" }, { status: 400 });
   }
 
+  // BE-03: strip EXIF metadata (location, device info, etc.)
+  const stripped = await sharp(buffer).rotate().toBuffer();
+
   const ext = detectedMime === "image/jpeg" ? "jpg" : detectedMime.split("/")[1];
   const key = `uploads/${randomUUID()}.${ext}`;
 
-  const url = await uploadToR2(key, buffer, detectedMime);
+  const url = await uploadToR2(key, stripped, detectedMime);
 
   return NextResponse.json({ url, urls: { thumb: url, medium: url, large: url } });
 }
