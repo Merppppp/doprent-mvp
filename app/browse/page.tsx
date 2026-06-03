@@ -167,7 +167,7 @@ export default async function BrowsePage({
                       height: 12,
                       borderRadius: 999,
                       background: COLOR_SWATCH[c],
-                      border: "1px solid var(--line)",
+                      border: "1px solid rgba(0,0,0,0.1)",
                       display: "inline-block",
                       marginRight: 6,
                       verticalAlign: "middle",

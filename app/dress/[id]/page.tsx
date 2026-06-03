@@ -12,8 +12,8 @@ import {
   getBoutiqueBySlug,
   getDressBySlug,
   listBlackouts,
+  listDresses,
   listOccasions,
-  listSimilarDresses,
 } from "@/lib/dresses";
 import { COLOR_LABELS_TH } from "@/lib/types";
 
@@ -48,7 +48,7 @@ export default async function DressPage({ params }: { params: Params }) {
   const [occasions, boutique, related, user, blackouts] = await Promise.all([
     listOccasions(),
     getBoutiqueBySlug(slugify(dress.boutique_name)).catch(() => null),
-    listSimilarDresses(dress, 4),
+    listDresses({ limit: 4 }),
     getCurrentUser().catch(() => null),
     listBlackouts(dress.id),
   ]);
@@ -364,34 +364,29 @@ export default async function DressPage({ params }: { params: Params }) {
         </div>
       </div>
 
-      {/* RELATED — content-based similarity: occasion overlap, color, size,
-          price band, designer, boutique (see listSimilarDresses). Hidden
-          entirely if the catalogue can't yield even one candidate, so the
-          section header doesn't dangle over an empty grid. */}
-      {related.length > 0 ? (
-        <div style={{ paddingTop: 48, paddingBottom: 60, borderTop: "1px solid var(--line)" }}>
-          <div
-            className="section-head"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "end",
-              marginBottom: 28,
-              gap: 12,
-            }}
-          >
-            <h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>ชุดที่คล้ายกัน</h2>
-            <Link href="/browse" style={{ fontSize: 14, color: "var(--ink-2)" }}>
-              ดูทั้งหมด →
-            </Link>
-          </div>
-          <div className="grid-4" style={{ gap: 20 }}>
-            {related.map((d, i) => (
-              <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
-            ))}
-          </div>
+      {/* RELATED */}
+      <div style={{ paddingTop: 48, paddingBottom: 60, borderTop: "1px solid var(--line)" }}>
+        <div
+          className="section-head"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "end",
+            marginBottom: 28,
+            gap: 12,
+          }}
+        >
+          <h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>ชุดที่คล้ายกัน</h2>
+          <Link href="/browse" style={{ fontSize: 14, color: "var(--ink-2)" }}>
+            ดูทั้งหมด →
+          </Link>
         </div>
-      ) : null}
+        <div className="grid-4" style={{ gap: 20 }}>
+          {related.filter((d) => d.id !== dress.id).slice(0, 4).map((d, i) => (
+            <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
+          ))}
+        </div>
+      </div>
 
       <script
         type="application/ld+json"

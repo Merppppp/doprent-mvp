@@ -3,76 +3,40 @@
 @tailwind utilities;
 
 /* ============================================================
-   DopRent design tokens — "Verde · Blush · Gold" (2026-06 refresh)
-   ------------------------------------------------------------
-   CI of record: warm charcoal ink on a warm cream page, a deep
-   teal/emerald brand accent (trust, calm, not corporate) warmed by
-   a blush + soft gold for editorial accents. Token NAMES are kept
-   identical to the previous "Charcoal·Butter·Cobalt" set so every
-   component that reads var(--accent) / var(--cobalt) adopts the new
-   theme automatically — only the VALUES changed. Revert = restore
-   _backups/globals.css.bak. All OKLCH, never pure #000 / #fff.
+   DopRent design tokens
+   Warm-rose neutrals (hue ~30°), visible champagne warmth on
+   ambient surfaces. Bolder than the polish pass: chroma pushed
+   from 0.005-0.008 to 0.015-0.025 so the tint is perceivable
+   on a single screen, not just in aggregate.
    ============================================================ */
 :root {
-  /* Neutrals — warm charcoal → cream, never pure black/white */
-  --ink: oklch(0.235 0.018 70);   /* warm charcoal, near-black */
-  --ink-2: oklch(0.47 0.014 72);  /* secondary text */
-  --ink-3: oklch(0.62 0.012 74);  /* tertiary / captions */
-  --line: oklch(0.885 0.012 78);  /* hairline on cream */
-  --line-2: oklch(0.93 0.010 80);
-  --bg: oklch(0.982 0.009 85);    /* warm cream page background */
-  --surface: oklch(0.962 0.012 82); /* soft cream card surface */
+  /* Neutrals — warm-rose tinted, never pure black/white */
+  --ink: oklch(0.18 0.015 30);
+  --ink-2: oklch(0.42 0.012 30);
+  --ink-3: oklch(0.62 0.012 30);
+  --line: oklch(0.9 0.015 35);
+  --line-2: oklch(0.94 0.012 35);
+  --bg: oklch(0.98 0.01 40);
+  --surface: oklch(0.995 0.005 35);
 
-  /* Ambient deeper-cream surface — used for hero, how-it-works,
-     just-in sections so they read as one editorial composition. */
-  --warm: oklch(0.945 0.014 80);
+  /* Ambient warm surface — visibly champagne now. Used for hero,
+     how-it-works, just-in sections. */
+  --warm: oklch(0.93 0.03 70);
 
-  /* Brand accent — deep teal / emerald. The DopRent signature.
-     Carries CTAs, brand mark, verified/trust. Pair with --accent-ink
-     for text on top (now a warm near-white — teal is dark). */
-  --accent: oklch(0.45 0.085 168);
-  --accent-2: oklch(0.33 0.072 168); /* darker hover state / deep */
-  --accent-soft: oklch(0.93 0.03 168); /* tint for badge / wash fills */
-  --accent-ink: oklch(0.985 0.012 168);  /* warm near-white text on teal */
+  /* Brand accent — warm terracotta/rust. The DopRent brand color
+     of record. Use sparingly: hero eyebrow, save heart, key CTAs. */
+  --accent: oklch(0.6 0.16 25);
+  --accent-2: oklch(0.5 0.18 25); /* darker hover state */
 
-  /* Cobalt slot — now the same teal family so links / verified badge /
-     info / focus / saved state read on-brand. (name kept for compat) */
-  --cobalt: oklch(0.40 0.082 168);
-  --cobalt-2: oklch(0.32 0.072 168);  /* darker hover */
-  --cobalt-soft: oklch(0.93 0.03 168); /* tint fill */
+  /* For text/icons on dark ink surfaces — slightly warm off-white,
+     never raw #fff. Use this instead of "#fff" everywhere. */
+  --on-dark: oklch(0.99 0.008 35);
 
-  /* Editorial warm accents — used by the home art / avatars. */
-  --blush: oklch(0.9 0.042 28);
-  --gold: oklch(0.76 0.095 82);
-
-  /* For text/icons on dark ink surfaces — warm off-white, never #fff */
-  --on-dark: oklch(0.98 0.012 90);
-
-  /* Functional — semantic status. Solid for text/icons, -soft for
-     warm-tinted background washes (replaces ad-hoc rgba alpha fills so
-     status chips stay on-theme, never pure saturated web colors). */
+  /* Accent / functional */
   --line-green: #06C755; /* LINE's actual brand color — keep exact */
   --danger: oklch(0.55 0.16 25);
-  --danger-soft: oklch(0.94 0.035 25);
   --success: oklch(0.55 0.13 150);
-  --success-soft: oklch(0.94 0.03 150);
-  --warn: oklch(0.62 0.12 70);        /* amber, warm-tinted */
-  --warn-soft: oklch(0.94 0.04 75);
-  --info: var(--cobalt);              /* teal family — was blue */
-  --info-soft: var(--cobalt-soft);
-
-  /* Motion — exponential ease-out, no bounce. Durations tuned for
-     "refined", not flashy. prefers-reduced-motion neutralises all. */
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-soft: cubic-bezier(0.33, 1, 0.68, 1);
-  --dur-1: 140ms;  /* hover/press feedback */
-  --dur-2: 260ms;  /* card lift, media zoom */
-  --dur-3: 520ms;  /* entrance reveals */
-
-  /* Elevation — warm-tinted shadows (never pure black alpha) */
-  --shadow-1: 0 1px 2px oklch(0.3 0.02 85 / 0.06), 0 1px 1px oklch(0.3 0.02 85 / 0.04);
-  --shadow-2: 0 6px 18px oklch(0.3 0.02 85 / 0.08), 0 2px 6px oklch(0.3 0.02 85 / 0.05);
-  --shadow-3: 0 16px 40px oklch(0.3 0.02 85 / 0.12), 0 4px 12px oklch(0.3 0.02 85 / 0.06);
+  --info: oklch(0.55 0.12 240);
 }
 
 *,
@@ -85,10 +49,10 @@ html,
 body {
   background: var(--bg);
   color: var(--ink);
-  /* Anuphan is the body face (crisp Thai + Latin). IBM Plex Sans Thai Looped
-     and Inter remain as fallbacks if the webfont hasn't loaded yet. */
-  font-family: "Anuphan", "IBM Plex Sans Thai Looped", "Inter", system-ui,
-    -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  /* IBM Plex Sans Thai Looped renders Thai crisply on all screens. Inter is the
+     Latin fallback (used for English words inside Thai sentences). */
+  font-family: "IBM Plex Sans Thai Looped", "Inter", system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -101,16 +65,9 @@ body {
    Sans Thai Looped body, so they share metrics and OpenType features.
    Use for hero headlines and page titles where editorial weight matters. */
 .display-serif {
-  font-family: "Bai Jamjuree", "IBM Plex Serif Thai", "Georgia", "Charter",
+  font-family: "IBM Plex Serif Thai", "IBM Plex Serif", "Georgia", "Charter",
     "Times New Roman", serif;
   font-feature-settings: "kern", "liga", "calt";
-}
-
-/* Display/heading face — Bai Jamjuree carries headings site-wide.
-   (Body stays Anuphan.) Keeps the editorial weight of the refresh. */
-h1, h2, h3 {
-  font-family: "Bai Jamjuree", "IBM Plex Serif Thai", "Georgia", serif;
-  letter-spacing: -0.01em;
 }
 
 /* Display sizes — used by .hero-title and .page-title via inline styles.
@@ -440,13 +397,10 @@ img {
 /* Buttons */
 .btn {
   padding: 9px 18px;
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 14px;
   font-weight: 500;
-  transition: background var(--dur-1) var(--ease),
-    border-color var(--dur-1) var(--ease),
-    transform var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease),
-    color var(--dur-1) var(--ease);
+  transition: all 0.15s;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -454,41 +408,13 @@ img {
   gap: 8px;
   line-height: 1;
   border: 1px solid transparent;
-  will-change: transform;
-}
-/* Shared press feedback — never animates layout, only transform */
-.btn:active {
-  transform: translateY(1px) scale(0.985);
-}
-/* Primary brand CTA — butter gold, deep-gold text. The signature button. */
-.btn-primary {
-  background: var(--accent);
-  color: var(--accent-ink);
-  box-shadow: var(--shadow-1);
-}
-.btn-primary:hover {
-  background: var(--accent-2);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-2);
 }
 .btn-dark {
   background: var(--ink);
   color: var(--on-dark);
 }
 .btn-dark:hover {
-  background: oklch(0.32 0.014 85);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-2);
-}
-/* Cobalt — trust / secondary action */
-.btn-cobalt {
-  background: var(--cobalt);
-  color: var(--on-dark);
-}
-.btn-cobalt:hover {
-  background: var(--cobalt-2);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-2);
+  background: oklch(0.26 0.01 30);
 }
 .btn-outline {
   border: 1px solid var(--line);
@@ -497,16 +423,13 @@ img {
 }
 .btn-outline:hover {
   border-color: var(--ink);
-  transform: translateY(-1px);
 }
 .btn-line {
   background: var(--line-green);
   color: var(--on-dark);
 }
 .btn-line:hover {
-  filter: brightness(1.04);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-2);
+  opacity: 0.92;
 }
 .btn-block {
   width: 100%;
@@ -514,137 +437,6 @@ img {
 .btn-lg {
   padding: 13px 24px;
   font-size: 15px;
-}
-
-/* ============================================================
-   Motion & surface system
-   Transform + opacity only. Everything below respects the
-   prefers-reduced-motion block at the bottom of this file.
-   ============================================================ */
-
-/* Card — the canonical raised surface. Lifts gently on hover. */
-.card-surface {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  transition: transform var(--dur-2) var(--ease),
-    box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
-  will-change: transform;
-}
-.card-surface:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-2);
-  border-color: var(--line-2);
-}
-
-/* Generic hover lift for links/tiles that aren't full cards */
-.hover-lift {
-  transition: transform var(--dur-2) var(--ease),
-    box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
-  will-change: transform;
-}
-.hover-lift:hover {
-  transform: translateY(-3px);
-}
-
-/* Media zoom — wrap an <img> in .media; image scales on card hover.
-   overflow hidden lives on .media so only the photo moves, not layout. */
-.media {
-  overflow: hidden;
-}
-.media img,
-.media > svg,
-.media-zoom img,
-.media-zoom > svg {
-  transition: transform var(--dur-3) var(--ease);
-  will-change: transform;
-}
-.card:hover .media img,
-.card-surface:hover .media img,
-.media-zoom:hover img,
-.card:hover .media > svg,
-.card-surface:hover .media > svg,
-.media-zoom:hover > svg {
-  transform: scale(1.045);
-}
-
-/* Animated underline for editorial text links */
-.link-underline {
-  position: relative;
-  display: inline-block;
-}
-.link-underline::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: -2px;
-  width: 100%;
-  height: 1px;
-  background: currentColor;
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform var(--dur-2) var(--ease);
-}
-.link-underline:hover::after {
-  transform: scaleX(1);
-}
-
-/* Scroll reveal — JS adds .is-in when the element enters the viewport.
-   Default (no-JS) state is visible, so content never gets stuck hidden. */
-.reveal {
-  opacity: 1;
-}
-.js-reveal .reveal {
-  opacity: 0;
-  transform: translateY(16px);
-  transition: opacity var(--dur-3) var(--ease-soft),
-    transform var(--dur-3) var(--ease-soft);
-}
-.js-reveal .reveal.is-in {
-  opacity: 1;
-  transform: none;
-}
-/* Stagger children of a reveal-group */
-.js-reveal .reveal-stagger > * {
-  opacity: 0;
-  transform: translateY(16px);
-  transition: opacity var(--dur-3) var(--ease-soft),
-    transform var(--dur-3) var(--ease-soft);
-}
-.js-reveal .reveal-stagger.is-in > * {
-  opacity: 1;
-  transform: none;
-}
-.js-reveal .reveal-stagger.is-in > *:nth-child(2) { transition-delay: 60ms; }
-.js-reveal .reveal-stagger.is-in > *:nth-child(3) { transition-delay: 120ms; }
-.js-reveal .reveal-stagger.is-in > *:nth-child(4) { transition-delay: 180ms; }
-.js-reveal .reveal-stagger.is-in > *:nth-child(5) { transition-delay: 240ms; }
-.js-reveal .reveal-stagger.is-in > *:nth-child(6) { transition-delay: 300ms; }
-.js-reveal .reveal-stagger.is-in > *:nth-child(7) { transition-delay: 360ms; }
-.js-reveal .reveal-stagger.is-in > *:nth-child(8) { transition-delay: 420ms; }
-
-/* Hero entrance — gentle fade-up on first paint, staggered. */
-@keyframes rise-in {
-  from { opacity: 0; transform: translateY(18px); }
-  to { opacity: 1; transform: none; }
-}
-.rise {
-  animation: rise-in var(--dur-3) var(--ease-soft) both;
-}
-.rise-1 { animation-delay: 40ms; }
-.rise-2 { animation-delay: 120ms; }
-.rise-3 { animation-delay: 200ms; }
-.rise-4 { animation-delay: 280ms; }
-.rise-5 { animation-delay: 360ms; }
-
-/* Soft pulse used by the save-heart on toggle */
-@keyframes pop {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.28); }
-  100% { transform: scale(1); }
-}
-.pop {
-  animation: pop var(--dur-2) var(--ease);
 }
 
 /* Ad badges (Featured / Sponsored) — brand-tinted, no uppercase shouting */
@@ -667,8 +459,8 @@ img {
   backdrop-filter: blur(6px);
 }
 .ad-badge.featured {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
+  background: oklch(0.94 0.04 75);
+  color: oklch(0.38 0.07 60);
 }
 .ad-badge.sponsored {
   background: var(--ink);

@@ -110,7 +110,7 @@ export default async function BoutiquesPage({
             className="boutique-card"
             style={{
               background: "var(--surface)",
-              border: `1px solid ${b.featured ? "var(--gold)" : "var(--line)"}`,
+              border: `1px solid ${b.featured ? "#FCD34D" : "var(--line)"}`,
               borderRadius: 8,
               cursor: "pointer",
             }}

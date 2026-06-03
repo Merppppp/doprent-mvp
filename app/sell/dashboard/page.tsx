@@ -28,10 +28,10 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const KYC_LABEL: Record<string, { text: string; color: string }> = {
-  none: { text: "ยังไม่ส่ง KYC", color: "var(--warn)" },
-  submitted: { text: "ส่ง KYC แล้ว · รอตรวจ", color: "var(--info)" },
-  verified: { text: "✓ ผ่าน KYC", color: "var(--success)" },
-  rejected: { text: "KYC ตีกลับ · กรุณาส่งใหม่", color: "var(--danger)" },
+  none: { text: "ยังไม่ส่ง KYC", color: "#D97706" },
+  submitted: { text: "ส่ง KYC แล้ว · รอตรวจ", color: "#1F6FEB" },
+  verified: { text: "✓ ผ่าน KYC", color: "#15803D" },
+  rejected: { text: "KYC ตีกลับ · กรุณาส่งใหม่", color: "#DC2626" },
 };
 
 export default async function SellerDashboard({
@@ -123,8 +123,8 @@ export default async function SellerDashboard({
               style={{
                 marginLeft: 8,
                 padding: "2px 8px",
-                background: "var(--warn-soft)",
-                color: "var(--warn)",
+                background: "rgba(217,119,6,0.1)",
+                color: "#D97706",
                 fontSize: 11,
                 borderRadius: 3,
                 fontWeight: 600,
@@ -141,8 +141,8 @@ export default async function SellerDashboard({
         <div
           style={{
             padding: 14,
-            background: "var(--info-soft)",
-            border: "1px solid var(--info)",
+            background: "rgba(31,111,235,0.08)",
+            border: "1px solid rgba(31,111,235,0.3)",
             borderRadius: 8,
             marginBottom: 18,
             fontSize: 14,
@@ -234,8 +234,8 @@ export default async function SellerDashboard({
         <div
           style={{
             padding: 14,
-            background: "var(--warn-soft)",
-            border: "1px solid var(--warn)",
+            background: "rgba(217,119,6,0.08)",
+            border: "1px solid rgba(217,119,6,0.3)",
             borderRadius: 8,
             marginBottom: 16,
             fontSize: 13.5,
@@ -243,7 +243,7 @@ export default async function SellerDashboard({
             lineHeight: 1.5,
           }}
         >
-          ⚠️ ต้อง <Link href={`/sell/kyc?slug=${boutique.slug}`} style={{ color: "var(--warn)", fontWeight: 600 }}>ส่งเอกสาร KYC →</Link> ก่อนถึงจะเพิ่มชุดได้
+          ⚠️ ต้อง <Link href={`/sell/kyc?slug=${boutique.slug}`} style={{ color: "#D97706", fontWeight: 600 }}>ส่งเอกสาร KYC →</Link> ก่อนถึงจะเพิ่มชุดได้
         </div>
       ) : null}
 
