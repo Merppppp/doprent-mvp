@@ -54,13 +54,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid file type" }, { status: 400 });
   }
 
-  // BE-03: strip EXIF metadata (location, device info, etc.)
-  const stripped = await sharp(buffer).rotate().toBuffer();
-
   const ext = detectedMime === "image/jpeg" ? "jpg" : detectedMime.split("/")[1];
-  const key = `uploads/${randomUUID()}.${ext}`;
+  const uuid = randomUUID();
 
-  const url = await uploadToR2(key, stripped, detectedMime);
+  // BE-03 + BE-04: strip EXIF then generate 3 sizes in parallel
+  const base = sharp(buffer).rotate(); // .rotate() auto-orients and strips EXIF
+  const [thumb, medium, large] = await Promise.all([
+    base.clone().resize(400).toBuffer(),
+    base.clone().resize(800).toBuffer(),
+    base.clone().resize(1600).toBuffer(),
+  ]);
 
-  return NextResponse.json({ url, urls: { thumb: url, medium: url, large: url } });
+  const [thumbUrl, mediumUrl, largeUrl] = await Promise.all([
+    uploadToR2(`uploads/${uuid}_thumb.${ext}`, thumb, detectedMime),
+    uploadToR2(`uploads/${uuid}_medium.${ext}`, medium, detectedMime),
+    uploadToR2(`uploads/${uuid}_large.${ext}`, large, detectedMime),
+  ]);
+
+  return NextResponse.json({
+    url: largeUrl,
+    urls: { thumb: thumbUrl, medium: mediumUrl, large: largeUrl },
+  });
 }
