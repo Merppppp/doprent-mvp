@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { BookingStatus } from "@/lib/types";
 import { dueAt, findTransition, rentalDays } from "@/lib/bookings";
 
-type Result<T = Record<string, never>> =
+type Result<T = unknown> =
   | ({ ok: true } & T)
   | { ok: false; error: string };
 
