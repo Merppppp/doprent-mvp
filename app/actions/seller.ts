@@ -180,6 +180,7 @@ export async function updateBoutique(
     "address",
     "hours",
     "cover_color",
+    "promptpay_id",
   ];
   for (const f of fields) {
     const v = formData.get(f);

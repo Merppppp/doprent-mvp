@@ -291,6 +291,16 @@ function UserMenu({
           </Link>
         ) : null}
 
+        {isSeller ? (
+          <Link href="/sell/bookings" style={menuItemStyle}>
+            การจองของร้าน
+          </Link>
+        ) : null}
+
+        <Link href="/account/bookings" style={menuItemStyle}>
+          การจองของฉัน
+        </Link>
+
         <Link href="/account" style={menuItemStyle}>
           บัญชีของฉัน
         </Link>

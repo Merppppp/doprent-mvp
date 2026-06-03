@@ -48,6 +48,7 @@ export default async function EditBoutiquePage() {
           area_label: boutique.area_label,
           line_url: boutique.line_url,
           instagram: boutique.instagram,
+          promptpay_id: boutique.promptpay_id ?? null,
           since_year: boutique.since_year,
           tag: boutique.tag,
           story: boutique.story,

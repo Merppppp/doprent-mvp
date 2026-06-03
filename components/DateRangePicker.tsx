@@ -94,7 +94,6 @@ export default function DateRangePicker({
   dressId,
   boutiqueId,
   isLoggedIn,
-  loginNext,
 }: Props) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
@@ -312,7 +311,7 @@ export default function DateRangePicker({
             </div>
           ) : null}
           <div style={{ marginTop: 2 }}>
-            ข้อมูลทั้งหมดจะถูกส่งให้ร้านเมื่อกดทักทาย LINE
+            กด &quot;จองเลย&quot; เพื่อเลือกที่อยู่จัดส่งและชำระเงินผ่าน QR PromptPay
           </div>
         </div>
       ) : nights === 0 && !hasConflict ? (
@@ -322,47 +321,62 @@ export default function DateRangePicker({
       ) : null}
 
       {nights > 0 && !hasConflict ? (
-        isLoggedIn && lineHref ? (
-          <a
-            href={lineHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={trackAndGo}
-            style={{
-              display: "block",
-              marginTop: 12,
-              padding: "12px 16px",
-              background: "var(--line-green)",
-              color: "var(--on-dark)",
-              borderRadius: 6,
-              textAlign: "center",
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            จองวันนี้ผ่าน LINE · {nights} วัน
-          </a>
-        ) : (
-          // Anonymous viewer — bounce to login, never expose LINE URL.
-          <Link
-            href={`/login?next=${encodeURIComponent(loginNext || "/")}`}
-            style={{
-              display: "block",
-              marginTop: 12,
-              padding: "12px 16px",
-              background: "var(--ink)",
-              color: "var(--on-dark)",
-              borderRadius: 6,
-              textAlign: "center",
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            เข้าสู่ระบบเพื่อจอง · {nights} วัน
-          </Link>
-        )
+        <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+          {isLoggedIn && dressId ? (
+            <Link
+              href={`/checkout/address?dress=${dressId}&start=${start}&end=${end}`}
+              onClick={trackAndGo}
+              className="btn btn-primary"
+              style={{
+                display: "block",
+                padding: "12px 16px",
+                textAlign: "center",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              จองเลย · {nights} วัน
+            </Link>
+          ) : (
+            // Anonymous viewer — bounce to login, return to checkout after.
+            <Link
+              href={`/login?next=${encodeURIComponent(
+                `/checkout/address?dress=${dressId ?? ""}&start=${start}&end=${end}`
+              )}`}
+              className="btn btn-dark"
+              style={{
+                display: "block",
+                padding: "12px 16px",
+                textAlign: "center",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              เข้าสู่ระบบเพื่อจอง · {nights} วัน
+            </Link>
+          )}
+          {isLoggedIn && lineHref ? (
+            <a
+              href={lineHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={trackAndGo}
+              style={{
+                display: "block",
+                padding: "10px 16px",
+                textAlign: "center",
+                fontSize: 13,
+                fontWeight: 500,
+                color: "var(--ink-2)",
+                border: "1px solid var(--line)",
+                borderRadius: 8,
+                textDecoration: "none",
+              }}
+            >
+              สอบถามร้านก่อน (LINE)
+            </a>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

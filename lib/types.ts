@@ -26,6 +26,64 @@ export type AdsTier = "free" | "boost" | "featured";
 export type Status = "pending" | "live" | "rejected" | "draft";
 export type KycStatus = "none" | "submitted" | "verified" | "rejected";
 
+/** Booking lifecycle — mirrors the CHECK + transition trigger in
+ *  supabase/migrations/2026-06-03_bookings.sql. Keep in sync with
+ *  BOOKING_STATUS_META / TRANSITIONS in lib/bookings.ts. */
+export type BookingStatus =
+  | "booking_pending"
+  | "waiting_for_payment"
+  | "payment_review"
+  | "confirmed"
+  | "cancel_requested"
+  | "slip_disputed"
+  | "rejected"
+  | "cancelled"
+  | "payment_expired";
+
+export type Address = {
+  id: string;
+  user_id: string;
+  recipient_name: string;
+  phone: string;
+  address_text: string;
+  is_default: boolean;
+  created_at: string;
+};
+
+export type Booking = {
+  id: string;
+  renter_id: string;
+  boutique_id: string;
+  dress_id: string;
+  start_date: string; // YYYY-MM-DD
+  end_date: string; // YYYY-MM-DD
+  rental_total: number;
+  deposit: number;
+  shipping_fee: number | null; // null until seller sets on accept
+  status: BookingStatus;
+  slip_path: string | null;
+  address_id: string | null;
+  recipient_name: string | null; // snapshot at booking time
+  phone: string | null;
+  address_text: string | null;
+  current_due_at: string | null;
+  cancel_reason: string | null;
+  cancel_from_status: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Booking joined with dress + boutique for list/detail rendering. */
+export type BookingDetail = Booking & {
+  dress_name: string | null;
+  dress_slug: string | null;
+  dress_image: string | null;
+  boutique_name: string | null;
+  boutique_slug: string | null;
+  boutique_line_url: string | null;
+  boutique_promptpay_id: string | null;
+};
+
 export type Occasion = {
   key: OccasionKey;
   th: string;
@@ -63,6 +121,8 @@ export type Boutique = {
   hours: string | null;
   line_url: string;
   instagram: string | null;
+  /** PromptPay id (mobile/national-id) for in-web QR payments. */
+  promptpay_id: string | null;
   since_year: number | null;
   cover_color: Color;
   tag: string | null;

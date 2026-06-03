@@ -25,6 +25,7 @@ type Props = {
     area_label: string;
     line_url: string;
     instagram: string | null;
+    promptpay_id?: string | null;
     since_year: number | null;
     tag: string | null;
     story: string | null;
@@ -91,6 +92,15 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
       </Labeled>
       <Labeled label="Instagram">
         <input type="text" name="instagram" defaultValue={boutique.instagram ?? ""} style={inputStyle} />
+      </Labeled>
+      <Labeled label="PromptPay (เบอร์มือถือ / เลขบัตร ปชช.) — สำหรับรับเงินจองผ่าน QR">
+        <input
+          type="text"
+          name="promptpay_id"
+          defaultValue={boutique.promptpay_id ?? ""}
+          placeholder="เช่น 0812345678"
+          style={inputStyle}
+        />
       </Labeled>
       <Labeled label="ที่อยู่ร้าน">
         <input type="text" name="address" defaultValue={boutique.address ?? ""} style={inputStyle} />
