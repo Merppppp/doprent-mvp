@@ -329,6 +329,25 @@ export default async function DressPage({ params }: { params: Params }) {
             <Spec lbl="ดีไซเนอร์" val={dress.designer ?? "—"} />
           </div>
 
+          {/* Price tiers / promotion table (read-only) */}
+          {dress.price_tiers && dress.price_tiers.length > 0 ? (
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>แพ็กเกจราคา</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {dress.price_tiers.map((t, i) => (
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div style={{ padding: 10, borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)" }}>
+                      {t.days} วัน
+                    </div>
+                    <div style={{ padding: 10, borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)", textAlign: "right", fontWeight: 600 }}>
+                      ฿{(t.price ?? 0).toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {/* Availability calendar */}
           <DressAvailabilityCalendar blackouts={blackouts} />
 
