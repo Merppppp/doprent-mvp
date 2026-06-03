@@ -3,7 +3,8 @@ import { randomUUID } from "crypto";
 import { auth } from "@/auth";
 import { uploadToR2 } from "@/lib/r2";
 
-const MAX_SIZE = 10 * 1024 * 1024; // 10MB raw (BE-02 will enforce 2MB after resize)
+// BE-02: 2MB hard limit at server level
+const MAX_SIZE = 2 * 1024 * 1024;
 
 // BE-01: magic bytes signatures for allowed image types
 const MAGIC_SIGNATURES = [
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "File too large" }, { status: 400 });
+    return NextResponse.json({ error: "ไฟล์ใหญ่เกิน 2MB" }, { status: 400 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
