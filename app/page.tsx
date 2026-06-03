@@ -1,5 +1,6 @@
 import Link from "next/link";
 import DressCard from "@/components/DressCard";
+import CountUp from "@/components/CountUp";
 import { BoutiqueCover, OccasionTile } from "@/components/DressArt";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { getCurrentUser } from "@/lib/auth";
@@ -69,15 +70,15 @@ export default async function HomePage() {
             </div>
             <div className="h26-trust rise rise-5">
               <span>
-                <b data-count={stats.boutiques}>0</b>
+                <b><CountUp value={stats.boutiques} /></b>
                 <small>ร้านเช่าคัดสรร</small>
               </span>
               <span>
-                <b data-count={stats.dresses}>0</b>
+                <b><CountUp value={stats.dresses} /></b>
                 <small>ชุดพร้อมเช่า</small>
               </span>
               <span>
-                <b data-count={stats.minPrice} data-prefix="฿">0</b>
+                <b><CountUp value={stats.minPrice} prefix="฿" /></b>
                 <small>เริ่มต้น / วัน</small>
               </span>
             </div>
@@ -393,19 +394,7 @@ const HOME_CSS = `
 
 const HOME_JS = `(function(){
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches;
-  // count-up
-  function countUp(el){
-    var target=parseFloat(el.getAttribute('data-count'))||0, pre=el.getAttribute('data-prefix')||'', t0=null, dur=1200;
-    function step(ts){ if(!t0)t0=ts; var p=Math.min((ts-t0)/dur,1); var e=1-Math.pow(1-p,3);
-      el.textContent=pre+Math.round(target*e).toLocaleString('en-US'); if(p<1)requestAnimationFrame(step); }
-    requestAnimationFrame(step);
-  }
-  var stats=[].slice.call(document.querySelectorAll('.home26 [data-count]'));
-  if(reduce){ stats.forEach(function(el){var p=el.getAttribute('data-prefix')||'';el.textContent=p+(parseFloat(el.getAttribute('data-count'))||0).toLocaleString('en-US');}); }
-  else if('IntersectionObserver' in window){
-    var so=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){countUp(e.target);so.unobserve(e.target);}});},{threshold:.6});
-    stats.forEach(function(el){so.observe(el);});
-  } else { stats.forEach(countUp); }
+  // hero stat count-up now handled by the <CountUp> client component.
   // hero parallax + spotlight (fine pointer, motion ok)
   if(!reduce && window.matchMedia && matchMedia('(pointer:fine)').matches){
     var hero=document.querySelector('.home26 .h26-hero'), glow=document.getElementById('h26glow'), stack=document.getElementById('h26stack');

@@ -41,6 +41,11 @@
   --cobalt-2: oklch(0.32 0.072 168);  /* darker hover */
   --cobalt-soft: oklch(0.93 0.03 168); /* tint fill */
 
+  /* Saved-heart — stays a warm red (universal "saved/favourite" signal),
+     intentionally NOT the teal brand hue so the wishlist reads instantly. */
+  --save: oklch(0.58 0.2 22);
+  --save-2: oklch(0.5 0.19 22);
+
   /* Editorial warm accents — used by the home art / avatars. */
   --blush: oklch(0.9 0.042 28);
   --gold: oklch(0.76 0.095 82);
@@ -714,6 +719,52 @@ img {
 .status-rejected {
   background: oklch(0.92 0.04 25);
   color: oklch(0.45 0.11 25);
+}
+
+/* ===== Pricing tiers (sell page) — click to select, no auto-navigate ===== */
+.tier-card {
+  position: relative;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 24px;
+  cursor: pointer;
+  outline: none;
+  transition: transform var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+}
+.tier-card:hover {
+  border-color: var(--ink-3);
+}
+.tier-card:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.tier-card.is-selected {
+  border-color: var(--accent);
+  border-width: 2px;
+  padding: 23px; /* keep size stable when border grows 1px -> 2px */
+  transform: translateY(-6px);
+  box-shadow: 0 14px 30px -18px oklch(0.45 0.085 168 / 0.55);
+}
+.tier-pop {
+  position: absolute;
+  top: -10px;
+  right: 16px;
+  background: var(--accent-soft);
+  color: var(--accent-2);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tier-card,
+  .tier-card.is-selected {
+    transition: border-color var(--dur-1) var(--ease);
+    transform: none;
+  }
 }
 .status-rejected .dot {
   background: var(--danger);
