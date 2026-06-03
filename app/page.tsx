@@ -4,7 +4,7 @@ import CountUp from "@/components/CountUp";
 import { BoutiqueCover, OccasionTile } from "@/components/DressArt";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { getCurrentUser } from "@/lib/auth";
-import { getStats, listBoutiques, listDresses, listOccasions } from "@/lib/dresses";
+import { getStats, listBoutiques, listDresses, listOccasions, listSponsorBoutiques } from "@/lib/dresses";
 
 // Force dynamic so DressCard receives correct per-user isLoggedIn / savedSet
 // (otherwise Next ISR caches one version and serves it to everyone)
@@ -15,13 +15,18 @@ const LINE_URL =
   process.env.NEXT_PUBLIC_DEFAULT_LINE_URL ?? "https://line.me/R/ti/p/@doprent";
 
 export default async function HomePage() {
-  const [dresses, boutiques, occasions, stats, user] = await Promise.all([
+  const [dresses, boutiques, sponsors, occasions, stats, user] = await Promise.all([
     listDresses({ limit: 8 }),
     listBoutiques({ featuredFirst: true, limit: 4 }),
+    listSponsorBoutiques(8),
     listOccasions(),
     getStats(),
     getCurrentUser().catch(() => null),
   ]);
+  // Paid (boost/featured) shops fill the marquee as a "ร้านสนับสนุน" ad slot.
+  // Fall back to the verified-shop strip when nobody is on a paid plan yet.
+  const sponsorStrip = sponsors.length > 0;
+  const marqueeShops = sponsorStrip ? sponsors : boutiques;
   const heroDress = dresses[0];
   const heroImg =
     heroDress && Array.isArray(heroDress.images) && heroDress.images.length > 0
@@ -109,11 +114,11 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ========== VERIFIED MARQUEE (real boutiques) ========== */}
-      {boutiques.length > 0 ? (
+      {/* ========== SPONSOR / VERIFIED MARQUEE (paid shops first) ========== */}
+      {marqueeShops.length > 0 ? (
         <div className="h26-marquee" aria-hidden>
           <div className="track">
-            {[...boutiques, ...boutiques, ...boutiques].map((b, i) => (
+            {[...marqueeShops, ...marqueeShops, ...marqueeShops].map((b, i) => (
               <span className="item" key={`${b.id}-${i}`}>
                 {b.verified ? (
                   <span className="v">
@@ -122,6 +127,7 @@ export default async function HomePage() {
                 ) : null}
                 {b.name}
                 <span className="loc">· {b.area_label}</span>
+                {sponsorStrip ? <span className="spon">ร้านสนับสนุน</span> : null}
               </span>
             ))}
           </div>
@@ -349,6 +355,7 @@ const HOME_CSS = `
 .home26 .h26-marquee .item .loc{color:var(--ink-3);font-weight:400;font-family:"Anuphan"}
 .home26 .h26-marquee .item .v{width:16px;height:16px;border-radius:50%;background:var(--accent);display:grid;place-items:center}
 .home26 .h26-marquee .item .v svg{width:9px;height:9px;stroke:var(--accent-ink);stroke-width:3.5;fill:none}
+.home26 .h26-marquee .item .spon{font-family:"Anuphan";font-weight:500;font-size:10.5px;letter-spacing:.02em;color:var(--gold);background:color-mix(in oklch,var(--gold) 16%,transparent);border:1px solid color-mix(in oklch,var(--gold) 34%,transparent);padding:1px 7px;border-radius:999px;margin-left:2px}
 @keyframes h26scroll{to{transform:translateX(-33.333%)}}
 .home26 .h26-pillars{padding:66px 0;background:var(--bg)}
 .home26 .h26-phead{max-width:56ch;margin:0 auto 44px;text-align:center}

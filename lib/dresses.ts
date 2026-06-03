@@ -172,6 +172,31 @@ export async function listBoutiques(opts: { limit?: number; featuredFirst?: bool
   return (data ?? []) as Boutique[];
 }
 
+/**
+ * Paid sponsor strip — boutiques on a paid ads_tier (boost/featured).
+ * Powers the home marquee as a sponsored-shop placement. Featured first,
+ * then boost. Returns [] when no one is on a paid plan yet (caller falls
+ * back to the plain verified strip so it never renders empty).
+ */
+export async function listSponsorBoutiques(limit = 8): Promise<Boutique[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("boutiques")
+    .select(PUBLIC_BOUTIQUE_QUERY)
+    .eq("status", "live")
+    .in("ads_tier", ["boost", "featured"])
+    .order("ads_tier", { ascending: false }) // 'featured' > 'boost' alphabetically
+    .order("featured", { ascending: false })
+    .order("name", { ascending: true })
+    .limit(limit);
+  if (error) {
+    console.error("[doprent] supabase listSponsorBoutiques error", error);
+    return [];
+  }
+  return (data ?? []) as Boutique[];
+}
+
 export async function getBoutiqueBySlug(slug: string): Promise<Boutique | null> {
   const sb = getSupabase();
   if (!sb) return null;
@@ -185,6 +210,97 @@ export async function getBoutiqueBySlug(slug: string): Promise<Boutique | null> 
     return null;
   }
   return (data as Boutique) ?? null;
+}
+
+/**
+ * Content-based similarity scorer for the "ชุดที่คล้ายกัน" rail on
+ * /dress/[slug]. Pools up to 60 recent live+available candidates (excluding
+ * the seed dress), ranks them in-memory, returns the top `limit`.
+ *
+ * Weights — tuned for renter intent on DopRent (occasion is the primary
+ * decision axis, then color/size/price band):
+ *
+ *   occasion overlap (Jaccard on shared keys)  ×5
+ *   same color                                 ×3
+ *   same size                                  ×3
+ *   price within ±30%                          ×2
+ *   same designer (when both have one)         ×2
+ *   same boutique                              ×1  (low — section is
+ *     primarily for discovery, the boutique card on the page already
+ *     surfaces same-boutique inventory)
+ *
+ * Fallback: if scored pool yields fewer than `limit` results (e.g. tiny
+ * inventory or every candidate scored 0), pads from the recency-sorted
+ * remainder so the rail never renders empty.
+ */
+export async function listSimilarDresses(seed: Dress, limit = 4): Promise<Dress[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+
+  const [{ data, error }, verifiedSet] = await Promise.all([
+    sb
+      .from("dresses")
+      .select(PUBLIC_DRESS_QUERY)
+      .eq("status", "live")
+      .eq("available", true)
+      .neq("id", seed.id)
+      .order("featured", { ascending: false })
+      .order("sponsored", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(60),
+    fetchVerifiedBoutiqueIds(),
+  ]);
+  if (error) {
+    console.error("[doprent] supabase listSimilarDresses error", error);
+    return [];
+  }
+  const pool: Dress[] = ((data ?? []) as Dress[]).map((d) => ({
+    ...d,
+    boutique_verified: verifiedSet.has(d.boutique_id),
+  }));
+
+  const seedOcc = new Set(seed.occasions ?? []);
+  const seedPrice = seed.price_per_day;
+  const priceBand = seedPrice * 0.3; // ±30% window
+
+  const scored = pool.map((d) => {
+    let score = 0;
+
+    // Occasion overlap — Jaccard to prevent a dress tagged for every
+    // occasion from dominating purely on tag count.
+    const dOcc = d.occasions ?? [];
+    if (seedOcc.size && dOcc.length) {
+      const shared = dOcc.filter((o) => seedOcc.has(o)).length;
+      const union = new Set([...seedOcc, ...dOcc]).size;
+      if (union > 0) score += (shared / union) * 5;
+    }
+
+    if (d.color === seed.color) score += 3;
+    if (d.size === seed.size) score += 3;
+
+    if (Math.abs(d.price_per_day - seedPrice) <= priceBand) score += 2;
+
+    if (seed.designer && d.designer && d.designer === seed.designer) score += 2;
+
+    if (d.boutique_id === seed.boutique_id) score += 1;
+
+    return { dress: d, score };
+  });
+
+  // Sort by score desc, then by recency (pool already pre-sorted, so a
+  // stable sort preserves recency among ties).
+  scored.sort((a, b) => b.score - a.score);
+
+  const ranked = scored.filter((s) => s.score > 0).map((s) => s.dress);
+
+  if (ranked.length >= limit) return ranked.slice(0, limit);
+
+  // Fallback: pad from recency-sorted pool, skipping anything already in
+  // the ranked list, so the rail always renders `limit` items if there
+  // are at least `limit` other live dresses in the catalogue.
+  const rankedIds = new Set(ranked.map((d) => d.id));
+  const padding = pool.filter((d) => !rankedIds.has(d.id));
+  return [...ranked, ...padding].slice(0, limit);
 }
 
 export async function listDressesByBoutique(boutiqueId: string): Promise<Dress[]> {
