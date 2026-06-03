@@ -62,7 +62,7 @@ export async function getRenterBookings(): Promise<BookingDetail[]> {
     .select(BOOKING_SELECT)
     .eq("renter_id", user.id)
     .order("created_at", { ascending: false });
-  return ((data as RawJoin[] | null) ?? []).map(toDetail);
+  return ((data as unknown as RawJoin[] | null) ?? []).map(toDetail);
 }
 
 export async function getSellerBookings(): Promise<BookingDetail[]> {
@@ -82,7 +82,7 @@ export async function getSellerBookings(): Promise<BookingDetail[]> {
     .select(BOOKING_SELECT)
     .in("boutique_id", ids)
     .order("created_at", { ascending: false });
-  return ((data as RawJoin[] | null) ?? []).map(toDetail);
+  return ((data as unknown as RawJoin[] | null) ?? []).map(toDetail);
 }
 
 /** Single booking by id — RLS returns it only to renter / seller / admin. */
@@ -90,7 +90,7 @@ export async function getBookingForView(id: string): Promise<BookingDetail | nul
   const sb = createClient();
   const { data } = await sb.from("bookings").select(BOOKING_SELECT).eq("id", id).maybeSingle();
   if (!data) return null;
-  return toDetail(data as RawJoin);
+  return toDetail(data as unknown as RawJoin);
 }
 
 /** Is the current user the owner of this booking's boutique? (for view role) */

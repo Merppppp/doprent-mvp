@@ -165,7 +165,7 @@ export async function acceptBooking(
   const { sb, user, booking } = await loadBookingForActor(bookingId);
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
   if (!booking) return { ok: false, error: "ไม่พบการจอง" };
-  const b = booking as LoadedBooking;
+  const b = booking as unknown as LoadedBooking;
   if (ownerId(b) !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
   if (!Number.isFinite(shippingFee) || shippingFee < 0)
     return { ok: false, error: "ค่าจัดส่งไม่ถูกต้อง" };
@@ -207,7 +207,7 @@ async function sellerSimpleMove(
   const { sb, user, booking } = await loadBookingForActor(bookingId);
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
   if (!booking) return { ok: false, error: "ไม่พบการจอง" };
-  const b = booking as LoadedBooking;
+  const b = booking as unknown as LoadedBooking;
   if (ownerId(b) !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
   if (!findTransition(b.status, to, "seller"))
     return { ok: false, error: "เปลี่ยนสถานะนี้ไม่ได้" };
@@ -235,7 +235,7 @@ export async function markSlipUploaded(
   const { sb, user, booking } = await loadBookingForActor(bookingId);
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
   if (!booking) return { ok: false, error: "ไม่พบการจอง" };
-  const b = booking as LoadedBooking;
+  const b = booking as unknown as LoadedBooking;
   if (b.renter_id !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
   if (!slipPath) return { ok: false, error: "ยังไม่ได้อัปโหลดสลิป" };
   if (!findTransition(b.status, "payment_review", "renter"))
@@ -255,7 +255,7 @@ export async function cancelBooking(bookingId: string): Promise<Result> {
   const { sb, user, booking } = await loadBookingForActor(bookingId);
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
   if (!booking) return { ok: false, error: "ไม่พบการจอง" };
-  const b = booking as LoadedBooking;
+  const b = booking as unknown as LoadedBooking;
   if (b.renter_id !== user.id) return { ok: false, error: "ไม่มีสิทธิ์ยกเลิกการจองนี้" };
   if (!findTransition(b.status, "cancelled", "renter"))
     return { ok: false, error: "ยกเลิกในขั้นตอนนี้ไม่ได้ ติดต่อร้านผ่านแอดมิน" };
