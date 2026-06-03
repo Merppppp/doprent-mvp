@@ -246,8 +246,8 @@ export default function KycWizard({ boutiqueId }: Props) {
           style={{
             marginTop: 18,
             padding: 12,
-            background: "rgba(220,38,38,0.08)",
-            border: "1px solid rgba(220,38,38,0.3)",
+            background: "var(--danger-soft)",
+            border: "1px solid var(--danger)",
             borderRadius: 6,
             color: "var(--danger)",
             fontSize: 14,
@@ -581,7 +581,7 @@ function FileSlot({
       >
         {url ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ color: "#15803D" }}>✓</span>
+            <span style={{ color: "var(--success)" }}>✓</span>
             <span style={{ fontSize: 13 }}>อัปโหลดแล้ว</span>
             <label style={{ marginLeft: "auto", fontSize: 12, color: "var(--ink-3)", cursor: "pointer" }}>
               เปลี่ยนไฟล์

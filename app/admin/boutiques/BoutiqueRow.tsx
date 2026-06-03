@@ -82,11 +82,11 @@ export default function BoutiqueRow({ b }: { b: Boutique }) {
             color={
               b.kyc_status === "verified" ? "#15803D" :
               b.kyc_status === "rejected" ? "#DC2626" :
-              b.kyc_status === "submitted" ? "#1F6FEB" :
+              b.kyc_status === "submitted" ? "#11644c" :
               "#6B7280"
             }
           />
-          {b.verified ? <Badge text="✓ Verified" color="#1F6FEB" /> : null}
+          {b.verified ? <Badge text="✓ Verified" color="#11644c" /> : null}
           {b.featured ? <Badge text="★ Featured" color="#D97706" /> : null}
         </div>
       </div>

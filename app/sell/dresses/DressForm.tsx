@@ -186,7 +186,7 @@ export default function DressForm(props: Props) {
                   width: 22,
                   height: 22,
                   borderRadius: 999,
-                  background: "oklch(0.18 0.008 30 / 0.72)",
+                  background: "oklch(0.18 0.008 70 / 0.72)",
                   color: "var(--on-dark)",
                   border: "none",
                   fontSize: 11,
@@ -387,8 +387,8 @@ export default function DressForm(props: Props) {
         <div
           style={{
             padding: 12,
-            background: "rgba(220,38,38,0.08)",
-            border: "1px solid rgba(220,38,38,0.3)",
+            background: "var(--danger-soft)",
+            border: "1px solid var(--danger)",
             borderRadius: 6,
             color: "var(--danger)",
             fontSize: 14,

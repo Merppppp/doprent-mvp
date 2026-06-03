@@ -140,8 +140,8 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
         <div
           style={{
             padding: 12,
-            background: "rgba(220,38,38,0.08)",
-            border: "1px solid rgba(220,38,38,0.3)",
+            background: "var(--danger-soft)",
+            border: "1px solid var(--danger)",
             borderRadius: 6,
             color: "var(--danger)",
             fontSize: 14,
@@ -154,10 +154,10 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
         <div
           style={{
             padding: 12,
-            background: "rgba(21,128,61,0.08)",
-            border: "1px solid rgba(21,128,61,0.3)",
+            background: "var(--success-soft)",
+            border: "1px solid var(--success)",
             borderRadius: 6,
-            color: "#15803D",
+            color: "var(--success)",
             fontSize: 14,
           }}
         >
