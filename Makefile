@@ -1,6 +1,6 @@
 .PHONY: dev build start \
         db-up db-down db-logs \
-        db-migrate db-seed db-reset db-studio db-generate \
+        db-migrate db-seed db-seed-dev db-reset db-studio db-generate \
         typecheck lint
 
 # ---------------------------------------------------------------------------
@@ -44,9 +44,12 @@ db-migrate:
 db-seed:
 	npx prisma db seed
 
+db-seed-dev:
+	npx tsx prisma/seed.dev.ts
+
 db-studio:
 	npx prisma studio
 
-## Reset DB + migrate + seed (dev only)
+## Reset DB + migrate + seed dev (local only)
 db-reset:
-	npx prisma migrate reset --force && npx prisma db seed
+	npx prisma migrate reset --force && npx tsx prisma/seed.dev.ts
