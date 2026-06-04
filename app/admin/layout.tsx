@@ -16,7 +16,7 @@ const NAV = [
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?next=/admin");
-  if (user.profile.role !== "admin") redirect("/");
+  if (user.role !== "admin") redirect("/");
 
   return (
     <div className="shell" style={{ paddingTop: 24, paddingBottom: 60 }}>

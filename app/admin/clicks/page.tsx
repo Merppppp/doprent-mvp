@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -25,30 +25,24 @@ export default async function ClicksAdmin({
     (typeof RANGES)[number];
   const activeRange = range.key as RangeKey;
 
-  const sb = createClient();
-  const since =
-    range.days > 0 ? new Date(Date.now() - range.days * 86_400_000).toISOString() : null;
+  const since = range.days > 0 ? new Date(Date.now() - range.days * 86_400_000) : null;
 
-  // Load clicks rows
-  let q = sb
-    .from("line_clicks")
-    .select(
-      "id, dress_id, boutique_id, source, created_at, dresses(name, slug, boutique_name), boutiques(name, slug)",
-    )
-    .order("created_at", { ascending: false })
-    .limit(1500);
-  if (since) q = q.gte("created_at", since);
+  const rawClicks = await db.lineClick.findMany({
+    where: since ? { createdAt: { gte: since } } : undefined,
+    orderBy: { createdAt: "desc" },
+    take: 1500,
+    include: {
+      dress: { select: { name: true, slug: true, boutiqueName: true } },
+      boutique: { select: { name: true, slug: true } },
+    },
+  });
 
-  const { data: clicks } = await q;
-  const rows = ((clicks ?? []) as unknown) as Array<{
-    id: number;
-    dress_id: string | null;
-    boutique_id: string | null;
-    source: string | null;
-    created_at: string;
-    dresses: { name: string; slug: string; boutique_name: string } | null;
-    boutiques: { name: string; slug: string } | null;
-  }>;
+  const rows = rawClicks.map((r) => ({
+    id: Number(r.id), dress_id: r.dressId, boutique_id: r.boutiqueId,
+    source: r.source, created_at: r.createdAt.toISOString(),
+    dresses: r.dress ? { name: r.dress.name, slug: r.dress.slug, boutique_name: r.dress.boutiqueName } : null,
+    boutiques: r.boutique ? { name: r.boutique.name, slug: r.boutique.slug } : null,
+  }));
 
   // Aggregations
   const byBoutique = new Map<string, { name: string; slug: string; count: number }>();

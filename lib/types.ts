@@ -1,4 +1,3 @@
-// Types mirror the Supabase schema (see supabase/schema.sql)
 
 export type Color =
   | "rose"
@@ -26,9 +25,8 @@ export type AdsTier = "free" | "boost" | "featured";
 export type Status = "pending" | "live" | "rejected" | "draft";
 export type KycStatus = "none" | "submitted" | "verified" | "rejected";
 
-/** Booking lifecycle — mirrors the CHECK + transition trigger in
- *  supabase/migrations/2026-06-03_bookings.sql. Keep in sync with
- *  BOOKING_STATUS_META / TRANSITIONS in lib/bookings.ts. */
+/** Booking lifecycle — mirrors the BookingStatus enum in prisma/schema.prisma.
+ *  Keep in sync with BOOKING_STATUS_META / TRANSITIONS in lib/bookings.ts. */
 export type BookingStatus =
   | "booking_pending"
   | "waiting_for_payment"
@@ -39,6 +37,109 @@ export type BookingStatus =
   | "rejected"
   | "cancelled"
   | "payment_expired";
+
+export type Occasion = {
+  key: OccasionKey;
+  th: string;
+  en: string;
+  color_token: Color;
+  sort_order: number;
+};
+
+export type Area = {
+  key: string;
+  th: string;
+  lat: number;
+  lng: number;
+  keywords: string[];
+};
+
+export type Boutique = {
+  id: string;
+  slug: string;
+  name: string;
+  owner_id: string | null;
+  owner_name: string | null;
+  area_key: string | null;
+  area_label: string;
+  address: string | null;
+  /** Structured Thai address (added 2026-05-13 for proper geocoding). */
+  house_no: string | null;
+  street: string | null;
+  subdistrict: string | null;
+  district: string | null;
+  province: string;
+  postal_code: string | null;
+  lat: number | null;
+  lng: number | null;
+  hours: string | null;
+  line_url: string;
+  instagram: string | null;
+  /** PromptPay id (mobile/national-id) for in-web QR payments.
+   *  Optional in the public Boutique shape — only the booking flow selects it. */
+  promptpay_id?: string | null;
+  since_year: number | null;
+  cover_color: Color;
+  tag: string | null;
+  story: string | null;
+  delivery_info: string | null;
+  featured: boolean;
+  /** Admin-toggled trust mark (post-KYC). Defaults to false. */
+  verified: boolean;
+  ads_tier: AdsTier;
+  status: Status;
+  reject_reason: string | null;
+  kyc_status: KycStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PriceTier = {
+  days: number;
+  price: number;
+};
+
+export type Dress = {
+  id: string;
+  slug: string;
+  tag_code: string;
+  name: string;
+  designer: string | null;
+  boutique_id: string;
+  boutique_name: string;
+  /** Denormalized from boutiques.verified — populated by listDresses(). */
+  boutique_verified?: boolean;
+  size: Size;
+  color: Color;
+  price_per_day: number;
+  deposit: number;
+  price_tiers: PriceTier[];
+  description: string | null;
+  images: string[];
+  occasions: OccasionKey[];
+  line_url: string;
+  ads_tier: AdsTier;
+  featured: boolean;
+  sponsored: boolean;
+  status: Status;
+  reject_reason: string | null;
+  available: boolean;
+  views: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DressWithBoutique = Dress & {
+  boutique: Boutique;
+};
+
+export type Blackout = {
+  dress_id: string;
+  date: string;
+  created_at: string;
+};
+
+/* ----------------------------- bookings ----------------------------- */
 
 export type Address = {
   id: string;
@@ -89,92 +190,6 @@ export type BookingDetail = Booking & {
   boutique_promptpay_id: string | null;
 };
 
-export type Occasion = {
-  key: OccasionKey;
-  th: string;
-  en: string;
-  color_token: Color;
-  sort_order: number;
-};
-
-export type Area = {
-  key: string;
-  th: string;
-  lat: number;
-  lng: number;
-  keywords: string[];
-};
-
-export type Boutique = {
-  id: string;
-  slug: string;
-  name: string;
-  owner_id: string | null;
-  owner_name: string | null;
-  area_key: string | null;
-  area_label: string;
-  address: string | null;
-  /** Structured Thai address (added 2026-05-13 for proper geocoding). */
-  house_no: string | null;
-  street: string | null;
-  subdistrict: string | null;
-  district: string | null;
-  province: string;
-  postal_code: string | null;
-  lat: number | null;
-  lng: number | null;
-  hours: string | null;
-  line_url: string;
-  instagram: string | null;
-  /** PromptPay id (mobile/national-id) for in-web QR payments. */
-  promptpay_id: string | null;
-  since_year: number | null;
-  cover_color: Color;
-  tag: string | null;
-  story: string | null;
-  featured: boolean;
-  /** Admin-toggled trust mark (post-KYC). Defaults to false. */
-  verified: boolean;
-  ads_tier: AdsTier;
-  status: Status;
-  reject_reason: string | null;
-  kyc_status: KycStatus;
-  created_at: string;
-  updated_at: string;
-};
-
-export type Dress = {
-  id: string;
-  slug: string;
-  name: string;
-  designer: string | null;
-  boutique_id: string;
-  boutique_name: string;
-  /** Denormalized from boutiques.verified — populated by listDresses(). */
-  boutique_verified?: boolean;
-  size: Size;
-  color: Color;
-  price_per_day: number;
-  deposit: number;
-  description: string | null;
-  images: string[];
-  occasions: OccasionKey[];
-  line_url: string;
-  ads_tier: AdsTier;
-  featured: boolean;
-  sponsored: boolean;
-  status: Status;
-  reject_reason: string | null;
-  available: boolean;
-  views: number;
-  created_at: string;
-  updated_at: string;
-};
-
-export type DressWithBoutique = Dress & {
-  boutique: Boutique;
-};
-
 export type Profile = {
   id: string;
   email: string | null;
@@ -182,18 +197,11 @@ export type Profile = {
   line_id: string | null;
   role: "customer" | "seller" | "admin";
   saved_dress_ids: string[];
-  /** Acquisition attribution (first-touch). Added 2026-06-04. */
-  signup_source: string | null;
-  signup_medium: string | null;
-  signup_campaign: string | null;
-  signup_referrer: string | null;
-  signup_channel: string | null;
-  /** Activity recency for MAU. */
-  last_active_at: string | null;
-  last_province: string | null;
   created_at: string;
   updated_at: string;
 };
+
+/* ---------------------------- analytics ----------------------------- */
 
 /** Acquisition channel buckets — mirrors lib/attribution.ts Channel. */
 export type Channel =

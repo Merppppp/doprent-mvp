@@ -31,7 +31,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
     listDressesByBoutique(b.id),
     getCurrentUser().catch(() => null),
   ]);
-  const savedSet = new Set(user?.profile.saved_dress_ids ?? []);
+  const savedSet = new Set<string>(user?.savedDressIds ?? []);
   const isLoggedIn = !!user;
 
   return (

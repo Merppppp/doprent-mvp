@@ -2,9 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { DressArt } from "@/components/DressArt";
+import SellerDashboardCalendarPanel from "@/components/SellerDashboardCalendarPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -28,10 +29,10 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const KYC_LABEL: Record<string, { text: string; color: string }> = {
-  none: { text: "ยังไม่ส่ง KYC", color: "var(--warn)" },
-  submitted: { text: "ส่ง KYC แล้ว · รอตรวจ", color: "var(--info)" },
-  verified: { text: "✓ ผ่าน KYC", color: "var(--success)" },
-  rejected: { text: "KYC ตีกลับ · กรุณาส่งใหม่", color: "var(--danger)" },
+  none: { text: "ยังไม่ส่ง KYC", color: "#D97706" },
+  submitted: { text: "ส่ง KYC แล้ว · รอตรวจ", color: "#1F6FEB" },
+  verified: { text: "✓ ผ่าน KYC", color: "#15803D" },
+  rejected: { text: "KYC ตีกลับ · กรุณาส่งใหม่", color: "#DC2626" },
 };
 
 export default async function SellerDashboard({
@@ -42,35 +43,35 @@ export default async function SellerDashboard({
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?next=/sell/dashboard");
 
-  const sb = createClient();
-  const { data: boutique } = await sb
-    .from("boutiques")
-    .select("*")
-    .eq("owner_id", user.profile.id)
-    .limit(1)
-    .maybeSingle();
-  if (!boutique) redirect("/sell/signup");
-  // Signup flow not complete — KYC never submitted (or was rejected) → force user back
-  if (boutique.kyc_status === "none" || boutique.kyc_status === "rejected") {
-    redirect(`/sell/kyc?slug=${boutique.slug}`);
+  const boutRaw = await db.boutique.findFirst({ where: { ownerId: user.id } });
+  if (!boutRaw) redirect("/sell/signup");
+  if (boutRaw.kycStatus === "none" || boutRaw.kycStatus === "rejected") {
+    redirect(`/sell/kyc?slug=${boutRaw.slug}`);
   }
 
-  // Get dresses + click counts in parallel
-  const [dressesRes, clicksRes] = await Promise.all([
-    sb
-      .from("dresses")
-      .select("*")
-      .eq("boutique_id", boutique.id)
-      .order("created_at", { ascending: false }),
-    sb
-      .from("line_clicks")
-      .select("id", { count: "exact", head: true })
-      .eq("boutique_id", boutique.id),
+  const boutique = {
+    id: boutRaw.id, slug: boutRaw.slug, name: boutRaw.name,
+    area_label: boutRaw.areaLabel, status: boutRaw.status,
+    kyc_status: boutRaw.kycStatus, verified: boutRaw.verified,
+  };
+
+  const [dressRows, totalClicks] = await Promise.all([
+    db.dress.findMany({
+      where: { boutiqueId: boutique.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, slug: true, tagCode: true, name: true, designer: true, size: true, color: true, pricePerDay: true, status: true, available: true, views: true, images: true, createdAt: true },
+    }),
+    db.lineClick.count({ where: { boutiqueId: boutique.id } }),
   ]);
 
-  const dresses = (dressesRes.data ?? []) as Array<{
+  const dresses = dressRows.map((d) => ({
+    id: d.id, slug: d.slug, tag_code: d.tagCode, name: d.name, designer: d.designer,
+    size: d.size, color: d.color, price_per_day: d.pricePerDay, status: d.status,
+    available: d.available, views: d.views, images: d.images as string[], created_at: d.createdAt.toISOString(),
+  })) as Array<{
     id: string;
     slug: string;
+    tag_code: string;
     name: string;
     designer: string | null;
     size: string;
@@ -82,7 +83,6 @@ export default async function SellerDashboard({
     images: string[];
     created_at: string;
   }>;
-  const totalClicks = clicksRes.count ?? 0;
   const liveCount = dresses.filter((d) => d.status === "live" && d.available).length;
   const pendingCount = dresses.filter((d) => d.status === "pending").length;
 
@@ -123,8 +123,8 @@ export default async function SellerDashboard({
               style={{
                 marginLeft: 8,
                 padding: "2px 8px",
-                background: "var(--warn-soft)",
-                color: "var(--warn)",
+                background: "rgba(217,119,6,0.1)",
+                color: "#D97706",
                 fontSize: 11,
                 borderRadius: 3,
                 fontWeight: 600,
@@ -141,8 +141,8 @@ export default async function SellerDashboard({
         <div
           style={{
             padding: 14,
-            background: "var(--info-soft)",
-            border: "1px solid var(--info)",
+            background: "rgba(31,111,235,0.08)",
+            border: "1px solid rgba(31,111,235,0.3)",
             borderRadius: 8,
             marginBottom: 18,
             fontSize: 14,
@@ -169,7 +169,7 @@ export default async function SellerDashboard({
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 4 }}>สถานะ KYC</div>
           <div style={{ fontWeight: 600, color: kyc.color, fontSize: 15 }}>{kyc.text}</div>
         </div>
-        {boutique.kyc_status === "none" || boutique.kyc_status === "rejected" ? (
+        {(boutique.kyc_status as string) === "none" || (boutique.kyc_status as string) === "rejected" ? (
           <Link
             href={`/sell/kyc?slug=${boutique.slug}`}
             className="btn btn-dark"
@@ -186,6 +186,19 @@ export default async function SellerDashboard({
         <StatCard label="รออนุมัติ" value={pendingCount} sub="ทีม DopRent กำลังตรวจ" />
         <StatCard label="LINE clicks ทั้งหมด" value={totalClicks} sub="ลูกค้าทักร้าน" />
       </div>
+
+      {dresses.length > 0 ? (
+        <SellerDashboardCalendarPanel
+          dresses={dresses.map((d) => ({
+            id: d.id,
+            name: d.name,
+            designer: d.designer,
+            tag_code: d.tag_code,
+            size: d.size,
+            price_per_day: d.price_per_day,
+          }))}
+        />
+      ) : null}
 
       {/* Actions */}
       <div
@@ -234,8 +247,8 @@ export default async function SellerDashboard({
         <div
           style={{
             padding: 14,
-            background: "var(--warn-soft)",
-            border: "1px solid var(--warn)",
+            background: "rgba(217,119,6,0.08)",
+            border: "1px solid rgba(217,119,6,0.3)",
             borderRadius: 8,
             marginBottom: 16,
             fontSize: 13.5,
@@ -243,7 +256,7 @@ export default async function SellerDashboard({
             lineHeight: 1.5,
           }}
         >
-          ⚠️ ต้อง <Link href={`/sell/kyc?slug=${boutique.slug}`} style={{ color: "var(--warn)", fontWeight: 600 }}>ส่งเอกสาร KYC →</Link> ก่อนถึงจะเพิ่มชุดได้
+          ⚠️ ต้อง <Link href={`/sell/kyc?slug=${boutique.slug}`} style={{ color: "#D97706", fontWeight: 600 }}>ส่งเอกสาร KYC →</Link> ก่อนถึงจะเพิ่มชุดได้
         </div>
       ) : null}
 
@@ -323,7 +336,7 @@ export default async function SellerDashboard({
                     {d.name}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6 }}>
-                    {d.designer || "—"} · Size {d.size} · ฿{d.price_per_day.toLocaleString()}/วัน
+                    {d.tag_code ? `รหัสชุด: ${d.tag_code} · ` : ""}{d.designer || "—"} · Size {d.size} · ฿{d.price_per_day.toLocaleString()}/วัน
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                     <span

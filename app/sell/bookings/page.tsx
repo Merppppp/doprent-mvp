@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { getSellerBookings } from "@/lib/booking-queries";
 import { amountDue } from "@/lib/bookings";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
@@ -19,10 +19,7 @@ const fmtThai = (s: string) => {
 };
 
 export default async function SellerBookingsPage() {
-  const sb = createClient();
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect("/login?next=/sell/bookings");
 
   const bookings = await getSellerBookings();

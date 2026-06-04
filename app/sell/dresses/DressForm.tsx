@@ -2,9 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/browser";
-import { createDress, updateDress } from "@/app/actions/seller";
-import type { Color, Occasion, OccasionKey, Size } from "@/lib/types";
+import { createDress, updateDress, updateDressPriceTiers } from "@/app/actions/seller";
+import type { Color, Occasion, OccasionKey, PriceTier, Size } from "@/lib/types";
 
 const COLORS: Color[] = ["rose", "ivory", "green", "black", "navy", "red", "blue", "purple"];
 const COLOR_TH: Record<Color, string> = {
@@ -44,6 +43,7 @@ type Props =
         images: string[];
         occasions: OccasionKey[];
         available: boolean;
+        price_tiers: PriceTier[];
       };
     };
 
@@ -63,6 +63,7 @@ export default function DressForm(props: Props) {
   const [occasions, setOccasions] = useState<OccasionKey[]>(initial?.occasions ?? []);
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
   const [available, setAvailable] = useState(initial?.available ?? true);
+  const [priceTiers, setPriceTiers] = useState<PriceTier[]>(initial?.price_tiers ?? []);
   const [uploadingCount, setUploadingCount] = useState(0);
   const [urlInput, setUrlInput] = useState("");
   const [showUrlInput, setShowUrlInput] = useState(false);
@@ -93,25 +94,21 @@ export default function DressForm(props: Props) {
   async function uploadImages(files: FileList | null) {
     if (!files || files.length === 0) return;
     setError(null);
-    const sb = createClient();
     const uploads: string[] = [];
     setUploadingCount(files.length);
     try {
       for (let i = 0; i < files.length; i++) {
-        const f = files[i];
-        const ext = (f.name.split(".").pop() ?? "jpg").toLowerCase();
-        const path = `${props.boutiqueId}/${Date.now()}-${i}.${ext}`;
-        const { data, error: upErr } = await sb.storage
-          .from("dress-images")
-          .upload(path, f, { upsert: false, contentType: f.type || undefined });
-        if (upErr || !data) {
-          setError(`อัปโหลดรูปไม่สำเร็จ: ${upErr?.message ?? "unknown"}`);
+        const fd = new FormData();
+        fd.append("file", files[i]);
+        const res = await fetch("/api/upload", { method: "POST", body: fd });
+        if (!res.ok) {
+          setError("อัปโหลดรูปไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง");
           break;
         }
-        const { data: pub } = sb.storage.from("dress-images").getPublicUrl(data.path);
-        uploads.push(pub.publicUrl);
+        const json = await res.json();
+        uploads.push(json.urls?.large ?? json.url ?? "");
       }
-      setImages((curr) => [...curr, ...uploads]);
+      setImages((curr) => [...curr, ...uploads.filter(Boolean)]);
     } finally {
       setUploadingCount(0);
     }
@@ -137,13 +134,23 @@ export default function DressForm(props: Props) {
     fd.set("available", available ? "true" : "false");
 
     try {
-      const res = isEdit
-        ? await updateDress(props.dressId, fd)
-        : await createDress(fd);
-      if (!res.ok) {
-        setError(res.error ?? "บันทึกไม่สำเร็จ");
-        setSubmitting(false);
-        return;
+      let dressId: string | undefined;
+      if (isEdit) {
+        const res = await updateDress(props.dressId, fd);
+        if (!res.ok) { setError(res.error ?? "บันทึกไม่สำเร็จ"); setSubmitting(false); return; }
+        dressId = props.dressId;
+      } else {
+        const res = await createDress(fd);
+        if (!res.ok) { setError(res.error ?? "บันทึกไม่สำเร็จ"); setSubmitting(false); return; }
+        dressId = res.id;
+      }
+      if (dressId) {
+        const tiersRes = await updateDressPriceTiers(dressId, priceTiers);
+        if (!tiersRes.ok) {
+          setError(tiersRes.error ?? "บันทึกแพ็กเกจราคาไม่สำเร็จ");
+          setSubmitting(false);
+          return;
+        }
       }
       router.push("/sell/dashboard");
     } catch (err) {
@@ -306,24 +313,93 @@ export default function DressForm(props: Props) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <Labeled label="ค่าเช่า / วัน (฿) *">
           <input
-            type="number"
-            min={100}
-            step={100}
-            value={pricePerDay}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={pricePerDay || ""}
             onChange={(e) => setPricePerDay(parseInt(e.target.value) || 0)}
             style={inputStyle}
           />
         </Labeled>
         <Labeled label="ค่ามัดจำ (฿)">
           <input
-            type="number"
-            min={0}
-            step={500}
-            value={deposit}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={deposit || ""}
             onChange={(e) => setDeposit(parseInt(e.target.value) || 0)}
             style={inputStyle}
           />
         </Labeled>
+      </div>
+
+      {/* Price tiers */}
+      <div>
+        <label style={labelStyle}>แพ็กเกจราคา (ไม่บังคับ)</label>
+        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 10 }}>
+          กำหนดราคาตามจำนวนวัน เช่น เช่า 3 วัน ราคา 2,100 บาท
+        </div>
+        {priceTiers.map((tier, i) => (
+          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, marginBottom: 8 }}>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="จำนวนวัน"
+              value={tier.days || ""}
+              onChange={(e) => {
+                const v = parseInt(e.target.value) || 0;
+                setPriceTiers((curr) => curr.map((t, idx) => idx === i ? { ...t, days: v } : t));
+              }}
+              style={inputStyle}
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="ราคา (฿)"
+              value={tier.price || ""}
+              onChange={(e) => {
+                const v = parseInt(e.target.value) || 0;
+                setPriceTiers((curr) => curr.map((t, idx) => idx === i ? { ...t, price: v } : t));
+              }}
+              style={inputStyle}
+            />
+            <button
+              type="button"
+              onClick={() => setPriceTiers((curr) => curr.filter((_, idx) => idx !== i))}
+              style={{
+                padding: "0 12px",
+                border: "1px solid rgba(220,38,38,0.4)",
+                borderRadius: 6,
+                background: "rgba(220,38,38,0.08)",
+                color: "#DC2626",
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              ลบ
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => setPriceTiers((curr) => [...curr, { days: 1, price: 0 }])}
+          style={{
+            width: "100%",
+            padding: "10px",
+            border: "1px dashed var(--line)",
+            borderRadius: 6,
+            background: "var(--surface)",
+            color: "var(--ink-2)",
+            fontSize: 13,
+            cursor: "pointer",
+            marginTop: 4,
+          }}
+        >
+          + เพิ่มแพ็กเกจวันใหม่
+        </button>
       </div>
 
       <Labeled label="โอกาส (เลือกได้หลายอัน)">

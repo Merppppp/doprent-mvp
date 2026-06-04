@@ -5,7 +5,7 @@ import MobileMenu from "./MobileMenu";
 export default async function Header() {
   const user = await getCurrentUser().catch(() => null);
 
-  const fullName = user?.profile.full_name || user?.email.split("@")[0] || "";
+  const fullName = user?.name || user?.email.split("@")[0] || "";
   const initials = fullName
     .trim()
     .split(/\s+/)
@@ -13,7 +13,7 @@ export default async function Header() {
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const savedCount = user?.profile.saved_dress_ids?.length ?? 0;
+  const savedCount = user?.savedDressIds?.length ?? 0;
 
   return (
     <header
@@ -72,8 +72,8 @@ export default async function Header() {
               <UserMenu
                 fullName={fullName}
                 email={user.email}
-                isAdmin={user.profile.role === "admin"}
-                isSeller={user.profile.role === "seller" || user.profile.role === "admin"}
+                isAdmin={user.role === "admin"}
+                isSeller={user.role === "seller" || user.role === "admin"}
                 initials={initials}
               />
             </>
@@ -100,8 +100,8 @@ export default async function Header() {
               ? {
                   fullName,
                   email: user.email,
-                  isAdmin: user.profile.role === "admin",
-                  isSeller: user.profile.role === "seller" || user.profile.role === "admin",
+                  isAdmin: user.role === "admin",
+                  isSeller: user.role === "seller" || user.role === "admin",
                   initials,
                   savedCount,
                 }

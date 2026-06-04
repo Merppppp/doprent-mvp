@@ -26,6 +26,7 @@ type Props = {
     line_url: string;
     instagram: string | null;
     promptpay_id?: string | null;
+    delivery_info?: string | null;
     since_year: number | null;
     tag: string | null;
     story: string | null;

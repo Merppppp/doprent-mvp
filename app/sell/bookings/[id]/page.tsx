@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { getBookingForView, currentUserIsSellerOf } from "@/lib/booking-queries";
 import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
@@ -20,10 +20,7 @@ const fmtThai = (s: string) => {
 };
 
 export default async function SellerBookingDetail({ params }: { params: { id: string } }) {
-  const sb = createClient();
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect(`/login?next=/sell/bookings/${params.id}`);
 
   const b = await getBookingForView(params.id);
@@ -34,14 +31,7 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
 
   const meta = BOOKING_STATUS_META[b.status];
 
-  // Signed URL for the slip (private bucket) once uploaded.
-  let slipUrl: string | null = null;
-  if (b.slip_path) {
-    const { data } = await sb.storage
-      .from("payment-slips")
-      .createSignedUrl(b.slip_path, 60 * 30);
-    slipUrl = data?.signedUrl ?? null;
-  }
+  const slipUrl: string | null = b.slip_path ?? null;
 
   return (
     <div className="shell" style={{ paddingTop: 36, paddingBottom: 80, maxWidth: 560 }}>

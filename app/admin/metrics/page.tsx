@@ -1,41 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-/* ------------------------------- types ------------------------------- */
-
-type TrafficRow = { day: string; channel: string; views: number; sessions: number; users: number };
-type ProvinceRow = { province: string; views: number; sessions: number };
-type ChannelSignupRow = { channel: string; signups: number };
-type MauRow = { month: string; mau: number };
-type DailyBookingRow = {
-  day: string;
-  bookings: number;
-  confirmed: number;
-  gmv: number;
-  gmv_confirmed: number;
-  commission_revenue: number;
-};
-type OccasionRow = { occasion: string; bookings: number; confirmed: number; commission_revenue: number };
-type Funnel = { total: number; confirmed: number; lost: number; in_progress: number; confirm_rate_pct: number | null };
-type SubRevenueRow = { plan: string; active_subs: number; mrr: number };
-type SubAdoption = { total_boutiques: number; paid_boutiques: number; adoption_rate_pct: number | null };
-
-type Overview = {
-  range_days: number;
-  traffic: TrafficRow[];
-  traffic_by_province: ProvinceRow[];
-  channel_signups: ChannelSignupRow[];
-  mau: MauRow[];
-  total_users: number;
-  new_users: number;
-  active_users: number;
-  daily_bookings: DailyBookingRow[];
-  by_occasion: OccasionRow[];
-  funnel: Funnel | null;
-  subscription_revenue: SubRevenueRow[];
-  subscription_adoption: SubAdoption | null;
-};
+const RANGE_DAYS = 30;
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -67,60 +34,155 @@ const OCCASION_TH: Record<string, string> = {
 const baht = (n: number) => `฿${(n ?? 0).toLocaleString("th-TH")}`;
 const num = (n: number) => (n ?? 0).toLocaleString("th-TH");
 
-function sum<T>(rows: T[], pick: (r: T) => number) {
-  return rows.reduce((a, r) => a + (pick(r) || 0), 0);
+/* --------------------------- data fetching --------------------------- */
+
+type ChannelRow = { channel: string; views: number; sessions: number };
+type ProvinceRow = { province: string; views: number; sessions: number };
+type DailyRow = { day: string; bookings: number; confirmed: number; gmv_confirmed: number; commission: number };
+type OccasionRow = { occasion: string; bookings: number; confirmed: number; commission: number };
+
+async function getMetrics() {
+  const since = new Date(Date.now() - RANGE_DAYS * 86400000);
+
+  const [
+    totalUsers,
+    newUsers,
+    activeUsers,
+    signupGroups,
+    traffic,
+    provinces,
+    daily,
+    byOccasion,
+    funnelGroups,
+    activeSubs,
+    totalBoutiques,
+  ] = await Promise.all([
+    db.user.count(),
+    db.user.count({ where: { createdAt: { gte: since } } }),
+    db.user.count({ where: { lastActiveAt: { gte: since } } }),
+    db.user.groupBy({ by: ["signupChannel"], _count: { _all: true } }),
+    db.$queryRaw<ChannelRow[]>`
+      select coalesce(channel, 'direct') as channel,
+             count(*)::int as views,
+             count(distinct session_id)::int as sessions
+      from page_views where created_at >= ${since}
+      group by 1 order by views desc`,
+    db.$queryRaw<ProvinceRow[]>`
+      select coalesce(province, 'unknown') as province,
+             count(*)::int as views,
+             count(distinct session_id)::int as sessions
+      from page_views where created_at >= ${since}
+      group by 1 order by views desc limit 12`,
+    db.$queryRaw<DailyRow[]>`
+      select to_char(date_trunc('day', created_at), 'YYYY-MM-DD') as day,
+             count(*)::int as bookings,
+             count(*) filter (where status = 'confirmed')::int as confirmed,
+             coalesce(sum(rental_total) filter (where status = 'confirmed'), 0)::int as gmv_confirmed,
+             coalesce(sum(commission_amount) filter (where status = 'confirmed'), 0)::int as commission
+      from bookings where created_at >= ${since}
+      group by 1 order by day`,
+    db.$queryRaw<OccasionRow[]>`
+      select occ as occasion,
+             count(*)::int as bookings,
+             count(*) filter (where b.status = 'confirmed')::int as confirmed,
+             coalesce(sum(b.commission_amount) filter (where b.status = 'confirmed'), 0)::int as commission
+      from bookings b
+      join dresses d on d.id = b.dress_id
+      cross join lateral unnest(coalesce(d.occasions, array[]::text[])) as occ
+      group by 1 order by bookings desc`,
+    db.booking.groupBy({ by: ["status"], _count: { _all: true } }),
+    db.sellerSubscription.findMany({
+      where: { status: "active" },
+      select: { plan: true, amount: true, billingCycle: true, boutiqueId: true },
+    }),
+    db.boutique.count(),
+  ]);
+
+  // signups by channel
+  const signups = new Map<string, number>();
+  for (const g of signupGroups) signups.set(g.signupChannel ?? "direct", g._count._all);
+
+  // booking funnel
+  const statusCount = new Map<string, number>();
+  for (const g of funnelGroups) statusCount.set(g.status, g._count._all);
+  const totalBookings = [...statusCount.values()].reduce((a, b) => a + b, 0);
+  const confirmed = statusCount.get("confirmed") ?? 0;
+  const lost =
+    (statusCount.get("rejected") ?? 0) +
+    (statusCount.get("cancelled") ?? 0) +
+    (statusCount.get("payment_expired") ?? 0);
+  const confirmRate = totalBookings ? Math.round((confirmed / totalBookings) * 10000) / 100 : null;
+
+  // subscription revenue + adoption
+  const subByPlan = new Map<string, { active: number; mrr: number }>();
+  const paidBoutiques = new Set<string>();
+  for (const s of activeSubs) {
+    const cur = subByPlan.get(s.plan) ?? { active: 0, mrr: 0 };
+    cur.active += 1;
+    cur.mrr += s.billingCycle === "yearly" ? Math.round(s.amount / 12) : s.amount;
+    subByPlan.set(s.plan, cur);
+    if (s.plan !== "free" && s.boutiqueId) paidBoutiques.add(s.boutiqueId);
+  }
+  const adoptionRate = totalBoutiques
+    ? Math.round((paidBoutiques.size / totalBoutiques) * 10000) / 100
+    : null;
+
+  return {
+    totalUsers,
+    newUsers,
+    activeUsers,
+    signups,
+    traffic,
+    provinces,
+    daily,
+    byOccasion,
+    funnel: { total: totalBookings, confirmed, lost, confirmRate },
+    subByPlan,
+    subscriptionRevenue: [...subByPlan.values()].reduce((a, b) => a + b.mrr, 0),
+    adoption: { paid: paidBoutiques.size, total: totalBoutiques, rate: adoptionRate },
+  };
 }
 
 /* ------------------------------- page -------------------------------- */
 
 export default async function AdminMetricsPage() {
-  const sb = createClient();
-  const { data, error } = await sb.rpc("admin_metrics_overview", { days: 30 });
-  const m = (data as Overview | null) ?? null;
+  let m: Awaited<ReturnType<typeof getMetrics>> | null = null;
+  let err: string | null = null;
+  try {
+    m = await getMetrics();
+  } catch (e) {
+    err = (e as Error).message;
+  }
 
-  if (error || !m) {
+  if (!m) {
     return (
       <div>
         <H1>Business Metrics</H1>
         <Notice>
-          ยังดึงข้อมูลไม่ได้ — ตรวจว่าได้รัน migration{" "}
-          <code>2026-06-04_business_analytics.sql</code> ใน Supabase SQL Editor แล้ว
-          {error ? (
-            <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-3)" }}>{error.message}</div>
-          ) : null}
+          ยังดึงข้อมูลไม่ได้ — ตรวจว่าได้รัน Prisma migration (ตาราง page_views / bookings /
+          seller_subscriptions) แล้ว
+          {err ? <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-3)" }}>{err}</div> : null}
         </Notice>
       </div>
     );
   }
 
-  const totalViews = sum(m.traffic, (r) => r.views);
-  const totalSessions = sum(m.traffic, (r) => r.sessions);
-  const totalBookings = sum(m.daily_bookings, (r) => r.bookings);
-  const totalConfirmed = sum(m.daily_bookings, (r) => r.confirmed);
-  const commissionRev = sum(m.daily_bookings, (r) => r.commission_revenue);
-  const gmvConfirmed = sum(m.daily_bookings, (r) => r.gmv_confirmed);
-  const mrr = sum(m.subscription_revenue, (r) => r.mrr);
-
-  // Traffic by channel (aggregate the daily rows).
-  const byChannel = new Map<string, { views: number; sessions: number }>();
-  for (const r of m.traffic) {
-    const cur = byChannel.get(r.channel) ?? { views: 0, sessions: 0 };
-    cur.views += r.views;
-    cur.sessions += r.sessions;
-    byChannel.set(r.channel, cur);
-  }
-  const channelRows = [...byChannel.entries()].sort((a, b) => b[1].views - a[1].views);
+  const totalViews = m.traffic.reduce((a, r) => a + r.views, 0);
+  const totalSessions = m.traffic.reduce((a, r) => a + r.sessions, 0);
+  const totalBookings = m.daily.reduce((a, r) => a + r.bookings, 0);
+  const totalConfirmed = m.daily.reduce((a, r) => a + r.confirmed, 0);
+  const commissionRev = m.daily.reduce((a, r) => a + r.commission, 0);
+  const gmvConfirmed = m.daily.reduce((a, r) => a + r.gmv_confirmed, 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
       <div>
         <H1>Business Metrics</H1>
         <p style={{ color: "var(--ink-2)", fontSize: 13, marginTop: 4 }}>
-          ช่วง {m.range_days} วันล่าสุด · สำหรับรายงานผู้บริหาร / นักลงทุน
+          ช่วง {RANGE_DAYS} วันล่าสุด · สำหรับรายงานผู้บริหาร / นักลงทุน
         </p>
       </div>
 
-      {/* KPI cards */}
       <div
         style={{
           display: "grid",
@@ -129,35 +191,32 @@ export default async function AdminMetricsPage() {
         }}
       >
         <Kpi label="ผู้เข้าชม (sessions)" value={num(totalSessions)} sub={`${num(totalViews)} pageviews`} />
-        <Kpi label="ผู้ใช้ทั้งหมด" value={num(m.total_users)} sub={`+${num(m.new_users)} สมัครใหม่`} />
-        <Kpi label="Active users" value={num(m.active_users)} sub={`${m.range_days} วัน`} />
+        <Kpi label="ผู้ใช้ทั้งหมด" value={num(m.totalUsers)} sub={`+${num(m.newUsers)} สมัครใหม่`} />
+        <Kpi label="Active users" value={num(m.activeUsers)} sub={`${RANGE_DAYS} วัน`} />
         <Kpi label="การจอง" value={num(totalBookings)} sub={`ยืนยัน ${num(totalConfirmed)}`} />
         <Kpi
           label="Conversion จอง→ยืนยัน"
-          value={m.funnel?.confirm_rate_pct != null ? `${m.funnel.confirm_rate_pct}%` : "—"}
-          sub={`จากทั้งหมด ${num(m.funnel?.total ?? 0)}`}
+          value={m.funnel.confirmRate != null ? `${m.funnel.confirmRate}%` : "—"}
+          sub={`จากทั้งหมด ${num(m.funnel.total)}`}
         />
         <Kpi label="Commission (ยืนยันแล้ว)" value={baht(commissionRev)} sub={`GMV ${baht(gmvConfirmed)}`} accent />
-        <Kpi label="MRR (subscription)" value={baht(mrr)} sub="รายเดือน" accent />
+        <Kpi label="MRR (subscription)" value={baht(m.subscriptionRevenue)} sub="รายเดือน" accent />
         <Kpi
           label="Subscription adoption"
-          value={m.subscription_adoption?.adoption_rate_pct != null ? `${m.subscription_adoption.adoption_rate_pct}%` : "—"}
-          sub={`${num(m.subscription_adoption?.paid_boutiques ?? 0)}/${num(
-            m.subscription_adoption?.total_boutiques ?? 0,
-          )} ร้าน`}
+          value={m.adoption.rate != null ? `${m.adoption.rate}%` : "—"}
+          sub={`${num(m.adoption.paid)}/${num(m.adoption.total)} ร้าน`}
         />
       </div>
 
-      {/* Traffic source / channel */}
       <Section title="แหล่งที่มาผู้เข้าชม (channel)">
-        {channelRows.length ? (
+        {m.traffic.length ? (
           <Table
             head={["ช่องทาง", "Sessions", "Pageviews", "สมัคร"]}
-            rows={channelRows.map(([ch, v]) => [
-              CHANNEL_TH[ch] ?? ch,
-              num(v.sessions),
-              num(v.views),
-              num(m.channel_signups.find((c) => c.channel === ch)?.signups ?? 0),
+            rows={m.traffic.map((r) => [
+              CHANNEL_TH[r.channel] ?? r.channel,
+              num(r.sessions),
+              num(r.views),
+              num(m.signups.get(r.channel) ?? 0),
             ])}
           />
         ) : (
@@ -165,30 +224,26 @@ export default async function AdminMetricsPage() {
         )}
       </Section>
 
-      {/* Geography */}
       <Section title="พื้นที่ผู้เข้าชม (โดยประมาณ)">
-        {m.traffic_by_province.length ? (
+        {m.provinces.length ? (
           <Table
             head={["พื้นที่", "Sessions", "Pageviews"]}
-            rows={m.traffic_by_province
-              .slice(0, 12)
-              .map((r) => [r.province, num(r.sessions), num(r.views)])}
+            rows={m.provinces.map((r) => [r.province, num(r.sessions), num(r.views)])}
           />
         ) : (
           <Empty>ต้องเปิด edge geo headers (Vercel) จึงจะเห็นพื้นที่</Empty>
         )}
       </Section>
 
-      {/* Bookings by category */}
       <Section title="การจองตามประเภทชุด (occasion)">
-        {m.by_occasion.length ? (
+        {m.byOccasion.length ? (
           <Table
             head={["ประเภท", "จอง", "ยืนยัน", "Commission"]}
-            rows={m.by_occasion.map((r) => [
+            rows={m.byOccasion.map((r) => [
               OCCASION_TH[r.occasion] ?? r.occasion,
               num(r.bookings),
               num(r.confirmed),
-              baht(r.commission_revenue),
+              baht(r.commission),
             ])}
           />
         ) : (
@@ -196,27 +251,25 @@ export default async function AdminMetricsPage() {
         )}
       </Section>
 
-      {/* Subscription revenue */}
       <Section title="Subscription → Revenue">
-        {m.subscription_revenue.length ? (
+        {m.subByPlan.size ? (
           <Table
             head={["แพ็กเกจ", "Active subs", "MRR"]}
-            rows={m.subscription_revenue.map((r) => [r.plan, num(r.active_subs), baht(r.mrr)])}
+            rows={[...m.subByPlan.entries()].map(([plan, v]) => [plan, num(v.active), baht(v.mrr)])}
           />
         ) : (
           <Empty>ยังไม่มี subscription (ตาราง seller_subscriptions ว่าง)</Empty>
         )}
       </Section>
 
-      {/* Daily bookings trend (compact) */}
       <Section title="การจองรายวัน">
-        {m.daily_bookings.length ? (
+        {m.daily.length ? (
           <Table
             head={["วันที่", "จอง", "ยืนยัน", "GMV ยืนยัน", "Commission"]}
-            rows={m.daily_bookings
+            rows={m.daily
               .slice(-14)
               .reverse()
-              .map((r) => [r.day, num(r.bookings), num(r.confirmed), baht(r.gmv_confirmed), baht(r.commission_revenue)])}
+              .map((r) => [r.day, num(r.bookings), num(r.confirmed), baht(r.gmv_confirmed), baht(r.commission)])}
           />
         ) : (
           <Empty>ยังไม่มีการจองในช่วงนี้</Empty>

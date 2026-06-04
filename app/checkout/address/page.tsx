@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { getMyAddresses } from "@/lib/booking-queries";
 import { rentalDays } from "@/lib/bookings";
 import CheckoutForm from "@/components/CheckoutForm";
@@ -26,28 +27,48 @@ export default async function CheckoutAddressPage({
 
   const backHref = `/checkout/address?dress=${dressId}&start=${start}&end=${end}`;
 
-  const sb = createClient();
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(backHref)}`);
 
   if (!dressId || !start || !end) {
     return <Fallback msg="ลิงก์การจองไม่สมบูรณ์ กรุณาเลือกชุดและวันที่จากหน้าชุดอีกครั้ง" />;
   }
 
-  const { data: dress } = await sb
-    .from("dresses")
-    .select("id,name,slug,images,price_per_day,deposit,status,available,boutique_name")
-    .eq("id", dressId)
-    .maybeSingle();
+  const row = await db.dress.findUnique({
+    where: { id: dressId },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      images: true,
+      pricePerDay: true,
+      deposit: true,
+      status: true,
+      available: true,
+      boutiqueName: true,
+    },
+  });
+  const dress = row
+    ? {
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        images: row.images,
+        price_per_day: row.pricePerDay,
+        deposit: row.deposit,
+        status: row.status,
+        available: row.available,
+        boutique_name: row.boutiqueName,
+      }
+    : null;
 
   if (!dress) return <Fallback msg="ไม่พบชุดนี้" />;
   if (dress.status !== "live" || !dress.available)
     return <Fallback msg="ชุดนี้ยังไม่เปิดให้จองในขณะนี้" />;
 
   const days = rentalDays(start, end);
-  const image = Array.isArray(dress.images) && dress.images.length > 0 ? dress.images[0] : null;
+  const image =
+    Array.isArray(dress.images) && dress.images.length > 0 ? String(dress.images[0]) : null;
   const addresses = await getMyAddresses();
 
   return (

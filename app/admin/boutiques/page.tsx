@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import BoutiqueRow from "./BoutiqueRow";
 
 export const dynamic = "force-dynamic";
@@ -21,30 +21,20 @@ export default async function BoutiquesAdmin({
     ? (searchParams!.status as StatusOpt)
     : "pending";
 
-  const sb = createClient();
-  let q = sb
-    .from("boutiques")
-    .select("id, slug, name, owner_name, area_label, line_url, instagram, since_year, status, kyc_status, verified, featured, created_at, owner_id")
-    .order("created_at", { ascending: false });
-  if (activeStatus !== "all") q = q.eq("status", activeStatus);
-  const { data, error } = await q;
+  const rawRows = await db.boutique.findMany({
+    where: activeStatus !== "all" ? { status: activeStatus } : undefined,
+    orderBy: { createdAt: "desc" },
+    select: { id: true, slug: true, name: true, ownerName: true, areaLabel: true, lineUrl: true, instagram: true, sinceYear: true, status: true, kycStatus: true, verified: true, featured: true, createdAt: true, ownerId: true },
+  });
 
-  const rows = (data ?? []) as Array<{
-    id: string;
-    slug: string;
-    name: string;
-    owner_name: string | null;
-    area_label: string;
-    line_url: string;
-    instagram: string | null;
-    since_year: number | null;
-    status: string;
-    kyc_status: string;
-    verified: boolean;
-    featured: boolean;
-    created_at: string;
-    owner_id: string | null;
-  }>;
+  const rows = rawRows.map((b) => ({
+    id: b.id, slug: b.slug, name: b.name, owner_name: b.ownerName,
+    area_label: b.areaLabel, line_url: b.lineUrl, instagram: b.instagram,
+    since_year: b.sinceYear, status: b.status, kyc_status: b.kycStatus,
+    verified: b.verified, featured: b.featured,
+    created_at: b.createdAt.toISOString(), owner_id: b.ownerId,
+  }));
+  const error = null as { message: string } | null;
 
   return (
     <div>

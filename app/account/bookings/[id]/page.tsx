@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { getBookingForView } from "@/lib/booking-queries";
 import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
 import { promptPayQrDataUrl } from "@/lib/payments";
@@ -21,10 +21,7 @@ const fmtThai = (s: string) => {
 };
 
 export default async function RenterBookingDetail({ params }: { params: { id: string } }) {
-  const sb = createClient();
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect(`/login?next=/account/bookings/${params.id}`);
 
   const b = await getBookingForView(params.id);

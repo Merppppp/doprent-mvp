@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import { listOccasions } from "@/lib/dresses";
 import DressForm from "../DressForm";
 
@@ -17,38 +17,26 @@ export default async function NewDressPage() {
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?next=/sell/dresses/new");
 
-  const sb = createClient();
-  const { data: boutique } = await sb
-    .from("boutiques")
-    .select("id, slug, name, line_url, kyc_status")
-    .eq("owner_id", user.profile.id)
-    .limit(1)
-    .maybeSingle();
-  if (!boutique) redirect("/sell/signup");
-  // Gate: KYC must be submitted (or verified) before listing dresses
-  if (boutique.kyc_status === "none" || boutique.kyc_status === "rejected") {
-    redirect(`/sell/kyc?slug=${boutique.slug}`);
+  const [raw, occasions] = await Promise.all([
+    db.boutique.findFirst({
+      where: { ownerId: user.id },
+      select: { id: true, slug: true, name: true, lineUrl: true, kycStatus: true },
+    }),
+    listOccasions(),
+  ]);
+  if (!raw) redirect("/sell/signup");
+  if (raw.kycStatus === "none" || raw.kycStatus === "rejected") {
+    redirect(`/sell/kyc?slug=${raw.slug}`);
   }
-
-  const occasions = await listOccasions();
 
   return (
     <div className="shell" style={{ paddingTop: 32, paddingBottom: 80, maxWidth: 720 }}>
-      <Link href="/sell/dashboard" style={{ fontSize: 13, color: "var(--ink-3)" }}>
-        ← กลับ Dashboard
-      </Link>
-      <h1 className="page-title" style={{ fontSize: 28, fontWeight: 600, margin: "12px 0 6px" }}>
-        เพิ่มชุดใหม่
-      </h1>
+      <Link href="/sell/dashboard" style={{ fontSize: 13, color: "var(--ink-3)" }}>← กลับ Dashboard</Link>
+      <h1 className="page-title" style={{ fontSize: 28, fontWeight: 600, margin: "12px 0 6px" }}>เพิ่มชุดใหม่</h1>
       <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
         ชุดจะเป็นสถานะ &ldquo;รอตรวจ&rdquo; จนกว่า admin จะอนุมัติ (ปกติ &lt; 24 ชม.)
       </p>
-      <DressForm
-        mode="create"
-        boutiqueId={boutique.id}
-        defaultLineUrl={boutique.line_url}
-        occasions={occasions}
-      />
+      <DressForm mode="create" boutiqueId={raw.id} defaultLineUrl={raw.lineUrl} occasions={occasions} />
     </div>
   );
 }

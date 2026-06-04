@@ -7,13 +7,15 @@ import DressCard from "@/components/DressCard";
 import SaveButton from "@/components/SaveButton";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import DateRangePicker from "@/components/DateRangePicker";
+import DressAvailabilityCalendar from "@/components/DressAvailabilityCalendar";
+import LineMessageCopyBox from "@/components/LineMessageCopyBox";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getBoutiqueBySlug,
   getDressBySlug,
   listBlackouts,
-  listDresses,
   listOccasions,
+  listSimilarDresses,
 } from "@/lib/dresses";
 import { COLOR_LABELS_TH } from "@/lib/types";
 
@@ -48,11 +50,11 @@ export default async function DressPage({ params }: { params: Params }) {
   const [occasions, boutique, related, user, blackouts] = await Promise.all([
     listOccasions(),
     getBoutiqueBySlug(slugify(dress.boutique_name)).catch(() => null),
-    listDresses({ limit: 4 }),
+    listSimilarDresses(dress, 4),
     getCurrentUser().catch(() => null),
     listBlackouts(dress.id),
   ]);
-  const savedSet = new Set(user?.profile.saved_dress_ids ?? []);
+  const savedSet = new Set<string>(user?.savedDressIds ?? []);
   const isLoggedIn = !!user;
   const isSaved = savedSet.has(dress.id);
 
@@ -153,6 +155,11 @@ export default async function DressPage({ params }: { params: Params }) {
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8, fontWeight: 500 }}>
             {dress.designer || "—"}
           </div>
+          {dress.tag_code ? (
+            <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 18 }}>
+              รหัสชุด: {dress.tag_code}
+            </div>
+          ) : null}
           {/* H1 + Save heart in a row — moved up here from the bottom CTA
               section so it doesn't compete with the date-picker booking
               button. Standard ecommerce pattern (heart-near-title). */}
@@ -322,6 +329,28 @@ export default async function DressPage({ params }: { params: Params }) {
             <Spec lbl="ดีไซเนอร์" val={dress.designer ?? "—"} />
           </div>
 
+          {/* Price tiers / promotion table (read-only) */}
+          {dress.price_tiers && dress.price_tiers.length > 0 ? (
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>แพ็กเกจราคา</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {dress.price_tiers.map((t, i) => (
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div style={{ padding: 10, borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)" }}>
+                      {t.days} วัน
+                    </div>
+                    <div style={{ padding: 10, borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)", textAlign: "right", fontWeight: 600 }}>
+                      ฿{(t.price ?? 0).toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Availability calendar */}
+          <DressAvailabilityCalendar blackouts={blackouts} />
+
           {/* Date picker (renter). LINE href and pre-filled message are
               omitted entirely for anonymous viewers — they see a login CTA
               instead of the booking button. */}
@@ -332,13 +361,16 @@ export default async function DressPage({ params }: { params: Params }) {
             dressPageUrl={url}
             dressImageUrl={dress.images?.[0]}
             pricePerDay={dress.price_per_day}
+            priceTiers={dress.price_tiers}
             deposit={dress.deposit}
             blackouts={blackouts}
             dressId={dress.id}
             boutiqueId={dress.boutique_id}
+            dressTagCode={dress.tag_code}
             isLoggedIn={isLoggedIn}
             loginNext={`/dress/${dress.slug}`}
           />
+
 
           {/* (CTA stack removed — date picker above is the only booking
               path; Save heart moved up to H1 row; small inline "ติดต่อ

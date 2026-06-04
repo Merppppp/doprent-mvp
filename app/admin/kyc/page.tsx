@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import KycRow from "./KycRow";
 
 export const dynamic = "force-dynamic";
@@ -21,34 +21,22 @@ export default async function KycReviewPage({
     ? (searchParams!.status as StatusOpt)
     : "pending";
 
-  const sb = createClient();
-  const { data, error } = await sb
-    .from("kyc_submissions")
-    .select(
-      "id, boutique_id, business_type, legal_name, tax_id, dbd_reg_no, bank_name, bank_acc_no, bank_acc_name, id_card_url, dbd_doc_url, book_bank_url, plan, status, review_notes, submitted_at, boutiques!inner(name, slug, area_label)",
-    )
-    .eq("status", activeStatus)
-    .order("submitted_at", { ascending: false });
+  const rawRows = await db.kycSubmission.findMany({
+    where: { status: activeStatus },
+    orderBy: { submittedAt: "desc" },
+    include: { boutique: { select: { name: true, slug: true, areaLabel: true } } },
+  });
 
-  const rows = ((data ?? []) as unknown) as Array<{
-    id: string;
-    boutique_id: string;
-    business_type: string;
-    legal_name: string;
-    tax_id: string;
-    dbd_reg_no: string | null;
-    bank_name: string;
-    bank_acc_no: string;
-    bank_acc_name: string;
-    id_card_url: string | null;
-    dbd_doc_url: string | null;
-    book_bank_url: string | null;
-    plan: string;
-    status: string;
-    review_notes: string | null;
-    submitted_at: string;
-    boutiques: { name: string; slug: string; area_label: string };
-  }>;
+  const rows = rawRows.map((r) => ({
+    id: r.id, boutique_id: r.boutiqueId, business_type: r.businessType,
+    legal_name: r.legalName, tax_id: r.taxId, dbd_reg_no: r.dbdRegNo,
+    bank_name: r.bankName, bank_acc_no: r.bankAccNo, bank_acc_name: r.bankAccName,
+    id_card_url: r.idCardUrl, dbd_doc_url: r.dbdDocUrl, book_bank_url: r.bookBankUrl,
+    plan: r.plan, status: r.status, review_notes: r.reviewNotes,
+    submitted_at: r.submittedAt.toISOString(),
+    boutiques: { name: r.boutique.name, slug: r.boutique.slug, area_label: r.boutique.areaLabel },
+  }));
+  const error = null as { message: string } | null;
 
   return (
     <div>

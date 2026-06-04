@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/browser";
-import { cancelBooking, markSlipUploaded } from "@/app/actions/bookings";
+import { cancelBooking, uploadSlip } from "@/app/actions/bookings";
 import type { BookingStatus } from "@/lib/types";
 
 type Props = {
@@ -23,18 +22,10 @@ export default function RenterBookingActions({ bookingId, status, canPay }: Prop
     setError("");
     setBusy(true);
     try {
-      const sb = createClient();
-      const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase();
-      const path = `${bookingId}/slip-${Date.now()}.${ext}`;
-      const { data, error: upErr } = await sb.storage
-        .from("payment-slips")
-        .upload(path, file, { upsert: false, contentType: file.type || undefined });
-      if (upErr || !data) {
-        setError(`อัปโหลดสลิปไม่สำเร็จ: ${upErr?.message ?? "unknown"}`);
-        setBusy(false);
-        return;
-      }
-      const res = await markSlipUploaded(bookingId, data.path);
+      // Server-side upload to R2 + status flip (no client storage SDK).
+      const fd = new FormData();
+      fd.append("slip", file);
+      const res = await uploadSlip(bookingId, fd);
       if (!res.ok) {
         setError(res.error);
         setBusy(false);
