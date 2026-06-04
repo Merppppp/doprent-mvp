@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { expireStaleBookings } from "@/lib/booking";
 
 const BOOKING_INCLUDE = {
   dress: { select: { id: true, name: true, slug: true, images: true } },
@@ -28,6 +29,8 @@ export async function GET(req: NextRequest) {
     include: BOOKING_INCLUDE,
     orderBy: { createdAt: "desc" },
   });
+
+  await expireStaleBookings(bookings.map((b) => b.id));
 
   return NextResponse.json(bookings);
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { expireStaleBookings } from "@/lib/booking";
 
 const BOOKING_INCLUDE = {
   dress: { select: { id: true, name: true, slug: true, images: true } },
@@ -21,6 +22,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   });
 
   if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await expireStaleBookings([booking.id]);
 
   const isCustomer = booking.customerId === session.user.id;
   const isSeller = booking.boutique.id === (await db.boutique.findFirst({ where: { ownerId: session.user.id } }))?.id;
