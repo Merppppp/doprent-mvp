@@ -1,4 +1,3 @@
-// Types mirror the Supabase schema (see supabase/schema.sql)
 
 export type Color =
   | "rose"
