@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import SignupForm from "./SignupForm";
 
 export const dynamic = "force-dynamic";
@@ -15,22 +15,13 @@ export default async function SellSignupPage() {
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?next=/sell/signup");
 
-  // If they already have a boutique, send to dashboard
-  const sb = createClient();
-  const { data: existing } = await sb
-    .from("boutiques")
-    .select("slug")
-    .eq("owner_id", user.profile.id)
-    .limit(1)
-    .maybeSingle();
+  const [existing, areasRaw] = await Promise.all([
+    db.boutique.findFirst({ where: { ownerId: user.id }, select: { slug: true } }),
+    db.area.findMany({ orderBy: { th: "asc" }, select: { key: true, th: true } }),
+  ]);
   if (existing) redirect("/sell/dashboard");
 
-  // Load areas for dropdown
-  const { data: areasData } = await sb
-    .from("areas")
-    .select("key, th")
-    .order("th", { ascending: true });
-  const areas = (areasData ?? []) as Array<{ key: string; th: string }>;
+  const areas = areasRaw as Array<{ key: string; th: string }>;
 
   return (
     <div className="shell" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 680 }}>
@@ -43,7 +34,6 @@ export default async function SellSignupPage() {
       <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 28 }}>
         ขั้นที่ 1/3 · กรอกข้อมูลร้าน (ขั้น 2: KYC, ขั้น 3: เพิ่มชุดแรก)
       </p>
-
       <SignupForm areas={areas} />
     </div>
   );

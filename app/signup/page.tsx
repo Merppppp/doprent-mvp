@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/browser";
-import GoogleSignInButton from "@/components/GoogleSignInButton";
+import { signIn } from "next-auth/react";
 
 export default function SignupPage() {
   const sp = useSearchParams();
@@ -17,57 +16,29 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  // After successful signup when email confirmation is ON, we show a
-  // "check your email" pending state instead of redirecting. Keeps the user
-  // on this page and gives them clear next steps (verify, resend, etc.).
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
-  const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "sent">(
-    "idle",
-  );
+  const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "sent">("idle");
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const form = e.currentTarget;
-    if (!form.reportValidity()) {
-      setError("กรุณาตรวจสอบข้อมูลให้ครบถ้วน");
-      return;
-    }
-    if (password.length < 6) {
-      setError("รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("รหัสผ่านทั้งสองช่องไม่ตรงกัน");
-      return;
-    }
+    if (password.length < 6) { setError("รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร"); return; }
+    if (password !== confirmPassword) { setError("รหัสผ่านทั้งสองช่องไม่ตรงกัน"); return; }
+
     setLoading(true);
-    const sb = createClient();
-    const siteUrl =
-      (typeof window !== "undefined" && window.location.origin) ||
-      "https://doprent.com";
-    const { data, error } = await sb.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-        // Where Supabase should redirect after the user clicks the email link.
-        emailRedirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
+    const res = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, fullName }),
     });
-    if (error) {
-      setError(error.message);
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error ?? "สมัครสมาชิกไม่สำเร็จ");
       setLoading(false);
       return;
     }
-    // When email confirmation is ON in Supabase:
-    //   data.user exists, data.session is null → show pending screen.
-    // When email confirmation is OFF (legacy pilot config):
-    //   data.session exists → just navigate, user is logged in.
-    if (data.session) {
-      window.location.href = next;
-      return;
-    }
+
     setPendingEmail(email);
     setLoading(false);
   }
@@ -75,119 +46,35 @@ export default function SignupPage() {
   async function resendVerification() {
     if (!pendingEmail) return;
     setResendStatus("sending");
-    const sb = createClient();
-    const siteUrl =
-      (typeof window !== "undefined" && window.location.origin) ||
-      "https://doprent.com";
-    const { error } = await sb.auth.resend({
-      type: "signup",
-      email: pendingEmail,
-      options: {
-        emailRedirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
+    const res = await fetch("/api/auth/resend-verification", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: pendingEmail }),
     });
-    if (error) {
-      setError(error.message);
-      setResendStatus("idle");
-      return;
-    }
-    setResendStatus("sent");
+    setResendStatus(res.ok ? "sent" : "idle");
+    if (!res.ok) setError("ส่งอีเมลไม่สำเร็จ กรุณาลองใหม่");
   }
 
   // ----- Pending verification screen -----
   if (pendingEmail) {
     return (
-      <div
-        style={{
-          maxWidth: 460,
-          margin: "0 auto",
-          padding: "64px 20px 80px",
-          width: "100%",
-          textAlign: "center",
-        }}
-      >
-        <div
-          aria-hidden
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: 999,
-            background: "var(--warm)",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 28,
-            marginBottom: 20,
-          }}
-        >
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "64px 20px 80px", width: "100%", textAlign: "center" }}>
+        <div aria-hidden style={{ width: 64, height: 64, borderRadius: 999, background: "var(--warm)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 28, marginBottom: 20 }}>
           ✉️
         </div>
-        <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 10 }}>
-          เช็คอีเมลของคุณ
-        </h1>
-        <p
-          style={{
-            fontSize: 15,
-            color: "var(--ink-2)",
-            lineHeight: 1.6,
-            marginBottom: 24,
-          }}
-        >
-          ส่งลิงก์ยืนยันไปที่{" "}
-          <strong style={{ color: "var(--ink)" }}>{pendingEmail}</strong> แล้ว
+        <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 10 }}>เช็คอีเมลของคุณ</h1>
+        <p style={{ fontSize: 15, color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 24 }}>
+          ส่งลิงก์ยืนยันไปที่ <strong style={{ color: "var(--ink)" }}>{pendingEmail}</strong> แล้ว
           กดลิงก์ในอีเมลเพื่อยืนยันบัญชีก่อนเข้าใช้งาน
         </p>
-
-        <div
-          style={{
-            padding: 14,
-            background: "var(--warm)",
-            borderRadius: 8,
-            fontSize: 13,
-            color: "var(--ink-2)",
-            lineHeight: 1.55,
-            marginBottom: 24,
-            textAlign: "left",
-          }}
-        >
-          <strong style={{ color: "var(--ink)", display: "block", marginBottom: 4 }}>
-            ไม่เห็นอีเมล?
-          </strong>
-          เช็คใน Spam / Promotions หรือรอสักครู่ ถ้ายังไม่ได้กดปุ่มข้างล่างเพื่อส่งใหม่
-        </div>
-
-        <button
-          type="button"
-          onClick={resendVerification}
-          disabled={resendStatus !== "idle"}
-          className="btn btn-outline btn-block"
-          style={{ marginBottom: 10 }}
-        >
-          {resendStatus === "sending"
-            ? "กำลังส่ง..."
-            : resendStatus === "sent"
-              ? "✓ ส่งอีเมลใหม่แล้ว"
-              : "ส่งอีเมลยืนยันใหม่"}
+        <button type="button" onClick={resendVerification} disabled={resendStatus !== "idle"}
+          className="btn btn-outline btn-block" style={{ marginBottom: 10 }}>
+          {resendStatus === "sending" ? "กำลังส่ง..." : resendStatus === "sent" ? "✓ ส่งอีเมลใหม่แล้ว" : "ส่งอีเมลยืนยันใหม่"}
         </button>
-
-        <Link
-          href={`/login?next=${encodeURIComponent(next)}`}
-          className="btn btn-dark btn-block"
-        >
+        <Link href={`/login?next=${encodeURIComponent(next)}`} className="btn btn-dark btn-block">
           กลับไปเข้าสู่ระบบ
         </Link>
-
-        {error ? (
-          <div
-            style={{
-              marginTop: 14,
-              color: "var(--danger)",
-              fontSize: 13,
-            }}
-          >
-            {error}
-          </div>
-        ) : null}
+        {error && <div style={{ marginTop: 14, color: "var(--danger)", fontSize: 13 }}>{error}</div>}
       </div>
     );
   }
@@ -196,40 +83,22 @@ export default function SignupPage() {
   return (
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "48px 20px 80px", width: "100%" }}>
       <h1 style={{ fontSize: 28, fontWeight: 600, marginBottom: 6 }}>สมัครสมาชิก</h1>
-      <p style={{ color: "var(--ink-2)", fontSize: 14, marginBottom: 28 }}>
-        บันทึกชุดที่ชอบ ติดตามการจอง
-      </p>
+      <p style={{ color: "var(--ink-2)", fontSize: 14, marginBottom: 28 }}>บันทึกชุดที่ชอบ ติดตามการจอง</p>
 
-      {error ? (
-        <div
-          style={{
-            background: "oklch(0.92 0.04 25)",
-            border: "1px solid oklch(0.78 0.12 25)",
-            color: "oklch(0.4 0.13 25)",
-            padding: "10px 14px",
-            borderRadius: 6,
-            fontSize: 13,
-            marginBottom: 16,
-          }}
-        >
+      {error && (
+        <div style={{ background: "oklch(0.92 0.04 25)", border: "1px solid oklch(0.78 0.12 25)", color: "oklch(0.4 0.13 25)", padding: "10px 14px", borderRadius: 6, fontSize: 13, marginBottom: 16 }}>
           {error}
         </div>
-      ) : null}
+      )}
 
-      {/* Google sign-up — primary path, lowers friction for Thai users with
-          existing Google accounts. Same OAuth flow as login. */}
-      <GoogleSignInButton next={next} label="สมัครด้วย Google" onError={setError} />
+      <button type="button" onClick={() => signIn("google", { callbackUrl: next })}
+        className="btn btn-outline btn-block btn-lg"
+        style={{ marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        <GoogleIcon />
+        สมัครด้วย Google
+      </button>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          margin: "18px 0",
-          color: "var(--ink-3)",
-          fontSize: 12,
-        }}
-      >
+      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 18px", color: "var(--ink-3)", fontSize: 12 }}>
         <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
         <span>หรือใช้อีเมล</span>
         <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
@@ -238,44 +107,19 @@ export default function SignupPage() {
       <form onSubmit={onSubmit}>
         <Field label="ชื่อ" type="text" value={fullName} onChange={setFullName} required />
         <Field label="อีเมล" type="email" value={email} onChange={setEmail} required />
-        <Field
-          label="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)"
-          type="password"
-          value={password}
-          onChange={setPassword}
-          required
-          minLength={6}
-          showToggle
-          showPassword={showPassword}
-          onToggleShowPassword={() => setShowPassword((prev) => !prev)}
-        />
-        <Field
-          label="ยืนยันรหัสผ่าน"
-          type="password"
-          value={confirmPassword}
-          onChange={setConfirmPassword}
-          required
-          minLength={6}
-          showToggle
-          showPassword={showPassword}
-          onToggleShowPassword={() => setShowPassword((prev) => !prev)}
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="btn btn-dark btn-block btn-lg"
-          style={{ marginTop: 12, opacity: loading ? 0.6 : 1 }}
-        >
+        <Field label="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)" type="password" value={password} onChange={setPassword}
+          required showToggle showPassword={showPassword} onToggleShowPassword={() => setShowPassword(p => !p)} />
+        <Field label="ยืนยันรหัสผ่าน" type="password" value={confirmPassword} onChange={setConfirmPassword}
+          required showToggle showPassword={showPassword} onToggleShowPassword={() => setShowPassword(p => !p)} />
+        <button type="submit" disabled={loading} className="btn btn-dark btn-block btn-lg"
+          style={{ marginTop: 12, opacity: loading ? 0.6 : 1 }}>
           {loading ? "กำลังสร้างบัญชี..." : "สร้างบัญชี"}
         </button>
       </form>
 
       <div style={{ textAlign: "center", fontSize: 13, color: "var(--ink-2)", marginTop: 16 }}>
         มีบัญชีอยู่แล้ว?{" "}
-        <Link
-          href={`/login?next=${encodeURIComponent(next)}`}
-          style={{ color: "var(--accent)", fontWeight: 500 }}
-        >
+        <Link href={`/login?next=${encodeURIComponent(next)}`} style={{ color: "var(--accent)", fontWeight: 500 }}>
           เข้าสู่ระบบ
         </Link>
       </div>
@@ -283,69 +127,34 @@ export default function SignupPage() {
   );
 }
 
-function Field({
-  label,
-  type,
-  value,
-  onChange,
-  required,
-  minLength,
-  showToggle,
-  showPassword,
-  onToggleShowPassword,
-}: {
-  label: string;
-  type: string;
-  value: string;
-  onChange: (v: string) => void;
-  required?: boolean;
-  minLength?: number;
-  showToggle?: boolean;
-  showPassword?: boolean;
-  onToggleShowPassword?: () => void;
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z"/>
+      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z"/>
+      <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332Z"/>
+      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58Z"/>
+    </svg>
+  );
+}
+
+function Field({ label, type, value, onChange, required, showToggle, showPassword, onToggleShowPassword }: {
+  label: string; type: string; value: string; onChange: (v: string) => void;
+  required?: boolean; showToggle?: boolean; showPassword?: boolean; onToggleShowPassword?: () => void;
 }) {
   const actualType = showToggle && type === "password" ? (showPassword ? "text" : "password") : type;
-
   return (
     <div style={{ marginBottom: 14 }}>
-      <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-        {label}
-      </label>
+      <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 6 }}>{label}</label>
       <div style={{ position: "relative" }}>
-        <input
-          type={actualType}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          required={required}
-          minLength={minLength}
-          style={{
-            width: "100%",
-            padding: showToggle ? "11px 44px 11px 14px" : "11px 14px",
-            border: "1px solid var(--line)",
-            borderRadius: 6,
-            fontSize: 14,
-          }}
-        />
-        {showToggle ? (
-          <button
-            type="button"
-            onClick={onToggleShowPassword}
-            style={{
-              position: "absolute",
-              top: "50%",
-              right: 10,
-              transform: "translateY(-50%)",
-              background: "none",
-              border: "none",
-              color: "var(--ink-3)",
-              fontSize: 13,
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
+        <input type={actualType} value={value} onChange={e => onChange(e.target.value)} required={required}
+          style={{ width: "100%", padding: showToggle ? "11px 44px 11px 14px" : "11px 14px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 14 }} />
+        {showToggle && (
+          <button type="button" onClick={onToggleShowPassword}
+            style={{ position: "absolute", top: "50%", right: 10, transform: "translateY(-50%)", background: "none", border: "none", color: "var(--ink-3)", fontSize: 13, cursor: "pointer", padding: 0 }}>
             {showPassword ? "ซ่อน" : "แสดง"}
           </button>
-        ) : null}
+        )}
       </div>
     </div>
   );

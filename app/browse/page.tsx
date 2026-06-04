@@ -68,7 +68,7 @@ export default async function BrowsePage({
     listDesigners(),
     getCurrentUser().catch(() => null),
   ]);
-  const savedSet = new Set(user?.profile.saved_dress_ids ?? []);
+  const savedSet = new Set<string>(user?.savedDressIds ?? []);
   const isLoggedIn = !!user;
 
   function makeHref(overrides: Partial<SearchParams>) {

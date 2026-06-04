@@ -1,44 +1,27 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
+import { db } from "@/lib/db";
 
-/** Toggle a dress ID in the current user's saved list. Idempotent. */
 export async function toggleSavedDress(dressId: string): Promise<{
   ok: boolean;
   saved: boolean;
   redirectTo?: string;
 }> {
-  const sb = createClient();
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
-  if (!user) {
-    return { ok: false, saved: false, redirectTo: "/login?next=/browse" };
-  }
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, saved: false, redirectTo: "/login?next=/browse" };
 
-  const { data: profile } = await sb
-    .from("profiles")
-    .select("saved_dress_ids")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const current: string[] = profile?.saved_dress_ids ?? [];
+  const current = user.savedDressIds;
   const exists = current.includes(dressId);
   const next = exists ? current.filter((id) => id !== dressId) : [...current, dressId];
 
-  const { error } = await sb
-    .from("profiles")
-    .update({ saved_dress_ids: next, updated_at: new Date().toISOString() })
-    .eq("id", user.id);
+  await db.user.update({
+    where: { id: user.id },
+    data: { savedDressIds: next },
+  });
 
-  if (error) {
-    return { ok: false, saved: exists };
-  }
-
-  // Refresh server components that show saved state
   revalidatePath("/account");
-  // Refresh the root layout so the Header's saved-count badge updates everywhere
   revalidatePath("/", "layout");
   return { ok: true, saved: !exists };
 }

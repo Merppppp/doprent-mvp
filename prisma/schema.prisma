@@ -1,0 +1,358 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Reference tables
+// ---------------------------------------------------------------------------
+
+model Occasion {
+  key        String @id
+  th         String
+  en         String
+  colorToken String @map("color_token")
+  sortOrder  Int    @default(0) @map("sort_order")
+
+  @@map("occasions")
+}
+
+model Area {
+  key      String    @id
+  th       String
+  lat      Decimal   @db.Decimal(9, 6)
+  lng      Decimal   @db.Decimal(9, 6)
+  keywords String[]
+  boutiques Boutique[]
+
+  @@map("areas")
+}
+
+// ---------------------------------------------------------------------------
+// Users / Auth
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(uuid()) @db.Uuid
+  email         String?   @unique
+  emailVerified DateTime? @map("email_verified")
+  passwordHash  String?   @map("password_hash")
+  name          String?   @map("full_name")
+  lineId        String?   @map("line_id")
+  role          Role      @default(customer)
+  savedDressIds String[]  @map("saved_dress_ids") @db.Uuid
+  image         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  accounts       Account[]
+  sessions       Session[]
+  boutiques      Boutique[]
+  kycSubmissions    KycSubmission[]
+  lineClicks        LineClick[]
+  adminAuditLogs    AdminAudit[]
+
+  @@map("users")
+}
+
+enum Role {
+  customer
+  seller
+  admin
+}
+
+// NextAuth adapter tables
+model Account {
+  id                String  @id @default(uuid()) @db.Uuid
+  userId            String  @map("user_id") @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid()) @db.Uuid
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id") @db.Uuid
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// Standard NextAuth adapter schema (used by Email provider + our custom email verify flow)
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Boutiques
+// ---------------------------------------------------------------------------
+
+model Boutique {
+  id           String     @id @default(uuid()) @db.Uuid
+  slug         String     @unique
+  name         String
+  ownerId      String?    @map("owner_id") @db.Uuid
+  ownerName    String?    @map("owner_name")
+  areaKey      String?    @map("area_key")
+  areaLabel    String     @map("area_label")
+  address      String?
+  houseNo      String?    @map("house_no")
+  street       String?
+  subdistrict  String?
+  district     String?
+  province     String     @default("กรุงเทพมหานคร")
+  postalCode   String?    @map("postal_code")
+  lat          Decimal?   @db.Decimal(9, 6)
+  lng          Decimal?   @db.Decimal(9, 6)
+  hours        String?
+  lineUrl      String     @map("line_url")
+  instagram    String?
+  sinceYear    Int?       @map("since_year")
+  coverColor   Color      @default(rose) @map("cover_color")
+  tag          String?
+  story        String?
+  deliveryInfo String?    @map("delivery_info")
+  featured     Boolean    @default(false)
+  adsTier      AdsTier    @default(free) @map("ads_tier")
+  verified     Boolean    @default(false)
+  status       Status     @default(live)
+  rejectReason String?    @map("reject_reason")
+  kycStatus    KycStatus  @default(none) @map("kyc_status")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  owner          User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  area           Area?          @relation(fields: [areaKey], references: [key])
+  dresses        Dress[]
+  kycSubmissions KycSubmission[]
+  lineClicks     LineClick[]
+
+  @@index([status])
+  @@index([featured])
+  @@index([areaKey])
+  @@index([verified])
+  @@index([district])
+  @@map("boutiques")
+}
+
+// ---------------------------------------------------------------------------
+// Dresses
+// ---------------------------------------------------------------------------
+
+model Dress {
+  id            String    @id @default(uuid()) @db.Uuid
+  slug          String    @unique
+  tagCode       String    @unique @map("tag_code")
+  name          String
+  designer      String?
+  boutiqueId    String    @map("boutique_id") @db.Uuid
+  boutiqueName  String    @map("boutique_name")
+  size          Size
+  color         Color
+  pricePerDay   Int       @map("price_per_day")
+  deposit       Int       @default(0)
+  priceTiers    Json      @default("[]") @map("price_tiers")
+  description   String?
+  images        Json      @default("[]")
+  occasions     String[]
+  lineUrl       String    @map("line_url")
+  adsTier       AdsTier   @default(free) @map("ads_tier")
+  featured      Boolean   @default(false)
+  sponsored     Boolean   @default(false)
+  status        Status    @default(live)
+  rejectReason  String?   @map("reject_reason")
+  available     Boolean   @default(true)
+  views         Int       @default(0)
+  searchVector  Unsupported("tsvector")? @map("search_vector")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  boutique   Boutique        @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  blackouts  DressBlackout[]
+  lineClicks LineClick[]
+
+  @@index([color])
+  @@index([size])
+  @@index([status])
+  @@index([available])
+  @@index([boutiqueId])
+  @@index([pricePerDay])
+  @@map("dresses")
+}
+
+// ---------------------------------------------------------------------------
+// KYC
+// ---------------------------------------------------------------------------
+
+model KycSubmission {
+  id           String      @id @default(uuid()) @db.Uuid
+  boutiqueId   String      @map("boutique_id") @db.Uuid
+  ownerId      String?     @map("owner_id") @db.Uuid
+  businessType BusinessType @map("business_type")
+  legalName    String      @map("legal_name")
+  taxId        String      @map("tax_id")
+  dbdRegNo     String?     @map("dbd_reg_no")
+  bankName     String?     @map("bank_name")
+  bankAccNo    String?     @map("bank_acc_no")
+  bankAccName  String?     @map("bank_acc_name")
+  idCardUrl    String?     @map("id_card_url")
+  dbdDocUrl    String?     @map("dbd_doc_url")
+  bookBankUrl  String?     @map("book_bank_url")
+  vatDocUrl    String?     @map("vat_doc_url")
+  plan         KycPlan     @default(Boost)
+  status       KycReviewStatus @default(pending)
+  reviewerId   String?     @map("reviewer_id") @db.Uuid
+  reviewNotes  String?     @map("review_notes")
+  submittedAt  DateTime    @default(now()) @map("submitted_at")
+  reviewedAt   DateTime?   @map("reviewed_at")
+
+  boutique Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  owner    User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([boutiqueId])
+  @@map("kyc_submissions")
+}
+
+// ---------------------------------------------------------------------------
+// Analytics
+// ---------------------------------------------------------------------------
+
+model LineClick {
+  id          BigInt    @id @default(autoincrement())
+  dressId     String?   @map("dress_id") @db.Uuid
+  boutiqueId  String?   @map("boutique_id") @db.Uuid
+  source      String?
+  userId      String?   @map("user_id") @db.Uuid
+  userAgent   String?   @map("user_agent")
+  ipHash      String?   @map("ip_hash")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  dress    Dress?    @relation(fields: [dressId], references: [id], onDelete: SetNull)
+  boutique Boutique? @relation(fields: [boutiqueId], references: [id], onDelete: SetNull)
+  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([dressId])
+  @@index([boutiqueId])
+  @@index([createdAt(sort: Desc)])
+  @@map("line_clicks")
+}
+
+model AdminAudit {
+  id         BigInt   @id @default(autoincrement())
+  adminId    String?  @map("admin_id") @db.Uuid
+  action     String
+  targetType String   @map("target_type")
+  targetId   String?  @map("target_id") @db.Uuid
+  reason     String?
+  payload    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  admin User? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([targetType, targetId])
+  @@index([createdAt(sort: Desc)])
+  @@map("admin_audit")
+}
+
+// ---------------------------------------------------------------------------
+// Availability
+// ---------------------------------------------------------------------------
+
+model DressBlackout {
+  dressId   String   @map("dress_id") @db.Uuid
+  date      DateTime @db.Date
+  createdAt DateTime @default(now()) @map("created_at")
+
+  dress Dress @relation(fields: [dressId], references: [id], onDelete: Cascade)
+
+  @@id([dressId, date])
+  @@index([dressId])
+  @@index([date])
+  @@map("dress_blackouts")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Color {
+  rose
+  ivory
+  green
+  black
+  navy
+  red
+  blue
+  purple
+}
+
+enum Size {
+  XS
+  S
+  M
+  L
+  XL
+}
+
+enum AdsTier {
+  free
+  boost
+  featured
+}
+
+enum Status {
+  pending
+  live
+  rejected
+  draft
+}
+
+enum KycStatus {
+  none
+  submitted
+  verified
+  rejected
+}
+
+enum KycReviewStatus {
+  pending
+  approved
+  rejected
+}
+
+enum KycPlan {
+  Free
+  Boost
+  Featured
+}
+
+enum BusinessType {
+  individual
+  company
+}
