@@ -3,6 +3,21 @@ import type { Booking, BookingStatus } from "@/lib/types";
 /** Hours a renter has to pay after the seller accepts (Phase 2 cron enforces). */
 export const PAYMENT_WINDOW_HOURS = 24;
 
+/**
+ * Platform commission rate applied to rental_total. Overridable via env so the
+ * business can tune it without a deploy. Snapshotted onto each booking at
+ * create time (bookings.commission_rate/amount) so historical revenue is stable.
+ */
+export const PLATFORM_COMMISSION_RATE = (() => {
+  const raw = Number(process.env.PLATFORM_COMMISSION_RATE);
+  return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : 0.1;
+})();
+
+/** Commission amount (THB, rounded) the platform earns on a rental subtotal. */
+export function commissionAmount(rentalTotal: number, rate = PLATFORM_COMMISSION_RATE): number {
+  return Math.round((Number(rentalTotal) || 0) * rate);
+}
+
 type Tone = "neutral" | "info" | "warn" | "success" | "danger";
 
 export const BOOKING_STATUS_META: Record<

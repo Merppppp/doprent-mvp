@@ -60,6 +60,11 @@ export type Booking = {
   rental_total: number;
   deposit: number;
   shipping_fee: number | null; // null until seller sets on accept
+  /** Platform commission snapshot (see lib/bookings.ts commissionAmount). */
+  commission_rate: number;
+  commission_amount: number | null;
+  /** Renter's first-touch acquisition channel (attribution). */
+  channel: string | null;
   status: BookingStatus;
   slip_path: string | null;
   address_id: string | null;
@@ -177,6 +182,66 @@ export type Profile = {
   line_id: string | null;
   role: "customer" | "seller" | "admin";
   saved_dress_ids: string[];
+  /** Acquisition attribution (first-touch). Added 2026-06-04. */
+  signup_source: string | null;
+  signup_medium: string | null;
+  signup_campaign: string | null;
+  signup_referrer: string | null;
+  signup_channel: string | null;
+  /** Activity recency for MAU. */
+  last_active_at: string | null;
+  last_province: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Acquisition channel buckets — mirrors lib/attribution.ts Channel. */
+export type Channel =
+  | "instagram"
+  | "facebook"
+  | "tiktok"
+  | "line"
+  | "google"
+  | "youtube"
+  | "twitter"
+  | "email"
+  | "referral"
+  | "direct"
+  | "other";
+
+/** Visitor pageview event (general traffic analytics). */
+export type PageView = {
+  id: number;
+  session_id: string | null;
+  user_id: string | null;
+  path: string | null;
+  channel: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  referrer: string | null;
+  province: string | null;
+  country: string | null;
+  user_agent: string | null;
+  ip_hash: string | null;
+  created_at: string;
+};
+
+export type SubscriptionPlan = "free" | "boost" | "featured";
+export type SubscriptionStatus = "active" | "past_due" | "cancelled" | "expired";
+
+/** Seller paid-plan record (drives adoption-rate → revenue reporting). */
+export type SellerSubscription = {
+  id: string;
+  boutique_id: string | null;
+  owner_id: string | null;
+  plan: SubscriptionPlan;
+  status: SubscriptionStatus;
+  amount: number; // THB per cycle
+  billing_cycle: "monthly" | "yearly";
+  started_at: string | null;
+  current_period_end: string | null;
+  cancelled_at: string | null;
   created_at: string;
   updated_at: string;
 };

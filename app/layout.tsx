@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ScrollReveal from "@/components/ScrollReveal";
+import PageViewTracker from "@/components/PageViewTracker";
+import ClarityAnalytics from "@/components/ClarityAnalytics";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 import "./globals.css";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
@@ -79,6 +82,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main id="main">{children}</main>
         <Footer />
         <ScrollReveal />
+        <PageViewTracker />
+        <ClarityAnalytics />
+        <GoogleAnalytics />
       </body>
     </html>
   );

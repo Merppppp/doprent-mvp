@@ -1,9 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import type { BookingStatus } from "@/lib/types";
-import { dueAt, findTransition, rentalDays } from "@/lib/bookings";
+import {
+  PLATFORM_COMMISSION_RATE,
+  commissionAmount,
+  dueAt,
+  findTransition,
+  rentalDays,
+} from "@/lib/bookings";
+import { FIRST_TOUCH_COOKIE, decodeAttribution } from "@/lib/attribution";
 
 type Result<T = unknown> =
   | ({ ok: true } & T)
@@ -103,6 +111,10 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   const days = rentalDays(startDate, endDate);
   const rentalTotal = Number(dress.price_per_day) * days;
 
+  // First-touch channel of the renter — closes the acquisition→booking loop.
+  const channel =
+    decodeAttribution(cookies().get(FIRST_TOUCH_COOKIE)?.value)?.channel ?? null;
+
   const { data: created, error: insErr } = await sb
     .from("bookings")
     .insert({
@@ -113,6 +125,9 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
       end_date: endDate,
       rental_total: rentalTotal,
       deposit: Number(dress.deposit) || 0,
+      commission_rate: PLATFORM_COMMISSION_RATE,
+      commission_amount: commissionAmount(rentalTotal),
+      channel,
       status: "booking_pending",
       address_id: addr.id,
       recipient_name: addr.recipient_name,
