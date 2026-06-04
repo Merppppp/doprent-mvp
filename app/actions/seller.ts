@@ -98,7 +98,7 @@ export async function updateBoutique(boutiqueId: string, formData: FormData): Pr
   if (!boutique || boutique.ownerId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์แก้ไขร้านนี้" };
 
   const updates: Record<string, unknown> = {};
-  const fields = ["name","area_label","area_key","instagram","tag","story","delivery_info","owner_name","address","hours","cover_color"] as const;
+  const fields = ["name","area_label","area_key","instagram","tag","story","delivery_info","owner_name","address","hours","cover_color","promptpay_id"] as const;
   for (const f of fields) {
     const v = formData.get(f);
     if (v !== null) {

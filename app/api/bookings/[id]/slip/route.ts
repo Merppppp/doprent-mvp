@@ -13,6 +13,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // อ่าน formData ก่อน DB query เพื่อหลีกเลี่ยง Next.js body parsing issue
+  const formData = await req.formData();
+  const file = formData.get("file");
+
   const booking = await db.booking.findUnique({ where: { id: params.id } });
 
   if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -22,9 +26,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (booking.status !== "waiting_payment") {
     return NextResponse.json({ error: "ไม่สามารถอัปโหลดสลิปในสถานะนี้" }, { status: 400 });
   }
-
-  const formData = await req.formData();
-  const file = formData.get("file");
 
   if (!file || typeof file === "string") {
     return NextResponse.json({ error: "กรุณาแนบไฟล์สลิป" }, { status: 400 });
