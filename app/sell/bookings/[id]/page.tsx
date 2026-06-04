@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { getBookingForView, currentUserIsSellerOf } from "@/lib/booking-queries";
+import { getSignedPrivateUrl } from "@/lib/r2";
 import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import SellerBookingActions from "@/components/SellerBookingActions";
@@ -31,7 +32,8 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
 
   const meta = BOOKING_STATUS_META[b.status];
 
-  const slipUrl: string | null = b.slip_path ?? null;
+  // Slip is private — sign a short-lived URL for the seller (authorized above).
+  const slipUrl = b.slip_path ? await getSignedPrivateUrl(b.slip_path) : null;
 
   return (
     <div className="shell" style={{ paddingTop: 36, paddingBottom: 80, maxWidth: 560 }}>

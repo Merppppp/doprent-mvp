@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { uploadToR2 } from "@/lib/r2";
+import { uploadPrivateToR2 } from "@/lib/r2";
 import type { BookingStatus } from "@/lib/types";
 import {
   PLATFORM_COMMISSION_RATE,
@@ -258,10 +258,11 @@ export async function uploadSlip(bookingId: string, formData: FormData): Promise
   if (!mime) return { ok: false, error: "ไฟล์ต้องเป็นรูปภาพ (JPG/PNG/WebP)" };
   const ext = mime === "image/jpeg" ? "jpg" : mime.split("/")[1];
 
+  // Private upload: store the KEY (not a public URL). Slips live in a private
+  // bucket and are shown only via short-lived presigned URLs to authorized parties.
   const key = `slips/${bookingId}/${randomUUID()}.${ext}`;
-  let slipUrl: string;
   try {
-    slipUrl = await uploadToR2(key, buffer, mime);
+    await uploadPrivateToR2(key, buffer, mime);
   } catch (e) {
     console.error("[doprent] slip upload error", e);
     return { ok: false, error: "อัปโหลดสลิปไม่สำเร็จ ลองใหม่อีกครั้ง" };
@@ -269,7 +270,7 @@ export async function uploadSlip(bookingId: string, formData: FormData): Promise
 
   const res = await db.booking.updateMany({
     where: { id: bookingId, status: "waiting_for_payment", renterId: user.id },
-    data: { slipPath: slipUrl, status: "payment_review" },
+    data: { slipPath: key, status: "payment_review" },
   });
   if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
   revalidatePath("/account/bookings");
