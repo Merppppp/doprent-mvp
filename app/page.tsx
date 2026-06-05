@@ -27,11 +27,13 @@ export default async function HomePage() {
   // Fall back to the verified-shop strip when nobody is on a paid plan yet.
   const sponsorStrip = sponsors.length > 0;
   const marqueeShops = sponsorStrip ? sponsors : boutiques;
-  const heroDress = dresses[0];
-  const heroImg =
-    heroDress && Array.isArray(heroDress.images) && heroDress.images.length > 0
-      ? heroDress.images[0]
-      : null;
+  // Hero coverflow — up to 6 freshest dresses the visitor can rotate through.
+  const heroItems: HeroItem[] = dresses.slice(0, 6).map((d) => ({
+    slug: d.slug,
+    name: d.name,
+    image: Array.isArray(d.images) && d.images.length > 0 ? d.images[0] : null,
+    price: d.price_per_day,
+  }));
   const savedSet = new Set(user?.profile.saved_dress_ids ?? []);
   const isLoggedIn = !!user;
   const teaserCount = Math.max(stats.dresses - dresses.length, 0);
@@ -89,28 +91,7 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="h26-stack rise rise-3" id="h26stack">
-            <div className="h26-frame h26-f1" data-depth="14">
-              {heroImg ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={heroImg} alt={heroDress?.name ?? ""} loading="eager" />
-              ) : null}
-            </div>
-            <div className="h26-frame h26-f3" data-depth="26" />
-            <div className="h26-frame h26-f2" data-depth="20">
-              <span className="h26-vchip">
-                <span className="ck">
-                  <svg viewBox="0 0 24 24"><polyline points="4,12 10,18 20,6" /></svg>
-                </span>
-                ร้านนี้ตรวจสอบแล้ว
-              </span>
-            </div>
-            {teaserCount > 0 ? (
-              <div className="h26-peek" data-depth="34">
-                <span className="sp" /> อีก <b>{teaserCount.toLocaleString()}+</b> ชุดรอให้สำรวจ
-              </div>
-            ) : null}
-          </div>
+          <HeroCarousel items={heroItems} />
         </div>
       </section>
 
