@@ -25,6 +25,7 @@ env:
 
 jobs:
   deploy-prod:
+    if: github.repository == 'doprent/doprent-mvp'
     runs-on: ubuntu-latest
 
     steps:
@@ -36,5 +37,5 @@ jobs:
           echo "$DEPLOY_SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -o StrictHostKeyChecking=no deploy@157.85.101.85 \
-            "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin && \
+            "echo '${{ secrets.GHCR_TOKEN }}' | docker login ghcr.io -u '${{ secrets.GHCR_USERNAME }}' --password-stdin && \
              docker service update --image ${{ env.IMAGE }}:${{ inputs.image_tag }} doprent-mvp-prod_app --with-registry-auth"

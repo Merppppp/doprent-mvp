@@ -2,7 +2,9 @@
 # Trigger: push to develop branch
 # Steps:   build & push to GHCR → deploy to VPS dev stack
 #
-# Required secrets:
+# Required secrets (on doprent/doprent-mvp):
+#   GHCR_USERNAME  — GitHub username with GHCR write access
+#   GHCR_TOKEN     — GitHub PAT (packages:write)
 #   DEPLOY_SSH_KEY — Private SSH key for deploy@157.85.101.85
 
 name: Deploy Dev
@@ -16,10 +18,8 @@ env:
 
 jobs:
   build-and-deploy:
+    if: github.repository == 'doprent/doprent-mvp'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - uses: actions/checkout@v4
@@ -30,8 +30,8 @@ jobs:
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - uses: docker/build-push-action@v6
         with:
