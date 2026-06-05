@@ -12,8 +12,18 @@ type Props = {
     isSeller: boolean;
     initials: string;
     savedCount: number;
+    renterBadge: number;
+    sellerBadge: number;
   } | null;
 };
+
+function MPill({ n }: { n: number }) {
+  return (
+    <span style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, background: "var(--accent)", color: "var(--accent-ink)", fontSize: 11, fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+      {n > 99 ? "99+" : n}
+    </span>
+  );
+}
 
 export default function MobileMenu({ user }: Props) {
   const [open, setOpen] = useState(false);
@@ -52,8 +62,12 @@ export default function MobileMenu({ user }: Props) {
           alignItems: "center",
           justifyContent: "center",
           padding: 0,
+          position: "relative",
         }}
       >
+        {user && user.renterBadge + user.sellerBadge > 0 ? (
+          <span aria-hidden style={{ position: "absolute", top: 6, right: 6, width: 8, height: 8, borderRadius: 999, background: "var(--accent)" }} />
+        ) : null}
         <span
           aria-hidden
           style={{
@@ -242,8 +256,9 @@ export default function MobileMenu({ user }: Props) {
                   <Link href="/account" style={drawerItem}>
                     บัญชีของฉัน
                   </Link>
-                  <Link href="/account/bookings" style={drawerItem}>
+                  <Link href="/account/bookings" style={{ ...drawerItem, display: "flex", alignItems: "center", gap: 8 }}>
                     การจองของฉัน
+                    {user.renterBadge > 0 ? <MPill n={user.renterBadge} /> : null}
                   </Link>
                   {user.isSeller ? (
                     <Link href="/sell/dashboard" style={drawerItem}>
@@ -251,8 +266,9 @@ export default function MobileMenu({ user }: Props) {
                     </Link>
                   ) : null}
                   {user.isSeller ? (
-                    <Link href="/sell/bookings" style={drawerItem}>
+                    <Link href="/sell/bookings" style={{ ...drawerItem, display: "flex", alignItems: "center", gap: 8 }}>
                       การจองของร้าน
+                      {user.sellerBadge > 0 ? <MPill n={user.sellerBadge} /> : null}
                     </Link>
                   ) : null}
                   {user.isAdmin ? (
