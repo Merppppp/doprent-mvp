@@ -58,3 +58,7 @@ export async function uploadSlip(id: string, file: File) {
 export function confirmBooking(id: string) {
   return request(`/api/bookings/${id}/confirm`, { method: "PATCH" });
 }
+
+export function getSlipUrl(id: string) {
+  return request<{ url: string; expiresIn: number }>(`/api/bookings/${id}/slip-url`);
+}
