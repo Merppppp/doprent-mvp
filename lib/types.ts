@@ -10,7 +10,20 @@ export type Color =
   | "blue"
   | "purple";
 
-export type Size = "XS" | "S" | "M" | "L" | "XL";
+export type Size =
+  | "XXXS"
+  | "XXS"
+  | "XS"
+  | "S"
+  | "M"
+  | "L"
+  | "XL"
+  | "XXL"
+  | "3XL"
+  | "4XL";
+
+/** Canonical size order — single source for forms + filters. */
+export const SIZES: Size[] = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"];
 
 export type OccasionKey =
   | "engagement"

@@ -17,7 +17,7 @@ const COLOR_TH: Record<Color, string> = {
   blue: "ฟ้า",
   purple: "ม่วง",
 };
-const SIZES: Size[] = ["XS", "S", "M", "L", "XL"];
+const SIZES: Size[] = ["XXXS","XXS","XS","S","M","L","XL","XXL","3XL","4XL"];
 
 type Props =
   | {

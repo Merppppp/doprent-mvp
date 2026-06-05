@@ -20,6 +20,7 @@ export type DressFilters = {
   occasions?: OccasionKey[];
   boutiqueSlugs?: string[];
   designers?: string[];
+  priceMin?: number;
   priceMax?: number;
   search?: string;
   sort?: "featured" | "price-asc" | "price-desc" | "name";
@@ -81,6 +82,7 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
     // We have boutique_name denormalized; join via boutiques table would be ideal,
     // but for performance we'll filter at the application layer for now.
   }
+  if (typeof opts.priceMin === "number") q = q.gte("price_per_day", opts.priceMin);
   if (typeof opts.priceMax === "number") q = q.lte("price_per_day", opts.priceMax);
   if (opts.occasions && opts.occasions.length) q = q.overlaps("occasions", opts.occasions);
   if (opts.limit) q = q.limit(opts.limit);

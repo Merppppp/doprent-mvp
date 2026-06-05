@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import DressResults from "@/components/DressResults";
+import BrowseFilters from "@/components/BrowseFilters";
 import { getCurrentUser } from "@/lib/auth";
 import { listDesigners, listDresses, listOccasions } from "@/lib/dresses";
 import {
@@ -8,6 +9,7 @@ import {
   COLOR_SWATCH,
   type Color,
   type OccasionKey,
+  SIZES,
 } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +23,7 @@ export const metadata: Metadata = {
 };
 
 const COLORS: Color[] = ["rose", "ivory", "green", "black", "navy", "red", "blue", "purple"];
+const PRICE_BOUNDS = { min: 0, max: 10000 };
 
 type SearchParams = {
   color?: string;
@@ -29,6 +32,8 @@ type SearchParams = {
   designer?: string;
   q?: string;
   sort?: string;
+  priceMin?: string;
+  priceMax?: string;
 };
 
 export default async function BrowsePage({
@@ -41,6 +46,8 @@ export default async function BrowsePage({
   const activeSize = searchParams?.size;
   const activeDesigner = searchParams?.designer?.trim() || undefined;
   const search = searchParams?.q?.trim() ?? "";
+  const activePriceMin = Number(searchParams?.priceMin) || PRICE_BOUNDS.min;
+  const activePriceMax = Number(searchParams?.priceMax) || PRICE_BOUNDS.max;
   const sort = (searchParams?.sort ?? "featured") as
     | "featured"
     | "price-asc"
@@ -53,6 +60,8 @@ export default async function BrowsePage({
       occasions: activeOcc ? [activeOcc] : undefined,
       sizes: activeSize ? [activeSize] : undefined,
       designers: activeDesigner ? [activeDesigner] : undefined,
+      priceMin: activePriceMin > PRICE_BOUNDS.min ? activePriceMin : undefined,
+      priceMax: activePriceMax < PRICE_BOUNDS.max ? activePriceMax : undefined,
       search: search || undefined,
       sort,
     }),
@@ -62,16 +71,10 @@ export default async function BrowsePage({
   ]);
   const savedSet = new Set(user?.profile.saved_dress_ids ?? []);
   const isLoggedIn = !!user;
-
-  function makeHref(overrides: Partial<SearchParams>) {
-    const sp = new URLSearchParams();
-    const next = { ...searchParams, ...overrides };
-    Object.entries(next).forEach(([k, v]) => {
-      if (v && v !== "all") sp.set(k, v as string);
-    });
-    const qs = sp.toString();
-    return `/browse${qs ? `?${qs}` : ""}`;
-  }
+  const occasionOptions = occasions.map((o) => ({ value: o.key, label: o.th }));
+  const colorOptions = COLORS.map((c) => ({ value: c, label: COLOR_LABELS_TH[c], swatch: COLOR_SWATCH[c] }));
+  const sizeOptions = SIZES.map((sz) => ({ value: sz, label: sz }));
+  const designerOptions = designers.map((d) => ({ value: d, label: d }));
 
   return (
     <div className="shell" style={{ paddingTop: 28, paddingBottom: 80 }}>
@@ -89,130 +92,20 @@ export default async function BrowsePage({
       <div className="browse-grid">
         {/* SIDEBAR */}
         <aside style={{ fontSize: 14 }}>
-          {/* Search */}
-          <form method="get" style={{ paddingBottom: 18 }}>
-            <div style={{ fontSize: 13, marginBottom: 10, fontWeight: 600 }}>ค้นหา</div>
-            {/* preserve other params */}
-            {activeColor !== "all" ? (
-              <input type="hidden" name="color" value={activeColor} />
-            ) : null}
-            {activeOcc ? <input type="hidden" name="occasion" value={activeOcc} /> : null}
-            {activeSize ? <input type="hidden" name="size" value={activeSize} /> : null}
-            {activeDesigner ? <input type="hidden" name="designer" value={activeDesigner} /> : null}
-            <input
-              type="search"
-              name="q"
-              defaultValue={search}
-              placeholder="ชื่อชุด, ดีไซเนอร์..."
-              style={{
-                width: "100%",
-                padding: "9px 12px",
-                border: "1px solid var(--line)",
-                borderRadius: 6,
-                background: "var(--surface)",
-                fontSize: 14,
-              }}
-            />
-          </form>
-
-          {/* Occasions */}
-          <FilterGroup title="โอกาส">
-            <Link
-              href={makeHref({ occasion: undefined })}
-              className="check-row"
-              style={chipBaseStyle(!activeOcc)}
-            >
-              ทั้งหมด
-            </Link>
-            {occasions.map((o) => (
-              <Link
-                key={o.key}
-                href={makeHref({ occasion: o.key })}
-                style={chipBaseStyle(activeOcc === o.key)}
-              >
-                {o.th}
-              </Link>
-            ))}
-          </FilterGroup>
-
-          {/* Designers */}
-          {designers.length > 0 ? (
-            <FilterGroup title="ดีไซเนอร์">
-              <DesignerFilter
-                designers={designers}
-                active={activeDesigner}
-                makeHref={makeHref}
-              />
-            </FilterGroup>
-          ) : null}
-
-          {/* Color chips */}
-          <FilterGroup title="สี">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <Link
-                href={makeHref({ color: undefined })}
-                style={colorChipStyle(activeColor === "all")}
-              >
-                ทั้งหมด
-              </Link>
-              {COLORS.map((c) => (
-                <Link
-                  key={c}
-                  href={makeHref({ color: c })}
-                  style={colorChipStyle(activeColor === c)}
-                >
-                  <span
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 999,
-                      background: COLOR_SWATCH[c],
-                      border: "1px solid var(--line)",
-                      display: "inline-block",
-                      marginRight: 6,
-                      verticalAlign: "middle",
-                    }}
-                  />
-                  {COLOR_LABELS_TH[c]}
-                </Link>
-              ))}
-            </div>
-          </FilterGroup>
-
-          {/* Size */}
-          <FilterGroup title="ขนาด">
-            <div style={{ display: "flex", gap: 6 }}>
-              {(["S", "M", "L"] as const).map((s) => (
-                <Link
-                  key={s}
-                  href={makeHref({ size: activeSize === s ? undefined : s })}
-                  style={sizeBtnStyle(activeSize === s)}
-                >
-                  {s}
-                </Link>
-              ))}
-            </div>
-          </FilterGroup>
-
-          {(activeColor !== "all" || activeOcc || activeSize || activeDesigner || search) && (
-            <div style={{ paddingTop: 12 }}>
-              <Link
-                href="/browse"
-                style={{
-                  display: "block",
-                  textAlign: "center",
-                  padding: 9,
-                  border: "1px solid var(--line)",
-                  borderRadius: 6,
-                  fontSize: 13,
-                  color: "var(--ink-2)",
-                  fontWeight: 500,
-                }}
-              >
-                ล้างตัวกรองทั้งหมด
-              </Link>
-            </div>
-          )}
+          <BrowseFilters
+            q={search}
+            color={activeColor === "all" ? null : activeColor}
+            occasion={activeOcc ?? null}
+            size={activeSize ?? null}
+            designer={activeDesigner ?? null}
+            priceMin={activePriceMin}
+            priceMax={activePriceMax}
+            priceBounds={PRICE_BOUNDS}
+            occasions={occasionOptions}
+            colors={colorOptions}
+            sizes={sizeOptions}
+            designers={designerOptions}
+          />
         </aside>
 
         {/* MAIN */}
@@ -258,129 +151,4 @@ export default async function BrowsePage({
       </div>
     </div>
   );
-}
-
-/**
- * Designer filter. Shows first 6 inline; rest collapsed in <details>.
- * "ทั้งหมด" chip clears the filter.
- */
-function DesignerFilter({
-  designers,
-  active,
-  makeHref,
-}: {
-  designers: string[];
-  active: string | undefined;
-  makeHref: (overrides: Partial<SearchParams>) => string;
-}) {
-  const HEAD = 6;
-  const head = designers.slice(0, HEAD);
-  const rest = designers.slice(HEAD);
-
-  // Ensure active designer is always visible even if it'd be hidden behind expand
-  const activeInRest = active && rest.includes(active);
-
-  return (
-    <>
-      <Link
-        href={makeHref({ designer: undefined })}
-        style={chipBaseStyle(!active)}
-      >
-        ทั้งหมด
-      </Link>
-      {head.map((d) => (
-        <Link
-          key={d}
-          href={makeHref({ designer: active === d ? undefined : d })}
-          style={chipBaseStyle(active === d)}
-        >
-          {d}
-        </Link>
-      ))}
-      {rest.length > 0 ? (
-        <details open={!!activeInRest} style={{ marginTop: 2 }}>
-          <summary
-            style={{
-              listStyle: "none",
-              cursor: "pointer",
-              fontSize: 13,
-              color: "var(--ink-3)",
-              padding: "5px 0",
-              fontWeight: 500,
-            }}
-          >
-            ดูเพิ่ม ({rest.length})
-          </summary>
-          {rest.map((d) => (
-            <Link
-              key={d}
-              href={makeHref({ designer: active === d ? undefined : d })}
-              style={chipBaseStyle(active === d)}
-            >
-              {d}
-            </Link>
-          ))}
-        </details>
-      ) : null}
-    </>
-  );
-}
-
-function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
-  // Spacing-only separation between filter groups — borders between every group
-  // creates visual fatigue in a narrow sidebar.
-  return (
-    <div style={{ padding: "20px 0 4px" }}>
-      <div
-        style={{
-          fontSize: 12,
-          marginBottom: 10,
-          fontWeight: 600,
-          color: "var(--ink-3)",
-        }}
-      >
-        {title}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function chipBaseStyle(active: boolean): React.CSSProperties {
-  return {
-    display: "block",
-    padding: "5px 0",
-    fontSize: 14,
-    color: active ? "var(--ink)" : "var(--ink-2)",
-    fontWeight: active ? 600 : 400,
-  };
-}
-
-function colorChipStyle(active: boolean): React.CSSProperties {
-  return {
-    padding: "5px 11px",
-    border: `1px solid ${active ? "var(--ink)" : "var(--line)"}`,
-    borderRadius: 6,
-    fontSize: 12,
-    background: active ? "var(--ink)" : "var(--surface)",
-    color: active ? "var(--on-dark)" : "var(--ink)",
-    display: "inline-flex",
-    alignItems: "center",
-    cursor: "pointer",
-  };
-}
-
-function sizeBtnStyle(active: boolean): React.CSSProperties {
-  return {
-    padding: "8px 0",
-    border: `1px solid ${active ? "var(--ink)" : "var(--line)"}`,
-    borderRadius: 6,
-    background: active ? "var(--ink)" : "var(--surface)",
-    color: active ? "var(--on-dark)" : "var(--ink)",
-    fontSize: 13,
-    flex: 1,
-    fontWeight: 500,
-    textAlign: "center",
-    minWidth: 50,
-  };
 }
