@@ -93,6 +93,36 @@ export async function getBookingForView(id: string): Promise<BookingDetail | nul
   return toDetail(data as unknown as RawJoin);
 }
 
+/** Counts for the nav notification badges:
+ *  renter = bookings waiting on the renter to pay;
+ *  seller = bookings waiting on the shop (new request or slip to review). */
+export async function getBookingBadges(): Promise<{ renter: number; seller: number }> {
+  const sb = createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { renter: 0, seller: 0 };
+
+  const { count: renterCount } = await sb
+    .from("bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("renter_id", user.id)
+    .eq("status", "waiting_for_payment");
+
+  let seller = 0;
+  const { data: shops } = await sb.from("boutiques").select("id").eq("owner_id", user.id);
+  const ids = (shops ?? []).map((s: { id: string }) => s.id);
+  if (ids.length > 0) {
+    const { count: sellerCount } = await sb
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .in("boutique_id", ids)
+      .in("status", ["booking_pending", "payment_review"]);
+    seller = sellerCount ?? 0;
+  }
+  return { renter: renterCount ?? 0, seller };
+}
+
 /** Is the current user the owner of this booking's boutique? (for view role) */
 export async function currentUserIsSellerOf(boutiqueId: string): Promise<boolean> {
   const sb = createClient();
