@@ -388,7 +388,7 @@ export default function DressForm(props: Props) {
                 <input
                   type="number"
                   min={1}
-                  step={50}
+                  step={1}
                   value={row.perDay}
                   onChange={(e) => updatePerDay(i, parseInt(e.target.value) || 0)}
                   placeholder="บาท / วัน"
@@ -437,7 +437,7 @@ export default function DressForm(props: Props) {
         <input
           type="number"
           min={0}
-          step={500}
+          step={1}
           value={deposit}
           onChange={(e) => setDeposit(parseInt(e.target.value) || 0)}
           style={inputStyle}
