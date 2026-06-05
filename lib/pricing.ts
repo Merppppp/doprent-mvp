@@ -82,8 +82,8 @@ export function hasMultipleRates(tiers: PriceTier[] | null | undefined): boolean
  *  - at least one tier, first starts at day 1
  *  - contiguous (each min = previous max + 1), exactly one open-ended tier at the end
  *  - per_day > 0
- *  - no price inversion: the total at a tier's first night must be ≥ the total at
- *    the previous tier's last night (renting longer never costs less overall).
+ *  - per-day is non-increasing as days grow (a longer tier never costs MORE per
+ *    day). A lower TOTAL for more days is allowed — that's the long-rental discount.
  */
 export function validateTiers(tiers: PriceTier[]): { ok: boolean; error?: string } {
   if (!tiers.length) return { ok: false, error: "ต้องมีอย่างน้อย 1 ช่วงราคา" };
@@ -100,13 +100,12 @@ export function validateTiers(tiers: PriceTier[]): { ok: boolean; error?: string
       if (t.max == null || next.min !== t.max + 1) {
         return { ok: false, error: "ช่วงวันต้องต่อเนื่องกัน ไม่มีวันขาดหาย" };
       }
-      // inversion guard: total at next tier's first night ≥ total at this tier's last night
-      const thisLastTotal = t.per_day * t.max;
-      const nextFirstTotal = next.per_day * next.min;
-      if (nextFirstTotal < thisLastTotal) {
+      // Longer rentals should never cost MORE per day (a total that drops as days
+      // grow is fine and expected — that's the long-rental discount).
+      if (next.per_day > t.per_day) {
         return {
           ok: false,
-          error: `ราคากลับด้าน: เช่า ${next.min} วัน (฿${nextFirstTotal.toLocaleString()}) ถูกกว่า ${t.max} วัน (฿${thisLastTotal.toLocaleString()})`,
+          error: `ช่วง ${next.min} วันขึ้นไป ราคาต่อวัน (฿${next.per_day.toLocaleString()}) แพงกว่าช่วงสั้นกว่า — เช่านานควรถูกกว่าหรือเท่ากัน`,
         };
       }
     }
