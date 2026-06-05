@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getMyAddresses } from "@/lib/booking-queries";
 import { rentalDays } from "@/lib/bookings";
+import { hasMultipleRates, normalizeTiers, startingPerDay } from "@/lib/pricing";
 import CheckoutForm from "@/components/CheckoutForm";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ export default async function CheckoutAddressPage({
       slug: true,
       images: true,
       pricePerDay: true,
+      priceTiers: true,
       deposit: true,
       status: true,
       available: true,
@@ -55,6 +57,7 @@ export default async function CheckoutAddressPage({
         slug: row.slug,
         images: row.images,
         price_per_day: row.pricePerDay,
+        price_tiers: row.priceTiers,
         deposit: row.deposit,
         status: row.status,
         available: row.available,
@@ -115,7 +118,8 @@ export default async function CheckoutAddressPage({
           <div style={{ fontWeight: 600, fontSize: 15 }}>{dress.name}</div>
           <div style={{ color: "var(--ink-2)" }}>{dress.boutique_name}</div>
           <div style={{ color: "var(--ink-3)", marginTop: 2 }}>
-            ฿{Number(dress.price_per_day).toLocaleString()} / วัน
+            {hasMultipleRates(normalizeTiers(dress.price_tiers)) ? "เริ่มต้น " : ""}฿
+            {startingPerDay(normalizeTiers(dress.price_tiers), Number(dress.price_per_day)).toLocaleString()} / วัน
           </div>
         </div>
       </div>
@@ -126,6 +130,7 @@ export default async function CheckoutAddressPage({
         endDate={end}
         days={days}
         pricePerDay={Number(dress.price_per_day)}
+        priceTiers={normalizeTiers(dress.price_tiers)}
         deposit={Number(dress.deposit) || 0}
         addresses={addresses}
       />

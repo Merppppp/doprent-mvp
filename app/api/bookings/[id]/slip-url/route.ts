@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   });
 
   if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!booking.slipUrl) return NextResponse.json({ error: "ยังไม่มีสลิป" }, { status: 404 });
+  if (!booking.slipPath) return NextResponse.json({ error: "ยังไม่มีสลิป" }, { status: 404 });
 
   const isSeller = booking.boutique.ownerId === session.user.id;
   const isAdmin = session.user.role === "admin";
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const signedUrl = await getSignedUrl(
     r2,
-    new GetObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: booking.slipUrl }),
+    new GetObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: booking.slipPath }),
     { expiresIn: EXPIRES_IN }
   );
 

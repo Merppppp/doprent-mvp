@@ -88,6 +88,7 @@
 
 html,
 body {
+  overflow-x: hidden;
   background: var(--bg);
   color: var(--ink);
   /* Anuphan is the body face (crisp Thai + Latin). IBM Plex Sans Thai Looped
@@ -219,12 +220,149 @@ img {
   gap: 20px;
 }
 
-/* Hero: text + art side-by-side on desktop, stacked on mobile */
+/* Hero: text + dress showcase side-by-side on desktop, stacked on mobile */
 .hero-grid {
   display: grid;
   grid-template-columns: 1.1fr 1fr;
   gap: 60px;
   align-items: center;
+}
+
+/* Hero showcase — no overflow clip here; clipping is handled at body level */
+.hero-showcase {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 440px;
+}
+
+/* Swiper wrapper */
+.hero-swiper-wrap {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Smoke aura — expands well beyond the card stack so it reads
+   as a grand luminous haze rising from the whole right column.
+   Each blob is its own slow-drifting colour cloud. */
+.hero-mist {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  /* Fade hard on left (protects text), soft on all other edges */
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 40%, black 70%, transparent 100%),
+                      linear-gradient(to bottom, black 0%, black 65%, transparent 95%);
+  mask-image: linear-gradient(to right, transparent 0%, black 40%, black 70%, transparent 100%),
+              linear-gradient(to bottom, black 0%, black 65%, transparent 95%);
+  -webkit-mask-composite: intersect;
+  mask-composite: intersect;
+}
+.mist-blob {
+  position: absolute;
+  border-radius: 50%;
+  animation: mist-float 11s ease-in-out infinite alternate;
+}
+/* Rose — large warm cloud, top */
+.mist-1 {
+  width: 520px; height: 480px;
+  background: radial-gradient(circle at 40% 45%, #D4857E 0%, #F0C0BB 35%, transparent 68%);
+  filter: blur(48px);
+  opacity: 0.55;
+  top: -10%; left: -12%;
+  animation-delay: 0s;
+  animation-duration: 11s;
+}
+/* Navy — drifts up from bottom-left */
+.mist-2 {
+  width: 460px; height: 440px;
+  background: radial-gradient(circle at 50% 55%, #5060A0 0%, #98AACC 38%, transparent 68%);
+  filter: blur(52px);
+  opacity: 0.48;
+  bottom: -15%; left: -5%;
+  animation-delay: -4s;
+  animation-duration: 13s;
+}
+/* Purple — billows from right centre */
+.mist-3 {
+  width: 440px; height: 420px;
+  background: radial-gradient(circle at 45% 50%, #8B6EBC 0%, #C8B8E4 38%, transparent 68%);
+  filter: blur(44px);
+  opacity: 0.5;
+  top: 20%; right: -18%;
+  animation-delay: -6s;
+  animation-duration: 14s;
+}
+
+@keyframes mist-float {
+  0%   { transform: translate(0, 0)       scale(1);    }
+  25%  { transform: translate(18px, -28px) scale(1.12); }
+  50%  { transform: translate(-14px, 16px) scale(0.91); }
+  75%  { transform: translate(22px, 8px)  scale(1.07); }
+  100% { transform: translate(-8px, -18px) scale(1.03); }
+}
+
+/* Swiper effect-cards sizing — BIG cards */
+.hero-cards-swiper {
+  width: 340px;
+  height: 460px;
+  position: relative;
+  z-index: 1;
+  overflow: visible;
+}
+.hero-card-slide {
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow:
+    0 14px 36px oklch(0.3 0.03 85 / 0.16),
+    0 4px 12px oklch(0.3 0.03 85 / 0.1);
+  border: 2px solid oklch(1 0 0 / 0.6);
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hero-card-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  text-decoration: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+.hero-card-img {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+.hero-card-img img,
+.hero-card-img svg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.hero-card-label {
+  padding: 16px 20px;
+  background: var(--surface);
+}
+.hero-card-name {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hero-card-price {
+  display: block;
+  font-size: 14px;
+  color: var(--ink-2);
+  margin-top: 4px;
+  font-weight: 500;
 }
 
 /* Browse: sidebar + main */
@@ -327,6 +465,13 @@ img {
     font-size: 56px !important;
     line-height: 1.12 !important;
   }
+  .hero-showcase {
+    min-height: 380px;
+  }
+  .hero-cards-swiper {
+    width: 300px;
+    height: 400px;
+  }
   .page-title {
     font-size: 30px !important;
   }
@@ -374,6 +519,26 @@ img {
   /* Editorial hero — tighter padding on phone */
   .hero-editorial {
     padding: 64px 0 40px !important;
+  }
+  .hero-showcase {
+    min-height: auto;
+    margin-top: 16px;
+  }
+  .hero-cards-swiper {
+    width: 280px;
+    height: 380px;
+  }
+  .hero-card-slide {
+    border-radius: 14px;
+  }
+  .mist-blob {
+    filter: blur(40px);
+    opacity: 0.25;
+  }
+  /* Hero stats tighter on mobile */
+  .hero-stats {
+    gap: 24px !important;
+    margin-top: 32px !important;
   }
   .hero-sub {
     font-size: 15px !important;
@@ -673,7 +838,9 @@ img {
 }
 .ad-badge.featured {
   background: var(--accent-soft);
-  color: var(--accent-ink);
+  color: var(--accent-2);
+  border: 1px solid var(--accent);
+  font-weight: 700;
 }
 .ad-badge.sponsored {
   background: var(--ink);

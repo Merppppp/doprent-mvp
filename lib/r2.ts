@@ -19,15 +19,7 @@ export const r2 = new S3Client({
 
 export const R2_BUCKET = process.env.R2_BUCKET_NAME!;
 export const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL!;
-export const R2_PRIVATE_BUCKET = process.env.R2_PRIVATE_BUCKET_NAME!;
-
-/**
- * Bucket for SENSITIVE files (payment slips). This bucket must NOT be bound to
- * a public domain — slips are served only via short-lived presigned URLs to
- * authorized parties. Falls back to the main bucket if unset, but in production
- * configure a SEPARATE private bucket (see DEPLOY notes).
- */
-export const R2_SLIPS_BUCKET = process.env.R2_SLIPS_BUCKET || R2_BUCKET;
+export const R2_PRIVATE_BUCKET = process.env.R2_PRIVATE_BUCKET_NAME || R2_BUCKET;
 
 export async function uploadToR2(key: string, body: Buffer, contentType: string): Promise<string> {
   await r2.send(
@@ -60,7 +52,7 @@ export async function uploadPrivateToR2(
 ): Promise<string> {
   await r2.send(
     new PutObjectCommand({
-      Bucket: R2_SLIPS_BUCKET,
+      Bucket: R2_PRIVATE_BUCKET,
       Key: key,
       Body: body,
       ContentType: contentType,
@@ -73,7 +65,7 @@ export async function uploadPrivateToR2(
 export async function getSignedPrivateUrl(key: string, expiresIn = 1800): Promise<string> {
   return getSignedUrl(
     r2,
-    new GetObjectCommand({ Bucket: R2_SLIPS_BUCKET, Key: key }),
+    new GetObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: key }),
     { expiresIn }
   );
 }

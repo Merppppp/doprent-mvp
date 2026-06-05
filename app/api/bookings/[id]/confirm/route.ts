@@ -17,7 +17,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (booking.boutique.ownerId !== session.user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (booking.status !== "paid") {
+  if (booking.status !== "payment_review") {
     return NextResponse.json({ error: "ยังไม่มีสลิปการชำระเงิน" }, { status: 400 });
   }
 

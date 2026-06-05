@@ -14,6 +14,7 @@ import {
   findTransition,
   rentalDays,
 } from "@/lib/bookings";
+import { normalizeTiers, priceForNights } from "@/lib/pricing";
 import { FIRST_TOUCH_COOKIE, decodeAttribution } from "@/lib/attribution";
 
 type Result<T = unknown> =
@@ -84,7 +85,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   // price snapshot from the dress (must be live + available)
   const dress = await db.dress.findUnique({
     where: { id: dressId },
-    select: { id: true, boutiqueId: true, pricePerDay: true, deposit: true, status: true, available: true },
+    select: { id: true, boutiqueId: true, pricePerDay: true, priceTiers: true, deposit: true, status: true, available: true },
   });
   if (!dress) return { ok: false, error: "ไม่พบชุดนี้" };
   if (dress.status !== "live" || !dress.available)
@@ -98,7 +99,11 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   if (!addr) return { ok: false, error: "ไม่พบที่อยู่จัดส่ง" };
 
   const days = rentalDays(startDate, endDate);
-  const rentalTotal = dress.pricePerDay * days;
+  const rentalTotal = priceForNights(
+    normalizeTiers(dress.priceTiers),
+    dress.pricePerDay,
+    days,
+  ).total;
 
   // First-touch channel of the renter — closes the acquisition→booking loop.
   const channel =

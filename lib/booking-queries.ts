@@ -149,6 +149,35 @@ export async function getBookingForView(id: string): Promise<BookingDetail | nul
   return toBookingDetail(b as unknown as PrismaBookingWithJoins);
 }
 
+/** Counts for the nav notification badges:
+ *  renter = bookings waiting on the renter to pay;
+ *  seller = bookings waiting on the shop (new request or slip to review). */
+export async function getBookingBadges(): Promise<{ renter: number; seller: number }> {
+  const user = await getCurrentUser();
+  if (!user) return { renter: 0, seller: 0 };
+
+  const renterCount = await db.booking.count({
+    where: { renterId: user.id, status: "waiting_for_payment" },
+  });
+
+  const shops = await db.boutique.findMany({
+    where: { ownerId: user.id },
+    select: { id: true },
+  });
+  const ids = shops.map((s) => s.id);
+
+  let seller = 0;
+  if (ids.length > 0) {
+    seller = await db.booking.count({
+      where: {
+        boutiqueId: { in: ids },
+        status: { in: ["booking_pending", "payment_review"] },
+      },
+    });
+  }
+  return { renter: renterCount, seller };
+}
+
 /** Is the current user the owner of this booking's boutique? (for view role) */
 export async function currentUserIsSellerOf(boutiqueId: string): Promise<boolean> {
   const user = await getCurrentUser();

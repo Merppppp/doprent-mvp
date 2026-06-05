@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addAddress, createBooking } from "@/app/actions/bookings";
-import type { Address } from "@/lib/types";
+import { priceForNights } from "@/lib/pricing";
+import type { Address, PriceTier } from "@/lib/types";
 
 type Props = {
   dressId: string;
@@ -11,6 +12,7 @@ type Props = {
   endDate: string;
   days: number;
   pricePerDay: number;
+  priceTiers?: PriceTier[] | null;
   deposit: number;
   addresses: Address[];
 };
@@ -26,6 +28,7 @@ export default function CheckoutForm({
   endDate,
   days,
   pricePerDay,
+  priceTiers,
   deposit,
   addresses: initialAddresses,
 }: Props) {
@@ -38,7 +41,7 @@ export default function CheckoutForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const rental = pricePerDay * days;
+  const { perDay: effPerDay, total: rental } = priceForNights(priceTiers ?? null, pricePerDay, days);
 
   async function onAddAddress(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -187,7 +190,7 @@ export default function CheckoutForm({
         }}
       >
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>สรุปการจอง</h2>
-        <Row label={`ค่าเช่า (฿${pricePerDay.toLocaleString()} × ${days} วัน)`} value={`฿${rental.toLocaleString()}`} />
+        <Row label={`ค่าเช่า (฿${effPerDay.toLocaleString()} × ${days} วัน)`} value={`฿${rental.toLocaleString()}`} />
         <Row label="ค่ามัดจำ" value={`฿${deposit.toLocaleString()}`} />
         <Row label="ค่าจัดส่ง" value="รอร้านคำนวณ" muted />
         <div style={{ borderTop: "1px solid var(--line)", margin: "10px 0" }} />

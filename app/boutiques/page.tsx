@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { BoutiqueCover } from "@/components/DressArt";
-import VerifiedBadge from "@/components/VerifiedBadge";
+import BoutiqueFinder from "@/components/BoutiqueFinder";
 import { listBoutiques } from "@/lib/dresses";
 
 export const revalidate = 60;
@@ -102,58 +101,21 @@ export default async function BoutiquesPage({
           </Link>
         </div>
       ) : (
-      <div className="grid-2" style={{ gap: 20 }}>
-        {boutiques.map((b) => (
-          <Link
-            key={b.id}
-            href={`/boutique/${b.slug}`}
-            className="boutique-card"
-            style={{
-              background: "var(--surface)",
-              border: `1px solid ${b.featured ? "var(--gold)" : "var(--line)"}`,
-              borderRadius: 8,
-              cursor: "pointer",
-            }}
-          >
-            <div className="cover">
-              <BoutiqueCover color={b.cover_color} />
-            </div>
-            <div style={{ padding: 22, flex: 1 }}>
-              {b.featured ? (
-                <span
-                  className="ad-badge featured"
-                  style={{ position: "static", display: "inline-flex", marginBottom: 8 }}
-                >
-                  <span className="dot" />
-                  Featured
-                </span>
-              ) : null}
-              <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6 }}>
-                {b.area_label}
-              </div>
-              <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                {b.name}
-                {b.verified ? <VerifiedBadge size="sm" /> : null}
-              </h3>
-              <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 14, lineHeight: 1.5 }}>
-                {b.tag}
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--ink-3)",
-                  display: "flex",
-                  gap: 12,
-                  flexWrap: "wrap",
-                }}
-              >
-                {b.since_year ? <span>ตั้งแต่ {b.since_year}</span> : null}
-                {b.instagram ? <span>· {b.instagram}</span> : null}
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
+      <BoutiqueFinder
+        shops={boutiques.map((b) => ({
+          id: b.id,
+          slug: b.slug,
+          name: b.name,
+          areaKey: b.area_key,
+          areaLabel: b.area_label,
+          coverColor: b.cover_color,
+          featured: b.featured,
+          verified: b.verified,
+          tag: b.tag,
+          sinceYear: b.since_year,
+          instagram: b.instagram,
+        }))}
+      />
       )}
     </div>
   );

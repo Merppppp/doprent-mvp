@@ -153,7 +153,6 @@ model Boutique {
   tag          String?
   story        String?
   deliveryInfo  String?    @map("delivery_info")
-  promptpayId   String?    @map("promptpay_id")
   featured      Boolean    @default(false)
   adsTier      AdsTier    @default(free) @map("ads_tier")
   verified     Boolean    @default(false)
@@ -257,71 +256,6 @@ model KycSubmission {
   @@index([status])
   @@index([boutiqueId])
   @@map("kyc_submissions")
-}
-
-// ---------------------------------------------------------------------------
-// Booking / Payment flow
-// ---------------------------------------------------------------------------
-
-model Address {
-  id           String   @id @default(uuid()) @db.Uuid
-  userId       String   @map("user_id") @db.Uuid
-  label        String
-  recipientName String  @map("recipient_name")
-  phone        String
-  addressLine  String   @map("address_line")
-  subdistrict  String?
-  district     String?
-  province     String   @default("กรุงเทพมหานคร")
-  postalCode   String   @map("postal_code")
-  isDefault    Boolean  @default(false) @map("is_default")
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookings Booking[]
-
-  @@index([userId])
-  @@map("addresses")
-}
-
-model Booking {
-  id           String        @id @default(uuid()) @db.Uuid
-  customerId   String        @map("customer_id") @db.Uuid
-  boutiqueId   String        @map("boutique_id") @db.Uuid
-  dressId      String        @map("dress_id") @db.Uuid
-  addressId    String?       @map("address_id") @db.Uuid
-  dateFrom     DateTime      @map("date_from") @db.Date
-  dateTo       DateTime      @map("date_to") @db.Date
-  rentalFee    Int           @map("rental_fee")
-  depositFee   Int           @map("deposit_fee")
-  shippingFee  Int           @default(0) @map("shipping_fee")
-  totalAmount  Int           @map("total_amount")
-  status       BookingStatus @default(pending)
-  slipUrl      String?       @map("slip_url")
-  note         String?
-  expiresAt    DateTime?     @map("expires_at")
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-
-  customer User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  boutique Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
-  dress    Dress    @relation(fields: [dressId], references: [id], onDelete: Cascade)
-  address  Address? @relation(fields: [addressId], references: [id], onDelete: SetNull)
-
-  @@index([customerId])
-  @@index([boutiqueId])
-  @@index([status])
-  @@map("bookings")
-}
-
-enum BookingStatus {
-  pending
-  confirmed
-  waiting_payment
-  paid
-  completed
-  cancelled
-  rejected
 }
 
 // ---------------------------------------------------------------------------

@@ -2,8 +2,33 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { createDress, updateDress, updateDressPriceTiers } from "@/app/actions/seller";
+import { createDress, updateDress } from "@/app/actions/seller";
 import type { Color, Occasion, OccasionKey, PriceTier, Size } from "@/lib/types";
+import { priceForNights, validateTiers } from "@/lib/pricing";
+
+type TierRow = { max: number | null; perDay: number };
+
+/** Min day for each row: row 0 = 1, others = prev row's max + 1. */
+function rowMins(rows: TierRow[]): number[] {
+  const mins: number[] = [];
+  let min = 1;
+  for (let i = 0; i < rows.length; i++) {
+    mins.push(min);
+    const isLast = i === rows.length - 1;
+    const max = isLast ? null : rows[i].max;
+    if (max != null) min = max + 1;
+  }
+  return mins;
+}
+
+function toPriceTiers(rows: TierRow[]): PriceTier[] {
+  const mins = rowMins(rows);
+  return rows.map((r, i) => ({
+    min: mins[i],
+    max: i === rows.length - 1 ? null : r.max,
+    per_day: r.perDay,
+  }));
+}
 
 const COLORS: Color[] = ["rose", "ivory", "green", "black", "navy", "red", "blue", "purple"];
 const COLOR_TH: Record<Color, string> = {
@@ -16,7 +41,7 @@ const COLOR_TH: Record<Color, string> = {
   blue: "ฟ้า",
   purple: "ม่วง",
 };
-const SIZES: Size[] = ["XS", "S", "M", "L", "XL"];
+const SIZES: Size[] = ["XXXS","XXS","XS","S","M","L","XL","XXL","3XL","4XL"];
 
 type Props =
   | {
@@ -37,13 +62,13 @@ type Props =
         size: Size;
         color: Color;
         price_per_day: number;
+        price_tiers: PriceTier[] | null;
         deposit: number;
         description: string | null;
         line_url: string;
         images: string[];
         occasions: OccasionKey[];
         available: boolean;
-        price_tiers: PriceTier[];
       };
     };
 
@@ -56,14 +81,32 @@ export default function DressForm(props: Props) {
   const [designer, setDesigner] = useState(initial?.designer ?? "");
   const [size, setSize] = useState<Size>(initial?.size ?? "M");
   const [color, setColor] = useState<Color>(initial?.color ?? "rose");
-  const [pricePerDay, setPricePerDay] = useState(initial?.price_per_day ?? 1500);
+  const [tiers, setTiers] = useState<TierRow[]>(
+    initial?.price_tiers && initial.price_tiers.length
+      ? initial.price_tiers.map((t) => ({ max: t.max, perDay: t.per_day }))
+      : [{ max: null, perDay: initial?.price_per_day ?? 500 }],
+  );
+  const [tierError, setTierError] = useState<string | null>(null);
+  const updateMax = (i: number, v: number) =>
+    setTiers((p) => p.map((r, idx) => (idx === i ? { ...r, max: v } : r)));
+  const updatePerDay = (i: number, v: number) =>
+    setTiers((p) => p.map((r, idx) => (idx === i ? { ...r, perDay: v } : r)));
+  const removeTier = (i: number) =>
+    setTiers((p) => (p.length <= 1 ? p : p.filter((_, idx) => idx !== i)));
+  const addTier = () =>
+    setTiers((p) => {
+      const mins = rowMins(p);
+      const lastIdx = p.length - 1;
+      const copy = [...p];
+      copy.splice(lastIdx, 0, { max: mins[lastIdx] + 1, perDay: p[lastIdx].perDay });
+      return copy;
+    });
   const [deposit, setDeposit] = useState(initial?.deposit ?? 3000);
   const [description, setDescription] = useState(initial?.description ?? "");
   const [lineUrl, setLineUrl] = useState(initial?.line_url ?? props.defaultLineUrl);
   const [occasions, setOccasions] = useState<OccasionKey[]>(initial?.occasions ?? []);
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
   const [available, setAvailable] = useState(initial?.available ?? true);
-  const [priceTiers, setPriceTiers] = useState<PriceTier[]>(initial?.price_tiers ?? []);
   const [uploadingCount, setUploadingCount] = useState(0);
   const [urlInput, setUrlInput] = useState("");
   const [showUrlInput, setShowUrlInput] = useState(false);
@@ -125,7 +168,17 @@ export default function DressForm(props: Props) {
     fd.set("designer", designer);
     fd.set("size", size);
     fd.set("color", color);
-    fd.set("price_per_day", String(pricePerDay));
+    const pt = toPriceTiers(tiers);
+    const v = validateTiers(pt);
+    if (!v.ok) {
+      setTierError(v.error ?? "ราคาไม่ถูกต้อง");
+      setSubmitting(false);
+      return;
+    }
+    setTierError(null);
+    const basePerDay = Math.min(...pt.map((t) => t.per_day));
+    fd.set("price_tiers", JSON.stringify(pt));
+    fd.set("price_per_day", String(basePerDay));
     fd.set("deposit", String(deposit));
     fd.set("description", description);
     fd.set("line_url", lineUrl);
@@ -134,23 +187,12 @@ export default function DressForm(props: Props) {
     fd.set("available", available ? "true" : "false");
 
     try {
-      let dressId: string | undefined;
       if (isEdit) {
         const res = await updateDress(props.dressId, fd);
         if (!res.ok) { setError(res.error ?? "บันทึกไม่สำเร็จ"); setSubmitting(false); return; }
-        dressId = props.dressId;
       } else {
         const res = await createDress(fd);
         if (!res.ok) { setError(res.error ?? "บันทึกไม่สำเร็จ"); setSubmitting(false); return; }
-        dressId = res.id;
-      }
-      if (dressId) {
-        const tiersRes = await updateDressPriceTiers(dressId, priceTiers);
-        if (!tiersRes.ok) {
-          setError(tiersRes.error ?? "บันทึกแพ็กเกจราคาไม่สำเร็จ");
-          setSubmitting(false);
-          return;
-        }
       }
       router.push("/sell/dashboard");
     } catch (err) {
@@ -310,97 +352,91 @@ export default function DressForm(props: Props) {
         </Labeled>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <Labeled label="ค่าเช่า / วัน (฿) *">
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={pricePerDay || ""}
-            onChange={(e) => setPricePerDay(parseInt(e.target.value) || 0)}
-            style={inputStyle}
-          />
-        </Labeled>
-        <Labeled label="ค่ามัดจำ (฿)">
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={deposit || ""}
-            onChange={(e) => setDeposit(parseInt(e.target.value) || 0)}
-            style={inputStyle}
-          />
-        </Labeled>
-      </div>
-
-      {/* Price tiers */}
-      <div>
-        <label style={labelStyle}>แพ็กเกจราคา (ไม่บังคับ)</label>
-        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 10 }}>
-          กำหนดราคาตามจำนวนวัน เช่น เช่า 3 วัน ราคา 2,100 บาท
+      <Labeled label="ราคาเช่า (ตามจำนวนวัน) *">
+        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8 }}>
+          ตั้งราคาต่อวันให้ครบทุกช่วง ยิ่งเช่านานต่อวันยิ่งถูก ระบบคิดเงินตามช่วงที่ลูกค้าจองอัตโนมัติ
         </div>
-        {priceTiers.map((tier, i) => (
-          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, marginBottom: 8 }}>
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="จำนวนวัน"
-              value={tier.days || ""}
-              onChange={(e) => {
-                const v = parseInt(e.target.value) || 0;
-                setPriceTiers((curr) => curr.map((t, idx) => idx === i ? { ...t, days: v } : t));
-              }}
-              style={inputStyle}
-            />
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="ราคา (฿)"
-              value={tier.price || ""}
-              onChange={(e) => {
-                const v = parseInt(e.target.value) || 0;
-                setPriceTiers((curr) => curr.map((t, idx) => idx === i ? { ...t, price: v } : t));
-              }}
-              style={inputStyle}
-            />
-            <button
-              type="button"
-              onClick={() => setPriceTiers((curr) => curr.filter((_, idx) => idx !== i))}
-              style={{
-                padding: "0 12px",
-                border: "1px solid rgba(220,38,38,0.4)",
-                borderRadius: 6,
-                background: "rgba(220,38,38,0.08)",
-                color: "#DC2626",
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              ลบ
-            </button>
-          </div>
-        ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {tiers.map((row, i) => {
+            const mins = rowMins(tiers);
+            const isLast = i === tiers.length - 1;
+            return (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 30px", gap: 8, alignItems: "center" }}>
+                <div style={{ fontSize: 13, color: "var(--ink-2)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  {isLast ? (
+                    <span>ตั้งแต่ {mins[i]} วันขึ้นไป</span>
+                  ) : (
+                    <>
+                      <span style={{ color: "var(--ink-3)" }}>ตั้งแต่ {mins[i]} ถึง</span>
+                      <input
+                        type="number"
+                        min={mins[i]}
+                        value={row.max ?? ""}
+                        onChange={(e) => updateMax(i, parseInt(e.target.value) || mins[i])}
+                        style={{ ...inputStyle, width: 60, textAlign: "center" }}
+                      />
+                      <span style={{ color: "var(--ink-3)" }}>วัน</span>
+                    </>
+                  )}
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={row.perDay}
+                  onChange={(e) => updatePerDay(i, parseInt(e.target.value) || 0)}
+                  placeholder="บาท / วัน"
+                  style={inputStyle}
+                />
+                {!isLast ? (
+                  <button
+                    type="button"
+                    onClick={() => removeTier(i)}
+                    aria-label="ลบช่วง"
+                    style={{ border: 0, background: "none", color: "var(--ink-3)", cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+                  >
+                    ×
+                  </button>
+                ) : (
+                  <span />
+                )}
+              </div>
+            );
+          })}
+        </div>
         <button
           type="button"
-          onClick={() => setPriceTiers((curr) => [...curr, { days: 1, price: 0 }])}
-          style={{
-            width: "100%",
-            padding: "10px",
-            border: "1px dashed var(--line)",
-            borderRadius: 6,
-            background: "var(--surface)",
-            color: "var(--ink-2)",
-            fontSize: 13,
-            cursor: "pointer",
-            marginTop: 4,
-          }}
+          onClick={addTier}
+          style={{ marginTop: 10, fontSize: 13, color: "var(--ink-2)", background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 6, padding: "7px 12px", cursor: "pointer" }}
         >
-          + เพิ่มแพ็กเกจวันใหม่
+          + เพิ่มช่วง
         </button>
-      </div>
+        {tierError ? (
+          <div style={{ marginTop: 8, fontSize: 12, color: "var(--danger)" }}>{tierError}</div>
+        ) : null}
+        <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+          {[2, 4, 7].map((n) => {
+            const q = priceForNights(toPriceTiers(tiers), Math.min(...tiers.map((t) => t.perDay)), n);
+            return (
+              <div key={n} style={{ background: "var(--bg)", borderRadius: 6, padding: "8px 10px", textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: "var(--ink-3)" }}>เช่า {n} วัน</div>
+                <div style={{ fontSize: 15, fontWeight: 600 }}>฿{q.total.toLocaleString()}</div>
+              </div>
+            );
+          })}
+        </div>
+      </Labeled>
+
+      <Labeled label="ค่ามัดจำ (฿)">
+        <input
+          type="number"
+          min={0}
+          step={1}
+          value={deposit}
+          onChange={(e) => setDeposit(parseInt(e.target.value) || 0)}
+          style={inputStyle}
+        />
+      </Labeled>
 
       <Labeled label="โอกาส (เลือกได้หลายอัน)">
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>

@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DressArt } from "@/components/DressArt";
+import Gallery from "@/components/Gallery";
+import DistanceBadge from "@/components/DistanceBadge";
 import LineButton from "@/components/LineButton";
 import DressCard from "@/components/DressCard";
 import SaveButton from "@/components/SaveButton";
@@ -17,6 +19,7 @@ import {
   listOccasions,
   listSimilarDresses,
 } from "@/lib/dresses";
+import { hasMultipleRates, startingPerDay } from "@/lib/pricing";
 import { COLOR_LABELS_TH } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -101,53 +104,22 @@ export default async function DressPage({ params }: { params: Params }) {
         className="detail-grid"
         style={{ padding: "8px 0 60px" }}
       >
-        {/* GALLERY */}
+        {/* GALLERY — real images get the fullscreen lightbox; listings with no
+            uploaded photos fall back to the generated DressArt placeholder. */}
         <div>
-          <div
-            style={{
-              aspectRatio: "4/5",
-              borderRadius: 8,
-              overflow: "hidden",
-              marginBottom: 10,
-            }}
-          >
-            {dress.images?.[0] ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={dress.images[0]} alt={dress.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : (
-              <DressArt color={dress.color} variant={0} />
-            )}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                style={{
-                  aspectRatio: "3/4",
-                  borderRadius: 6,
-                  overflow: "hidden",
-                  border: "2px solid transparent",
-                }}
-              >
-                <DressArt color={dress.color} variant={i} />
-              </div>
-            ))}
+          {dress.images?.length ? (
+            <Gallery images={dress.images} alt={dress.name} />
+          ) : (
             <div
               style={{
-                aspectRatio: "3/4",
-                borderRadius: 6,
-                background: "var(--bg)",
-                border: "1px dashed var(--line)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 11,
-                color: "var(--ink-3)",
+                aspectRatio: "4/5",
+                borderRadius: 8,
+                overflow: "hidden",
               }}
             >
-              รูปเพิ่มเติม
+              <DressArt color={dress.color} variant={0} />
             </div>
-          </div>
+          )}
         </div>
 
         {/* INFO */}
@@ -193,8 +165,11 @@ export default async function DressPage({ params }: { params: Params }) {
               flexWrap: "wrap",
             }}
           >
+            {hasMultipleRates(dress.price_tiers) ? (
+              <span style={{ fontSize: 13, color: "var(--ink-3)", fontWeight: 500 }}>เริ่มต้น</span>
+            ) : null}
             <span style={{ fontSize: 24, fontWeight: 600 }}>
-              ฿{dress.price_per_day.toLocaleString()}
+              ฿{startingPerDay(dress.price_tiers, dress.price_per_day).toLocaleString()}
             </span>
             <span style={{ color: "var(--ink-3)", fontSize: 14 }}>/วัน</span>
             <span
@@ -272,9 +247,12 @@ export default async function DressPage({ params }: { params: Params }) {
                   {dress.boutique_name}
                   {boutique?.verified ? <VerifiedBadge size="sm" /> : null}
                 </div>
-                <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 1 }}>
-                  {boutique?.area_label ?? ""}
-                  {boutique?.since_year ? ` · ตั้งแต่ ${boutique.since_year}` : ""}
+                <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 1, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span>
+                    {boutique?.area_label ?? ""}
+                    {boutique?.since_year ? ` · ตั้งแต่ ${boutique.since_year}` : ""}
+                  </span>
+                  <DistanceBadge areaKey={boutique?.area_key} />
                 </div>
               </div>
               <div style={{ marginLeft: "auto", color: "var(--ink-3)", fontSize: 18 }}>→</div>
@@ -396,29 +374,34 @@ export default async function DressPage({ params }: { params: Params }) {
         </div>
       </div>
 
-      {/* RELATED */}
-      <div style={{ paddingTop: 48, paddingBottom: 60, borderTop: "1px solid var(--line)" }}>
-        <div
-          className="section-head"
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "end",
-            marginBottom: 28,
-            gap: 12,
-          }}
-        >
-          <h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>ชุดที่คล้ายกัน</h2>
-          <Link href="/browse" style={{ fontSize: 14, color: "var(--ink-2)" }}>
-            ดูทั้งหมด →
-          </Link>
+      {/* RELATED — content-based similarity: occasion overlap, color, size,
+          price band, designer, boutique (see listSimilarDresses). Hidden
+          entirely if the catalogue can't yield even one candidate, so the
+          section header doesn't dangle over an empty grid. */}
+      {related.length > 0 ? (
+        <div style={{ paddingTop: 48, paddingBottom: 60, borderTop: "1px solid var(--line)" }}>
+          <div
+            className="section-head"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "end",
+              marginBottom: 28,
+              gap: 12,
+            }}
+          >
+            <h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>ชุดที่คล้ายกัน</h2>
+            <Link href="/browse" style={{ fontSize: 14, color: "var(--ink-2)" }}>
+              ดูทั้งหมด →
+            </Link>
+          </div>
+          <div className="grid-4" style={{ gap: 20 }}>
+            {related.map((d, i) => (
+              <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
+            ))}
+          </div>
         </div>
-        <div className="grid-4" style={{ gap: 20 }}>
-          {related.filter((d) => d.id !== dress.id).slice(0, 4).map((d, i) => (
-            <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
-          ))}
-        </div>
-      </div>
+      ) : null}
 
       <script
         type="application/ld+json"
