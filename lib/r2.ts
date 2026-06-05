@@ -13,6 +13,7 @@ export const r2 = new S3Client({
 
 export const R2_BUCKET = process.env.R2_BUCKET_NAME!;
 export const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL!;
+export const R2_PRIVATE_BUCKET = process.env.R2_PRIVATE_BUCKET_NAME!;
 
 export async function uploadToR2(key: string, body: Buffer, contentType: string): Promise<string> {
   await r2.send(
