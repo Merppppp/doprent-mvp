@@ -1,0 +1,27 @@
+# Sync upstream (Merppppp/doprent-mvp) → fork (doprent/doprent-mvp)
+# Place this file at: Merppppp/doprent-mvp/.github/workflows/sync-to-fork.yml
+#
+# Required secrets (on Merppppp/doprent-mvp):
+#   FORK_PAT — GitHub PAT with repo push access to doprent/doprent-mvp
+
+name: Sync to Fork
+
+on:
+  push:
+    branches: [develop, main]
+  create:
+    tags: ["v*"]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to fork
+        run: |
+          git remote add fork https://x-access-token:${{ secrets.FORK_PAT }}@github.com/doprent/doprent-mvp.git
+          git push fork --all --force
+          git push fork --tags --force
