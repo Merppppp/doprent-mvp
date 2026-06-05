@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isValidLineContact, normalizeLineUrl } from "@/lib/line";
-import type { Color } from "@/lib/types";
+import { dressLimitFor } from "@/lib/tiers";
+import type { AdsTier, Color } from "@/lib/types";
 
 /** Convert a Thai/English name to a URL slug. */
 function slugify(s: string): string {
@@ -308,12 +309,27 @@ export async function createDress(formData: FormData): Promise<{ ok: boolean; er
   if (!boutiqueId) return { ok: false, error: "ไม่พบร้าน" };
   const { data: b } = await sb
     .from("boutiques")
-    .select("id, owner_id, name, line_url, kyc_status")
+    .select("id, owner_id, name, line_url, kyc_status, ads_tier")
     .eq("id", boutiqueId)
     .maybeSingle();
   if (!b || b.owner_id !== user.id) return { ok: false, error: "ไม่มีสิทธิ์เพิ่มชุดในร้านนี้" };
   if (b.kyc_status === "none" || b.kyc_status === "rejected") {
     return { ok: false, error: "ต้องส่งเอกสาร KYC ก่อนถึงจะเพิ่มชุดได้" };
+  }
+
+  // Enforce per-plan listing quota.
+  const limit = dressLimitFor((b as { ads_tier?: AdsTier }).ads_tier);
+  if (limit != null) {
+    const { count } = await sb
+      .from("dresses")
+      .select("id", { count: "exact", head: true })
+      .eq("boutique_id", boutiqueId);
+    if ((count ?? 0) >= limit) {
+      return {
+        ok: false,
+        error: `แพ็กเกจปัจจุบันลงชุดได้สูงสุด ${limit} ตัว — อัปเกรดแพ็กเกจเพื่อลงเพิ่ม`,
+      };
+    }
   }
 
   const name = String(formData.get("name") ?? "").trim();
