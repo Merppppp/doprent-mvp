@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import MobileMenu from "./MobileMenu";
+import Logo from "./Logo";
 
 export default async function Header() {
   const user = await getCurrentUser().catch(() => null);
@@ -35,11 +36,8 @@ export default async function Header() {
           padding: "12px 0",
         }}
       >
-        <Link
-          href="/"
-          style={{ fontWeight: 700, fontSize: 20, letterSpacing: "-0.01em" }}
-        >
-          DopRent
+        <Link href="/" aria-label="doprent" style={{ display: "inline-flex", alignItems: "center" }}>
+          <Logo size={22} />
         </Link>
 
         <nav
