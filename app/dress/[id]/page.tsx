@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DressArt } from "@/components/DressArt";
 import Gallery from "@/components/Gallery";
+import DistanceBadge from "@/components/DistanceBadge";
 import LineButton from "@/components/LineButton";
 import DressCard from "@/components/DressCard";
 import SaveButton from "@/components/SaveButton";
@@ -235,9 +236,12 @@ export default async function DressPage({ params }: { params: Params }) {
                   {dress.boutique_name}
                   {boutique?.verified ? <VerifiedBadge size="sm" /> : null}
                 </div>
-                <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 1 }}>
-                  {boutique?.area_label ?? ""}
-                  {boutique?.since_year ? ` · ตั้งแต่ ${boutique.since_year}` : ""}
+                <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 1, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span>
+                    {boutique?.area_label ?? ""}
+                    {boutique?.since_year ? ` · ตั้งแต่ ${boutique.since_year}` : ""}
+                  </span>
+                  <DistanceBadge areaKey={boutique?.area_key} />
                 </div>
               </div>
               <div style={{ marginLeft: "auto", color: "var(--ink-3)", fontSize: 18 }}>→</div>

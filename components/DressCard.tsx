@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DressArt } from "./DressArt";
 import SaveButton from "./SaveButton";
 import VerifiedBadge from "./VerifiedBadge";
+import DistanceBadge from "./DistanceBadge";
 import type { Dress } from "@/lib/types";
 
 type Props = {
@@ -88,6 +89,9 @@ export default function DressCard({ dress, variant = 0, savedSet, isLoggedIn }: 
                 <span style={{ marginLeft: 4, display: "inline-flex", verticalAlign: "middle" }}>
                   <VerifiedBadge size="sm" />
                 </span>
+              ) : null}
+              {dress.area_key ? (
+                <DistanceBadge areaKey={dress.area_key} style={{ marginLeft: 6, verticalAlign: "middle" }} />
               ) : null}
             </span>
             <span style={{ fontWeight: 600, color: "var(--ink)", whiteSpace: "nowrap", fontSize: 14 }}>

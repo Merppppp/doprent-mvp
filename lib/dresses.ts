@@ -50,6 +50,17 @@ async function fetchVerifiedBoutiqueIds(): Promise<Set<string>> {
   return new Set(((data ?? []) as Array<{ id: string }>).map((r) => r.id));
 }
 
+/** Map of boutique_id -> area_key, to denormalize shop area onto dresses (for distance display). */
+async function fetchBoutiqueAreaMap(): Promise<Map<string, string | null>> {
+  const sb = getSupabase();
+  if (!sb) return new Map();
+  const { data, error } = await sb.from("boutiques").select("id, area_key");
+  if (error) return new Map();
+  return new Map(
+    ((data ?? []) as Array<{ id: string; area_key: string | null }>).map((r) => [r.id, r.area_key]),
+  );
+}
+
 /** Fetch up to `limit` live, available dresses, ordered by ads tier then recency. */
 export async function listDresses(opts: DressFilters & { limit?: number } = {}): Promise<Dress[]> {
   const sb = getSupabase();
@@ -74,9 +85,10 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
   if (opts.occasions && opts.occasions.length) q = q.overlaps("occasions", opts.occasions);
   if (opts.limit) q = q.limit(opts.limit);
 
-  const [{ data, error }, verifiedSet] = await Promise.all([
+  const [{ data, error }, verifiedSet, areaMap] = await Promise.all([
     q,
     fetchVerifiedBoutiqueIds(),
+    fetchBoutiqueAreaMap(),
   ]);
   if (error) {
     console.error("[doprent] supabase listDresses error", error);
@@ -85,6 +97,7 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
   let rows = ((data ?? []) as Dress[]).map((d) => ({
     ...d,
     boutique_verified: verifiedSet.has(d.boutique_id),
+    area_key: areaMap.get(d.boutique_id) ?? null,
   }));
 
   // Application-layer filters not supported cleanly by Supabase

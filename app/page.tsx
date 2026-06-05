@@ -1,6 +1,7 @@
 import Link from "next/link";
 import DressCard from "@/components/DressCard";
 import CountUp from "@/components/CountUp";
+import DistanceBadge from "@/components/DistanceBadge";
 import { BoutiqueCover, OccasionTile } from "@/components/DressArt";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { getCurrentUser } from "@/lib/auth";
@@ -237,7 +238,10 @@ export default async function HomePage() {
                   <BoutiqueCover color={b.cover_color} />
                 </div>
                 <div style={{ padding: 22, flex: 1 }}>
-                  <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6 }}>{b.area_label}</div>
+                  <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span>{b.area_label}</span>
+                    <DistanceBadge areaKey={b.area_key} />
+                  </div>
                   <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, letterSpacing: "-0.01em", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     {b.name}
                     {b.verified ? <VerifiedBadge size="sm" /> : null}

@@ -147,6 +147,8 @@ export type Dress = {
   boutique_name: string;
   /** Denormalized from boutiques.verified — populated by listDresses(). */
   boutique_verified?: boolean;
+  /** Denormalized from the dress's boutique area_key — populated by listDresses(). Used for distance display. */
+  area_key?: string | null;
   size: Size;
   color: Color;
   price_per_day: number;

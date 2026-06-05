@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import DressCard from "@/components/DressCard";
+import DressResults from "@/components/DressResults";
 import { getCurrentUser } from "@/lib/auth";
 import { listDesigners, listDresses, listOccasions } from "@/lib/dresses";
 import {
@@ -167,7 +167,7 @@ export default async function BrowsePage({
                       height: 12,
                       borderRadius: 999,
                       background: COLOR_SWATCH[c],
-                      border: "1px solid rgba(0,0,0,0.1)",
+                      border: "1px solid var(--line)",
                       display: "inline-block",
                       marginRight: 6,
                       verticalAlign: "middle",
@@ -252,11 +252,7 @@ export default async function BrowsePage({
               </Link>
             </div>
           ) : (
-            <div className="grid-3" style={{ gap: "24px 20px" }}>
-              {dresses.map((d, i) => (
-                <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
-              ))}
-            </div>
+            <DressResults dresses={dresses} savedIds={[...savedSet]} isLoggedIn={isLoggedIn} />
           )}
         </main>
       </div>
