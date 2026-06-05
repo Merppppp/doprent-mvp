@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { uploadToR2 } from "@/lib/r2";
+import { r2, R2_PRIVATE_BUCKET } from "@/lib/r2";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB — slip อาจเป็น screenshot ใหญ่กว่ารูปชุด
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -38,8 +39,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const ext = file.type === "image/jpeg" ? "jpg" : file.type.split("/")[1];
+  const key = `slips/${params.id}_${randomUUID()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
-  const slipUrl = await uploadToR2(`slips/${params.id}_${randomUUID()}.${ext}`, buffer, file.type);
+
+  await r2.send(new PutObjectCommand({
+    Bucket: R2_PRIVATE_BUCKET,
+    Key: key,
+    Body: buffer,
+    ContentType: file.type,
+  }));
+
+  const slipUrl = key;
 
   const updated = await db.booking.update({
     where: { id: params.id },
