@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
+import { priceForNights } from "@/lib/pricing";
+import type { PriceTier } from "@/lib/types";
 
 type Props = {
   /**
@@ -18,8 +20,10 @@ type Props = {
   dressPageUrl?: string;
   /** First image URL of the dress (sent as a link in LINE message). */
   dressImageUrl?: string;
-  /** Per-day rental price (THB). */
+  /** Base/fallback per-day rental price (THB). */
   pricePerDay?: number;
+  /** Optional duration-based pricing tiers (overrides flat per-day when set). */
+  priceTiers?: PriceTier[] | null;
   /** Deposit (THB). */
   deposit?: number;
   /** Unavailable dates as YYYY-MM-DD strings. Renter can't pick a range overlapping these. */
@@ -99,6 +103,7 @@ export default function DateRangePicker({
   dressPageUrl,
   dressImageUrl,
   pricePerDay,
+  priceTiers,
   deposit,
   blackouts = [],
   dressId,
@@ -110,6 +115,7 @@ export default function DateRangePicker({
 
   const blackoutSet = useMemo(() => new Set(blackouts), [blackouts]);
   const nights = nightsBetween(start, end);
+  const quote = priceForNights(priceTiers ?? null, pricePerDay ?? 0, nights);
 
   // Conflict check: does the selected range hit any blackout?
   const conflictDates = useMemo(() => {
@@ -133,8 +139,7 @@ export default function DateRangePicker({
       `วันที่: ${fmtThai(start)} ถึง ${fmtThai(end)} (${nights} วัน)`,
     ];
     if (typeof pricePerDay === "number") {
-      const total = pricePerDay * nights;
-      lines.push(`ราคา: ฿${pricePerDay.toLocaleString()}/วัน × ${nights} = ฿${total.toLocaleString()}`);
+      lines.push(`ราคา: ฿${quote.perDay.toLocaleString()}/วัน × ${nights} = ฿${quote.total.toLocaleString()}`);
     }
     if (typeof deposit === "number" && deposit > 0) {
       lines.push(`ค่ามัดจำ: ฿${deposit.toLocaleString()}`);
@@ -144,7 +149,7 @@ export default function DateRangePicker({
     const text = lines.join("\n");
     const sep = lineUrl.includes("?") ? "&" : "?";
     return `${lineUrl}${sep}text=${encodeURIComponent(text)}`;
-  }, [isLoggedIn, lineUrl, start, end, nights, hasConflict, dressName, boutiqueName, pricePerDay, deposit, dressPageUrl, dressImageUrl]);
+  }, [isLoggedIn, lineUrl, start, end, nights, hasConflict, dressName, boutiqueName, pricePerDay, priceTiers, deposit, dressPageUrl, dressImageUrl, quote.perDay, quote.total]);
 
   function trackAndGo(e: React.MouseEvent<HTMLAnchorElement>) {
     if (dressId || boutiqueId) {
@@ -221,7 +226,7 @@ export default function DateRangePicker({
           </div>
           {typeof pricePerDay === "number" ? (
             <div style={{ marginTop: 2 }}>
-              ราคา: ฿{(pricePerDay * nights).toLocaleString()} ({nights} × ฿{pricePerDay.toLocaleString()})
+              ราคา: ฿{quote.total.toLocaleString()} ({nights} × ฿{quote.perDay.toLocaleString()}/วัน)
             </div>
           ) : null}
           <div style={{ marginTop: 2 }}>

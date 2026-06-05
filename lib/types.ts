@@ -151,6 +151,9 @@ export type Boutique = {
   updated_at: string;
 };
 
+/** One duration-based pricing bracket. per_day = THB/day; max=null means open-ended (X+ days). */
+export type PriceTier = { min: number; max: number | null; per_day: number };
+
 export type Dress = {
   id: string;
   slug: string;
@@ -164,7 +167,14 @@ export type Dress = {
   area_key?: string | null;
   size: Size;
   color: Color;
+  /** Starting/base per-day rate (THB). Fallback when no tiers; also the "from" price for cards & filters. */
   price_per_day: number;
+  /**
+   * Optional duration-based pricing. Contiguous day ranges, each with a per-day
+   * rate (longer = cheaper/day). Last tier has max=null (open-ended "X+ days").
+   * When null/empty, pricing falls back to price_per_day. See lib/pricing.ts.
+   */
+  price_tiers: PriceTier[] | null;
   deposit: number;
   description: string | null;
   images: string[];

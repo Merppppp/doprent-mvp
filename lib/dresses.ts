@@ -1,4 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from "./supabase";
+import { normalizeTiers } from "./pricing";
 import type { Boutique, Color, Dress, Occasion, OccasionKey } from "./types";
 
 /** Hard-coded occasions in case occasions table isn't seeded yet */
@@ -27,7 +28,7 @@ export type DressFilters = {
 };
 
 const PUBLIC_DRESS_QUERY =
-  "id,slug,name,designer,boutique_id,boutique_name,size,color,price_per_day,deposit,description,images,occasions,line_url,ads_tier,featured,sponsored,status,available,views,created_at,updated_at";
+  "id,slug,name,designer,boutique_id,boutique_name,size,color,price_per_day,price_tiers,deposit,description,images,occasions,line_url,ads_tier,featured,sponsored,status,available,views,created_at,updated_at";
 
 // Public-safe column allowlist for boutiques. Mirrors the column-level GRANT
 // in migration 2026-05-18_boutique_address_privacy.sql — DO NOT add address,
@@ -96,11 +97,15 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
     console.error("[doprent] supabase listDresses error", error);
     return [];
   }
-  let rows = ((data ?? []) as Dress[]).map((d) => ({
-    ...d,
-    boutique_verified: verifiedSet.has(d.boutique_id),
-    area_key: areaMap.get(d.boutique_id) ?? null,
-  }));
+  let rows = ((data ?? []) as Dress[]).map((d) => {
+    const pt = normalizeTiers(d.price_tiers);
+    return {
+      ...d,
+      boutique_verified: verifiedSet.has(d.boutique_id),
+      area_key: areaMap.get(d.boutique_id) ?? null,
+      price_tiers: pt.length ? pt : null,
+    };
+  });
 
   // Application-layer filters not supported cleanly by Supabase
   if (opts.search) {
@@ -167,7 +172,10 @@ export async function getDressBySlug(slug: string): Promise<Dress | null> {
     console.error("[doprent] supabase getDressBySlug error", error);
     return null;
   }
-  return (data as Dress) ?? null;
+  if (!data) return null;
+  const d = data as Dress;
+  const pt = normalizeTiers(d.price_tiers);
+  return { ...d, price_tiers: pt.length ? pt : null };
 }
 
 export async function listBoutiques(opts: { limit?: number; featuredFirst?: boolean } = {}): Promise<

@@ -3,6 +3,7 @@ import { DressArt } from "./DressArt";
 import SaveButton from "./SaveButton";
 import VerifiedBadge from "./VerifiedBadge";
 import DistanceBadge from "./DistanceBadge";
+import { hasMultipleRates, startingPerDay } from "@/lib/pricing";
 import type { Dress } from "@/lib/types";
 
 type Props = {
@@ -95,7 +96,10 @@ export default function DressCard({ dress, variant = 0, savedSet, isLoggedIn }: 
               ) : null}
             </span>
             <span style={{ fontWeight: 600, color: "var(--ink)", whiteSpace: "nowrap", fontSize: 14 }}>
-              ฿{dress.price_per_day.toLocaleString()}{" "}
+              {hasMultipleRates(dress.price_tiers) ? (
+                <span style={{ fontSize: 11, fontWeight: 400, color: "var(--ink-3)" }}>เริ่ม </span>
+              ) : null}
+              ฿{startingPerDay(dress.price_tiers, dress.price_per_day).toLocaleString()}{" "}
               <span style={{ color: "var(--ink-3)", fontSize: 12, fontWeight: 400 }}>/วัน</span>
             </span>
           </div>

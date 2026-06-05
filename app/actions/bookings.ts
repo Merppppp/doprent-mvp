@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { BookingStatus } from "@/lib/types";
 import { dueAt, findTransition, rentalDays } from "@/lib/bookings";
+import { normalizeTiers, priceForNights } from "@/lib/pricing";
 
 type Result<T = unknown> =
   | ({ ok: true } & T)
@@ -85,7 +86,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   // price snapshot from the dress (must be live + available)
   const { data: dress, error: dErr } = await sb
     .from("dresses")
-    .select("id,boutique_id,price_per_day,deposit,status,available")
+    .select("id,boutique_id,price_per_day,price_tiers,deposit,status,available")
     .eq("id", dressId)
     .maybeSingle();
   if (dErr || !dress) return { ok: false, error: "ไม่พบชุดนี้" };
@@ -101,7 +102,11 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   if (aErr || !addr) return { ok: false, error: "ไม่พบที่อยู่จัดส่ง" };
 
   const days = rentalDays(startDate, endDate);
-  const rentalTotal = Number(dress.price_per_day) * days;
+  const rentalTotal = priceForNights(
+    normalizeTiers((dress as { price_tiers?: unknown }).price_tiers),
+    Number(dress.price_per_day),
+    days,
+  ).total;
 
   const { data: created, error: insErr } = await sb
     .from("bookings")

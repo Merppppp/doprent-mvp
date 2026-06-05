@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getMyAddresses } from "@/lib/booking-queries";
 import { rentalDays } from "@/lib/bookings";
+import { hasMultipleRates, normalizeTiers, startingPerDay } from "@/lib/pricing";
 import CheckoutForm from "@/components/CheckoutForm";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ export default async function CheckoutAddressPage({
 
   const { data: dress } = await sb
     .from("dresses")
-    .select("id,name,slug,images,price_per_day,deposit,status,available,boutique_name")
+    .select("id,name,slug,images,price_per_day,price_tiers,deposit,status,available,boutique_name")
     .eq("id", dressId)
     .maybeSingle();
 
@@ -94,7 +95,8 @@ export default async function CheckoutAddressPage({
           <div style={{ fontWeight: 600, fontSize: 15 }}>{dress.name}</div>
           <div style={{ color: "var(--ink-2)" }}>{dress.boutique_name}</div>
           <div style={{ color: "var(--ink-3)", marginTop: 2 }}>
-            ฿{Number(dress.price_per_day).toLocaleString()} / วัน
+            {hasMultipleRates(normalizeTiers(dress.price_tiers)) ? "เริ่มต้น " : ""}฿
+            {startingPerDay(normalizeTiers(dress.price_tiers), Number(dress.price_per_day)).toLocaleString()} / วัน
           </div>
         </div>
       </div>
@@ -105,6 +107,7 @@ export default async function CheckoutAddressPage({
         endDate={end}
         days={days}
         pricePerDay={Number(dress.price_per_day)}
+        priceTiers={normalizeTiers(dress.price_tiers)}
         deposit={Number(dress.deposit) || 0}
         addresses={addresses}
       />

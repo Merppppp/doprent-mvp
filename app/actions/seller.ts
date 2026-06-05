@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isValidLineContact, normalizeLineUrl } from "@/lib/line";
 import { dressLimitFor } from "@/lib/tiers";
+import { normalizeTiers, validateTiers } from "@/lib/pricing";
 import type { AdsTier, Color } from "@/lib/types";
 
 /** Convert a Thai/English name to a URL slug. */
@@ -346,7 +347,13 @@ export async function createDress(formData: FormData): Promise<{ ok: boolean; er
   const images: string[] = imagesRaw ? imagesRaw.split("\n").map((s) => s.trim()).filter(Boolean) : [];
   const occasionsRaw = formData.getAll("occasions").map((v) => String(v)).filter(Boolean);
 
-  if (pricePerDay < 100) return { ok: false, error: "ราคาเช่าต่อวันต้องอย่างน้อย ฿100" };
+  const tiers = normalizeTiers(String(formData.get("price_tiers") ?? ""));
+  if (tiers.length) {
+    const v = validateTiers(tiers);
+    if (!v.ok) return { ok: false, error: v.error ?? "ราคาตามช่วงไม่ถูกต้อง" };
+  } else if (pricePerDay < 100) {
+    return { ok: false, error: "ราคาเช่าต่อวันต้องอย่างน้อย ฿100" };
+  }
 
   const { data: created, error: insertErr } = await sb
     .from("dresses")
@@ -359,6 +366,7 @@ export async function createDress(formData: FormData): Promise<{ ok: boolean; er
       size,
       color,
       price_per_day: pricePerDay,
+      price_tiers: tiers.length ? tiers : null,
       deposit: isNaN(deposit) ? 0 : deposit,
       description,
       images,
@@ -420,6 +428,17 @@ export async function updateDress(
   if (ppd !== null) {
     const p = parseInt(String(ppd), 10);
     if (!isNaN(p) && p > 0) updates.price_per_day = p;
+  }
+  const tiersRaw = formData.get("price_tiers");
+  if (typeof tiersRaw === "string") {
+    const tiers = normalizeTiers(tiersRaw);
+    if (tiers.length) {
+      const v = validateTiers(tiers);
+      if (!v.ok) return { ok: false, error: v.error ?? "ราคาตามช่วงไม่ถูกต้อง" };
+      updates.price_tiers = tiers;
+    } else {
+      updates.price_tiers = null;
+    }
   }
   const dep = formData.get("deposit");
   if (dep !== null) {

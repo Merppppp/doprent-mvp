@@ -17,6 +17,7 @@ import {
   listOccasions,
   listSimilarDresses,
 } from "@/lib/dresses";
+import { hasMultipleRates, startingPerDay } from "@/lib/pricing";
 import { COLOR_LABELS_TH } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -157,8 +158,11 @@ export default async function DressPage({ params }: { params: Params }) {
               flexWrap: "wrap",
             }}
           >
+            {hasMultipleRates(dress.price_tiers) ? (
+              <span style={{ fontSize: 13, color: "var(--ink-3)", fontWeight: 500 }}>เริ่มต้น</span>
+            ) : null}
             <span style={{ fontSize: 24, fontWeight: 600 }}>
-              ฿{dress.price_per_day.toLocaleString()}
+              ฿{startingPerDay(dress.price_tiers, dress.price_per_day).toLocaleString()}
             </span>
             <span style={{ color: "var(--ink-3)", fontSize: 14 }}>/วัน</span>
             <span
@@ -306,6 +310,7 @@ export default async function DressPage({ params }: { params: Params }) {
             dressPageUrl={url}
             dressImageUrl={dress.images?.[0]}
             pricePerDay={dress.price_per_day}
+            priceTiers={dress.price_tiers}
             deposit={dress.deposit}
             blackouts={blackouts}
             dressId={dress.id}

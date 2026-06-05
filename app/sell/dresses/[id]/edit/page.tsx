@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { listOccasions } from "@/lib/dresses";
+import { normalizeTiers } from "@/lib/pricing";
 import DressForm from "../../DressForm";
 import type { Color, OccasionKey, Size } from "@/lib/types";
 
@@ -32,7 +33,7 @@ export default async function EditDressPage({ params }: { params: { id: string }
 
   const { data: dress } = await sb
     .from("dresses")
-    .select("id, name, designer, size, color, price_per_day, deposit, description, line_url, images, occasions, available, boutique_id")
+    .select("id, name, designer, size, color, price_per_day, price_tiers, deposit, description, line_url, images, occasions, available, boutique_id")
     .eq("id", params.id)
     .maybeSingle();
   if (!dress || dress.boutique_id !== boutique.id) notFound();
@@ -59,6 +60,7 @@ export default async function EditDressPage({ params }: { params: { id: string }
           size: dress.size as Size,
           color: dress.color as Color,
           price_per_day: dress.price_per_day,
+          price_tiers: normalizeTiers(dress.price_tiers),
           deposit: dress.deposit,
           description: dress.description,
           line_url: dress.line_url,
