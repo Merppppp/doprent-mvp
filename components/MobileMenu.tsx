@@ -242,9 +242,17 @@ export default function MobileMenu({ user }: Props) {
                   <Link href="/account" style={drawerItem}>
                     บัญชีของฉัน
                   </Link>
+                  <Link href="/account/bookings" style={drawerItem}>
+                    การจองของฉัน
+                  </Link>
                   {user.isSeller ? (
                     <Link href="/sell/dashboard" style={drawerItem}>
                       Dashboard ร้านของฉัน
+                    </Link>
+                  ) : null}
+                  {user.isSeller ? (
+                    <Link href="/sell/bookings" style={drawerItem}>
+                      การจองของร้าน
                     </Link>
                   ) : null}
                   {user.isAdmin ? (
