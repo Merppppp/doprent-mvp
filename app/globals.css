@@ -673,7 +673,9 @@ img {
 }
 .ad-badge.featured {
   background: var(--accent-soft);
-  color: var(--accent-ink);
+  color: var(--accent-2);
+  border: 1px solid var(--accent);
+  font-weight: 700;
 }
 .ad-badge.sponsored {
   background: var(--ink);
