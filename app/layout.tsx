@@ -1,6 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ScrollReveal from "@/components/ScrollReveal";
+import PageViewTracker from "@/components/PageViewTracker";
+import ClarityAnalytics from "@/components/ClarityAnalytics";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
+import LocationProvider from "@/components/LocationProvider";
 import "./globals.css";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
@@ -45,7 +50,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#FAFAFA",
+  themeColor: "#F7F3E8",
 };
 
 // Force dynamic rendering so the auth-aware Header always reads the latest cookie state.
@@ -59,7 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Thai+Looped:wght@400;500;600;700&family=IBM+Plex+Serif+Thai:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600&family=Bai+Jamjuree:ital,wght@0,400;0,500;0,600;0,700;1,500;1,600&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Sans+Thai+Looped:wght@400;500;600&family=IBM+Plex+Serif+Thai:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
       </head>
@@ -74,9 +79,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           ข้ามไปยังเนื้อหา
         </a>
-        <Header />
-        <main id="main">{children}</main>
-        <Footer />
+        <LocationProvider>
+          <Header />
+          <main id="main">{children}</main>
+          <Footer />
+          <ScrollReveal />
+          <PageViewTracker />
+          <ClarityAnalytics />
+          <GoogleAnalytics />
+        </LocationProvider>
       </body>
     </html>
   );

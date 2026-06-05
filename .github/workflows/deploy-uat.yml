@@ -1,0 +1,50 @@
+# Pipeline: deploy-uat
+# Trigger: push to main branch
+# Steps:   build & push to GHCR → deploy to VPS uat stack
+#
+# Required secrets:
+#   DEPLOY_SSH_KEY — Private SSH key for deploy@157.85.101.85
+
+name: Deploy UAT
+
+on:
+  push:
+    branches: [main]
+
+env:
+  IMAGE: ghcr.io/doprent/doprent-mvp
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        run: echo "TAG=uat-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}
+
+      - name: Deploy to VPS
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -o StrictHostKeyChecking=no deploy@157.85.101.85 \
+            "docker service update --image ${{ env.IMAGE }}:${{ env.TAG }} doprent-mvp-uat_app --with-registry-auth"

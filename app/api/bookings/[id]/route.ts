@@ -7,7 +7,7 @@ const BOOKING_INCLUDE = {
   dress: { select: { id: true, name: true, slug: true, images: true } },
   boutique: { select: { id: true, name: true, slug: true, lineUrl: true, promptpayId: true } },
   address: true,
-  customer: { select: { id: true, name: true, email: true } },
+  renter: { select: { id: true, name: true, email: true } },
 };
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   await expireStaleBookings([booking.id]);
 
-  const isCustomer = booking.customerId === session.user.id;
+  const isCustomer = booking.renterId === session.user.id;
   const isSeller = booking.boutique.id === (await db.boutique.findFirst({ where: { ownerId: session.user.id } }))?.id;
   const isAdmin = session.user.role === "admin";
 

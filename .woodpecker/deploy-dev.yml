@@ -1,0 +1,54 @@
+# =============================================================================
+# Pipeline: deploy-dev
+# Trigger: push to develop branch
+# Steps:   prepare tag → build & push to GHCR → deploy to VPS dev stack
+#
+# Required secrets (configure in Woodpecker UI):
+#   ghcr_username  — GitHub username with GHCR write access
+#   ghcr_token     — GitHub Personal Access Token (packages:write)
+#   deploy_ssh_key — Private SSH key for deploy@157.85.101.85
+# =============================================================================
+
+when:
+  branch: develop
+  event: push
+
+steps:
+  - name: prepare-tag
+    image: alpine
+    commands:
+      - SHORT_SHA=$(echo $CI_COMMIT_SHA | cut -c1-7)
+      - echo "dev-$SHORT_SHA" > .tag
+      - echo "Image tag:" && cat .tag
+
+  - name: build-push
+    image: docker:24-cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      GHCR_USERNAME:
+        from_secret: ghcr_username
+      GHCR_TOKEN:
+        from_secret: ghcr_token
+    commands:
+      - TAG=$(cat .tag)
+      - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+      - docker build -t ghcr.io/doprent/doprent-mvp:$TAG .
+      - docker push ghcr.io/doprent/doprent-mvp:$TAG
+      - echo "Pushed ghcr.io/doprent/doprent-mvp:$TAG"
+
+  - name: deploy-dev
+    image: alpine
+    environment:
+      DEPLOY_SSH_KEY:
+        from_secret: deploy_ssh_key
+    commands:
+      - apk add --no-cache openssh-client
+      - TAG=$(cat .tag)
+      - mkdir -p ~/.ssh
+      - echo "$DEPLOY_SSH_KEY" > ~/.ssh/id_rsa
+      - chmod 600 ~/.ssh/id_rsa
+      - >-
+        ssh -o StrictHostKeyChecking=no deploy@157.85.101.85
+        "docker service update --image ghcr.io/doprent/doprent-mvp:${TAG} doprent-mvp-dev_app --with-registry-auth"
+      - echo "Deployed $TAG to dev stack"

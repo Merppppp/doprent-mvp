@@ -17,7 +17,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (booking.boutique.ownerId !== session.user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (booking.status !== "pending") {
+  if (booking.status !== "booking_pending") {
     return NextResponse.json({ error: "ไม่สามารถปฏิเสธได้ในสถานะนี้" }, { status: 400 });
   }
 

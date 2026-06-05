@@ -47,6 +47,14 @@ model User {
   role          Role      @default(customer)
   savedDressIds String[]  @map("saved_dress_ids") @db.Uuid
   image         String?
+  // Acquisition attribution (first-touch) + activity recency for MAU
+  signupSource   String?   @map("signup_source")
+  signupMedium   String?   @map("signup_medium")
+  signupCampaign String?   @map("signup_campaign")
+  signupReferrer String?   @map("signup_referrer")
+  signupChannel  String?   @map("signup_channel")
+  lastActiveAt   DateTime? @map("last_active_at")
+  lastProvince   String?   @map("last_province")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
@@ -56,9 +64,14 @@ model User {
   kycSubmissions    KycSubmission[]
   lineClicks        LineClick[]
   adminAuditLogs    AdminAudit[]
-  addresses         Address[]
-  bookings          Booking[]
+  addresses          Address[]
+  bookings           Booking[]
+  pageViews          PageView[]
+  sellerSubscriptions SellerSubscription[]
 
+  @@index([lastActiveAt(sort: Desc)])
+  @@index([signupChannel])
+  @@index([createdAt(sort: Desc)])
   @@map("users")
 }
 
@@ -134,12 +147,12 @@ model Boutique {
   hours        String?
   lineUrl      String     @map("line_url")
   instagram    String?
+  promptpayId  String?    @map("promptpay_id")
   sinceYear    Int?       @map("since_year")
   coverColor   Color      @default(rose) @map("cover_color")
   tag          String?
   story        String?
   deliveryInfo  String?    @map("delivery_info")
-  promptpayId   String?    @map("promptpay_id")
   featured      Boolean    @default(false)
   adsTier      AdsTier    @default(free) @map("ads_tier")
   verified     Boolean    @default(false)
@@ -155,6 +168,7 @@ model Boutique {
   kycSubmissions KycSubmission[]
   lineClicks     LineClick[]
   bookings       Booking[]
+  subscriptions  SellerSubscription[]
 
   @@index([status])
   @@index([featured])
@@ -245,71 +259,6 @@ model KycSubmission {
 }
 
 // ---------------------------------------------------------------------------
-// Booking / Payment flow
-// ---------------------------------------------------------------------------
-
-model Address {
-  id           String   @id @default(uuid()) @db.Uuid
-  userId       String   @map("user_id") @db.Uuid
-  label        String
-  recipientName String  @map("recipient_name")
-  phone        String
-  addressLine  String   @map("address_line")
-  subdistrict  String?
-  district     String?
-  province     String   @default("กรุงเทพมหานคร")
-  postalCode   String   @map("postal_code")
-  isDefault    Boolean  @default(false) @map("is_default")
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookings Booking[]
-
-  @@index([userId])
-  @@map("addresses")
-}
-
-model Booking {
-  id           String        @id @default(uuid()) @db.Uuid
-  customerId   String        @map("customer_id") @db.Uuid
-  boutiqueId   String        @map("boutique_id") @db.Uuid
-  dressId      String        @map("dress_id") @db.Uuid
-  addressId    String?       @map("address_id") @db.Uuid
-  dateFrom     DateTime      @map("date_from") @db.Date
-  dateTo       DateTime      @map("date_to") @db.Date
-  rentalFee    Int           @map("rental_fee")
-  depositFee   Int           @map("deposit_fee")
-  shippingFee  Int           @default(0) @map("shipping_fee")
-  totalAmount  Int           @map("total_amount")
-  status       BookingStatus @default(pending)
-  slipUrl      String?       @map("slip_url")
-  note         String?
-  expiresAt    DateTime?     @map("expires_at")
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-
-  customer User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  boutique Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
-  dress    Dress    @relation(fields: [dressId], references: [id], onDelete: Cascade)
-  address  Address? @relation(fields: [addressId], references: [id], onDelete: SetNull)
-
-  @@index([customerId])
-  @@index([boutiqueId])
-  @@index([status])
-  @@map("bookings")
-}
-
-enum BookingStatus {
-  pending
-  confirmed
-  waiting_payment
-  paid
-  completed
-  cancelled
-  rejected
-}
-
-// ---------------------------------------------------------------------------
 // Analytics
 // ---------------------------------------------------------------------------
 
@@ -319,6 +268,11 @@ model LineClick {
   boutiqueId  String?   @map("boutique_id") @db.Uuid
   source      String?
   userId      String?   @map("user_id") @db.Uuid
+  channel     String?
+  utmSource   String?   @map("utm_source")
+  referrer    String?
+  province    String?
+  sessionId   String?   @map("session_id")
   userAgent   String?   @map("user_agent")
   ipHash      String?   @map("ip_hash")
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -329,8 +283,123 @@ model LineClick {
 
   @@index([dressId])
   @@index([boutiqueId])
+  @@index([channel])
   @@index([createdAt(sort: Desc)])
   @@map("line_clicks")
+}
+
+// Visitor pageviews — general traffic analytics (anon + authed). Fills the gap
+// that line_clicks (authed-only) can't measure: top-of-funnel visitors.
+model PageView {
+  id          BigInt   @id @default(autoincrement())
+  sessionId   String?  @map("session_id")
+  userId      String?  @map("user_id") @db.Uuid
+  path        String?
+  channel     String?
+  utmSource   String?  @map("utm_source")
+  utmMedium   String?  @map("utm_medium")
+  utmCampaign String?  @map("utm_campaign")
+  referrer    String?
+  province    String?
+  country     String?
+  userAgent   String?  @map("user_agent")
+  ipHash      String?  @map("ip_hash")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([channel])
+  @@index([sessionId])
+  @@index([userId])
+  @@index([province])
+  @@map("page_views")
+}
+
+// Seller paid-plan record — drives subscription adoption-rate -> revenue (MRR).
+model SellerSubscription {
+  id               String       @id @default(uuid()) @db.Uuid
+  boutiqueId       String?      @map("boutique_id") @db.Uuid
+  ownerId          String?      @map("owner_id") @db.Uuid
+  plan             SubPlan      @default(free)
+  status           SubStatus    @default(active)
+  amount           Int          @default(0)
+  billingCycle     BillingCycle @default(monthly) @map("billing_cycle")
+  startedAt        DateTime?    @default(now()) @map("started_at")
+  currentPeriodEnd DateTime?    @map("current_period_end")
+  cancelledAt      DateTime?    @map("cancelled_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  boutique Boutique? @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  owner    User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([boutiqueId])
+  @@index([status])
+  @@index([plan])
+  @@map("seller_subscriptions")
+}
+
+// ---------------------------------------------------------------------------
+// Bookings (Phase 1: self-serve booking + PromptPay slip upload)
+// ---------------------------------------------------------------------------
+
+model Address {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  recipientName String   @map("recipient_name")
+  phone         String
+  addressText   String   @map("address_text")
+  isDefault     Boolean  @default(false) @map("is_default")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+model Booking {
+  id               String        @id @default(uuid()) @db.Uuid
+  renterId         String        @map("renter_id") @db.Uuid
+  boutiqueId       String        @map("boutique_id") @db.Uuid
+  dressId          String        @map("dress_id") @db.Uuid
+  startDate        DateTime      @map("start_date") @db.Date
+  endDate          DateTime      @map("end_date") @db.Date
+  // price snapshot at booking time (THB, integer baht)
+  rentalTotal      Int           @map("rental_total")
+  deposit          Int           @default(0)
+  shippingFee      Int?          @map("shipping_fee")
+  // platform commission snapshot (stable even if rate later changes)
+  commissionRate   Decimal       @default(0.10) @map("commission_rate") @db.Decimal(5, 4)
+  commissionAmount Int?          @map("commission_amount")
+  // renter's first-touch acquisition channel (attribution)
+  channel          String?
+  status           BookingStatus @default(booking_pending)
+  slipPath         String?       @map("slip_path")
+  // delivery address snapshot
+  addressId        String?       @map("address_id") @db.Uuid
+  recipientName    String?       @map("recipient_name")
+  phone            String?
+  addressText      String?       @map("address_text")
+  currentDueAt     DateTime?     @map("current_due_at")
+  cancelReason     String?       @map("cancel_reason")
+  cancelFromStatus String?       @map("cancel_from_status")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  renter   User     @relation(fields: [renterId], references: [id], onDelete: Cascade)
+  boutique Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  dress    Dress    @relation(fields: [dressId], references: [id], onDelete: Cascade)
+  address  Address? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+
+  @@index([renterId])
+  @@index([boutiqueId])
+  @@index([dressId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("bookings")
 }
 
 model AdminAudit {
@@ -425,4 +494,34 @@ enum KycPlan {
 enum BusinessType {
   individual
   company
+}
+
+enum BookingStatus {
+  booking_pending
+  waiting_for_payment
+  payment_review
+  confirmed
+  cancel_requested
+  slip_disputed
+  rejected
+  cancelled
+  payment_expired
+}
+
+enum SubPlan {
+  free
+  boost
+  featured
+}
+
+enum SubStatus {
+  active
+  past_due
+  cancelled
+  expired
+}
+
+enum BillingCycle {
+  monthly
+  yearly
 }

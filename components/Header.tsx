@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import MobileMenu from "./MobileMenu";
+import { getBookingBadges } from "@/lib/booking-queries";
+import Logo from "./Logo";
 
 export default async function Header() {
   const user = await getCurrentUser().catch(() => null);
@@ -14,6 +16,7 @@ export default async function Header() {
     .slice(0, 2)
     .toUpperCase();
   const savedCount = user?.savedDressIds?.length ?? 0;
+  const badges = user ? await getBookingBadges() : { renter: 0, seller: 0 };
 
   return (
     <header
@@ -32,14 +35,12 @@ export default async function Header() {
           alignItems: "center",
           justifyContent: "space-between",
           gap: 16,
-          padding: "12px 16px",
+          paddingTop: 12,
+          paddingBottom: 12,
         }}
       >
-        <Link
-          href="/"
-          style={{ fontWeight: 700, fontSize: 20, letterSpacing: "-0.01em" }}
-        >
-          DopRent
+        <Link href="/" aria-label="doprent" style={{ display: "inline-flex", alignItems: "center" }}>
+          <Logo size={22} />
         </Link>
 
         <nav
@@ -75,6 +76,8 @@ export default async function Header() {
                 isAdmin={user.role === "admin"}
                 isSeller={user.role === "seller" || user.role === "admin"}
                 initials={initials}
+                renterBadge={badges.renter}
+                sellerBadge={badges.seller}
               />
             </>
           ) : (
@@ -104,6 +107,8 @@ export default async function Header() {
                   isSeller: user.role === "seller" || user.role === "admin",
                   initials,
                   savedCount,
+                  renterBadge: badges.renter,
+                  sellerBadge: badges.seller,
                 }
               : null
           }
@@ -136,8 +141,8 @@ function SavedLink({ count }: { count: number }) {
         width="18"
         height="18"
         viewBox="0 0 24 24"
-        fill={count > 0 ? "var(--accent)" : "none"}
-        stroke={count > 0 ? "var(--accent)" : "var(--ink)"}
+        fill={count > 0 ? "var(--save)" : "none"}
+        stroke={count > 0 ? "var(--save)" : "var(--ink)"}
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -173,18 +178,31 @@ function SavedLink({ count }: { count: number }) {
   );
 }
 
+function Pill({ n }: { n: number }) {
+  if (!n) return null;
+  return (
+    <span style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, background: "var(--accent)", color: "var(--accent-ink)", fontSize: 11, fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+      {n > 99 ? "99+" : n}
+    </span>
+  );
+}
+
 function UserMenu({
   fullName,
   email,
   isAdmin,
   isSeller,
   initials,
+  renterBadge,
+  sellerBadge,
 }: {
   fullName: string;
   email: string;
   isAdmin: boolean;
   isSeller: boolean;
   initials: string;
+  renterBadge: number;
+  sellerBadge: number;
 }) {
   return (
     <details
@@ -233,6 +251,7 @@ function UserMenu({
           {fullName.split(" ")[0]}
         </span>
         <span style={{ color: "var(--ink-3)", marginRight: 4, fontSize: 10 }}>▼</span>
+        {renterBadge + sellerBadge > 0 ? <Pill n={renterBadge + sellerBadge} /> : null}
       </summary>
       <div
         style={{
@@ -290,6 +309,18 @@ function UserMenu({
             Dashboard ร้านของฉัน
           </Link>
         ) : null}
+
+        {isSeller ? (
+          <Link href="/sell/bookings" style={{ ...menuItemStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            การจองของร้าน
+            <Pill n={sellerBadge} />
+          </Link>
+        ) : null}
+
+        <Link href="/account/bookings" style={{ ...menuItemStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          การจองของฉัน
+          <Pill n={renterBadge} />
+        </Link>
 
         <Link href="/account" style={menuItemStyle}>
           บัญชีของฉัน

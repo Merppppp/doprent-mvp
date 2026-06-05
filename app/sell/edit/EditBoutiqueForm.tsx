@@ -25,10 +25,11 @@ type Props = {
     area_label: string;
     line_url: string;
     instagram: string | null;
+    promptpay_id?: string | null;
+    delivery_info?: string | null;
     since_year: number | null;
     tag: string | null;
     story: string | null;
-    delivery_info: string | null;
     owner_name: string | null;
     address: string | null;
     hours: string | null;
@@ -93,6 +94,15 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
       <Labeled label="Instagram">
         <input type="text" name="instagram" defaultValue={boutique.instagram ?? ""} style={inputStyle} />
       </Labeled>
+      <Labeled label="PromptPay (เบอร์มือถือ / เลขบัตร ปชช.) — สำหรับรับเงินจองผ่าน QR">
+        <input
+          type="text"
+          name="promptpay_id"
+          defaultValue={boutique.promptpay_id ?? ""}
+          placeholder="เช่น 0812345678"
+          style={inputStyle}
+        />
+      </Labeled>
       <Labeled label="ที่อยู่ร้าน">
         <input type="text" name="address" defaultValue={boutique.address ?? ""} style={inputStyle} />
       </Labeled>
@@ -127,15 +137,6 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
           style={{ ...inputStyle, resize: "vertical" }}
         />
       </Labeled>
-      <Labeled label="ข้อมูลการจัดส่ง">
-        <textarea
-          name="delivery_info"
-          defaultValue={boutique.delivery_info ?? ""}
-          rows={3}
-          maxLength={250}
-          style={{ ...inputStyle, resize: "vertical" }}
-        />
-      </Labeled>
       <Labeled label="สีหลักของร้าน">
         <select name="cover_color" defaultValue={boutique.cover_color} style={inputStyle}>
           {COLORS.map((c) => (
@@ -150,8 +151,8 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
         <div
           style={{
             padding: 12,
-            background: "rgba(220,38,38,0.08)",
-            border: "1px solid rgba(220,38,38,0.3)",
+            background: "var(--danger-soft)",
+            border: "1px solid var(--danger)",
             borderRadius: 6,
             color: "var(--danger)",
             fontSize: 14,
@@ -164,10 +165,10 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
         <div
           style={{
             padding: 12,
-            background: "rgba(21,128,61,0.08)",
-            border: "1px solid rgba(21,128,61,0.3)",
+            background: "var(--success-soft)",
+            border: "1px solid var(--success)",
             borderRadius: 6,
-            color: "#15803D",
+            color: "var(--success)",
             fontSize: 14,
           }}
         >

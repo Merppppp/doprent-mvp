@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isValidLineContact, normalizeLineUrl } from "@/lib/line";
-import type { Color, PriceTier } from "@/lib/types";
+import { dressLimitFor } from "@/lib/tiers";
+import { normalizeTiers, validateTiers } from "@/lib/pricing";
+import type { AdsTier, Color, PriceTier } from "@/lib/types";
 
 function slugify(s: string): string {
   return s.toLowerCase().trim()
@@ -178,18 +180,36 @@ export async function createDress(formData: FormData): Promise<{ ok: boolean; er
 
   const boutique = await db.boutique.findUnique({
     where: { id: boutiqueId },
-    select: { ownerId: true, name: true, lineUrl: true, kycStatus: true },
+    select: { ownerId: true, name: true, lineUrl: true, kycStatus: true, adsTier: true },
   });
   if (!boutique || boutique.ownerId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์เพิ่มชุดในร้านนี้" };
   if (boutique.kycStatus === "none" || boutique.kycStatus === "rejected") {
     return { ok: false, error: "ต้องส่งเอกสาร KYC ก่อนถึงจะเพิ่มชุดได้" };
   }
 
+  // Enforce per-plan listing quota.
+  const limit = dressLimitFor(boutique.adsTier as AdsTier);
+  if (limit != null) {
+    const count = await db.dress.count({ where: { boutiqueId } });
+    if (count >= limit) {
+      return {
+        ok: false,
+        error: `แพ็กเกจปัจจุบันลงชุดได้สูงสุด ${limit} ตัว — อัปเกรดแพ็กเกจเพื่อลงเพิ่ม`,
+      };
+    }
+  }
+
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { ok: false, error: "กรุณาใส่ชื่อชุด" };
 
   const pricePerDay = parseInt(String(formData.get("price_per_day") ?? "0"), 10);
-  if (pricePerDay < 100) return { ok: false, error: "ราคาเช่าต่อวันต้องอย่างน้อย ฿100" };
+  const tiers = normalizeTiers(String(formData.get("price_tiers") ?? ""));
+  if (tiers.length) {
+    const v = validateTiers(tiers);
+    if (!v.ok) return { ok: false, error: v.error ?? "ราคาตามช่วงไม่ถูกต้อง" };
+  } else if (pricePerDay < 100) {
+    return { ok: false, error: "ราคาเช่าต่อวันต้องอย่างน้อย ฿100" };
+  }
 
   const lineUrlRaw = String(formData.get("line_url") ?? "").trim();
   const lineUrl = lineUrlRaw ? normalizeLineUrl(lineUrlRaw) : boutique.lineUrl;
@@ -211,6 +231,7 @@ export async function createDress(formData: FormData): Promise<{ ok: boolean; er
       size: String(formData.get("size") ?? "M") as "XS"|"S"|"M"|"L"|"XL",
       color: String(formData.get("color") ?? "rose") as Color,
       pricePerDay,
+      priceTiers: tiers.length ? tiers : null,
       deposit: parseInt(String(formData.get("deposit") ?? "0"), 10) || 0,
       description: String(formData.get("description") ?? "").trim() || null,
       images,
@@ -252,6 +273,17 @@ export async function updateDress(dressId: string, formData: FormData): Promise<
   }
   const ppd = formData.get("price_per_day");
   if (ppd !== null) { const p = parseInt(String(ppd), 10); if (!isNaN(p) && p > 0) updates.pricePerDay = p; }
+  const tiersRaw = formData.get("price_tiers");
+  if (typeof tiersRaw === "string") {
+    const updTiers = normalizeTiers(tiersRaw);
+    if (updTiers.length) {
+      const v = validateTiers(updTiers);
+      if (!v.ok) return { ok: false, error: v.error ?? "ราคาตามช่วงไม่ถูกต้อง" };
+      updates.priceTiers = updTiers;
+    } else {
+      updates.priceTiers = null;
+    }
+  }
   const dep = formData.get("deposit");
   if (dep !== null) { const p = parseInt(String(dep), 10); if (!isNaN(p)) updates.deposit = p; }
   const imagesRaw = formData.get("images");

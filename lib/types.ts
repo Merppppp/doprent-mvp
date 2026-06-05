@@ -9,7 +9,20 @@ export type Color =
   | "blue"
   | "purple";
 
-export type Size = "XS" | "S" | "M" | "L" | "XL";
+export type Size =
+  | "XXXS"
+  | "XXS"
+  | "XS"
+  | "S"
+  | "M"
+  | "L"
+  | "XL"
+  | "XXL"
+  | "3XL"
+  | "4XL";
+
+/** Canonical size order — single source for forms + filters. */
+export const SIZES: Size[] = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"];
 
 export type OccasionKey =
   | "engagement"
@@ -24,6 +37,19 @@ export type OccasionKey =
 export type AdsTier = "free" | "boost" | "featured";
 export type Status = "pending" | "live" | "rejected" | "draft";
 export type KycStatus = "none" | "submitted" | "verified" | "rejected";
+
+/** Booking lifecycle — mirrors the BookingStatus enum in prisma/schema.prisma.
+ *  Keep in sync with BOOKING_STATUS_META / TRANSITIONS in lib/bookings.ts. */
+export type BookingStatus =
+  | "booking_pending"
+  | "waiting_for_payment"
+  | "payment_review"
+  | "confirmed"
+  | "cancel_requested"
+  | "slip_disputed"
+  | "rejected"
+  | "cancelled"
+  | "payment_expired";
 
 export type Occasion = {
   key: OccasionKey;
@@ -62,6 +88,9 @@ export type Boutique = {
   hours: string | null;
   line_url: string;
   instagram: string | null;
+  /** PromptPay id (mobile/national-id) for in-web QR payments.
+   *  Optional in the public Boutique shape — only the booking flow selects it. */
+  promptpay_id?: string | null;
   since_year: number | null;
   cover_color: Color;
   tag: string | null;
@@ -78,10 +107,8 @@ export type Boutique = {
   updated_at: string;
 };
 
-export type PriceTier = {
-  days: number;
-  price: number;
-};
+/** One duration-based pricing bracket. per_day = THB/day; max=null means open-ended (X+ days). */
+export type PriceTier = { min: number; max: number | null; per_day: number };
 
 export type Dress = {
   id: string;
@@ -93,11 +120,19 @@ export type Dress = {
   boutique_name: string;
   /** Denormalized from boutiques.verified — populated by listDresses(). */
   boutique_verified?: boolean;
+  /** Denormalized from the dress's boutique area_key — populated by listDresses(). Used for distance display. */
+  area_key?: string | null;
   size: Size;
   color: Color;
+  /** Starting/base per-day rate (THB). Fallback when no tiers; also the "from" price for cards & filters. */
   price_per_day: number;
+  /**
+   * Optional duration-based pricing. Contiguous day ranges, each with a per-day
+   * rate (longer = cheaper/day). Last tier has max=null (open-ended "X+ days").
+   * When null/empty, pricing falls back to price_per_day. See lib/pricing.ts.
+   */
+  price_tiers: PriceTier[] | null;
   deposit: number;
-  price_tiers: PriceTier[];
   description: string | null;
   images: string[];
   occasions: OccasionKey[];
@@ -123,6 +158,57 @@ export type Blackout = {
   created_at: string;
 };
 
+/* ----------------------------- bookings ----------------------------- */
+
+export type Address = {
+  id: string;
+  user_id: string;
+  recipient_name: string;
+  phone: string;
+  address_text: string;
+  is_default: boolean;
+  created_at: string;
+};
+
+export type Booking = {
+  id: string;
+  renter_id: string;
+  boutique_id: string;
+  dress_id: string;
+  start_date: string; // YYYY-MM-DD
+  end_date: string; // YYYY-MM-DD
+  rental_total: number;
+  deposit: number;
+  shipping_fee: number | null; // null until seller sets on accept
+  /** Platform commission snapshot (see lib/bookings.ts commissionAmount). */
+  commission_rate: number;
+  commission_amount: number | null;
+  /** Renter's first-touch acquisition channel (attribution). */
+  channel: string | null;
+  status: BookingStatus;
+  slip_path: string | null;
+  address_id: string | null;
+  recipient_name: string | null; // snapshot at booking time
+  phone: string | null;
+  address_text: string | null;
+  current_due_at: string | null;
+  cancel_reason: string | null;
+  cancel_from_status: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Booking joined with dress + boutique for list/detail rendering. */
+export type BookingDetail = Booking & {
+  dress_name: string | null;
+  dress_slug: string | null;
+  dress_image: string | null;
+  boutique_name: string | null;
+  boutique_slug: string | null;
+  boutique_line_url: string | null;
+  boutique_promptpay_id: string | null;
+};
+
 export type Profile = {
   id: string;
   email: string | null;
@@ -130,6 +216,59 @@ export type Profile = {
   line_id: string | null;
   role: "customer" | "seller" | "admin";
   saved_dress_ids: string[];
+  created_at: string;
+  updated_at: string;
+};
+
+/* ---------------------------- analytics ----------------------------- */
+
+/** Acquisition channel buckets — mirrors lib/attribution.ts Channel. */
+export type Channel =
+  | "instagram"
+  | "facebook"
+  | "tiktok"
+  | "line"
+  | "google"
+  | "youtube"
+  | "twitter"
+  | "email"
+  | "referral"
+  | "direct"
+  | "other";
+
+/** Visitor pageview event (general traffic analytics). */
+export type PageView = {
+  id: number;
+  session_id: string | null;
+  user_id: string | null;
+  path: string | null;
+  channel: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  referrer: string | null;
+  province: string | null;
+  country: string | null;
+  user_agent: string | null;
+  ip_hash: string | null;
+  created_at: string;
+};
+
+export type SubscriptionPlan = "free" | "boost" | "featured";
+export type SubscriptionStatus = "active" | "past_due" | "cancelled" | "expired";
+
+/** Seller paid-plan record (drives adoption-rate → revenue reporting). */
+export type SellerSubscription = {
+  id: string;
+  boutique_id: string | null;
+  owner_id: string | null;
+  plan: SubscriptionPlan;
+  status: SubscriptionStatus;
+  amount: number; // THB per cycle
+  billing_cycle: "monthly" | "yearly";
+  started_at: string | null;
+  current_period_end: string | null;
+  cancelled_at: string | null;
   created_at: string;
   updated_at: string;
 };

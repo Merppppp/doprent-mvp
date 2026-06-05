@@ -34,7 +34,7 @@ export default async function BoutiquesAdmin({
     verified: b.verified, featured: b.featured,
     created_at: b.createdAt.toISOString(), owner_id: b.ownerId,
   }));
-  const error = null;
+  const error = null as { message: string } | null;
 
   return (
     <div>

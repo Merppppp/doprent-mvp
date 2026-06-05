@@ -1,4 +1,10 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const R2_ENDPOINT = `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
 
@@ -13,7 +19,7 @@ export const r2 = new S3Client({
 
 export const R2_BUCKET = process.env.R2_BUCKET_NAME!;
 export const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL!;
-export const R2_PRIVATE_BUCKET = process.env.R2_PRIVATE_BUCKET_NAME!;
+export const R2_PRIVATE_BUCKET = process.env.R2_PRIVATE_BUCKET_NAME || R2_BUCKET;
 
 export async function uploadToR2(key: string, body: Buffer, contentType: string): Promise<string> {
   await r2.send(
@@ -33,5 +39,33 @@ export async function deleteFromR2(key: string): Promise<void> {
       Bucket: R2_BUCKET,
       Key: key,
     })
+  );
+}
+
+/* ------------------------- private files (slips) ------------------------- */
+
+/** Upload a private object to the slips bucket. Returns the KEY (no public URL). */
+export async function uploadPrivateToR2(
+  key: string,
+  body: Buffer,
+  contentType: string
+): Promise<string> {
+  await r2.send(
+    new PutObjectCommand({
+      Bucket: R2_PRIVATE_BUCKET,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  );
+  return key;
+}
+
+/** Short-lived presigned GET URL for a private object (default 30 min). */
+export async function getSignedPrivateUrl(key: string, expiresIn = 1800): Promise<string> {
+  return getSignedUrl(
+    r2,
+    new GetObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: key }),
+    { expiresIn }
   );
 }

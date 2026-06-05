@@ -177,9 +177,6 @@ export default function SellerAvailabilityPicker({ dresses }: { dresses: DressOp
           <AvailabilityCalendar
             dressId={selectedDressId}
             initialBlackouts={blackouts}
-            selectedYear={selectedYear}
-            selectedMonth={selectedMonth}
-            onMonthChange={handleMonthChange}
           />
         </div>
       ) : null}

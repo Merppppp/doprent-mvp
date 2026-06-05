@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { expireStaleBookings } from "@/lib/booking";
 
 const BOOKING_INCLUDE = {
   dress: { select: { id: true, name: true, slug: true, images: true } },
   boutique: { select: { id: true, name: true, slug: true, lineUrl: true, promptpayId: true } },
   address: true,
-  customer: { select: { id: true, name: true, email: true } },
+  renter: { select: { id: true, name: true, email: true } },
 };
 
 export async function GET(req: NextRequest) {
@@ -22,15 +21,13 @@ export async function GET(req: NextRequest) {
   const where =
     role === "seller"
       ? { boutique: { ownerId: session.user.id } }
-      : { customerId: session.user.id };
+      : { renterId: session.user.id };
 
   const bookings = await db.booking.findMany({
     where,
     include: BOOKING_INCLUDE,
     orderBy: { createdAt: "desc" },
   });
-
-  await expireStaleBookings(bookings.map((b) => b.id));
 
   return NextResponse.json(bookings);
 }
@@ -42,15 +39,14 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { dressId, addressId, dateFrom, dateTo, note } = body;
+  const { dressId, addressId, startDate, endDate } = body;
 
-  if (!dressId || !dateFrom || !dateTo) {
+  if (!dressId || !startDate || !endDate) {
     return NextResponse.json({ error: "กรุณากรอกข้อมูลให้ครบ" }, { status: 400 });
   }
 
-  // จำกัด 3 pending ต่อ user
   const pendingCount = await db.booking.count({
-    where: { customerId: session.user.id, status: "pending" },
+    where: { renterId: session.user.id, status: "booking_pending" },
   });
   if (pendingCount >= 3) {
     return NextResponse.json({ error: "มี booking รอดำเนินการอยู่แล้ว 3 รายการ" }, { status: 400 });
@@ -62,22 +58,32 @@ export async function POST(req: NextRequest) {
   });
   if (!dress) return NextResponse.json({ error: "ไม่พบชุดนี้" }, { status: 404 });
 
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  const rentalTotal = dress.pricePerDay * days;
+  const commissionRate = parseFloat(process.env.PLATFORM_COMMISSION_RATE || "0.10");
+  const commissionAmount = Math.round(rentalTotal * commissionRate);
+
+  const addr = addressId
+    ? await db.address.findUnique({ where: { id: addressId }, select: { recipientName: true, phone: true, addressText: true } })
+    : null;
 
   const booking = await db.booking.create({
     data: {
-      customerId: session.user.id,
+      renterId: session.user.id,
       boutiqueId: dress.boutiqueId,
       dressId,
+      startDate: start,
+      endDate: end,
+      rentalTotal,
+      deposit: dress.deposit,
+      commissionRate,
+      commissionAmount,
       addressId: addressId ?? null,
-      dateFrom: new Date(dateFrom),
-      dateTo: new Date(dateTo),
-      rentalFee: dress.pricePerDay,
-      depositFee: dress.deposit,
-      shippingFee: 0,
-      totalAmount: dress.pricePerDay + dress.deposit,
-      note: note ?? null,
-      expiresAt,
+      recipientName: addr?.recipientName ?? null,
+      phone: addr?.phone ?? null,
+      addressText: addr?.addressText ?? null,
     },
     include: BOOKING_INCLUDE,
   });

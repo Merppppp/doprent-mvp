@@ -24,16 +24,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (booking.boutique.ownerId !== session.user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (booking.status !== "pending") {
+  if (booking.status !== "booking_pending") {
     return NextResponse.json({ error: "ไม่สามารถตอบรับได้ในสถานะนี้" }, { status: 400 });
   }
 
   const updated = await db.booking.update({
     where: { id: params.id },
     data: {
-      status: "waiting_payment",
+      status: "waiting_for_payment",
       shippingFee,
-      totalAmount: booking.rentalFee + booking.depositFee + shippingFee,
     },
   });
 

@@ -5,8 +5,8 @@ export async function expireStaleBookings(bookingIds: string[]) {
   await db.booking.updateMany({
     where: {
       id: { in: bookingIds },
-      status: "pending",
-      expiresAt: { lt: new Date() },
+      status: "booking_pending",
+      currentDueAt: { lt: new Date() },
     },
     data: { status: "cancelled" },
   });

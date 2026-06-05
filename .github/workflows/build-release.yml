@@ -1,0 +1,39 @@
+# Pipeline: build-release
+# Trigger: tag push (v*)
+# Steps:   build & push to GHCR with semver tag (NO deployment)
+#
+# Usage:
+#   git tag v1.0.0 && git push origin v1.0.0
+#   → builds ghcr.io/doprent/doprent-mvp:v1.0.0
+#   → deploy manually via deploy-prod workflow
+
+name: Build Release
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  IMAGE: ghcr.io/doprent/doprent-mvp
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.ref_name }}
