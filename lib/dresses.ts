@@ -202,6 +202,28 @@ export async function getDressBySlug(slug: string): Promise<Dress | null> {
   return mapDress(d, boutique?.verified ?? false);
 }
 
+/**
+ * Paid sponsor strip — boutiques on a paid ads_tier (boost/featured).
+ * Powers the home marquee as a sponsored-shop placement. Featured first,
+ * then boost. Returns [] when no one is on a paid plan yet (caller falls
+ * back to the plain verified strip so it never renders empty).
+ */
+export async function listSponsorBoutiques(limit = 8): Promise<Boutique[]> {
+  try {
+    const rows = await db.boutique.findMany({
+      where: {
+        status: "live",
+        adsTier: { in: ["boost", "featured"] },
+      },
+      orderBy: [{ adsTier: "desc" }, { featured: "desc" }, { name: "asc" }],
+      take: limit,
+    });
+    return rows.map(mapBoutique);
+  } catch {
+    return [];
+  }
+}
+
 export async function listBoutiques(opts: { limit?: number; featuredFirst?: boolean } = {}): Promise<Boutique[]> {
   const rows = await db.boutique.findMany({
     where: { status: "live" },

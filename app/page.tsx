@@ -6,7 +6,7 @@ import { DressArt, BoutiqueCover, OccasionTile } from "@/components/DressArt";
 import HeroSwiper from "@/components/HeroSwiper";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { getCurrentUser } from "@/lib/auth";
-import { getStats, listBoutiques, listDresses, listOccasions } from "@/lib/dresses";
+import { getStats, listBoutiques, listDresses, listOccasions, listSponsorBoutiques } from "@/lib/dresses";
 
 // Force dynamic so DressCard receives correct per-user isLoggedIn / savedSet
 // (otherwise Next ISR caches one version and serves it to everyone)
@@ -17,15 +17,21 @@ const LINE_URL =
   process.env.NEXT_PUBLIC_DEFAULT_LINE_URL ?? "https://line.me/R/ti/p/@doprent";
 
 export default async function HomePage() {
-  const [dresses, boutiques, occasions, stats, user] = await Promise.all([
+  const [dresses, boutiques, sponsors, occasions, stats, user] = await Promise.all([
     listDresses({ limit: 8 }),
     listBoutiques({ featuredFirst: true, limit: 4 }),
+    listSponsorBoutiques(8),
     listOccasions(),
     getStats(),
     getCurrentUser().catch(() => null),
   ]);
+  // Paid (boost/featured) shops fill the marquee as a "ร้านสนับสนุน" ad slot.
+  // Fall back to the verified-shop strip when nobody is on a paid plan yet.
+  const sponsorStrip = sponsors.length > 0;
+  const marqueeShops = sponsorStrip ? sponsors : boutiques;
   const savedSet = new Set<string>(user?.savedDressIds ?? []);
   const isLoggedIn = !!user;
+  const teaserCount = Math.max(stats.dresses - dresses.length, 0);
 
   const orgLd = {
     "@context": "https://schema.org",
@@ -159,7 +165,7 @@ export default async function HomePage() {
               </Link>
             </div>
 
-            {/* Mini stats — editorial style */}
+            {/* Mini stats — editorial style with CountUp animation */}
             <div
               className="hero-stats rise rise-5"
               style={{
@@ -180,7 +186,7 @@ export default async function HomePage() {
                     color: "var(--ink)",
                   }}
                 >
-                  {stats.boutiques}
+                  <CountUp value={stats.boutiques} />
                 </div>
                 <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>
                   ร้านเช่า
@@ -196,7 +202,7 @@ export default async function HomePage() {
                     color: "var(--ink)",
                   }}
                 >
-                  {stats.dresses}
+                  <CountUp value={stats.dresses} />
                 </div>
                 <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>
                   ชุดพร้อมเช่า
@@ -212,7 +218,7 @@ export default async function HomePage() {
                     color: "var(--ink)",
                   }}
                 >
-                  ฿{stats.minPrice.toLocaleString()}
+                  <CountUp value={stats.minPrice} prefix="฿" />
                 </div>
                 <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>
                   เริ่มต้น / วัน
@@ -237,46 +243,62 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Stats are now integrated into the hero section above */}
-
-      {/* ========== TRUST ========== */}
-      <div
-        style={{
-          background: "var(--surface)",
-          borderTop: "1px solid var(--line)",
-          borderBottom: "1px solid var(--line)",
-        }}
-      >
-        <div
-          className="shell grid-4"
-          style={{
-            padding: "18px 0",
-            gap: 18,
-          }}
-        >
-          <TrustItem ttl="ตรวจสภาพก่อนส่ง" desc="ทุกชุดเช็คก่อนส่งมือลูกค้า" />
-          <TrustItem ttl="ร้านเช่าน่าเชื่อถือ" desc="คัดร้านที่ตรวจสอบแล้ว" />
-          <TrustItem ttl="ไม่มีค่าธรรมเนียม" desc="จ่ายราคาเดียวกับร้านบอก" />
-          <TrustItem ttl="คุยกับร้านโดยตรง" desc="ทุกขั้นตอนผ่าน LINE chat" />
+      {/* ========== SPONSOR / VERIFIED MARQUEE (paid shops first) ========== */}
+      {marqueeShops.length > 0 ? (
+        <div className="h26-marquee" aria-hidden>
+          <div className="track">
+            {[...marqueeShops, ...marqueeShops, ...marqueeShops].map((b, i) => (
+              <span className="item" key={`${b.id}-${i}`}>
+                {b.verified ? (
+                  <span className="v">
+                    <svg viewBox="0 0 24 24"><polyline points="4,12 10,18 20,6" /></svg>
+                  </span>
+                ) : null}
+                {b.name}
+                <span className="loc">· {b.area_label}</span>
+                {sponsorStrip ? <span className="spon">ร้านสนับสนุน</span> : null}
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
+
+      {/* ========== TRUST PILLARS ========== */}
+      <section className="h26-pillars" id="trust">
+        <div className="shell">
+          <div className="h26-phead reveal-stagger">
+            <h2>เช่ากับร้านที่ไม่รู้จักก็อุ่นใจได้</h2>
+            <p>DopRent คัดร้าน ตรวจสภาพ และให้คุณคุยตรงกับร้านทุกขั้นตอน</p>
+          </div>
+          <div className="h26-prow reveal-stagger">
+            <Pillar
+              n={1}
+              t="ร้านเช่าคัดมาแล้ว"
+              d="คัดเฉพาะร้านที่ตรวจสอบข้อมูลและรีวิวจริง ร้านที่ผ่านการยืนยันมีป้ายกำกับชัดเจน"
+            />
+            <Pillar
+              n={2}
+              t="ดูสภาพก่อนตัดสินใจ"
+              d="รูปและรายละเอียดชุดจากร้านโดยตรง สอบถามตำหนิ ขนาด เนื้อผ้า ได้ก่อนจอง"
+            />
+            <Pillar
+              n={3}
+              t="คุยกับร้านตรงผ่าน LINE"
+              d="ตกลงวันรับ–คืน ราคา และวิธีจัดส่งกับร้านเอง ไม่มีคนกลางมาเพิ่มค่าธรรมเนียม"
+            />
+          </div>
+        </div>
+      </section>
 
       {/* ========== HOW IT WORKS ========== */}
-      <section className="section-pad" style={{ background: "var(--bg)", padding: "72px 0" }}>
+      <section className="section-pad" style={{ background: "var(--surface)", padding: "72px 0", borderTop: "1px solid var(--line)" }}>
         <div className="shell">
-          <h2
-            style={{
-              fontSize: 32,
-              fontWeight: 700,
-              letterSpacing: "-0.02em",
-              marginBottom: 36,
-            }}
-          >
-            วิธีใช้งาน
+          <h2 style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.02em", marginBottom: 36 }}>
+            เช่าจบใน 3 ขั้นตอน
           </h2>
-          <div className="grid-3" style={{ gap: 24 }}>
-            <Step n="1" t="เลือกชุด" d="กรองตามโอกาส สี ขนาด ราคา ดีไซเนอร์ ร้านเช่า หาชุดที่ใช่ภายในไม่กี่คลิก" />
-            <Step n="2" t="แชต LINE กับร้าน" d="กดปุ่มเปิด LINE ตรงไปคุยกับร้านเช่า ตกลงวัน ราคา การส่ง" />
+          <div className="grid-3 reveal-stagger" style={{ gap: 24 }}>
+            <Step n="1" t="เลือกชุด เลือกวัน" d="กรองตามโอกาส สี ขนาด ราคา ร้านเช่า หาชุดที่ใช่ภายในไม่กี่คลิก" />
+            <Step n="2" t="แชต LINE กับร้าน" d="กดปุ่มเปิด LINE ตรงไปคุยกับร้าน ตกลงวัน ราคา และการส่ง" />
             <Step n="3" t="รับชุด ใส่ ส่งคืน" d="โอน PromptPay ตรงร้าน รับชุดผ่าน Grab ส่งคืนตามวันที่ตกลง" />
           </div>
         </div>
@@ -286,45 +308,20 @@ export default async function HomePage() {
       <section className="section-pad" style={{ padding: "60px 0" }}>
         <div className="shell">
           <SectionHead title="เลือกตามโอกาส" linkText="ดูทั้งหมด →" linkHref="/browse" />
-          <div className="grid-4" style={{ gap: 12 }}>
+          <div className="grid-4 reveal-stagger" style={{ gap: 12 }}>
             {occasions.map((o) => (
               <Link
                 key={o.key}
                 href={`/browse?occasion=${o.key}`}
-                style={{
-                  aspectRatio: "5/4",
-                  borderRadius: 8,
-                  overflow: "hidden",
-                  position: "relative",
-                  cursor: "pointer",
-                }}
+                className="media-zoom hover-lift"
+                style={{ aspectRatio: "5/4", borderRadius: 12, overflow: "hidden", position: "relative", cursor: "pointer" }}
               >
                 <OccasionTile color={o.color_token} />
-                <span
-                  style={{
-                    position: "absolute",
-                    left: 16,
-                    bottom: 14,
-                    right: 16,
-                    color: "var(--on-dark)",
-                    fontSize: 16,
-                    fontWeight: 600,
-                    lineHeight: 1.1,
-                    zIndex: 2,
-                  }}
-                >
+                <span style={{ position: "absolute", left: 16, bottom: 14, right: 16, color: "var(--on-dark)", fontSize: 16, fontWeight: 600, lineHeight: 1.1, zIndex: 2 }}>
                   {o.th}
-                  <span style={{ display: "block", fontSize: 12, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>
-                    {o.en}
-                  </span>
+                  <span style={{ display: "block", fontSize: 12, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>{o.en}</span>
                 </span>
-                <span
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: "linear-gradient(to top, rgba(0,0,0,0.55), transparent 55%)",
-                  }}
-                />
+                <span style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.55), transparent 55%)" }} />
               </Link>
             ))}
           </div>
@@ -334,11 +331,26 @@ export default async function HomePage() {
       {/* ========== JUST IN (NEW) ========== */}
       <section className="section-pad" style={{ background: "var(--warm)", padding: "72px 0" }}>
         <div className="shell">
-          <SectionHead title="มาใหม่" linkText={`ดูทั้งหมด ${stats.dresses} ชุด →`} linkHref="/browse" />
-          <div className="grid-4" style={{ gap: 20 }}>
-            {dresses.slice(0, 8).map((d, i) => (
+          <SectionHead title="ชุดมาใหม่" linkText={`ดูทั้งหมด ${stats.dresses} ชุด →`} linkHref="/browse" />
+          <p className="h26-fresh reveal-stagger">
+            <span className="live" /> อัปเดตจากร้านเป็นประจำ · เลือกก่อนชุดที่ถูกใจถูกจองไปก่อน
+          </p>
+          <div className="grid-4 reveal-stagger" style={{ gap: 20 }}>
+            {dresses.slice(0, 7).map((d, i) => (
               <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
             ))}
+            {/* curiosity hook — locked teaser into the full catalog */}
+            <Link href="/browse" className="h26-lock hover-lift" aria-label="ดูชุดทั้งหมด">
+              <div className="bg" />
+              <div className="ov">
+                <span className="lk">
+                  <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+                </span>
+                <span className="big">+{teaserCount > 0 ? teaserCount.toLocaleString() : stats.dresses.toLocaleString()}</span>
+                <span className="sm">ชุดในแคตตาล็อก</span>
+                <span className="unlock">แตะดูทั้งหมด →</span>
+              </div>
+            </Link>
           </div>
         </div>
       </section>
@@ -351,21 +363,10 @@ export default async function HomePage() {
             linkText={`ดูร้านเช่าทั้งหมด ${stats.boutiques} ร้าน →`}
             linkHref="/boutiques"
           />
-          <div className="grid-2" style={{ gap: 20 }}>
+          <div className="grid-2 reveal-stagger" style={{ gap: 20 }}>
             {boutiques.map((b) => (
-              <Link
-                key={b.id}
-                href={`/boutique/${b.slug}`}
-                className="boutique-card"
-                style={{
-                  background: "var(--surface)",
-                  border: "1px solid var(--line)",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  transition: "border 0.15s",
-                }}
-              >
-                <div className="cover">
+              <Link key={b.id} href={`/boutique/${b.slug}`} className="boutique-card card-surface" style={{ cursor: "pointer" }}>
+                <div className="cover media">
                   <BoutiqueCover color={b.cover_color} />
                 </div>
                 <div style={{ padding: 22, flex: 1 }}>
@@ -377,24 +378,8 @@ export default async function HomePage() {
                     {b.name}
                     {b.verified ? <VerifiedBadge size="sm" /> : null}
                   </h3>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: "var(--ink-2)",
-                      marginBottom: 14,
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    {b.tag}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "var(--ink-3)",
-                      display: "flex",
-                      gap: 12,
-                    }}
-                  >
+                  <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 14, lineHeight: 1.5 }}>{b.tag}</div>
+                  <div style={{ fontSize: 12, color: "var(--ink-3)", display: "flex", gap: 12 }}>
                     {b.since_year ? <span>เปิดตั้งแต่ {b.since_year}</span> : null}
                   </div>
                 </div>
@@ -404,6 +389,26 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ========== CTA ========== */}
+      <section className="section-pad" style={{ textAlign: "center", padding: "84px 0" }}>
+        <div className="shell">
+          <h2 className="display-serif" style={{ fontSize: "clamp(30px,4vw,46px)", marginBottom: 16 }}>
+            ชุดที่ใช่ <em style={{ fontStyle: "italic", color: "var(--accent)" }}>รออยู่</em> แล้ว
+          </h2>
+          <p style={{ color: "var(--ink-2)", fontSize: 17, maxWidth: "46ch", margin: "0 auto 28px" }}>
+            เลือกจากชุดงานกว่า {stats.dresses} ตัว จากร้านเช่าที่คัดมาแล้วทั่วกรุงเทพฯ
+          </p>
+          <Link href="/browse" className="btn btn-primary btn-lg" style={{ padding: "15px 30px", fontSize: 16 }}>
+            เริ่มเลือกชุด <span aria-hidden style={{ marginLeft: 2 }}>→</span>
+          </Link>
+        </div>
+      </section>
+
+      {/* ===== scoped styles for home page sections ===== */}
+      <style
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: HOME_CSS }}
+      />
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
@@ -413,69 +418,20 @@ export default async function HomePage() {
   );
 }
 
-function Stat({ num, lbl }: { num: string; lbl: string }) {
+function Pillar({ n, t, d }: { n: number; t: string; d: string }) {
   return (
-    <div>
-      <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1 }}>
-        {num}
-      </div>
-      <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 6 }}>{lbl}</div>
-    </div>
-  );
-}
-
-function TrustItem({ ttl, desc }: { ttl: string; desc: string }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 6,
-          background: "var(--bg)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "var(--ink)",
-          flexShrink: 0,
-          fontSize: 14,
-        }}
-      >
-        ✓
-      </div>
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2 }}>{ttl}</div>
-        <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{desc}</div>
-      </div>
+    <div className="h26-pillar">
+      <div className="pic">{n}</div>
+      <h3>{t}</h3>
+      <p>{d}</p>
     </div>
   );
 }
 
 function Step({ n, t, d }: { n: string; t: string; d: string }) {
   return (
-    <div
-      style={{
-        background: "var(--surface)",
-        padding: 24,
-        borderRadius: 8,
-        border: "1px solid var(--line)",
-      }}
-    >
-      <div
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 8,
-          background: "var(--ink)",
-          color: "var(--on-dark)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontWeight: 600,
-          fontSize: 14,
-          marginBottom: 16,
-        }}
-      >
+    <div className="card-surface hover-lift" style={{ padding: 24 }}>
+      <div style={{ width: 34, height: 34, borderRadius: 9, background: "var(--accent)", color: "var(--accent-ink)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 15, marginBottom: 16 }}>
         {n}
       </div>
       <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>{t}</div>
@@ -484,7 +440,6 @@ function Step({ n, t, d }: { n: string; t: string; d: string }) {
   );
 }
 
-// SectionHead component
 function SectionHead({
   title,
   linkText,
@@ -495,29 +450,64 @@ function SectionHead({
   linkHref: string;
 }) {
   return (
-    <div
-      className="section-head"
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "end",
-        marginBottom: 28,
-        gap: 12,
-      }}
-    >
-      <h2
-        style={{
-          fontSize: 32,
-          fontWeight: 700,
-          letterSpacing: "-0.02em",
-          lineHeight: 1.1,
-        }}
-      >
-        {title}
-      </h2>
-      <Link href={linkHref} style={{ fontSize: 14, color: "var(--ink-2)", padding: "6px 0" }}>
+    <div className="section-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "end", marginBottom: 20, gap: 12 }}>
+      <h2 style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.1 }}>{title}</h2>
+      <Link href={linkHref} style={{ fontSize: 14, color: "var(--cobalt)", padding: "6px 0", whiteSpace: "nowrap" }}>
         {linkText}
       </Link>
     </div>
   );
 }
+
+const HOME_CSS = `
+/* ===== Marquee ===== */
+.h26-marquee{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface);overflow:hidden;padding:13px 0}
+.h26-marquee .track{display:flex;gap:38px;white-space:nowrap;width:max-content;animation:h26scroll 30s linear infinite}
+.h26-marquee:hover .track{animation-play-state:paused}
+.h26-marquee .item{display:inline-flex;align-items:center;gap:8px;font-family:"Bai Jamjuree";font-weight:500;font-size:14.5px;color:var(--ink-2)}
+.h26-marquee .item .loc{color:var(--ink-3);font-weight:400;font-family:"Anuphan"}
+.h26-marquee .item .v{width:16px;height:16px;border-radius:50%;background:var(--accent);display:grid;place-items:center}
+.h26-marquee .item .v svg{width:9px;height:9px;stroke:var(--accent-ink);stroke-width:3.5;fill:none}
+.h26-marquee .item .spon{font-family:"Anuphan";font-weight:500;font-size:10.5px;letter-spacing:.02em;color:var(--gold);background:color-mix(in oklch,var(--gold) 16%,transparent);border:1px solid color-mix(in oklch,var(--gold) 34%,transparent);padding:1px 7px;border-radius:999px;margin-left:2px}
+@keyframes h26scroll{to{transform:translateX(-33.333%)}}
+
+/* ===== Trust Pillars ===== */
+.h26-pillars{padding:66px 0;background:var(--bg)}
+.h26-phead{max-width:56ch;margin:0 auto 44px;text-align:center}
+.h26-phead h2{font-size:clamp(26px,3.4vw,38px);font-weight:600;margin-bottom:12px}
+.h26-phead p{color:var(--ink-2);font-size:16.5px}
+.h26-prow{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+.h26-pillar{padding:0 34px;position:relative}
+.h26-pillar + .h26-pillar{border-left:1px solid var(--line)}
+.h26-pillar .pic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;margin-bottom:16px;background:var(--accent-soft);color:var(--accent-2);font-family:"Bai Jamjuree";font-weight:600;font-size:17px}
+.h26-pillar h3{font-size:20px;font-weight:600;margin-bottom:9px}
+.h26-pillar p{color:var(--ink-2);font-size:15px;line-height:1.6}
+
+/* ===== Fresh indicator ===== */
+.h26-fresh{display:flex;align-items:center;gap:9px;font-size:14.5px;color:var(--ink-2);margin:-6px 0 24px}
+.h26-fresh .live{width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 0 0 color-mix(in oklch,var(--success) 50%,transparent);animation:h26pulse2 2s ease-in-out infinite}
+@keyframes h26pulse2{0%{box-shadow:0 0 0 0 color-mix(in oklch,var(--success) 50%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+
+/* ===== Locked teaser card ===== */
+.h26-lock{position:relative;border-radius:12px;overflow:hidden;background:var(--surface);display:block;aspect-ratio:auto;min-height:100%;cursor:pointer}
+.h26-lock .bg{position:absolute;inset:0;background:linear-gradient(155deg,oklch(0.6 0.08 168),oklch(0.4 0.07 168));filter:blur(2px);transform:scale(1.05);transition:filter .5s ease,transform .7s ease}
+.h26-lock:hover .bg{filter:blur(0px);transform:scale(1.08)}
+.h26-lock::after{content:"";position:absolute;inset:0;background:oklch(0.235 0.018 70/.4)}
+.h26-lock .ov{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:18px;color:var(--on-dark)}
+.h26-lock .lk{width:40px;height:40px;border-radius:50%;background:color-mix(in oklch,var(--on-dark) 20%,transparent);backdrop-filter:blur(4px);display:grid;place-items:center;margin-bottom:13px;transition:transform .4s ease}
+.h26-lock:hover .lk{transform:scale(1.08)}
+.h26-lock .lk svg{width:18px;height:18px;stroke:var(--on-dark);stroke-width:2;fill:none}
+.h26-lock .big{font-family:"Bai Jamjuree";font-size:26px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
+.h26-lock .sm{font-size:13px;opacity:.9;margin-bottom:13px}
+.h26-lock .unlock{display:inline-flex;align-items:center;gap:6px;background:var(--bg);color:var(--ink);font-size:13.5px;font-weight:500;padding:8px 16px;border-radius:999px}
+
+@media (max-width:900px){
+  .h26-prow{grid-template-columns:1fr}
+  .h26-pillar{padding:24px 0}
+  .h26-pillar + .h26-pillar{border-left:none;border-top:1px solid var(--line)}
+}
+@media (prefers-reduced-motion:reduce){
+  .h26-fresh .live{animation:none}
+  .h26-marquee .track{animation:none}
+}
+`;
