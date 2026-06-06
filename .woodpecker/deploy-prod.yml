@@ -20,13 +20,10 @@ steps:
   - name: clone-config
     image: alpine/git
     environment:
-      CONFIG_KEY:
-        from_secret: config_deploy_key_prod
+      CONFIG_TOKEN:
+        from_secret: config_token_prod
     commands:
-      - mkdir -p ~/.ssh
-      - echo "$CONFIG_KEY" > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
-      - ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
-      - git clone --depth 1 git@github.com:doprent/doprent-config-prod.git .config
+      - git clone --depth 1 https://x-access-token:${CONFIG_TOKEN}@github.com/doprent/doprent-config-prod.git .config
       - echo "Config loaded:" && wc -l .config/doprent-mvp/prod.env
 
   - name: deploy-prod
