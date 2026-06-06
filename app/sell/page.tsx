@@ -127,9 +127,9 @@ export default async function SellLanding() {
           ทำไมร้านเช่าชุดเลือก DopRent
         </h2>
         <div className="grid-3" style={{ gap: 20 }}>
-          <Feature icon="💸" title="ไม่เก็บเปอร์เซ็นต์" body="ราคา ค่ามัดจำ ค่าส่ง ลูกค้าคุยกับร้านโดยตรง DopRent ไม่หักเงิน" />
-          <Feature icon="💚" title="LINE ตรงๆ" body="ลูกค้ากดปุ่ม LINE ทักร้านทันที ไม่มีระบบ chat กลาง ไม่มี middleman" />
-          <Feature icon="🎯" title="ลูกค้าตรงกลุ่ม" body="ผู้ใช้ DopRent คือผู้หญิงกรุงเทพฯ 25-35 ที่กำลังหาชุดเฉพาะกิจ" />
+          <Feature icon="" title="ไม่เก็บเปอร์เซ็นต์" body="ราคา ค่ามัดจำ ค่าส่ง ลูกค้าคุยกับร้านโดยตรง DopRent ไม่หักเงิน" />
+          <Feature icon="" title="เข้าถึงลูกค้าได้ง่าย" body="สื่อสารสะดวก ติดต่อสอบถามลูกค้าได้โดยตรง" />
+          <Feature icon="" title="ลูกค้าตรงกลุ่ม" body="สร้างโปรไฟล์ร้าน โปรโมทผ่าน Doprent เจาะลูกค้าตรงกลุ่ม" />
         </div>
       </div>
 
