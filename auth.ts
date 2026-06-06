@@ -18,6 +18,7 @@ class EmailNotVerifiedError extends CredentialsSignin {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   adapter: PrismaAdapter(db),
   // JWT strategy: session lives in a cookie — no DB call needed in middleware
   // Prisma adapter still handles OAuth accounts + user storage

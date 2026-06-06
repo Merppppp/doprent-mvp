@@ -39,6 +39,9 @@ ARG NEXT_PUBLIC_CLARITY_ID
 # DB URL for build (Next.js prerender needs a live DB)
 ARG DATABASE_URL
 
+# Ensure public dir exists (some projects don't have one)
+RUN mkdir -p public
+
 # Build Next.js — produces .next/standalone
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
@@ -74,6 +77,6 @@ USER nextjs
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD wget -qO- http://localhost:3000/api/health 2>/dev/null || wget -qO- http://localhost:3000/ 2>/dev/null || exit 1
+  CMD wget -qO- http://127.0.0.1:3000/api/health 2>/dev/null || wget -qO- http://127.0.0.1:3000/ 2>/dev/null || exit 1
 
 CMD ["node", "server.js"]

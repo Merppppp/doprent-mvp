@@ -1,24 +1,36 @@
 # Pipeline: build-release
 # Trigger: tag push (v*)
-# Steps:   build & push to GHCR with semver tag (NO deployment)
+# Flow:    clone prod config → build & push to GHCR with semver tag (NO deployment)
 
 when:
   - event: tag
     ref: "refs/tags/v*"
 
 steps:
-  - name: build-push-release
-    image: woodpeckerci/plugin-docker-buildx
-    settings:
-      registry: ghcr.io
-      repo: ghcr.io/doprent/doprent-mvp
-      tags: ${CI_COMMIT_TAG}
-      username:
-        from_secret: ghcr_username
-      password:
-        from_secret: ghcr_token
-      build_args_from_env:
-        - DATABASE_URL
+  - name: clone-config
+    image: alpine/git
     environment:
-      DATABASE_URL:
-        from_secret: database_url_prod
+      CONFIG_KEY:
+        from_secret: config_deploy_key_prod
+    commands:
+      - mkdir -p ~/.ssh
+      - echo "$CONFIG_KEY" > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
+      - ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+      - git clone --depth 1 git@github.com:doprent/doprent-config-prod.git .config
+      - echo "Config loaded:" && wc -l .config/doprent-mvp/prod.env
+
+  - name: build-push-release
+    image: docker:27-cli
+    environment:
+      GHCR_USERNAME:
+        from_secret: ghcr_username
+      GHCR_TOKEN:
+        from_secret: ghcr_token
+    commands:
+      - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+      - >-
+        docker build
+        $(grep -vE '^(#|$)' .config/doprent-mvp/prod.env | sed 's/^/--build-arg /' | tr '\n' ' ')
+        -t ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG} .
+      - docker push ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG}
+      - echo "Pushed ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG}"

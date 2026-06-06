@@ -1,6 +1,6 @@
 # Pipeline: deploy-uat
 # Trigger: push to main branch
-# Steps:   build & push to GHCR → deploy to VPS uat stack
+# Flow:    clone config → build & push to GHCR → deploy to VPS uat stack
 
 when:
   - branch: main
@@ -10,25 +10,37 @@ steps:
   - name: prepare-tag
     image: alpine
     commands:
-      - SHORT_SHA=$(echo $CI_COMMIT_SHA | cut -c1-7)
-      - echo "uat-$SHORT_SHA" > .tag
+      - echo "uat-$(echo $CI_COMMIT_SHA | cut -c1-7)" > .tag
       - echo "Image tag:" && cat .tag
 
-  - name: build-push
-    image: woodpeckerci/plugin-docker-buildx
-    settings:
-      registry: ghcr.io
-      repo: ghcr.io/doprent/doprent-mvp
-      tags: uat-${CI_COMMIT_SHA:0:7}
-      username:
-        from_secret: ghcr_username
-      password:
-        from_secret: ghcr_token
-      build_args_from_env:
-        - DATABASE_URL
+  - name: clone-config
+    image: alpine/git
     environment:
-      DATABASE_URL:
-        from_secret: database_url_uat
+      CONFIG_KEY:
+        from_secret: config_deploy_key_nonprod
+    commands:
+      - mkdir -p ~/.ssh
+      - echo "$CONFIG_KEY" > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
+      - ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+      - git clone --depth 1 git@github.com:doprent/doprent-config-non-prod.git .config
+      - echo "Config loaded:" && wc -l .config/doprent-mvp/uat.env
+
+  - name: build-push
+    image: docker:27-cli
+    environment:
+      GHCR_USERNAME:
+        from_secret: ghcr_username
+      GHCR_TOKEN:
+        from_secret: ghcr_token
+    commands:
+      - TAG=$(cat .tag)
+      - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+      - >-
+        docker build
+        $(grep -vE '^(#|$)' .config/doprent-mvp/uat.env | sed 's/^/--build-arg /' | tr '\n' ' ')
+        -t ghcr.io/doprent/doprent-mvp:$TAG .
+      - docker push ghcr.io/doprent/doprent-mvp:$TAG
+      - echo "Pushed ghcr.io/doprent/doprent-mvp:$TAG"
 
   - name: deploy-uat
     image: alpine
@@ -41,7 +53,8 @@ steps:
       - mkdir -p ~/.ssh
       - echo "$DEPLOY_SSH_KEY" > ~/.ssh/id_rsa
       - chmod 600 ~/.ssh/id_rsa
+      - scp -o StrictHostKeyChecking=no .config/doprent-mvp/uat.env deploy@157.85.101.85:/opt/doprent/doprent-server/envs/uat.env
       - >-
         ssh -o StrictHostKeyChecking=no deploy@157.85.101.85
         "docker service update --image ghcr.io/doprent/doprent-mvp:${TAG} doprent-mvp-uat_app --with-registry-auth"
-      - echo "Deployed $TAG to uat stack"
+      - echo "Deployed $TAG to uat"
