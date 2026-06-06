@@ -121,7 +121,7 @@ export default async function HomePage() {
           </Link>
 
           <Link
-            href="/boutiques"
+            href="/sell/signup"
             style={{
               marginTop: 18,
               fontSize: 13,
@@ -130,7 +130,7 @@ export default async function HomePage() {
               paddingBottom: 1,
             }}
           >
-            หรือดูร้านทั้งหมด
+            เปิดร้านกับ Doprent
           </Link>
         </div>
       </section>
