@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { Spinner } from "@/components/Loading";
 import AvailabilityCalendar from "./AvailabilityCalendar";
 
 type DressOption = {
@@ -145,7 +146,9 @@ export default function SellerAvailabilityPicker({ dresses }: { dresses: DressOp
       </div>
 
       {loading ? (
-        <div style={{ marginTop: 18, color: "var(--ink-3)", fontSize: 13 }}>กำลังโหลดปฏิทิน...</div>
+        <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 10, color: "var(--ink-3)", fontSize: 13 }}>
+          <Spinner size={16} label="กำลังโหลดปฏิทิน..." />
+        </div>
       ) : null}
       {error ? (
         <div

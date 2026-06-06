@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toggleSavedDress } from "@/app/actions/saved";
+import { Spinner } from "@/components/Loading";
 
 type Props = {
   dressId: string;
@@ -64,7 +65,7 @@ export default function SaveButton({
           cursor: isPending ? "wait" : "pointer",
         }}
       >
-        <HeartIcon filled={saved} size={18} />
+        {isPending ? <Spinner size={16} /> : <HeartIcon filled={saved} size={18} />}
       </button>
     );
   }
@@ -93,7 +94,7 @@ export default function SaveButton({
         zIndex: 2,
       }}
     >
-      <HeartIcon filled={saved} size={16} />
+      {isPending ? <Spinner size={14} /> : <HeartIcon filled={saved} size={16} />}
     </button>
   );
 }

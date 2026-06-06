@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Spinner } from "@/components/Loading";
 
 type Props = {
   dressName: string;
@@ -28,6 +29,7 @@ export default function LineMessageCopyBox({
   tagCode,
 }: Props) {
   const [copied, setCopied] = useState(false);
+  const [copying, setCopying] = useState(false);
 
   const message = useMemo(() => {
     const lines = ["สวัสดีค่ะ/ครับ"];
@@ -61,6 +63,7 @@ export default function LineMessageCopyBox({
   }, [dressName, boutiqueName, pricePerDay, dressPageUrl, dateFrom, dateTo]);
 
   const copyToClipboard = async () => {
+    setCopying(true);
     try {
       await navigator.clipboard.writeText(message);
       setCopied(true);
@@ -74,6 +77,8 @@ export default function LineMessageCopyBox({
       document.execCommand("copy");
       document.body.removeChild(textarea);
       setCopied(true);
+    } finally {
+      setCopying(false);
     }
 
     window.setTimeout(() => setCopied(false), 2000);
@@ -97,6 +102,7 @@ export default function LineMessageCopyBox({
         <button
           type="button"
           onClick={copyToClipboard}
+          disabled={copying}
           style={{
             border: "none",
             borderRadius: 8,
@@ -105,10 +111,11 @@ export default function LineMessageCopyBox({
             padding: "10px 14px",
             fontSize: 13,
             fontWeight: 600,
-            cursor: "pointer",
+            cursor: copying ? "wait" : "pointer",
+            opacity: copying ? 0.85 : 1,
           }}
         >
-          {copied ? "คัดลอกแล้ว" : "คัดลอกข้อความ"}
+          {copying ? <Spinner size={14} label="กำลังคัดลอก..." /> : copied ? "คัดลอกแล้ว" : "คัดลอกข้อความ"}
         </button>
       </div>
       <textarea

@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toggleBlackout } from "@/app/actions/availability";
+import { Spinner } from "@/components/Loading";
 
 type Props = {
   dressId: string;
@@ -280,7 +281,9 @@ export default function AvailabilityCalendar({
       ) : null}
 
       {pending ? (
-        <div style={{ marginTop: 10, fontSize: 11, color: "var(--ink-3)" }}>กำลังบันทึก…</div>
+        <div style={{ marginTop: 10, fontSize: 11, color: "var(--ink-3)", display: "flex", alignItems: "center", gap: 8 }}>
+          <Spinner size={14} label="กำลังบันทึก…" />
+        </div>
       ) : null}
     </div>
   );
