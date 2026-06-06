@@ -1,6 +1,6 @@
-# Pipeline: build-release
+# Pipeline: build-release + deploy-prod
 # Trigger: tag push (v*)
-# Flow:    clone prod config → build & push to GHCR with semver tag (NO deployment)
+# Flow:    clone prod config → build & push to GHCR → deploy to VPS prod stack
 
 when:
   - event: tag
@@ -28,3 +28,28 @@ steps:
       - "BUILD_ARGS=$$(grep -vE '^(#|$$)' .config/doprent-mvp/prod.env | sed 's/^/--build-arg /' | tr '\\n' ' ')"
       - "docker build $$BUILD_ARGS -t ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG} ."
       - "docker push ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG}"
+
+  - name: deploy-prod
+    image: alpine
+    environment:
+      DEPLOY_SSH_KEY:
+        from_secret: deploy_ssh_key
+    commands:
+      - apk add --no-cache openssh-client
+      - mkdir -p ~/.ssh
+      - "echo \"$$DEPLOY_SSH_KEY\" > ~/.ssh/id_rsa"
+      - chmod 600 ~/.ssh/id_rsa
+      - "scp -o StrictHostKeyChecking=no .config/doprent-mvp/prod.env deploy@157.85.101.85:/opt/doprent/doprent-server/envs/prod.env"
+      - >-
+        ssh -o StrictHostKeyChecking=no deploy@157.85.101.85 "
+          if docker service inspect doprent-mvp-prod_app >/dev/null 2>&1; then
+            echo 'Service exists — updating image...';
+            docker service update --image ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG} doprent-mvp-prod_app --with-registry-auth;
+          else
+            echo 'First deploy — creating stack...';
+            cd /opt/doprent/doprent-server &&
+            set -a && source envs/prod.env && set +a &&
+            export IMAGE_TAG=${CI_COMMIT_TAG} &&
+            docker stack deploy -c stacks/app-template.yml doprent-mvp-prod --with-registry-auth;
+          fi
+        "
