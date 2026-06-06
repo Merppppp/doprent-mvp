@@ -7,3 +7,6 @@ out
 *.log
 
 .claude
+
+.env.dev
+.env.main
