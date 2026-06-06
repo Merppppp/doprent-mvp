@@ -118,7 +118,7 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
   };
 
   if (opts.color && opts.color !== "all") where.color = opts.color;
-  if (opts.sizes?.length) where.size = { in: opts.sizes as Size[] };
+  if (opts.sizes?.length) where.size = { in: opts.sizes as unknown as Prisma.EnumSizeFilter<"Dress">["in"] };
   if (typeof opts.priceMax === "number") where.pricePerDay = { lte: opts.priceMax };
   if (opts.occasions?.length) where.occasions = { hasSome: opts.occasions };
   if (opts.search) {

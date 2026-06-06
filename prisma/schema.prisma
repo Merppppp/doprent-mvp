@@ -347,9 +347,14 @@ model SellerSubscription {
 model Address {
   id            String   @id @default(uuid()) @db.Uuid
   userId        String   @map("user_id") @db.Uuid
+  label         String
   recipientName String   @map("recipient_name")
   phone         String
-  addressText   String   @map("address_text")
+  addressLine   String   @map("address_line")
+  subdistrict   String?
+  district      String?
+  province      String?  @default("กรุงเทพมหานคร")
+  postalCode    String   @map("postal_code")
   isDefault     Boolean  @default(false) @map("is_default")
   createdAt     DateTime @default(now()) @map("created_at")
 

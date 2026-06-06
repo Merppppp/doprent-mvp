@@ -303,11 +303,11 @@ export async function updateDress(dressId: string, formData: FormData): Promise<
 export async function updateDressPriceTiers(dressId: string, tiers: PriceTier[]): Promise<{ ok: boolean; error?: string }> {
   if (!Array.isArray(tiers)) return { ok: false, error: "รูปแบบข้อมูลไม่ถูกต้อง" };
   for (const t of tiers) {
-    if (!Number.isInteger(t.days) || t.days <= 0) return { ok: false, error: "จำนวนวันต้องเป็นจำนวนเต็มที่มากกว่า 0" };
-    if (!Number.isInteger(t.price) || t.price <= 0) return { ok: false, error: "ราคาต้องเป็นจำนวนเต็มที่มากกว่า 0" };
+    if (!Number.isInteger(t.min) || t.min <= 0) return { ok: false, error: "จำนวนวันต้องเป็นจำนวนเต็มที่มากกว่า 0" };
+    if (!Number.isInteger(t.per_day) || t.per_day <= 0) return { ok: false, error: "ราคาต้องเป็นจำนวนเต็มที่มากกว่า 0" };
   }
-  const days = tiers.map((t) => t.days);
-  if (new Set(days).size !== days.length) return { ok: false, error: "จำนวนวันต้องไม่ซ้ำกัน" };
+  const mins = tiers.map((t) => t.min);
+  if (new Set(mins).size !== mins.length) return { ok: false, error: "จำนวนวันต้องไม่ซ้ำกัน" };
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };

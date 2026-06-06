@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   const commissionAmount = Math.round(rentalTotal * commissionRate);
 
   const addr = addressId
-    ? await db.address.findUnique({ where: { id: addressId }, select: { recipientName: true, phone: true, addressText: true } })
+    ? await db.address.findUnique({ where: { id: addressId }, select: { recipientName: true, phone: true, addressLine: true } })
     : null;
 
   const booking = await db.booking.create({
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       addressId: addressId ?? null,
       recipientName: addr?.recipientName ?? null,
       phone: addr?.phone ?? null,
-      addressText: addr?.addressText ?? null,
+      addressText: addr?.addressLine ?? null,
     },
     include: BOOKING_INCLUDE,
   });

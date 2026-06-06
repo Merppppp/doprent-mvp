@@ -36,6 +36,9 @@ ARG NEXT_PUBLIC_DEFAULT_LINE_URL
 ARG NEXT_PUBLIC_GA_ID
 ARG NEXT_PUBLIC_CLARITY_ID
 
+# DB URL for build (Next.js prerender needs a live DB)
+ARG DATABASE_URL
+
 # Build Next.js — produces .next/standalone
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build

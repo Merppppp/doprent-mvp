@@ -92,7 +92,7 @@ export async function getMyAddresses(): Promise<Address[]> {
     user_id: a.userId,
     recipient_name: a.recipientName,
     phone: a.phone,
-    address_text: a.addressText,
+    address_text: a.addressLine,
     is_default: a.isDefault,
     created_at: a.createdAt.toISOString(),
   }));

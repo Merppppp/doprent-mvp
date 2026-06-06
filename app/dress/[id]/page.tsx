@@ -315,10 +315,10 @@ export default async function DressPage({ params }: { params: Params }) {
                 {dress.price_tiers.map((t, i) => (
                   <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                     <div style={{ padding: 10, borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)" }}>
-                      {t.days} วัน
+                      {t.min}{t.max ? `–${t.max}` : "+"} วัน
                     </div>
                     <div style={{ padding: 10, borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)", textAlign: "right", fontWeight: 600 }}>
-                      ฿{(t.price ?? 0).toLocaleString()}
+                      ฿{(t.per_day ?? 0).toLocaleString()}/วัน
                     </div>
                   </div>
                 ))}

@@ -29,11 +29,16 @@ export async function addAddress(formData: FormData): Promise<Result<{ id: strin
 
   const recipient = String(formData.get("recipient_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
-  const addressText = String(formData.get("address_text") ?? "").trim();
+  const label = String(formData.get("label") ?? "บ้าน").trim();
+  const addressLine = String(formData.get("address_line") ?? formData.get("address_text") ?? "").trim();
+  const subdistrict = String(formData.get("subdistrict") ?? "").trim() || null;
+  const district = String(formData.get("district") ?? "").trim() || null;
+  const province = String(formData.get("province") ?? "กรุงเทพมหานคร").trim();
+  const postalCode = String(formData.get("postal_code") ?? "").trim();
   const makeDefault = String(formData.get("is_default") ?? "") === "on";
   if (!recipient) return { ok: false, error: "กรุณาใส่ชื่อผู้รับ" };
   if (!phone) return { ok: false, error: "กรุณาใส่เบอร์โทร" };
-  if (!addressText) return { ok: false, error: "กรุณาใส่ที่อยู่จัดส่ง" };
+  if (!addressLine) return { ok: false, error: "กรุณาใส่ที่อยู่จัดส่ง" };
 
   // First address becomes default automatically.
   const count = await db.address.count({ where: { userId: user.id } });
@@ -49,9 +54,14 @@ export async function addAddress(formData: FormData): Promise<Result<{ id: strin
   const created = await db.address.create({
     data: {
       userId: user.id,
+      label,
       recipientName: recipient,
       phone,
-      addressText,
+      addressLine,
+      subdistrict,
+      district,
+      province,
+      postalCode,
       isDefault,
     },
     select: { id: true },
@@ -94,7 +104,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   // address snapshot (must belong to the user)
   const addr = await db.address.findFirst({
     where: { id: addressId, userId: user.id },
-    select: { id: true, recipientName: true, phone: true, addressText: true },
+    select: { id: true, recipientName: true, phone: true, addressLine: true },
   });
   if (!addr) return { ok: false, error: "ไม่พบที่อยู่จัดส่ง" };
 
@@ -125,7 +135,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
       addressId: addr.id,
       recipientName: addr.recipientName,
       phone: addr.phone,
-      addressText: addr.addressText,
+      addressText: addr.addressLine,
     },
     select: { id: true },
   });
