@@ -51,13 +51,13 @@ steps:
       - >-
         ssh -o StrictHostKeyChecking=no deploy@157.85.101.85 "
           if docker service inspect doprent-mvp-dev_app >/dev/null 2>&1; then
+            echo 'Service exists — updating image...';
             docker service update --image ghcr.io/doprent/doprent-mvp:$${TAG} doprent-mvp-dev_app --with-registry-auth;
           else
-            echo '::error:: Stack doprent-mvp-dev not found on VPS. Run first-time deploy manually:';
-            echo '  ssh deploy@157.85.101.85';
-            echo '  cd /opt/doprent/doprent-server';
-            echo '  source envs/dev.env && export DOMAIN=dev.doprent.com IMAGE_TAG=$${TAG} REGISTRY=ghcr.io IMAGE_NAME=doprent/doprent-mvp';
-            echo '  docker stack deploy -c stacks/app-template.yml doprent-mvp-dev --with-registry-auth';
-            exit 1;
+            echo 'First deploy — creating stack...';
+            cd /opt/doprent/doprent-server &&
+            set -a && source envs/dev.env && set +a &&
+            export IMAGE_TAG=$${TAG} &&
+            docker stack deploy -c stacks/app-template.yml doprent-mvp-dev --with-registry-auth;
           fi
         "
