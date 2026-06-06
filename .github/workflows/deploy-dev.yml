@@ -20,6 +20,7 @@ jobs:
   build-and-deploy:
     if: github.repository == 'doprent/doprent-mvp'
     runs-on: ubuntu-latest
+    environment: dev
 
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +39,11 @@ jobs:
           context: .
           push: true
           tags: ${{ env.IMAGE }}:${{ env.TAG }}
+          build-args: |
+            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
+            NEXT_PUBLIC_DEFAULT_LINE_URL=${{ vars.NEXT_PUBLIC_DEFAULT_LINE_URL }}
+            NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID }}
+            NEXT_PUBLIC_CLARITY_ID=${{ vars.NEXT_PUBLIC_CLARITY_ID }}
 
       - name: Deploy to VPS
         env:

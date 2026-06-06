@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { isValidLineContact, normalizeLineUrl } from "@/lib/line";
 import { dressLimitFor } from "@/lib/tiers";
@@ -231,7 +232,7 @@ export async function createDress(formData: FormData): Promise<{ ok: boolean; er
       size: String(formData.get("size") ?? "M") as "XS"|"S"|"M"|"L"|"XL",
       color: String(formData.get("color") ?? "rose") as Color,
       pricePerDay,
-      priceTiers: tiers.length ? tiers : null,
+      priceTiers: tiers.length ? tiers : Prisma.JsonNull,
       deposit: parseInt(String(formData.get("deposit") ?? "0"), 10) || 0,
       description: String(formData.get("description") ?? "").trim() || null,
       images,
@@ -281,7 +282,7 @@ export async function updateDress(dressId: string, formData: FormData): Promise<
       if (!v.ok) return { ok: false, error: v.error ?? "ราคาตามช่วงไม่ถูกต้อง" };
       updates.priceTiers = updTiers;
     } else {
-      updates.priceTiers = null;
+      updates.priceTiers = Prisma.JsonNull;
     }
   }
   const dep = formData.get("deposit");

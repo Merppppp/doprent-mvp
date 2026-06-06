@@ -30,6 +30,12 @@ COPY . .
 # Generate Prisma client (required before build)
 RUN npx prisma generate
 
+# Build-time env (NEXT_PUBLIC_* baked into bundle)
+ARG NEXT_PUBLIC_SITE_URL
+ARG NEXT_PUBLIC_DEFAULT_LINE_URL
+ARG NEXT_PUBLIC_GA_ID
+ARG NEXT_PUBLIC_CLARITY_ID
+
 # Build Next.js — produces .next/standalone
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
