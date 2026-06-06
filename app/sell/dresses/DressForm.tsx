@@ -111,6 +111,8 @@ export default function DressForm(props: Props) {
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
   const [available, setAvailable] = useState(initial?.available ?? true);
   const [uploadingCount, setUploadingCount] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState("");
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -147,10 +149,35 @@ export default function DressForm(props: Props) {
     };
   }, []);
 
+  function uploadFileWithProgress(file: File, onProgress: (percent: number) => void) {
+    return new Promise<{ url: string; urls?: { large?: string } }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/upload");
+      xhr.responseType = "json";
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          onProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(xhr.response as { url: string; urls?: { large?: string } });
+        } else {
+          reject(new Error("อัปโหลดรูปไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง"));
+        }
+      };
+      xhr.onerror = () => reject(new Error("อัปโหลดรูปไม่สำเร็จ — โปรดตรวจสอบการเชื่อมต่อ"));
+      const fd = new FormData();
+      fd.append("file", file);
+      xhr.send(fd);
+    });
+  }
+
   async function uploadImages(files: FileList | null) {
     if (!files || files.length === 0) return;
     setImageError(null);
     setSubmitError(null);
+    setUploadStatus("กำลังเตรียมรูปภาพสำหรับอัปโหลด");
     const selectedFiles = Array.from(files);
     const nextPending = selectedFiles.map((file, index) => {
       const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : "";
@@ -163,36 +190,54 @@ export default function DressForm(props: Props) {
     try {
       for (const pending of nextPending) {
         let uploadFile = pending.file;
+        setUploadStatus(`กำลังอัปโหลดรูปที่ ${uploads.length + 1} จาก ${selectedFiles.length}`);
+        setUploadProgress((curr) => ({ ...curr, [pending.id]: 0 }));
         try {
           uploadFile = await prepareImageFileForUpload(pending.file);
         } catch (err) {
-          setImageError((err as Error).message);
+          const message = (err as Error).message || "ไฟล์รูปไม่ถูกต้อง";
+          setImageError(message);
+          setUploadStatus(null);
           setPendingUploads((curr) => curr.filter((item) => item.id !== pending.id));
           if (pending.preview) {
             URL.revokeObjectURL(pending.preview);
             previewUrlsRef.current = previewUrlsRef.current.filter((url) => url !== pending.preview);
           }
+          setUploadingCount((curr) => Math.max(0, curr - 1));
           continue;
         }
 
-        const fd = new FormData();
-        fd.append("file", uploadFile);
-        const res = await fetch("/api/upload", { method: "POST", body: fd });
-        if (!res.ok) {
-          setImageError("อัปโหลดรูปไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง");
+        try {
+          const json = await uploadFileWithProgress(uploadFile, (percent) => {
+            setUploadProgress((curr) => ({ ...curr, [pending.id]: percent }));
+          });
+          const url = json.urls?.large ?? json.url ?? "";
+          if (!url) throw new Error("ไม่สามารถรับ URL รูปได้จากเซิร์ฟเวอร์");
+          uploads.push(url);
+        } catch (err) {
+          setImageError((err as Error).message);
+          setUploadStatus(null);
           break;
-        }
-        const json = await res.json();
-        const url = json.urls?.large ?? json.url ?? "";
-        if (url) uploads.push(url);
-        setPendingUploads((curr) => curr.filter((item) => item.id !== pending.id));
-        if (pending.preview) {
-          URL.revokeObjectURL(pending.preview);
-          previewUrlsRef.current = previewUrlsRef.current.filter((url) => url !== pending.preview);
+        } finally {
+          setPendingUploads((curr) => curr.filter((item) => item.id !== pending.id));
+          setUploadProgress((curr) => {
+            const next = { ...curr };
+            delete next[pending.id];
+            return next;
+          });
+          if (pending.preview) {
+            URL.revokeObjectURL(pending.preview);
+            previewUrlsRef.current = previewUrlsRef.current.filter((url) => url !== pending.preview);
+          }
+          setUploadingCount((curr) => Math.max(0, curr - 1));
         }
       }
-      setImages((curr) => [...curr, ...uploads]);
+      if (uploads.length > 0) {
+        setImages((curr) => [...curr, ...uploads]);
+      }
     } finally {
+      setUploadStatus(null);
+      setUploadProgress({});
       setUploadingCount(0);
     }
   }
@@ -301,38 +346,47 @@ export default function DressForm(props: Props) {
               </button>
             </div>
           ))}
-          {pendingUploads.map((pending) => (
-            <div
-              key={pending.id}
-              style={{
-                position: "relative",
-                width: 80,
-                height: 100,
-                borderRadius: 6,
-                overflow: "hidden",
-                background: "var(--bg)",
-                opacity: 0.9,
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={pending.preview} alt={pending.file.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          {pendingUploads.map((pending) => {
+            const progress = uploadProgress[pending.id] ?? 0;
+            return (
               <div
+                key={pending.id}
                 style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  padding: "4px 6px",
-                  background: "rgba(0,0,0,0.55)",
-                  color: "white",
-                  fontSize: 10,
-                  textAlign: "center",
+                  position: "relative",
+                  width: 80,
+                  height: 100,
+                  borderRadius: 6,
+                  overflow: "hidden",
+                  background: "var(--bg)",
+                  opacity: 0.9,
                 }}
               >
-                กำลังอัปโหลด…
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={pending.preview} alt={pending.file.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    padding: "6px 8px",
+                    background: "rgba(0,0,0,0.65)",
+                    color: "white",
+                    fontSize: 11,
+                    textAlign: "center",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    flexDirection: "column",
+                  }}
+                >
+                  <span>กำลังอัปโหลด</span>
+                  <span style={{ fontWeight: 600 }}>{progress}%</span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <label
             style={{
               width: 80,
@@ -357,9 +411,22 @@ export default function DressForm(props: Props) {
               onChange={(e) => uploadImages(e.target.files)}
               style={{ display: "none" }}
             />
-            {uploadingCount > 0 ? `กำลังขึ้น... (${uploadingCount})` : "+ อัปโหลด"}
+            {uploadingCount > 0 ? `กำลังอัปโหลด ${uploadingCount} รูป` : "+ อัปโหลด"}
           </label>
         </div>
+        {uploadStatus ? (
+          <div style={{ marginTop: 10, fontSize: 13, color: "var(--ink-3)" }}>
+            {uploadStatus}
+          </div>
+        ) : null}
+        {uploadingCount > 0 && Object.values(uploadProgress).length > 0 ? (
+          <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-4)" }}>
+            {`ความคืบหน้าโดยเฉลี่ย ${Math.round(
+              Object.values(uploadProgress).reduce((sum, value) => sum + value, 0) /
+                Object.values(uploadProgress).length,
+            )}%`}
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={() => setShowUrlInput((s) => !s)}
