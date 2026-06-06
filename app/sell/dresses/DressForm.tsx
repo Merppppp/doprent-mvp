@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createDress, updateDress, updateDressPriceTiers } from "@/app/actions/seller";
+import { MAX_UPLOAD_BYTES, prepareImageFileForUpload } from "@/lib/image";
 import type { Color, Occasion, OccasionKey, PriceTier, Size } from "@/lib/types";
 
 const COLORS: Color[] = ["rose", "ivory", "green", "black", "navy", "red", "blue", "purple"];
@@ -65,9 +66,12 @@ export default function DressForm(props: Props) {
   const [available, setAvailable] = useState(initial?.available ?? true);
   const [priceTiers, setPriceTiers] = useState<PriceTier[]>(initial?.price_tiers ?? []);
   const [uploadingCount, setUploadingCount] = useState(0);
+  const [pendingUploads, setPendingUploads] = useState<Array<{ id: string; file: File; preview: string }>>([]);
+  const previewUrlsRef = useRef<string[]>([]);
   const [urlInput, setUrlInput] = useState("");
   const [showUrlInput, setShowUrlInput] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   function toggleOccasion(k: OccasionKey) {
@@ -82,33 +86,68 @@ export default function DressForm(props: Props) {
       .map((s) => s.trim())
       .filter((s) => /^https?:\/\//.test(s));
     if (urls.length === 0) {
-      setError("ใส่ URL รูปที่ขึ้นต้นด้วย http:// หรือ https://");
+      setImageError("ใส่ URL รูปที่ขึ้นต้นด้วย http:// หรือ https://");
+      setSubmitError(null);
       return;
     }
     setImages((curr) => [...curr, ...urls]);
     setUrlInput("");
     setShowUrlInput(false);
-    setError(null);
+    setImageError(null);
+    setSubmitError(null);
   }
+
+  useEffect(() => {
+    return () => {
+      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   async function uploadImages(files: FileList | null) {
     if (!files || files.length === 0) return;
-    setError(null);
+    setImageError(null);
+    setSubmitError(null);
+    const selectedFiles = Array.from(files);
+    const nextPending = selectedFiles.map((file, index) => {
+      const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : "";
+      if (preview) previewUrlsRef.current.push(preview);
+      return { id: `${Date.now()}-${index}`, file, preview };
+    });
+    setPendingUploads((curr) => [...curr, ...nextPending]);
     const uploads: string[] = [];
-    setUploadingCount(files.length);
+    setUploadingCount(selectedFiles.length);
     try {
-      for (let i = 0; i < files.length; i++) {
+      for (const pending of nextPending) {
+        let uploadFile = pending.file;
+        try {
+          uploadFile = await prepareImageFileForUpload(pending.file);
+        } catch (err) {
+          setImageError((err as Error).message);
+          setPendingUploads((curr) => curr.filter((item) => item.id !== pending.id));
+          if (pending.preview) {
+            URL.revokeObjectURL(pending.preview);
+            previewUrlsRef.current = previewUrlsRef.current.filter((url) => url !== pending.preview);
+          }
+          continue;
+        }
+
         const fd = new FormData();
-        fd.append("file", files[i]);
+        fd.append("file", uploadFile);
         const res = await fetch("/api/upload", { method: "POST", body: fd });
         if (!res.ok) {
-          setError("อัปโหลดรูปไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง");
+          setImageError("อัปโหลดรูปไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง");
           break;
         }
         const json = await res.json();
-        uploads.push(json.urls?.large ?? json.url ?? "");
+        const url = json.urls?.large ?? json.url ?? "";
+        if (url) uploads.push(url);
+        setPendingUploads((curr) => curr.filter((item) => item.id !== pending.id));
+        if (pending.preview) {
+          URL.revokeObjectURL(pending.preview);
+          previewUrlsRef.current = previewUrlsRef.current.filter((url) => url !== pending.preview);
+        }
       }
-      setImages((curr) => [...curr, ...uploads.filter(Boolean)]);
+      setImages((curr) => [...curr, ...uploads]);
     } finally {
       setUploadingCount(0);
     }
@@ -116,7 +155,7 @@ export default function DressForm(props: Props) {
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError(null);
+    setSubmitError(null);
     setSubmitting(true);
 
     const fd = new FormData();
@@ -137,24 +176,24 @@ export default function DressForm(props: Props) {
       let dressId: string | undefined;
       if (isEdit) {
         const res = await updateDress(props.dressId, fd);
-        if (!res.ok) { setError(res.error ?? "บันทึกไม่สำเร็จ"); setSubmitting(false); return; }
+        if (!res.ok) { setSubmitError(res.error ?? "บันทึกไม่สำเร็จ"); setSubmitting(false); return; }
         dressId = props.dressId;
       } else {
         const res = await createDress(fd);
-        if (!res.ok) { setError(res.error ?? "บันทึกไม่สำเร็จ"); setSubmitting(false); return; }
+        if (!res.ok) { setSubmitError(res.error ?? "บันทึกไม่สำเร็จ"); setSubmitting(false); return; }
         dressId = res.id;
       }
       if (dressId) {
         const tiersRes = await updateDressPriceTiers(dressId, priceTiers);
         if (!tiersRes.ok) {
-          setError(tiersRes.error ?? "บันทึกแพ็กเกจราคาไม่สำเร็จ");
+          setSubmitError(tiersRes.error ?? "บันทึกแพ็กเกจราคาไม่สำเร็จ");
           setSubmitting(false);
           return;
         }
       }
       router.push("/sell/dashboard");
     } catch (err) {
-      setError((err as Error).message);
+      setSubmitError((err as Error).message);
       setSubmitting(false);
     }
   }
@@ -204,6 +243,38 @@ export default function DressForm(props: Props) {
               </button>
             </div>
           ))}
+          {pendingUploads.map((pending) => (
+            <div
+              key={pending.id}
+              style={{
+                position: "relative",
+                width: 80,
+                height: 100,
+                borderRadius: 6,
+                overflow: "hidden",
+                background: "var(--bg)",
+                opacity: 0.9,
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={pending.preview} alt={pending.file.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <div
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  padding: "4px 6px",
+                  background: "rgba(0,0,0,0.55)",
+                  color: "white",
+                  fontSize: 10,
+                  textAlign: "center",
+                }}
+              >
+                กำลังอัปโหลด…
+              </div>
+            </div>
+          ))}
           <label
             style={{
               width: 80,
@@ -247,6 +318,21 @@ export default function DressForm(props: Props) {
         >
           {showUrlInput ? "↑ ซ่อน URL input" : "หรือใส่ลิงก์รูปจากเว็บอื่น (Unsplash, IG, ฯลฯ)"}
         </button>
+        {imageError ? (
+          <div
+            style={{
+              marginTop: 12,
+              padding: 12,
+              background: "rgba(220,38,38,0.08)",
+              border: "1px solid rgba(220,38,38,0.3)",
+              borderRadius: 6,
+              color: "var(--danger)",
+              fontSize: 14,
+            }}
+          >
+            {imageError}
+          </div>
+        ) : null}
         {showUrlInput ? (
           <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "flex-start" }}>
             <textarea
@@ -459,7 +545,7 @@ export default function DressForm(props: Props) {
         </label>
       ) : null}
 
-      {error ? (
+      {submitError ? (
         <div
           style={{
             padding: 12,
@@ -470,7 +556,7 @@ export default function DressForm(props: Props) {
             fontSize: 14,
           }}
         >
-          {error}
+          {submitError}
         </div>
       ) : null}
 

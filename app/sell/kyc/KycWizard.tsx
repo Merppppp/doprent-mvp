@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { submitKyc } from "@/app/actions/seller";
+import { prepareImageFileForUpload } from "@/lib/image";
 
 type BusinessType = "individual" | "company";
 type Plan = "Free" | "Boost" | "Featured";
@@ -35,6 +36,12 @@ export default function KycWizard({ boutiqueId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState<{ field: string; pct: number } | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<{
+    id_card: { previewUrl: string; fileName: string; type: string } | null;
+    dbd_doc: { previewUrl: string; fileName: string; type: string } | null;
+    book_bank: { previewUrl: string; fileName: string; type: string } | null;
+  }>({ id_card: null, dbd_doc: null, book_bank: null });
+  const filePreviewRefs = useRef<Record<string, string>>({});
 
   // form state
   const [businessType, setBusinessType] = useState<BusinessType>("individual");
@@ -67,12 +74,47 @@ export default function KycWizard({ boutiqueId }: Props) {
       if (field === "id_card") setIdCardUrl(url);
       if (field === "dbd_doc") setDbdDocUrl(url);
       if (field === "book_bank") setBookBankUrl(url);
+      setPendingFiles((prev) => ({ ...prev, [field]: null }));
+      if (filePreviewRefs.current[field]) {
+        URL.revokeObjectURL(filePreviewRefs.current[field]);
+        delete filePreviewRefs.current[field];
+      }
       setUploading(null);
     } catch (err) {
       setError((err as Error).message);
       setUploading(null);
     }
   }
+
+  async function handleFileSelected(field: "id_card" | "dbd_doc" | "book_bank", file: File) {
+    setError(null);
+    const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : "";
+    if (filePreviewRefs.current[field]) {
+      URL.revokeObjectURL(filePreviewRefs.current[field]);
+    }
+    if (previewUrl) {
+      filePreviewRefs.current[field] = previewUrl;
+    }
+    setPendingFiles((prev) => ({
+      ...prev,
+      [field]: { previewUrl, fileName: file.name, type: file.type },
+    }));
+
+    let uploadFileData: File;
+    try {
+      uploadFileData = await prepareImageFileForUpload(file);
+    } catch (err) {
+      setError((err as Error).message);
+      return;
+    }
+    uploadFile(field, uploadFileData);
+  }
+
+  useEffect(() => {
+    return () => {
+      Object.values(filePreviewRefs.current).forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   function validateStep(s: Step): string | null {
     if (s === 1) return null;
@@ -201,8 +243,10 @@ export default function KycWizard({ boutiqueId }: Props) {
           setDbdRegNo={setDbdRegNo}
           idCardUrl={idCardUrl}
           dbdDocUrl={dbdDocUrl}
+          pendingIdCard={pendingFiles.id_card}
+          pendingDbdDoc={pendingFiles.dbd_doc}
           uploading={uploading}
-          uploadFile={uploadFile}
+          onFileSelected={handleFileSelected}
         />
       ) : null}
       {step === 3 ? (
@@ -351,8 +395,10 @@ function Step2(props: {
   setDbdRegNo: (s: string) => void;
   idCardUrl: string;
   dbdDocUrl: string;
+  pendingIdCard: { previewUrl: string; fileName: string; type: string } | null;
+  pendingDbdDoc: { previewUrl: string; fileName: string; type: string } | null;
   uploading: { field: string; pct: number } | null;
-  uploadFile: (f: "id_card" | "dbd_doc" | "book_bank", file: File) => Promise<void>;
+  onFileSelected: (f: "id_card" | "dbd_doc" | "book_bank", file: File) => void;
 }) {
   const isCompany = props.businessType === "company";
   return (
@@ -396,8 +442,9 @@ function Step2(props: {
         hint="JPG / PNG / PDF · ใช้สำหรับยืนยันตัวตนเท่านั้น เก็บเป็นความลับ"
         url={props.idCardUrl}
         field="id_card"
+        pending={props.pendingIdCard}
         uploading={props.uploading}
-        uploadFile={props.uploadFile}
+        onFileSelected={props.onFileSelected}
       />
       {isCompany ? (
         <FileSlot
@@ -405,8 +452,9 @@ function Step2(props: {
           hint="อายุไม่เกิน 3 เดือน"
           url={props.dbdDocUrl}
           field="dbd_doc"
+          pending={props.pendingDbdDoc}
           uploading={props.uploading}
-          uploadFile={props.uploadFile}
+          onFileSelected={props.onFileSelected}
         />
       ) : null}
     </div>
@@ -421,8 +469,9 @@ function Step3(props: {
   bankAccName: string;
   setBankAccName: (s: string) => void;
   bookBankUrl: string;
+  pendingBookBank: { previewUrl: string; fileName: string; type: string } | null;
   uploading: { field: string; pct: number } | null;
-  uploadFile: (f: "id_card" | "dbd_doc" | "book_bank", file: File) => Promise<void>;
+  onFileSelected: (f: "id_card" | "dbd_doc" | "book_bank", file: File) => void;
 }) {
   return (
     <div>
@@ -469,8 +518,9 @@ function Step3(props: {
         hint="หากมี ให้แนบหน้าที่มีชื่อบัญชีและเลขบัญชี"
         url={props.bookBankUrl}
         field="book_bank"
+        pending={props.pendingBookBank}
         uploading={props.uploading}
-        uploadFile={props.uploadFile}
+        onFileSelected={props.onFileSelected}
       />
     </div>
   );
@@ -530,44 +580,66 @@ function FileSlot({
   url,
   field,
   uploading,
-  uploadFile,
+  pending,
+  onFileSelected,
 }: {
   label: string;
   hint?: string;
   url: string;
   field: "id_card" | "dbd_doc" | "book_bank";
   uploading: { field: string; pct: number } | null;
-  uploadFile: (f: "id_card" | "dbd_doc" | "book_bank", file: File) => Promise<void>;
+  pending: { previewUrl: string; fileName: string; type: string } | null;
+  onFileSelected: (f: "id_card" | "dbd_doc" | "book_bank", file: File) => void;
 }) {
   const isUploading = uploading?.field === field;
+  const hasPreview = Boolean(pending?.previewUrl || (url && /\.(jpe?g|png|gif|webp|avif|bmp)$/i.test(url)));
+  const previewSrc = pending?.previewUrl || (url && /\.(jpe?g|png|gif|webp|avif|bmp)$/i.test(url) ? url : "");
+
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>{label}</div>
       {hint ? <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8 }}>{hint}</div> : null}
       <div
         style={{
-          border: `1px dashed ${url ? "var(--ink)" : "var(--line)"}`,
+          border: `1px dashed ${url || pending?.previewUrl ? "var(--ink)" : "var(--line)"}`,
           borderRadius: 8,
           padding: 14,
           background: "var(--surface)",
         }}
       >
-        {url ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ color: "#15803D" }}>✓</span>
-            <span style={{ fontSize: 13 }}>อัปโหลดแล้ว</span>
-            <label style={{ marginLeft: "auto", fontSize: 12, color: "var(--ink-3)", cursor: "pointer" }}>
-              เปลี่ยนไฟล์
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) uploadFile(field, f);
-                }}
-                style={{ display: "none" }}
-              />
-            </label>
+        {url || pending?.previewUrl ? (
+          <div style={{ display: "grid", gap: 10 }}>
+            {hasPreview ? (
+              <div style={{ width: "100%", minHeight: 120, borderRadius: 8, overflow: "hidden", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewSrc}
+                  alt={pending?.fileName ?? label}
+                  style={{ width: "100%", maxHeight: 220, objectFit: "contain", background: "var(--surface)" }}
+                />
+              </div>
+            ) : (
+              <div style={{ padding: 12, borderRadius: 6, background: "var(--surface)", color: "var(--ink-3)", fontSize: 13 }}>
+                {pending?.fileName ?? "ไฟล์เอกสารที่เลือก"}
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ color: isUploading ? "var(--ink-3)" : "#15803D", fontSize: 13 }}>
+                {isUploading ? "กำลังอัปโหลด…" : url ? "อัปโหลดแล้ว" : "ไฟล์พร้อมอัปโหลด"}
+              </span>
+              <label style={{ marginLeft: "auto", fontSize: 12, color: "var(--ink-3)", cursor: "pointer" }}>
+                เปลี่ยนไฟล์
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) onFileSelected(field, f);
+                  }}
+                  style={{ display: "none" }}
+                />
+              </label>
+            </div>
           </div>
         ) : (
           <label style={{ display: "block", cursor: "pointer", textAlign: "center", padding: 8 }}>
@@ -576,7 +648,7 @@ function FileSlot({
               accept="image/*,.pdf"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) uploadFile(field, f);
+                if (f) onFileSelected(field, f);
               }}
               style={{ display: "none" }}
             />
