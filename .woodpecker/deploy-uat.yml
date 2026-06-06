@@ -24,6 +24,11 @@ steps:
         from_secret: ghcr_username
       password:
         from_secret: ghcr_token
+      build_args_from_env:
+        - DATABASE_URL
+    environment:
+      DATABASE_URL:
+        from_secret: database_url_uat
 
   - name: deploy-uat
     image: alpine

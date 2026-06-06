@@ -24,6 +24,8 @@ steps:
         from_secret: ghcr_username
       password:
         from_secret: ghcr_token
+      build_args:
+        - DATABASE_URL=postgresql://admin:12345678@host.docker.internal:5433/doprent_dev
 
   - name: deploy-dev
     image: alpine
