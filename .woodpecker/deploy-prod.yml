@@ -1,24 +1,9 @@
-# =============================================================================
 # Pipeline: deploy-prod
-# Trigger: MANUAL only — specify IMAGE_TAG input before running
-# Steps:   pull specified image → deploy to prod stack on VPS
-#
-# Required secrets (configure in Woodpecker UI):
-#   deploy_ssh_key — Private SSH key for deploy@157.85.101.85
-#   ghcr_username  — GitHub username (for registry auth on remote)
-#   ghcr_token     — GitHub Personal Access Token (packages:read)
-#
-# Usage in Woodpecker UI:
-#   1. Go to Pipelines → deploy-prod → Trigger manually
-#   2. Set env var: IMAGE_TAG=v1.0.0
-#   3. Run
-# =============================================================================
+# Trigger: manual only
+# Usage: trigger manually in Woodpecker UI, set IMAGE_TAG variable
 
 when:
-  event: manual
-
-variables:
-  - &image_tag "${IMAGE_TAG:-MUST_SET_IMAGE_TAG}"
+  - event: manual
 
 steps:
   - name: validate-input
@@ -26,13 +11,11 @@ steps:
     commands:
       - |
         if [ -z "$IMAGE_TAG" ] || [ "$IMAGE_TAG" = "MUST_SET_IMAGE_TAG" ]; then
-          echo "ERROR: IMAGE_TAG env var is required. Set it before triggering this pipeline."
+          echo "ERROR: IMAGE_TAG env var is required."
           echo "Example: IMAGE_TAG=v1.0.0"
           exit 1
         fi
       - echo "Deploying image ghcr.io/doprent/doprent-mvp:$IMAGE_TAG to prod"
-    environment:
-      IMAGE_TAG: *image_tag
 
   - name: deploy-prod
     image: alpine
@@ -43,7 +26,6 @@ steps:
         from_secret: ghcr_username
       GHCR_TOKEN:
         from_secret: ghcr_token
-      IMAGE_TAG: *image_tag
     commands:
       - apk add --no-cache openssh-client
       - mkdir -p ~/.ssh

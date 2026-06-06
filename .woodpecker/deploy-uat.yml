@@ -1,17 +1,10 @@
-# =============================================================================
 # Pipeline: deploy-uat
-# Trigger: push to main branch (promotes to UAT)
-# Steps:   prepare tag → build & push to GHCR → deploy to VPS uat stack
-#
-# Required secrets (configure in Woodpecker UI):
-#   ghcr_username  — GitHub username with GHCR write access
-#   ghcr_token     — GitHub Personal Access Token (packages:write)
-#   deploy_ssh_key — Private SSH key for deploy@157.85.101.85
-# =============================================================================
+# Trigger: push to main branch
+# Steps:   build & push to GHCR → deploy to VPS uat stack
 
 when:
-  branch: main
-  event: push
+  - branch: main
+    event: push
 
 steps:
   - name: prepare-tag
@@ -22,20 +15,15 @@ steps:
       - echo "Image tag:" && cat .tag
 
   - name: build-push
-    image: docker:24-cli
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      GHCR_USERNAME:
+    image: woodpeckerci/plugin-docker-buildx
+    settings:
+      registry: ghcr.io
+      repo: ghcr.io/doprent/doprent-mvp
+      tags: uat-${CI_COMMIT_SHA:0:7}
+      username:
         from_secret: ghcr_username
-      GHCR_TOKEN:
+      password:
         from_secret: ghcr_token
-    commands:
-      - TAG=$(cat .tag)
-      - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-      - docker build -t ghcr.io/doprent/doprent-mvp:$TAG .
-      - docker push ghcr.io/doprent/doprent-mvp:$TAG
-      - echo "Pushed ghcr.io/doprent/doprent-mvp:$TAG"
 
   - name: deploy-uat
     image: alpine
