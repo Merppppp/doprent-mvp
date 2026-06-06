@@ -52,27 +52,33 @@ export async function POST(req: Request) {
         const session = await auth();
         userId = session?.user?.id ?? null;
         if (userId) {
-          // Recency for MAU — always updated.
-          await db.user.update({
+          const exists = await db.user.findUnique({
             where: { id: userId },
-            data: { lastActiveAt: new Date(), lastProvince: province },
+            select: { id: true },
           });
-          // Backfill signup attribution (e.g. OAuth users) when not yet set.
-          if (firstTouch) {
-            await db.user.updateMany({
-              where: { id: userId, signupChannel: null },
-              data: {
-                signupSource: firstTouch.source,
-                signupMedium: firstTouch.medium,
-                signupCampaign: firstTouch.campaign,
-                signupReferrer: firstTouch.referrer,
-                signupChannel: firstTouch.channel,
-              },
+          if (!exists) {
+            userId = null;
+          } else {
+            await db.user.update({
+              where: { id: userId },
+              data: { lastActiveAt: new Date(), lastProvince: province },
             });
+            if (firstTouch) {
+              await db.user.updateMany({
+                where: { id: userId, signupChannel: null },
+                data: {
+                  signupSource: firstTouch.source,
+                  signupMedium: firstTouch.medium,
+                  signupCampaign: firstTouch.campaign,
+                  signupReferrer: firstTouch.referrer,
+                  signupChannel: firstTouch.channel,
+                },
+              });
+            }
           }
         }
       } catch {
-        /* anon or auth unavailable — still record the pageview */
+        userId = null;
       }
 
       await db.pageView.create({
