@@ -1,0 +1,102 @@
+# Pipeline: manual operations
+# Trigger: manual only
+# Variables:
+#   ACTION     = deploy-prod | migrate  (required)
+#   IMAGE_TAG  = e.g. v1.0.0, dev-abc1234  (required)
+#   TARGET_ENV = dev | uat | prod  (required for migrate only)
+
+when:
+  - event: manual
+
+steps:
+  - name: validate-input
+    image: alpine
+    commands:
+      - |
+        case "$$ACTION" in
+          deploy-prod|migrate) echo "Action: $$ACTION" ;;
+          *) echo "ERROR: Set ACTION variable to 'deploy-prod' or 'migrate'"; exit 1 ;;
+        esac
+      - |
+        if [ -z "$$IMAGE_TAG" ]; then
+          echo "ERROR: IMAGE_TAG is required (e.g. v1.0.0, dev-abc1234)"
+          exit 1
+        fi
+      - |
+        if [ "$$ACTION" = "migrate" ]; then
+          case "$$TARGET_ENV" in
+            dev|uat|prod) ;;
+            *) echo "ERROR: TARGET_ENV must be dev, uat, or prod"; exit 1 ;;
+          esac
+        fi
+      - "echo OK — ACTION=$$ACTION IMAGE_TAG=$$IMAGE_TAG TARGET_ENV=$${TARGET_ENV:-n/a}"
+
+  - name: clone-config
+    image: alpine/git
+    environment:
+      CONFIG_TOKEN_NONPROD:
+        from_secret: config_token_nonprod
+      CONFIG_TOKEN_PROD:
+        from_secret: config_token_prod
+    commands:
+      - |
+        if [ "$$ACTION" = "deploy-prod" ]; then
+          ENV=prod
+        else
+          ENV="$$TARGET_ENV"
+        fi
+      - |
+        if [ "$$ENV" = "prod" ]; then
+          TOKEN="$$CONFIG_TOKEN_PROD"
+          REPO=doprent-config-prod
+        else
+          TOKEN="$$CONFIG_TOKEN_NONPROD"
+          REPO=doprent-config-non-prod
+        fi
+      - "git clone --depth 1 https://x-access-token:$${TOKEN}@github.com/doprent/$$REPO.git .config"
+      - |
+        if [ "$$ACTION" = "deploy-prod" ]; then
+          wc -l .config/doprent-mvp/prod.env
+        else
+          cat .config/doprent-mvp/$${TARGET_ENV}.migrate.env
+        fi
+
+  - name: deploy-prod
+    image: alpine
+    environment:
+      DEPLOY_SSH_KEY:
+        from_secret: deploy_ssh_key
+      GHCR_USERNAME:
+        from_secret: ghcr_username
+      GHCR_TOKEN:
+        from_secret: ghcr_token
+    commands:
+      - |
+        if [ "$$ACTION" != "deploy-prod" ]; then
+          echo "Skipping deploy-prod (ACTION=$$ACTION)"
+          exit 0
+        fi
+      - apk add --no-cache openssh-client
+      - mkdir -p ~/.ssh
+      - "echo \"$$DEPLOY_SSH_KEY\" > ~/.ssh/id_rsa"
+      - chmod 600 ~/.ssh/id_rsa
+      - "scp -o StrictHostKeyChecking=no .config/doprent-mvp/prod.env deploy@157.85.101.85:/opt/doprent/doprent-server/envs/prod.env"
+      - "ssh -o StrictHostKeyChecking=no deploy@157.85.101.85 \"echo '$$GHCR_TOKEN' | docker login ghcr.io -u '$$GHCR_USERNAME' --password-stdin && docker service update --image ghcr.io/doprent/doprent-mvp:$${IMAGE_TAG} doprent-mvp-prod_app --with-registry-auth\""
+
+  - name: run-migration
+    image: alpine
+    environment:
+      DEPLOY_SSH_KEY:
+        from_secret: deploy_ssh_key
+    commands:
+      - |
+        if [ "$$ACTION" != "migrate" ]; then
+          echo "Skipping migrate (ACTION=$$ACTION)"
+          exit 0
+        fi
+      - apk add --no-cache openssh-client
+      - mkdir -p ~/.ssh
+      - "echo \"$$DEPLOY_SSH_KEY\" > ~/.ssh/id_rsa"
+      - chmod 600 ~/.ssh/id_rsa
+      - "DB_URL=$$(grep -vE '^(#|$$)' .config/doprent-mvp/$${TARGET_ENV}.migrate.env | grep DATABASE_URL | cut -d= -f2-)"
+      - "ssh -o StrictHostKeyChecking=no deploy@157.85.101.85 \"docker run --rm --network app-net -e DATABASE_URL='$${DB_URL}' ghcr.io/doprent/doprent-mvp:$${IMAGE_TAG} npx prisma migrate deploy\""

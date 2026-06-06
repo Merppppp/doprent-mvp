@@ -145,7 +145,6 @@ export default async function HomePage() {
                   →
                 </span>
               </Link>
-
               <Link
                 href="/sell/signup"
                 className="link-underline"
