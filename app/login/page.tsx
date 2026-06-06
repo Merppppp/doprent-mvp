@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
+import { Spinner } from "@/components/Loading";
 
 export default function LoginPage() {
   const sp = useSearchParams();
@@ -90,8 +91,8 @@ export default function LoginPage() {
           กดปุ่มข้างล่างเพื่อส่งลิงก์ยืนยันใหม่
         </p>
         <button type="button" onClick={resendVerification} disabled={resendStatus !== "idle"}
-          className="btn btn-dark btn-block btn-lg" style={{ marginBottom: 10 }}>
-          {resendStatus === "sending" ? "กำลังส่ง..." : resendStatus === "sent" ? "✓ ส่งอีเมลใหม่แล้ว" : "ส่งลิงก์ยืนยันใหม่"}
+          className="btn btn-dark btn-block btn-lg" style={{ marginBottom: 10, display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
+          {resendStatus === "sending" ? <Spinner size={14} label="กำลังส่ง..." /> : resendStatus === "sent" ? "✓ ส่งอีเมลใหม่แล้ว" : "ส่งลิงก์ยืนยันใหม่"}
         </button>
         <button type="button" onClick={() => { setNeedsVerify(null); setResendStatus("idle"); }}
           className="btn btn-outline btn-block">
@@ -143,7 +144,7 @@ export default function LoginPage() {
         </div>
         <button type="submit" disabled={loading} className="btn btn-dark btn-block btn-lg"
           style={{ marginTop: 12, opacity: loading ? 0.6 : 1 }}>
-          {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+          {loading ? <Spinner size={16} label="กำลังเข้าสู่ระบบ..." /> : "เข้าสู่ระบบ"}
         </button>
       </form>
 
