@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { submitKyc } from "@/app/actions/seller";
 import RequiredMark from "@/components/RequiredMark";
 
@@ -53,6 +53,36 @@ export default function KycWizard({ boutiqueId }: Props) {
       setUploading(null);
     }
   }
+
+  async function handleFileSelected(field: "id_card" | "dbd_doc" | "book_bank", file: File) {
+    setError(null);
+    const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : "";
+    if (filePreviewRefs.current[field]) {
+      URL.revokeObjectURL(filePreviewRefs.current[field]);
+    }
+    if (previewUrl) {
+      filePreviewRefs.current[field] = previewUrl;
+    }
+    setPendingFiles((prev) => ({
+      ...prev,
+      [field]: { previewUrl, fileName: file.name, type: file.type },
+    }));
+
+    let uploadFileData: File;
+    try {
+      uploadFileData = await prepareImageFileForUpload(file);
+    } catch (err) {
+      setError((err as Error).message);
+      return;
+    }
+    uploadFile(field, uploadFileData);
+  }
+
+  useEffect(() => {
+    return () => {
+      Object.values(filePreviewRefs.current).forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   function validateStep(s: Step): string | null {
     if (s === 1) {
@@ -170,7 +200,7 @@ export default function KycWizard({ boutiqueId }: Props) {
           setTaxId={setTaxId}
           idCardUrl={idCardUrl}
           uploading={uploading}
-          uploadFile={uploadFile}
+          onFileSelected={handleFileSelected}
         />
       ) : null}
       {step === 2 ? (
@@ -300,8 +330,9 @@ function StepDocuments(props: {
         required
         url={props.idCardUrl}
         field="id_card"
+        pending={props.pendingIdCard}
         uploading={props.uploading}
-        uploadFile={props.uploadFile}
+        onFileSelected={props.onFileSelected}
       />
     </div>
   );
@@ -395,7 +426,8 @@ function FileSlot({
   url,
   field,
   uploading,
-  uploadFile,
+  pending,
+  onFileSelected,
 }: {
   label: string;
   hint?: string;
@@ -406,6 +438,9 @@ function FileSlot({
   uploadFile: (f: "id_card", file: File) => Promise<void>;
 }) {
   const isUploading = uploading?.field === field;
+  const hasPreview = Boolean(pending?.previewUrl || (url && /\.(jpe?g|png|gif|webp|avif|bmp)$/i.test(url)));
+  const previewSrc = pending?.previewUrl || (url && /\.(jpe?g|png|gif|webp|avif|bmp)$/i.test(url) ? url : "");
+
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
@@ -414,7 +449,7 @@ function FileSlot({
       {hint ? <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8 }}>{hint}</div> : null}
       <div
         style={{
-          border: `1px dashed ${url ? "var(--ink)" : "var(--line)"}`,
+          border: `1px dashed ${url || pending?.previewUrl ? "var(--ink)" : "var(--line)"}`,
           borderRadius: 8,
           padding: 14,
           background: "var(--surface)",
@@ -444,7 +479,7 @@ function FileSlot({
               accept="image/*,.pdf"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) uploadFile(field, f);
+                if (f) onFileSelected(field, f);
               }}
               style={{ display: "none" }}
             />
