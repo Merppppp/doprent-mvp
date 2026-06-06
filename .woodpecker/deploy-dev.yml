@@ -1,0 +1,51 @@
+# Pipeline: deploy-dev
+# Trigger: push to develop branch
+# Flow:    clone config → build & push to GHCR → deploy to VPS dev stack
+
+when:
+  - branch: develop
+    event: push
+
+steps:
+  - name: prepare-tag
+    image: alpine
+    commands:
+      - echo "dev-$$(echo $$CI_COMMIT_SHA | cut -c1-7)" > .tag
+      - cat .tag
+
+  - name: clone-config
+    image: alpine/git
+    environment:
+      CONFIG_TOKEN:
+        from_secret: config_token_nonprod
+    commands:
+      - "git clone --depth 1 https://x-access-token:$${CONFIG_TOKEN}@github.com/doprent/doprent-config-non-prod.git .config"
+      - wc -l .config/doprent-mvp/dev.env
+
+  - name: build-push
+    image: docker:27-cli
+    environment:
+      GHCR_USERNAME:
+        from_secret: ghcr_username
+      GHCR_TOKEN:
+        from_secret: ghcr_token
+    commands:
+      - TAG=$$(cat .tag)
+      - "echo \"$$GHCR_TOKEN\" | docker login ghcr.io -u \"$$GHCR_USERNAME\" --password-stdin"
+      - "BUILD_ARGS=$$(grep -vE '^(#|$$)' .config/doprent-mvp/dev.env | sed 's/^/--build-arg /' | tr '\\n' ' ')"
+      - "docker build $$BUILD_ARGS -t ghcr.io/doprent/doprent-mvp:$$TAG ."
+      - "docker push ghcr.io/doprent/doprent-mvp:$$TAG"
+
+  - name: deploy-dev
+    image: alpine
+    environment:
+      DEPLOY_SSH_KEY:
+        from_secret: deploy_ssh_key
+    commands:
+      - apk add --no-cache openssh-client
+      - TAG=$$(cat .tag)
+      - mkdir -p ~/.ssh
+      - "echo \"$$DEPLOY_SSH_KEY\" > ~/.ssh/id_rsa"
+      - chmod 600 ~/.ssh/id_rsa
+      - "scp -o StrictHostKeyChecking=no .config/doprent-mvp/dev.env deploy@157.85.101.85:/opt/doprent/doprent-server/envs/dev.env"
+      - "ssh -o StrictHostKeyChecking=no deploy@157.85.101.85 \"docker service update --image ghcr.io/doprent/doprent-mvp:$${TAG} doprent-mvp-dev_app --with-registry-auth\""

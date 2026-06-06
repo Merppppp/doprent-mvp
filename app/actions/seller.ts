@@ -3,9 +3,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { isValidLineContact, normalizeLineUrl } from "@/lib/line";
-import type { Color, PriceTier } from "@/lib/types";
+import { dressLimitFor } from "@/lib/tiers";
+import { normalizeTiers, validateTiers } from "@/lib/pricing";
+import type { AdsTier, Color, PriceTier } from "@/lib/types";
 
 function slugify(s: string): string {
   return s.toLowerCase().trim()
@@ -178,18 +181,36 @@ export async function createDress(formData: FormData): Promise<{ ok: boolean; er
 
   const boutique = await db.boutique.findUnique({
     where: { id: boutiqueId },
-    select: { ownerId: true, name: true, lineUrl: true, kycStatus: true },
+    select: { ownerId: true, name: true, lineUrl: true, kycStatus: true, adsTier: true },
   });
   if (!boutique || boutique.ownerId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์เพิ่มชุดในร้านนี้" };
   if (boutique.kycStatus === "none" || boutique.kycStatus === "rejected") {
     return { ok: false, error: "ต้องส่งเอกสาร KYC ก่อนถึงจะเพิ่มชุดได้" };
   }
 
+  // Enforce per-plan listing quota.
+  const limit = dressLimitFor(boutique.adsTier as AdsTier);
+  if (limit != null) {
+    const count = await db.dress.count({ where: { boutiqueId } });
+    if (count >= limit) {
+      return {
+        ok: false,
+        error: `แพ็กเกจปัจจุบันลงชุดได้สูงสุด ${limit} ตัว — อัปเกรดแพ็กเกจเพื่อลงเพิ่ม`,
+      };
+    }
+  }
+
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { ok: false, error: "กรุณาใส่ชื่อชุด" };
 
   const pricePerDay = parseInt(String(formData.get("price_per_day") ?? "0"), 10);
-  if (pricePerDay < 100) return { ok: false, error: "ราคาเช่าต่อวันต้องอย่างน้อย ฿100" };
+  const tiers = normalizeTiers(String(formData.get("price_tiers") ?? ""));
+  if (tiers.length) {
+    const v = validateTiers(tiers);
+    if (!v.ok) return { ok: false, error: v.error ?? "ราคาตามช่วงไม่ถูกต้อง" };
+  } else if (pricePerDay < 100) {
+    return { ok: false, error: "ราคาเช่าต่อวันต้องอย่างน้อย ฿100" };
+  }
 
   const lineUrlRaw = String(formData.get("line_url") ?? "").trim();
   const lineUrl = lineUrlRaw ? normalizeLineUrl(lineUrlRaw) : boutique.lineUrl;
@@ -211,6 +232,7 @@ export async function createDress(formData: FormData): Promise<{ ok: boolean; er
       size: String(formData.get("size") ?? "M") as "XS"|"S"|"M"|"L"|"XL",
       color: String(formData.get("color") ?? "rose") as Color,
       pricePerDay,
+      priceTiers: tiers.length ? tiers : Prisma.JsonNull,
       deposit: parseInt(String(formData.get("deposit") ?? "0"), 10) || 0,
       description: String(formData.get("description") ?? "").trim() || null,
       images,
@@ -252,6 +274,17 @@ export async function updateDress(dressId: string, formData: FormData): Promise<
   }
   const ppd = formData.get("price_per_day");
   if (ppd !== null) { const p = parseInt(String(ppd), 10); if (!isNaN(p) && p > 0) updates.pricePerDay = p; }
+  const tiersRaw = formData.get("price_tiers");
+  if (typeof tiersRaw === "string") {
+    const updTiers = normalizeTiers(tiersRaw);
+    if (updTiers.length) {
+      const v = validateTiers(updTiers);
+      if (!v.ok) return { ok: false, error: v.error ?? "ราคาตามช่วงไม่ถูกต้อง" };
+      updates.priceTiers = updTiers;
+    } else {
+      updates.priceTiers = Prisma.JsonNull;
+    }
+  }
   const dep = formData.get("deposit");
   if (dep !== null) { const p = parseInt(String(dep), 10); if (!isNaN(p)) updates.deposit = p; }
   const imagesRaw = formData.get("images");
@@ -270,11 +303,11 @@ export async function updateDress(dressId: string, formData: FormData): Promise<
 export async function updateDressPriceTiers(dressId: string, tiers: PriceTier[]): Promise<{ ok: boolean; error?: string }> {
   if (!Array.isArray(tiers)) return { ok: false, error: "รูปแบบข้อมูลไม่ถูกต้อง" };
   for (const t of tiers) {
-    if (!Number.isInteger(t.days) || t.days <= 0) return { ok: false, error: "จำนวนวันต้องเป็นจำนวนเต็มที่มากกว่า 0" };
-    if (!Number.isInteger(t.price) || t.price <= 0) return { ok: false, error: "ราคาต้องเป็นจำนวนเต็มที่มากกว่า 0" };
+    if (!Number.isInteger(t.min) || t.min <= 0) return { ok: false, error: "จำนวนวันต้องเป็นจำนวนเต็มที่มากกว่า 0" };
+    if (!Number.isInteger(t.per_day) || t.per_day <= 0) return { ok: false, error: "ราคาต้องเป็นจำนวนเต็มที่มากกว่า 0" };
   }
-  const days = tiers.map((t) => t.days);
-  if (new Set(days).size !== days.length) return { ok: false, error: "จำนวนวันต้องไม่ซ้ำกัน" };
+  const mins = tiers.map((t) => t.min);
+  if (new Set(mins).size !== mins.length) return { ok: false, error: "จำนวนวันต้องไม่ซ้ำกัน" };
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };

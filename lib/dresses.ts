@@ -2,10 +2,6 @@ import { db } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import type { Blackout, Boutique, Color, Dress, Occasion, OccasionKey, PriceTier, AdsTier, Status, KycStatus, Size } from "./types";
 
-// ---------------------------------------------------------------------------
-// Fallback data
-// ---------------------------------------------------------------------------
-
 const FALLBACK_OCCASIONS: Occasion[] = [
   { key: "engagement", th: "งานหมั้น", en: "Engagement", color_token: "rose", sort_order: 1 },
   { key: "wedding",    th: "งานแต่ง",  en: "Wedding",    color_token: "ivory", sort_order: 2 },
@@ -27,6 +23,7 @@ export type DressFilters = {
   occasions?: OccasionKey[];
   boutiqueSlugs?: string[];
   designers?: string[];
+  priceMin?: number;
   priceMax?: number;
   search?: string;
   sort?: "featured" | "price-asc" | "price-desc" | "name";
@@ -121,7 +118,7 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
   };
 
   if (opts.color && opts.color !== "all") where.color = opts.color;
-  if (opts.sizes?.length) where.size = { in: opts.sizes as string[] };
+  if (opts.sizes?.length) where.size = { in: opts.sizes as unknown as Prisma.EnumSizeFilter<"Dress">["in"] };
   if (typeof opts.priceMax === "number") where.pricePerDay = { lte: opts.priceMax };
   if (opts.occasions?.length) where.occasions = { hasSome: opts.occasions };
   if (opts.search) {

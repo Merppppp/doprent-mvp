@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { listOccasions } from "@/lib/dresses";
+import { normalizeTiers } from "@/lib/pricing";
 import DressForm from "../../DressForm";
 import type { Color, OccasionKey, PriceTier, Size } from "@/lib/types";
 
@@ -54,13 +55,13 @@ export default async function EditDressPage({ params }: { params: { id: string }
           size: dressRaw.size as Size,
           color: dressRaw.color as Color,
           price_per_day: dressRaw.pricePerDay,
+          price_tiers: normalizeTiers(dressRaw.priceTiers),
           deposit: dressRaw.deposit,
           description: dressRaw.description,
           line_url: dressRaw.lineUrl,
           images: (dressRaw.images ?? []) as string[],
           occasions: (dressRaw.occasions ?? []) as OccasionKey[],
           available: dressRaw.available,
-          price_tiers: (dressRaw.priceTiers ?? []) as PriceTier[],
         }}
       />
     </div>

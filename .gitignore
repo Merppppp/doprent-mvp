@@ -5,5 +5,5 @@ out
 .env.local
 .DS_Store
 *.log
-memory/
-tsconfig.tsbuildinfo
+
+.claude

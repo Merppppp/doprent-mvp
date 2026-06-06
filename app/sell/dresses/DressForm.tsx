@@ -3,8 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createDress, updateDress, updateDressPriceTiers } from "@/app/actions/seller";
-import { MAX_UPLOAD_BYTES, prepareImageFileForUpload } from "@/lib/image";
 import type { Color, Occasion, OccasionKey, PriceTier, Size } from "@/lib/types";
+import { MAX_UPLOAD_BYTES, prepareImageFileForUpload } from "@/lib/image";
+
+type PriceTierInput = { min: number; price: number };
 
 const COLORS: Color[] = ["rose", "ivory", "green", "black", "navy", "red", "blue", "purple"];
 const COLOR_TH: Record<Color, string> = {
@@ -64,15 +66,17 @@ export default function DressForm(props: Props) {
   const [occasions, setOccasions] = useState<OccasionKey[]>(initial?.occasions ?? []);
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
   const [available, setAvailable] = useState(initial?.available ?? true);
-  const [priceTiers, setPriceTiers] = useState<PriceTier[]>(initial?.price_tiers ?? []);
+  const [priceTiers, setPriceTiers] = useState<PriceTierInput[]>(
+    initial?.price_tiers?.map((tier) => ({ min: tier.min, price: tier.per_day })) ?? [],
+  );
   const [uploadingCount, setUploadingCount] = useState(0);
-  const [pendingUploads, setPendingUploads] = useState<Array<{ id: string; file: File; preview: string }>>([]);
-  const previewUrlsRef = useRef<string[]>([]);
   const [urlInput, setUrlInput] = useState("");
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [pendingUploads, setPendingUploads] = useState<Array<{ id: string; file: File; preview: string }>>([]);
+  const previewUrlsRef = useRef<string[]>([]);
 
   function toggleOccasion(k: OccasionKey) {
     setOccasions((curr) =>
@@ -96,8 +100,7 @@ export default function DressForm(props: Props) {
     setImageError(null);
     setSubmitError(null);
   }
-
-  useEffect(() => {
+    useEffect(() => {
     return () => {
       previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     };
@@ -184,7 +187,10 @@ export default function DressForm(props: Props) {
         dressId = res.id;
       }
       if (dressId) {
-        const tiersRes = await updateDressPriceTiers(dressId, priceTiers);
+        const tiersRes = await updateDressPriceTiers(
+          dressId,
+          priceTiers.map((tier) => ({ min: tier.min, max: null, per_day: tier.price })),
+        );
         if (!tiersRes.ok) {
           setSubmitError(tiersRes.error ?? "บันทึกแพ็กเกจราคาไม่สำเร็จ");
           setSubmitting(false);
@@ -196,6 +202,7 @@ export default function DressForm(props: Props) {
       setSubmitError((err as Error).message);
       setSubmitting(false);
     }
+
   }
 
   return (
@@ -432,10 +439,10 @@ export default function DressForm(props: Props) {
               inputMode="numeric"
               pattern="[0-9]*"
               placeholder="จำนวนวัน"
-              value={tier.days || ""}
+              value={tier.min || ""}
               onChange={(e) => {
                 const v = parseInt(e.target.value) || 0;
-                setPriceTiers((curr) => curr.map((t, idx) => idx === i ? { ...t, days: v } : t));
+                setPriceTiers((curr) => curr.map((t, idx) => idx === i ? { ...t, min: v } : t));
               }}
               style={inputStyle}
             />
@@ -471,7 +478,7 @@ export default function DressForm(props: Props) {
         ))}
         <button
           type="button"
-          onClick={() => setPriceTiers((curr) => [...curr, { days: 1, price: 0 }])}
+          onClick={() => setPriceTiers((curr) => [...curr, { min: 1, price: 0 }])}
           style={{
             width: "100%",
             padding: "10px",

@@ -33,9 +33,9 @@ export default async function AdminHomePage() {
       </p>
 
       <div className="grid-3" style={{ gap: 14, marginBottom: 36 }}>
-        <Stat label="KYC รออนุมัติ" value={kycPending} href="/admin/kyc" accent={!!kycPending.count} />
-        <Stat label="ร้านรออนุมัติ" value={bPending} href="/admin/boutiques?status=pending" accent={!!bPending.count} />
-        <Stat label="ชุดรออนุมัติ" value={dPending} href="/admin/dresses?status=pending" accent={!!dPending.count} />
+        <Stat label="KYC รออนุมัติ" value={kycPending} href="/admin/kyc" accent={!!kycPending} />
+        <Stat label="ร้านรออนุมัติ" value={bPending} href="/admin/boutiques?status=pending" accent={!!bPending} />
+        <Stat label="ชุดรออนุมัติ" value={dPending} href="/admin/dresses?status=pending" accent={!!dPending} />
       </div>
 
       <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>สถิติแพลตฟอร์ม</h2>

@@ -21,10 +21,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const booking = await db.booking.findUnique({ where: { id: params.id } });
 
   if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (booking.customerId !== session.user.id) {
+  if (booking.renterId !== session.user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (booking.status !== "waiting_payment") {
+  if (booking.status !== "waiting_for_payment") {
     return NextResponse.json({ error: "ไม่สามารถอัปโหลดสลิปในสถานะนี้" }, { status: 400 });
   }
 
@@ -49,11 +49,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     ContentType: file.type,
   }));
 
-  const slipUrl = key;
-
   const updated = await db.booking.update({
     where: { id: params.id },
-    data: { status: "paid", slipUrl },
+    data: { status: "payment_review", slipPath: key },
   });
 
   return NextResponse.json(updated);

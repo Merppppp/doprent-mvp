@@ -1,6 +1,9 @@
 import Link from "next/link";
 import DressCard from "@/components/DressCard";
+import CountUp from "@/components/CountUp";
+import DistanceBadge from "@/components/DistanceBadge";
 import { DressArt, BoutiqueCover, OccasionTile } from "@/components/DressArt";
+import HeroSwiper from "@/components/HeroSwiper";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { getCurrentUser } from "@/lib/auth";
 import { getStats, listBoutiques, listDresses, listOccasions } from "@/lib/dresses";
@@ -21,7 +24,6 @@ export default async function HomePage() {
     getStats(),
     getCurrentUser().catch(() => null),
   ]);
-  const heroDress = dresses[0];
   const savedSet = new Set<string>(user?.savedDressIds ?? []);
   const isLoggedIn = !!user;
 
@@ -38,132 +40,204 @@ export default async function HomePage() {
   return (
     <>
       {/* ========== HERO ==========
-          Editorial cover composition: single column, centered, serif display.
-          No right-column "dress art" placeholder (real photos aren't ready,
-          and a colored gradient block earns nothing). Typography + negative
-          space do the work. Inspired by editorial fashion brands (Toteme,
-          The Row) where the brand IS the wordmark + a single phrase. */}
+          Luxury split composition: editorial text left, curated dress
+          showcase right. Fashion-magazine layout (Vogue, Net-a-Porter)
+          where product is the hero visual, not abstract art.
+          Desktop: hero-grid (1.1fr 1fr). Mobile: stacks naturally. */}
       <section
         className="section-pad hero-editorial"
         style={{
           background: "var(--warm)",
-          padding: "120px 0 80px",
+          padding: "100px 0 72px",
           position: "relative",
         }}
       >
-        {/* Tiny ornamental brand mark — a single rust dot to break the
-            symmetry without adding visual noise. */}
-        <div
-          aria-hidden
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: 999,
-            background: "var(--accent)",
-            margin: "0 auto 32px",
-          }}
-        />
+        {/* Smoke aura — full-section, behind both columns */}
+        <div className="hero-mist" aria-hidden>
+          <span className="mist-blob mist-1" />
+          <span className="mist-blob mist-2" />
+          <span className="mist-blob mist-3" />
+        </div>
 
-        <div
-          className="shell"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            textAlign: "center",
-          }}
-        >
+        <div className="shell hero-grid">
+          {/* ---- Left: Editorial text ---- */}
           <div
             style={{
-              fontSize: 11,
-              color: "var(--ink-3)",
-              fontWeight: 500,
-              marginBottom: 28,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              paddingTop: 12,
             }}
           >
-            Bangkok &nbsp;·&nbsp; Boutique Rental
+            {/* Accent line + kicker */}
+            <div
+              className="rise rise-1"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 28,
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  width: 32,
+                  height: 1,
+                  background: "var(--accent)",
+                  display: "block",
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--ink-3)",
+                  fontWeight: 500,
+                  letterSpacing: "0.18em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Bangkok &nbsp;·&nbsp; Boutique Rental
+              </span>
+            </div>
+
+            <h1
+              className="hero-title display-serif rise rise-2"
+              style={{
+                marginBottom: 24,
+                maxWidth: "14ch",
+              }}
+            >
+              เช่าชุดจาก ร้านที่ไว้ใจได้
+            </h1>
+
+            <p
+              className="hero-sub rise rise-3"
+              style={{
+                fontSize: 17,
+                color: "var(--ink-2)",
+                maxWidth: 420,
+                marginBottom: 36,
+                lineHeight: 1.65,
+              }}
+            >
+              แคตตาล็อกชุดเช่าจากร้านในกรุงเทพ เลือกสี ขนาด ราคา แล้วทักร้านผ่าน LINE โดยตรง
+            </p>
+
+            {/* CTA cluster */}
+            <div
+              className="hero-cta rise rise-4"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <Link
+                href="/browse"
+                className="btn btn-primary btn-lg"
+                style={{ padding: "16px 32px", fontSize: 15 }}
+              >
+                เริ่มเลือกชุด
+                <span aria-hidden style={{ marginLeft: 4, fontSize: 16, lineHeight: 1 }}>
+                  →
+                </span>
+              </Link>
+
+              <Link
+                href="/sell/signup"
+                className="link-underline"
+                style={{
+                  fontSize: 14,
+                  color: "var(--ink-2)",
+                  padding: "8px 0",
+                }}
+              >
+                เปิดร้านกับ Doprent
+              </Link>
+            </div>
+
+            {/* Mini stats — editorial style */}
+            <div
+              className="hero-stats rise rise-5"
+              style={{
+                display: "flex",
+                gap: 32,
+                marginTop: 48,
+                paddingTop: 24,
+                borderTop: "1px solid var(--line)",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 28,
+                    fontWeight: 700,
+                    letterSpacing: "-0.02em",
+                    lineHeight: 1,
+                    color: "var(--ink)",
+                  }}
+                >
+                  {stats.boutiques}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>
+                  ร้านเช่า
+                </div>
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: 28,
+                    fontWeight: 700,
+                    letterSpacing: "-0.02em",
+                    lineHeight: 1,
+                    color: "var(--ink)",
+                  }}
+                >
+                  {stats.dresses}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>
+                  ชุดพร้อมเช่า
+                </div>
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: 28,
+                    fontWeight: 700,
+                    letterSpacing: "-0.02em",
+                    lineHeight: 1,
+                    color: "var(--ink)",
+                  }}
+                >
+                  ฿{stats.minPrice.toLocaleString()}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>
+                  เริ่มต้น / วัน
+                </div>
+              </div>
+            </div>
           </div>
 
-          <h1
-            className="hero-title display-serif"
-            style={{
-              marginBottom: 28,
-              maxWidth: "14ch",
-            }}
-          >
-            เช่าชุดจาก ร้านที่ไว้ใจได้
-          </h1>
-
-          <p
-            className="hero-sub"
-            style={{
-              fontSize: 17,
-              color: "var(--ink-2)",
-              maxWidth: 460,
-              marginBottom: 40,
-              lineHeight: 1.6,
-            }}
-          >
-            แคตตาล็อกชุดเช่าจากร้านในกรุงเทพ ทักร้านผ่าน LINE โดยตรง
-          </p>
-
-          <Link
-            href="/browse"
-            className="btn btn-dark btn-lg"
-            style={{ padding: "16px 28px", fontSize: 15 }}
-          >
-            เริ่มเลือกชุด
-            <span aria-hidden style={{ marginLeft: 4, fontSize: 16, lineHeight: 1 }}>
-              →
-            </span>
-          </Link>
-
-          <Link
-            href="/sell/signup"
-            style={{
-              marginTop: 18,
-              fontSize: 13,
-              color: "var(--ink-2)",
-              borderBottom: "1px solid var(--ink-3)",
-              paddingBottom: 1,
-            }}
-          >
-            เปิดร้านกับ Doprent
-          </Link>
+          {/* ---- Right: Swiper effect-cards ---- */}
+          <div className="hero-showcase rise rise-3">
+            <HeroSwiper
+              slides={dresses.slice(0, 5).map((d) => ({
+                id: d.id,
+                slug: d.slug,
+                name: d.name,
+                price_per_day: d.price_per_day,
+                image: Array.isArray(d.images) && d.images.length > 0 ? d.images[0] : null,
+                color: d.color,
+              }))}
+            />
+          </div>
         </div>
       </section>
 
-      {/* ========== STATS CAPTION ==========
-          Pilot scale shown as a single editorial caption line, no boxes,
-          no big numbers. Sits on --warm continuation just below the hero
-          so it feels like part of the same composition, not a SaaS metric row. */}
-      <div
-        style={{
-          background: "var(--warm)",
-          paddingBottom: 40,
-        }}
-      >
-        <div
-          className="shell"
-          style={{
-            textAlign: "center",
-            fontSize: 12,
-            color: "var(--ink-3)",
-            letterSpacing: "0.06em",
-          }}
-        >
-          <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>{stats.boutiques}</span>{" "}
-          ร้าน &nbsp;·&nbsp;{" "}
-          <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>{stats.dresses}</span>{" "}
-          ชุด &nbsp;·&nbsp; เริ่มต้น{" "}
-          <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>
-            ฿{stats.minPrice.toLocaleString()}
-          </span>{" "}
-          / วัน
-        </div>
-      </div>
+      {/* Stats are now integrated into the hero section above */}
 
       {/* ========== TRUST ========== */}
       <div
@@ -295,21 +369,11 @@ export default async function HomePage() {
                   <BoutiqueCover color={b.cover_color} />
                 </div>
                 <div style={{ padding: 22, flex: 1 }}>
-                  <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6 }}>
-                    {b.area_label}
+                  <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span>{b.area_label}</span>
+                    <DistanceBadge areaKey={b.area_key} />
                   </div>
-                  <h3
-                    style={{
-                      fontSize: 18,
-                      fontWeight: 600,
-                      marginBottom: 8,
-                      letterSpacing: "-0.01em",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      flexWrap: "wrap",
-                    }}
-                  >
+                  <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, letterSpacing: "-0.01em", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     {b.name}
                     {b.verified ? <VerifiedBadge size="sm" /> : null}
                   </h3>

@@ -36,7 +36,7 @@ export default async function KycReviewPage({
     submitted_at: r.submittedAt.toISOString(),
     boutiques: { name: r.boutique.name, slug: r.boutique.slug, area_label: r.boutique.areaLabel },
   }));
-  const error = null;
+  const error = null as { message: string } | null;
 
   return (
     <div>

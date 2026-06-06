@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 
@@ -20,7 +21,14 @@ async function writeAudit(
   payload?: Record<string, unknown>,
 ) {
   await db.adminAudit.create({
-    data: { adminId, action, targetType, targetId, reason, payload },
+    data: {
+      adminId,
+      action,
+      targetType,
+      targetId,
+      reason,
+      payload: payload as Prisma.InputJsonValue | undefined,
+    },
   });
 }
 

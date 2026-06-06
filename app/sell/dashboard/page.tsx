@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { DressArt } from "@/components/DressArt";
 import SellerDashboardCalendarPanel from "@/components/SellerDashboardCalendarPanel";
+import { dressLimitFor, TIER_LABEL } from "@/lib/tiers";
+import type { AdsTier } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +93,9 @@ export default async function SellerDashboard({
   // Can add dresses only after KYC has been submitted (submitted or verified).
   const canAddDress =
     boutique.kyc_status === "submitted" || boutique.kyc_status === "verified";
+  const dressLimit = dressLimitFor(boutRaw.adsTier as AdsTier);
+  const atLimit = dressLimit != null && dresses.length >= dressLimit;
+  const quotaText = dressLimit == null ? `${dresses.length} ตัว (ไม่จำกัด)` : `${dresses.length}/${dressLimit} ตัว`;
 
   return (
     <div className="shell" style={{ paddingTop: 32, paddingBottom: 80 }}>
@@ -169,7 +174,7 @@ export default async function SellerDashboard({
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 4 }}>สถานะ KYC</div>
           <div style={{ fontWeight: 600, color: kyc.color, fontSize: 15 }}>{kyc.text}</div>
         </div>
-        {boutique.kyc_status === "none" || boutique.kyc_status === "rejected" ? (
+        {(boutique.kyc_status as string) === "none" || (boutique.kyc_status as string) === "rejected" ? (
           <Link
             href={`/sell/kyc?slug=${boutique.slug}`}
             className="btn btn-dark"
@@ -211,18 +216,31 @@ export default async function SellerDashboard({
           flexWrap: "wrap",
         }}
       >
-        <h2 style={{ fontSize: 20, fontWeight: 600 }}>รายการชุดทั้งหมด</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <h2 style={{ fontSize: 20, fontWeight: 600 }}>รายการชุดทั้งหมด</h2>
+          <span style={{ fontSize: 12, color: atLimit ? "var(--warn)" : "var(--ink-3)", background: atLimit ? "var(--warn-soft)" : "var(--bg)", border: `1px solid ${atLimit ? "var(--warn)" : "var(--line)"}`, borderRadius: 999, padding: "3px 10px", fontWeight: 500 }}>
+            {TIER_LABEL[boutRaw.adsTier as AdsTier] ?? "Free"} · ลงชุด {quotaText}
+          </span>
+        </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Link href="/sell/edit" className="btn btn-outline" style={{ padding: "8px 14px", fontSize: 13 }}>
             แก้ไขข้อมูลร้าน
           </Link>
-          {canAddDress ? (
+          {canAddDress && !atLimit ? (
             <Link
               href="/sell/dresses/new"
               className="btn btn-dark"
               style={{ padding: "8px 14px", fontSize: 13 }}
             >
               + เพิ่มชุดใหม่
+            </Link>
+          ) : canAddDress && atLimit ? (
+            <Link
+              href="/sell/upgrade"
+              className="btn btn-dark"
+              style={{ padding: "8px 14px", fontSize: 13 }}
+            >
+              ครบโควต้า {quotaText} · อัปเกรด →
             </Link>
           ) : (
             <span

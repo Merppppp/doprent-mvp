@@ -33,7 +33,7 @@ export default async function DressesAdmin({
     status: d.status, available: d.available, featured: d.featured, sponsored: d.sponsored,
     images: d.images as string[], created_at: d.createdAt.toISOString(), views: d.views,
   }));
-  const error = null;
+  const error = null as { message: string } | null;
 
   return (
     <div>
