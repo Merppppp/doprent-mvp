@@ -15,7 +15,7 @@ steps:
           echo "Example: IMAGE_TAG=v1.0.0"
           exit 1
         fi
-      - echo "Deploying image ghcr.io/doprent/doprent-mvp:$IMAGE_TAG to prod"
+      - "echo Deploying image ghcr.io/doprent/doprent-mvp:$IMAGE_TAG to prod"
 
   - name: clone-config
     image: alpine/git
@@ -23,8 +23,8 @@ steps:
       CONFIG_TOKEN:
         from_secret: config_token_prod
     commands:
-      - git clone --depth 1 https://x-access-token:${CONFIG_TOKEN}@github.com/doprent/doprent-config-prod.git .config
-      - echo "Config loaded:" && wc -l .config/doprent-mvp/prod.env
+      - "git clone --depth 1 https://x-access-token:${CONFIG_TOKEN}@github.com/doprent/doprent-config-prod.git .config"
+      - "echo Config loaded: && wc -l .config/doprent-mvp/prod.env"
 
   - name: deploy-prod
     image: alpine
@@ -40,9 +40,6 @@ steps:
       - mkdir -p ~/.ssh
       - echo "$DEPLOY_SSH_KEY" > ~/.ssh/id_rsa
       - chmod 600 ~/.ssh/id_rsa
-      - scp -o StrictHostKeyChecking=no .config/doprent-mvp/prod.env deploy@157.85.101.85:/opt/doprent/doprent-server/envs/prod.env
-      - >-
-        ssh -o StrictHostKeyChecking=no deploy@157.85.101.85
-        "echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USERNAME' --password-stdin &&
-         docker service update --image ghcr.io/doprent/doprent-mvp:${IMAGE_TAG} doprent-mvp-prod_app --with-registry-auth"
-      - echo "Deployed ghcr.io/doprent/doprent-mvp:$IMAGE_TAG to prod"
+      - "scp -o StrictHostKeyChecking=no .config/doprent-mvp/prod.env deploy@157.85.101.85:/opt/doprent/doprent-server/envs/prod.env"
+      - "ssh -o StrictHostKeyChecking=no deploy@157.85.101.85 \"echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USERNAME' --password-stdin && docker service update --image ghcr.io/doprent/doprent-mvp:${IMAGE_TAG} doprent-mvp-prod_app --with-registry-auth\""
+      - "echo Deployed ghcr.io/doprent/doprent-mvp:$IMAGE_TAG to prod"

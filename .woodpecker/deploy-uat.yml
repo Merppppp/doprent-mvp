@@ -19,8 +19,8 @@ steps:
       CONFIG_TOKEN:
         from_secret: config_token_nonprod
     commands:
-      - git clone --depth 1 https://x-access-token:${CONFIG_TOKEN}@github.com/doprent/doprent-config-non-prod.git .config
-      - echo "Config loaded:" && wc -l .config/doprent-mvp/uat.env
+      - "git clone --depth 1 https://x-access-token:${CONFIG_TOKEN}@github.com/doprent/doprent-config-non-prod.git .config"
+      - "echo Config loaded: && wc -l .config/doprent-mvp/uat.env"
 
   - name: build-push
     image: docker:27-cli
@@ -31,13 +31,11 @@ steps:
         from_secret: ghcr_token
     commands:
       - TAG=$(cat .tag)
-      - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-      - >-
-        docker build
-        $(grep -vE '^(#|$)' .config/doprent-mvp/uat.env | sed 's/^/--build-arg /' | tr '\n' ' ')
-        -t ghcr.io/doprent/doprent-mvp:$TAG .
-      - docker push ghcr.io/doprent/doprent-mvp:$TAG
-      - echo "Pushed ghcr.io/doprent/doprent-mvp:$TAG"
+      - "echo \"$GHCR_TOKEN\" | docker login ghcr.io -u \"$GHCR_USERNAME\" --password-stdin"
+      - "BUILD_ARGS=$(grep -vE '^(#|$)' .config/doprent-mvp/uat.env | sed 's/^/--build-arg /' | tr '\\n' ' ')"
+      - "docker build $BUILD_ARGS -t ghcr.io/doprent/doprent-mvp:$TAG ."
+      - "docker push ghcr.io/doprent/doprent-mvp:$TAG"
+      - "echo Pushed ghcr.io/doprent/doprent-mvp:$TAG"
 
   - name: deploy-uat
     image: alpine
@@ -50,8 +48,6 @@ steps:
       - mkdir -p ~/.ssh
       - echo "$DEPLOY_SSH_KEY" > ~/.ssh/id_rsa
       - chmod 600 ~/.ssh/id_rsa
-      - scp -o StrictHostKeyChecking=no .config/doprent-mvp/uat.env deploy@157.85.101.85:/opt/doprent/doprent-server/envs/uat.env
-      - >-
-        ssh -o StrictHostKeyChecking=no deploy@157.85.101.85
-        "docker service update --image ghcr.io/doprent/doprent-mvp:${TAG} doprent-mvp-uat_app --with-registry-auth"
+      - "scp -o StrictHostKeyChecking=no .config/doprent-mvp/uat.env deploy@157.85.101.85:/opt/doprent/doprent-server/envs/uat.env"
+      - "ssh -o StrictHostKeyChecking=no deploy@157.85.101.85 \"docker service update --image ghcr.io/doprent/doprent-mvp:${TAG} doprent-mvp-uat_app --with-registry-auth\""
       - echo "Deployed $TAG to uat"

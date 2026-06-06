@@ -24,7 +24,7 @@ steps:
           echo "ERROR: IMAGE_TAG is required (e.g. dev-abc1234, v1.0.0)"
           exit 1
         fi
-      - echo "Migration: env=$TARGET_ENV image=ghcr.io/doprent/doprent-mvp:$IMAGE_TAG"
+      - "echo Migration: env=$TARGET_ENV image=ghcr.io/doprent/doprent-mvp:$IMAGE_TAG"
 
   - name: clone-config
     image: alpine/git
@@ -43,7 +43,7 @@ steps:
           REPO=doprent-config-non-prod
         fi
         git clone --depth 1 https://x-access-token:${TOKEN}@github.com/doprent/$REPO.git .config
-      - echo "Migrate env:" && cat .config/doprent-mvp/${TARGET_ENV}.migrate.env
+      - "echo Migrate env: && cat .config/doprent-mvp/${TARGET_ENV}.migrate.env"
 
   - name: run-migration
     image: alpine
@@ -55,12 +55,6 @@ steps:
       - mkdir -p ~/.ssh
       - echo "$DEPLOY_SSH_KEY" > ~/.ssh/id_rsa
       - chmod 600 ~/.ssh/id_rsa
-      - DB_URL=$(grep -vE '^(#|$)' .config/doprent-mvp/${TARGET_ENV}.migrate.env | grep DATABASE_URL | cut -d= -f2-)
-      - >-
-        ssh -o StrictHostKeyChecking=no deploy@157.85.101.85
-        "docker run --rm
-        --network app-net
-        -e DATABASE_URL='${DB_URL}'
-        ghcr.io/doprent/doprent-mvp:${IMAGE_TAG}
-        npx prisma migrate deploy"
+      - "DB_URL=$(grep -vE '^(#|$)' .config/doprent-mvp/${TARGET_ENV}.migrate.env | grep DATABASE_URL | cut -d= -f2-)"
+      - "ssh -o StrictHostKeyChecking=no deploy@157.85.101.85 \"docker run --rm --network app-net -e DATABASE_URL='${DB_URL}' ghcr.io/doprent/doprent-mvp:${IMAGE_TAG} npx prisma migrate deploy\""
       - echo "Migration completed for $TARGET_ENV"

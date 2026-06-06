@@ -13,8 +13,8 @@ steps:
       CONFIG_TOKEN:
         from_secret: config_token_prod
     commands:
-      - git clone --depth 1 https://x-access-token:${CONFIG_TOKEN}@github.com/doprent/doprent-config-prod.git .config
-      - echo "Config loaded:" && wc -l .config/doprent-mvp/prod.env
+      - "git clone --depth 1 https://x-access-token:${CONFIG_TOKEN}@github.com/doprent/doprent-config-prod.git .config"
+      - "echo Config loaded: && wc -l .config/doprent-mvp/prod.env"
 
   - name: build-push-release
     image: docker:27-cli
@@ -24,10 +24,8 @@ steps:
       GHCR_TOKEN:
         from_secret: ghcr_token
     commands:
-      - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-      - >-
-        docker build
-        $(grep -vE '^(#|$)' .config/doprent-mvp/prod.env | sed 's/^/--build-arg /' | tr '\n' ' ')
-        -t ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG} .
-      - docker push ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG}
-      - echo "Pushed ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG}"
+      - "echo \"$GHCR_TOKEN\" | docker login ghcr.io -u \"$GHCR_USERNAME\" --password-stdin"
+      - "BUILD_ARGS=$(grep -vE '^(#|$)' .config/doprent-mvp/prod.env | sed 's/^/--build-arg /' | tr '\\n' ' ')"
+      - "docker build $BUILD_ARGS -t ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG} ."
+      - "docker push ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG}"
+      - "echo Pushed ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG}"
