@@ -38,7 +38,7 @@ export type DressFilters = {
 type PrismaDress = Prisma.DressGetPayload<Record<string, never>>;
 type PrismaBoutique = Prisma.BoutiqueGetPayload<Record<string, never>>;
 
-function mapDress(d: PrismaDress, boutiqueVerified = false): Dress {
+function mapDress(d: PrismaDress & { boutique?: { areaKey: string | null } | null }, boutiqueVerified = false): Dress {
   return {
     id: d.id,
     slug: d.slug,
@@ -47,6 +47,7 @@ function mapDress(d: PrismaDress, boutiqueVerified = false): Dress {
     designer: d.designer,
     boutique_id: d.boutiqueId,
     boutique_name: d.boutiqueName,
+    area_key: d.boutique?.areaKey ?? null,
     size: d.size as Size,
     color: d.color as Color,
     price_per_day: d.pricePerDay,
@@ -148,6 +149,7 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
   const [rows, verifiedBoutiqueIds] = await Promise.all([
     db.dress.findMany({
       where,
+      include: { boutique: { select: { areaKey: true } } },
       orderBy: [{ featured: "desc" }, { sponsored: "desc" }, { createdAt: "desc" }],
       take: opts.limit,
     }),
@@ -196,10 +198,31 @@ export async function listDesigners(): Promise<string[]> {
 }
 
 export async function getDressBySlug(slug: string): Promise<Dress | null> {
-  const d = await db.dress.findUnique({ where: { slug } });
+  const d = await db.dress.findUnique({ where: { slug }, include: { boutique: { select: { areaKey: true, verified: true } } } });
   if (!d) return null;
-  const boutique = await db.boutique.findUnique({ where: { id: d.boutiqueId }, select: { verified: true } });
-  return mapDress(d, boutique?.verified ?? false);
+  return mapDress(d, d.boutique?.verified ?? false);
+}
+
+/**
+ * Paid sponsor strip — boutiques on a paid ads_tier (boost/featured).
+ * Powers the home marquee as a sponsored-shop placement. Featured first,
+ * then boost. Returns [] when no one is on a paid plan yet (caller falls
+ * back to the plain verified strip so it never renders empty).
+ */
+export async function listSponsorBoutiques(limit = 8): Promise<Boutique[]> {
+  try {
+    const rows = await db.boutique.findMany({
+      where: {
+        status: "live",
+        adsTier: { in: ["boost", "featured"] },
+      },
+      orderBy: [{ adsTier: "desc" }, { featured: "desc" }, { name: "asc" }],
+      take: limit,
+    });
+    return rows.map(mapBoutique);
+  } catch {
+    return [];
+  }
 }
 
 export async function listBoutiques(opts: { limit?: number; featuredFirst?: boolean } = {}): Promise<Boutique[]> {
@@ -223,6 +246,7 @@ export async function listDressesByBoutique(boutiqueId: string): Promise<Dress[]
   const [rows, boutique] = await Promise.all([
     db.dress.findMany({
       where: { boutiqueId, status: "live", available: true },
+      include: { boutique: { select: { areaKey: true } } },
       orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
     }),
     db.boutique.findUnique({ where: { id: boutiqueId }, select: { verified: true } }),
@@ -299,6 +323,7 @@ export async function listSimilarDresses(seed: Dress, limit = 4): Promise<Dress[
   const [rows, verifiedSet] = await Promise.all([
     db.dress.findMany({
       where: { status: "live", available: true, NOT: { id: seed.id } },
+      include: { boutique: { select: { areaKey: true } } },
       orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
       take: 60,
     }),

@@ -48,4 +48,16 @@ steps:
       - "echo \"$$DEPLOY_SSH_KEY\" > ~/.ssh/id_rsa"
       - chmod 600 ~/.ssh/id_rsa
       - "scp -o StrictHostKeyChecking=no .config/doprent-mvp/uat.env deploy@157.85.101.85:/opt/doprent/doprent-server/envs/uat.env"
-      - "ssh -o StrictHostKeyChecking=no deploy@157.85.101.85 \"docker service update --image ghcr.io/doprent/doprent-mvp:$${TAG} doprent-mvp-uat_app --with-registry-auth\""
+      - >-
+        ssh -o StrictHostKeyChecking=no deploy@157.85.101.85 "
+          if docker service inspect doprent-mvp-uat_app >/dev/null 2>&1; then
+            echo 'Service exists — updating image...';
+            docker service update --image ghcr.io/doprent/doprent-mvp:$${TAG} doprent-mvp-uat_app --with-registry-auth;
+          else
+            echo 'First deploy — creating stack...';
+            cd /opt/doprent/doprent-server &&
+            set -a && source envs/uat.env && set +a &&
+            export IMAGE_TAG=$${TAG} &&
+            docker stack deploy -c stacks/app-template.yml doprent-mvp-uat --with-registry-auth;
+          fi
+        "
