@@ -14,6 +14,9 @@ export const metadata: Metadata = {
   alternates: { canonical: `${SITE}/sell` },
 };
 
+// Feature flag — set to true to re-enable the seller package pricing section
+const SHOW_SELLER_PACKAGE_PRICING = false;
+
 const TIERS = [
   {
     key: "free",
@@ -130,7 +133,8 @@ export default async function SellLanding() {
         </div>
       </div>
 
-      {/* Pricing */}
+      {/* Pricing — hidden for MVP (re-enable by setting SHOW_SELLER_PACKAGE_PRICING = true) */}
+      {SHOW_SELLER_PACKAGE_PRICING && (
       <div style={{ maxWidth: 1080, margin: "0 auto" }}>
         <h2
           style={{
@@ -203,6 +207,7 @@ export default async function SellLanding() {
           ))}
         </div>
       </div>
+      )}
 
       {/* FAQ */}
       <div style={{ maxWidth: 720, margin: "64px auto 0" }}>
