@@ -4,9 +4,7 @@ import MobileMenu from "./MobileMenu";
 import { getBookingBadges } from "@/lib/booking-queries";
 import Logo from "./Logo";
 import NavbarSearch from "./NavbarSearch";
-import NavCategoryRow from "./NavCategoryRow";
 import LocaleToggle from "./LocaleToggle";
-import { listOccasions } from "@/lib/dresses";
 import { t } from "@/lib/i18n";
 import { getServerLocale } from "@/lib/i18n-server";
 
@@ -24,7 +22,6 @@ export default async function Header() {
     .toUpperCase();
   const savedCount = user?.savedDressIds?.length ?? 0;
   const badges = user ? await getBookingBadges() : { renter: 0, seller: 0 };
-  const occasions = await listOccasions();
 
   return (
     <header
@@ -141,9 +138,6 @@ export default async function Header() {
           }
         />
       </div>
-
-      {/* ── Category row ─────────────────────────────────────────────── */}
-      <NavCategoryRow occasions={occasions} locale={locale} />
 
       <style dangerouslySetInnerHTML={{ __html: `
         header details > div a { color: var(--ink) !important; }

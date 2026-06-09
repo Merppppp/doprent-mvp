@@ -204,7 +204,7 @@ export default async function DressPage({ params }: { params: Params }) {
               return (
                 <Link
                   key={okey}
-                  href={`/browse?occasion=${okey}`}
+                  href={`/?occasion=${okey}`}
                   style={{
                     padding: "4px 10px",
                     background: "var(--bg)",
