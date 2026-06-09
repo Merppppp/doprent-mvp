@@ -4,6 +4,9 @@ import MobileMenu from "./MobileMenu";
 import { getBookingBadges } from "@/lib/booking-queries";
 import Logo from "./Logo";
 import NavbarSearch from "./NavbarSearch";
+import NavCategoryRow from "./NavCategoryRow";
+import LocaleToggle from "./LocaleToggle";
+import { listOccasions } from "@/lib/dresses";
 
 export default async function Header() {
   const user = await getCurrentUser().catch(() => null);
@@ -18,6 +21,7 @@ export default async function Header() {
     .toUpperCase();
   const savedCount = user?.savedDressIds?.length ?? 0;
   const badges = user ? await getBookingBadges() : { renter: 0, seller: 0 };
+  const occasions = await listOccasions();
 
   return (
     <header
@@ -29,47 +33,56 @@ export default async function Header() {
         zIndex: 40,
       }}
     >
+      {/* ── Main bar ─────────────────────────────────────────────────── */}
       <div
         className="shell"
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          gap: 16,
-          paddingTop: 12,
-          paddingBottom: 12,
+          gap: 12,
+          paddingTop: 11,
+          paddingBottom: 11,
         }}
       >
-        <Link href="/" aria-label="doprent" style={{ display: "inline-flex", alignItems: "center" }}>
+        {/* Logo */}
+        <Link
+          href="/"
+          aria-label="doprent"
+          style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}
+        >
           <Logo size={22} />
         </Link>
 
-        <nav
-          className="nav-links"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 24,
-            fontSize: 14,
-            color: "rgba(255,255,255,0.85)",
-            marginLeft: "auto",
-            marginRight: 24,
-          }}
-        >
-          <Link href="/" style={{ padding: "6px 0", color: "inherit" }}>
-            เลือกชุด
-          </Link>
-          <Link href="/boutiques" style={{ padding: "6px 0", color: "inherit" }}>
-            ร้านเช่า
-          </Link>
-        </nav>
+        {/* Search bar — dominant center element */}
+        <div style={{ flex: 1, minWidth: 0, maxWidth: 680 }}>
+          <NavbarSearch />
+        </div>
 
-        <NavbarSearch />
-
+        {/* Desktop right group */}
         <div
           className="nav-cta-desktop"
-          style={{ display: "flex", gap: 8, alignItems: "center" }}
+          style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}
         >
+          {/* เปิดร้านกับ DopRent */}
+          <Link
+            href="/sell/signup"
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              color: "rgba(255,255,255,0.85)",
+              padding: "6px 2px",
+              whiteSpace: "nowrap",
+              textDecoration: "none",
+            }}
+            className="hdr-sell-link"
+          >
+            เปิดร้านกับ DopRent
+          </Link>
+
+          {/* TH/EN toggle */}
+          <LocaleToggle />
+
+          {/* Auth actions */}
           {user ? (
             <>
               <SavedLink count={savedCount} />
@@ -88,18 +101,24 @@ export default async function Header() {
               <Link
                 href="/login"
                 className="btn btn-outline"
-                style={{ padding: "9px 14px", border: "1.5px solid rgba(255,255,255,0.4)", color: "#fff", background: "transparent" }}
+                style={{
+                  padding: "8px 14px",
+                  border: "1.5px solid rgba(255,255,255,0.4)",
+                  color: "#fff",
+                  background: "transparent",
+                  fontSize: 13,
+                }}
               >
                 เข้าสู่ระบบ
               </Link>
-              <Link href="/signup" className="btn btn-dark">
+              <Link href="/signup" className="btn btn-dark" style={{ fontSize: 13 }}>
                 สมัครสมาชิก
               </Link>
             </>
           )}
         </div>
 
-        {/* Mobile hamburger — visibility controlled by CSS */}
+        {/* Mobile hamburger */}
         <MobileMenu
           user={
             user
@@ -117,15 +136,20 @@ export default async function Header() {
           }
         />
       </div>
+
+      {/* ── Category row ─────────────────────────────────────────────── */}
+      <NavCategoryRow occasions={occasions} />
+
       <style dangerouslySetInnerHTML={{ __html: `
-        .nav-links a { color: rgba(255,255,255,0.85); text-decoration: none; transition: color .15s; }
-        .nav-links a:hover { color: #fff; }
         header details > div a { color: var(--ink) !important; }
         header details > div button { color: var(--ink) !important; }
+        .hdr-sell-link:hover { color: #fff !important; }
       ` }} />
     </header>
   );
 }
+
+// ── SavedLink ────────────────────────────────────────────────────────────────
 
 function SavedLink({ count }: { count: number }) {
   return (
@@ -144,6 +168,7 @@ function SavedLink({ count }: { count: number }) {
         alignItems: "center",
         justifyContent: "center",
         color: "#fff",
+        flexShrink: 0,
       }}
     >
       <svg
@@ -187,14 +212,33 @@ function SavedLink({ count }: { count: number }) {
   );
 }
 
+// ── Pill badge ───────────────────────────────────────────────────────────────
+
 function Pill({ n }: { n: number }) {
   if (!n) return null;
   return (
-    <span style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, background: "var(--accent)", color: "var(--accent-ink)", fontSize: 11, fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+    <span
+      style={{
+        minWidth: 18,
+        height: 18,
+        padding: "0 5px",
+        borderRadius: 999,
+        background: "var(--accent)",
+        color: "var(--accent-ink)",
+        fontSize: 11,
+        fontWeight: 600,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        lineHeight: 1,
+      }}
+    >
       {n > 99 ? "99+" : n}
     </span>
   );
 }
+
+// ── UserMenu ─────────────────────────────────────────────────────────────────
 
 function UserMenu({
   fullName,
@@ -214,10 +258,7 @@ function UserMenu({
   sellerBadge: number;
 }) {
   return (
-    <details
-      style={{ position: "relative" }}
-      // <details>/<summary> gives us a free dropdown with no client JS
-    >
+    <details style={{ position: "relative" }}>
       <summary
         style={{
           listStyle: "none",
@@ -230,6 +271,7 @@ function UserMenu({
           background: "rgba(255,255,255,0.12)",
           cursor: "pointer",
           color: "rgba(255,255,255,0.9)",
+          flexShrink: 0,
         }}
       >
         <span
@@ -264,6 +306,7 @@ function UserMenu({
         <span style={{ color: "rgba(255,255,255,0.7)", marginRight: 4, fontSize: 10 }}>▼</span>
         {renterBadge + sellerBadge > 0 ? <Pill n={renterBadge + sellerBadge} /> : null}
       </summary>
+
       <div
         style={{
           position: "absolute",
@@ -277,6 +320,7 @@ function UserMenu({
           zIndex: 30,
         }}
       >
+        {/* Header — name + email */}
         <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--line)" }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>
             {fullName}
@@ -300,9 +344,35 @@ function UserMenu({
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{email}</div>
         </div>
 
-        {/* ---- Admin/Seller Group ---- */}
-        {(isAdmin || isSeller) && (
+        {/* ── Group 1: ทุก user ── */}
+        <div style={{ paddingTop: 4, paddingBottom: 4 }}>
+          <Link
+            href="/account/bookings"
+            style={{
+              ...menuItemStyle,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            การจองของฉัน
+            <Pill n={renterBadge} />
+          </Link>
+          <Link href="/account" style={menuItemStyle}>
+            สินค้าที่ชอบ
+          </Link>
+          <Link href="/boutiques" style={menuItemStyle}>
+            ร้านค้าที่ถูกใจ
+          </Link>
+          <Link href="/account" style={menuItemStyle}>
+            บัญชีของฉัน
+          </Link>
+        </div>
+
+        {/* ── Group 2: จัดการร้านค้า (seller only) ── */}
+        {isSeller && !isAdmin && (
           <>
+            <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
             <div
               style={{
                 padding: "8px 16px 4px",
@@ -315,58 +385,79 @@ function UserMenu({
             >
               จัดการร้านค้า
             </div>
-            {isAdmin ? (
-              <Link
-                href="/admin"
-                style={{
-                  display: "block",
-                  padding: "10px 16px",
-                  fontSize: 14,
-                  color: "var(--info)",
-                  fontWeight: 500,
-                }}
-              >
-                Admin Dashboard
-              </Link>
-            ) : null}
-            {isSeller ? (
-              <Link href="/sell/dashboard" style={menuItemStyle}>
-                Dashboard ร้านของฉัน
-              </Link>
-            ) : null}
-            {isSeller ? (
-              <Link
-                href="/sell/bookings"
-                style={{ ...menuItemStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}
-              >
-                การจองของร้าน
-                <Pill n={sellerBadge} />
-              </Link>
-            ) : null}
-            <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
+            <Link href="/sell/dashboard" style={menuItemStyle}>
+              Dashboard ร้านของฉัน
+            </Link>
+            <Link
+              href="/sell/bookings"
+              style={{
+                ...menuItemStyle,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              การจองของร้าน
+              <Pill n={sellerBadge} />
+            </Link>
           </>
         )}
 
-        {/* ---- User Group ---- */}
-        <Link
-          href="/account/bookings"
-          style={{ ...menuItemStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}
-        >
-          การจองของฉัน
-          <Pill n={renterBadge} />
-        </Link>
-        <Link href="/account" style={menuItemStyle}>
-          สินค้าที่ชอบ
-        </Link>
-        <Link href="/boutiques" style={menuItemStyle}>
-          ร้านค้าที่ถูกใจ
-        </Link>
-        <Link href="/account" style={menuItemStyle}>
-          บัญชีของฉัน
-        </Link>
+        {/* ── Group 3: Admin (admin only, shown separately) ── */}
+        {isAdmin && (
+          <>
+            <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
+            <div
+              style={{
+                padding: "8px 16px 4px",
+                fontSize: 11,
+                fontWeight: 600,
+                color: "var(--ink-3)",
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}
+            >
+              จัดการร้านค้า
+            </div>
+            <Link href="/sell/dashboard" style={menuItemStyle}>
+              Dashboard ร้านของฉัน
+            </Link>
+            <Link
+              href="/sell/bookings"
+              style={{
+                ...menuItemStyle,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              การจองของร้าน
+              <Pill n={sellerBadge} />
+            </Link>
+            <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
+            <div
+              style={{
+                padding: "8px 16px 4px",
+                fontSize: 11,
+                fontWeight: 600,
+                color: "var(--info)",
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}
+            >
+              Admin
+            </div>
+            <Link
+              href="/admin"
+              style={{ ...menuItemStyle, color: "var(--info)", fontWeight: 500 }}
+            >
+              Admin Dashboard
+            </Link>
+          </>
+        )}
 
+        {/* ── Sign out ── */}
         <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
-
         <form action="/auth/signout" method="POST">
           <button type="submit" style={{ ...menuItemStyle, width: "100%", textAlign: "left" }}>
             ออกจากระบบ

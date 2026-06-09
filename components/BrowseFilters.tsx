@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import SearchSelect, { type SelectOption } from "./SearchSelect";
 import PriceRange from "./PriceRange";
+import type { SelectOption } from "./SearchSelect";
 
 export type BrowseFiltersProps = {
   q: string;
@@ -19,6 +19,197 @@ export type BrowseFiltersProps = {
   sizes: SelectOption[];
   designers: SelectOption[];
 };
+
+// ── Dress type sub-groups (client-side URL only — no server filtering yet) ──
+
+const DRESS_TYPE_GROUPS: { label: string; key: "top" | "bottom" | "dress"; items: string[] }[] = [
+  {
+    label: "เสื้อ",
+    key: "top",
+    items: ["แขนยาว", "แขนสั้น", "แขนกุด", "สายเดี่ยว", "ปาดไหล่", "เกาะอก", "เสื้อคลุม", "คอเต่า/เสื้อโค้ท", "แจ็คเก็ต", "ชีทรู"],
+  },
+  {
+    label: "กางเกง / กระโปรง",
+    key: "bottom",
+    items: ["กระโปรงยาว", "กระโปรงสั้น", "กางเกงขายาว", "กางเกงขาสั้น"],
+  },
+  {
+    label: "เดรส",
+    key: "dress",
+    items: ["เดรสยาว", "เดรสสั้น"],
+  },
+];
+
+// ── Chip + Section helpers ────────────────────────────────────────────────────
+
+function SectionHeader({
+  label,
+  open,
+  onToggle,
+}: {
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        width: "100%",
+        padding: 0,
+        border: "none",
+        background: "none",
+        cursor: "pointer",
+        fontFamily: "inherit",
+      }}
+    >
+      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{label}</span>
+      <span
+        style={{
+          fontSize: 11,
+          color: "var(--ink-3)",
+          transition: "transform .2s",
+          display: "inline-block",
+          transform: open ? "rotate(0deg)" : "rotate(-90deg)",
+        }}
+      >
+        ▼
+      </span>
+    </button>
+  );
+}
+
+function SubGroupHeader({
+  label,
+  open,
+  onToggle,
+}: {
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        width: "100%",
+        padding: 0,
+        border: "none",
+        background: "none",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        marginBottom: open ? 6 : 0,
+      }}
+    >
+      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        {label}
+      </span>
+      <span
+        style={{
+          fontSize: 10,
+          color: "var(--ink-3)",
+          display: "inline-block",
+          transition: "transform .2s",
+          transform: open ? "rotate(0deg)" : "rotate(-90deg)",
+        }}
+      >
+        ▼
+      </span>
+    </button>
+  );
+}
+
+function Chip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: "6px 10px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: active ? 600 : 400,
+        color: active ? "#fff" : "var(--ink-2)",
+        background: active ? "#1B4332" : "var(--surface)",
+        border: `1px solid ${active ? "#1B4332" : "var(--line)"}`,
+        cursor: "pointer",
+        fontFamily: "inherit",
+        transition: "all .15s",
+        whiteSpace: "nowrap",
+        textAlign: "center",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function ColorSwatch({
+  value,
+  label,
+  hex,
+  active,
+  onClick,
+}: {
+  value: string;
+  label: string;
+  hex: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 7,
+        padding: "5px 8px",
+        borderRadius: 8,
+        border: `1.5px solid ${active ? "#1B4332" : "var(--line)"}`,
+        background: active ? "var(--accent-soft)" : "var(--surface)",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        transition: "all .15s",
+      }}
+    >
+      <span
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 999,
+          background: hex,
+          border: hex === "#FFFFFF" || hex === "#FFFDD0" ? "1px solid var(--line)" : "none",
+          flexShrink: 0,
+          display: "inline-block",
+        }}
+      />
+      <span style={{ fontSize: 12, color: active ? "#1B4332" : "var(--ink-2)", fontWeight: active ? 600 : 400 }}>
+        {label}
+      </span>
+    </button>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export default function BrowseFilters(props: BrowseFiltersProps) {
   const router = useRouter();
@@ -45,17 +236,29 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     [push],
   );
 
-  // Debounced free-text search.
-  const [q, setQ] = useState(props.q);
-  const first = useRef(true);
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    const t = setTimeout(() => setParam("q", q.trim() || null), 400);
-    return () => clearTimeout(t);
-  }, [q, setParam]);
+  // Active filter values
+  const activeType = params.get("type");
+
+  // Section open/close state
+  const [sections, setSections] = useState({
+    occasion: true,
+    type: true,
+    color: true,
+    size: true,
+    price: true,
+  });
+
+  const [typeGroups, setTypeGroups] = useState({
+    top: true,
+    bottom: true,
+    dress: true,
+  });
+
+  const toggleSection = (key: keyof typeof sections) =>
+    setSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const toggleTypeGroup = (key: keyof typeof typeGroups) =>
+    setTypeGroups((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const hasAny =
     !!props.color ||
@@ -63,55 +266,180 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     !!props.size ||
     !!props.designer ||
     !!props.q ||
+    !!activeType ||
     props.priceMin > props.priceBounds.min ||
     props.priceMax < props.priceBounds.max;
 
+  // Use existing colors from props (backed by DB color keys + swatch hex)
+  const colorItems = props.colors.map((c) => ({
+    value: c.value,
+    label: c.label,
+    hex: (c as SelectOption & { swatch?: string }).swatch ?? "#ccc",
+  }));
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <div>
-        <div style={{ fontSize: 12, marginBottom: 6, fontWeight: 600, color: "var(--ink-3)" }}>ค้นหา</div>
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="ชื่อชุด, ดีไซเนอร์…"
-          style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--line)", borderRadius: 8, background: "var(--surface)", fontSize: 14, color: "var(--ink)" }}
-        />
+    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      {/* ── Header row ── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 18,
+        }}
+      >
+        <span style={{ fontSize: 15, fontWeight: 700, color: "var(--ink)" }}>Filter</span>
+        {hasAny ? (
+          <button
+            type="button"
+            onClick={() => router.push(pathname, { scroll: false })}
+            style={{
+              fontSize: 12,
+              color: "var(--accent)",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontWeight: 500,
+            }}
+          >
+            ล้างทั้งหมด
+          </button>
+        ) : null}
       </div>
 
-      <SearchSelect label="โอกาส" value={props.occasion} options={props.occasions} onChange={(v) => setParam("occasion", v)} />
-      <SearchSelect label="ดีไซเนอร์" value={props.designer} options={props.designers} onChange={(v) => setParam("designer", v)} />
-      <SearchSelect label="สี" value={props.color} options={props.colors} onChange={(v) => setParam("color", v)} />
-      <SearchSelect label="ขนาด" value={props.size} options={props.sizes} searchable={false} onChange={(v) => setParam("size", v)} />
-
-      <div>
-        <div style={{ fontSize: 12, marginBottom: 10, fontWeight: 600, color: "var(--ink-3)" }}>ราคา / วัน</div>
-        <PriceRange
-          min={props.priceBounds.min}
-          max={props.priceBounds.max}
-          step={100}
-          lo={props.priceMin}
-          hi={props.priceMax}
-          onCommit={(lo, hi) =>
-            push((sp) => {
-              if (lo <= props.priceBounds.min) sp.delete("priceMin");
-              else sp.set("priceMin", String(lo));
-              if (hi >= props.priceBounds.max) sp.delete("priceMax");
-              else sp.set("priceMax", String(hi));
-            })
-          }
+      {/* ════ Section: โอกาส ════ */}
+      <div style={sectionStyle}>
+        <SectionHeader
+          label="โอกาส"
+          open={sections.occasion}
+          onToggle={() => toggleSection("occasion")}
         />
+        {sections.occasion && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 10 }}>
+            {props.occasions.map((occ) => (
+              <Chip
+                key={occ.value}
+                label={occ.label}
+                active={props.occasion === occ.value}
+                onClick={() => setParam("occasion", props.occasion === occ.value ? null : occ.value)}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {hasAny ? (
-        <button
-          type="button"
-          onClick={() => router.push(pathname, { scroll: false })}
-          style={{ padding: 9, border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, color: "var(--ink-2)", fontWeight: 500, background: "var(--surface)", cursor: "pointer" }}
-        >
-          ล้างตัวกรองทั้งหมด
-        </button>
-      ) : null}
+      {/* ════ Section: ประเภทชุด ════ */}
+      <div style={sectionStyle}>
+        <SectionHeader
+          label="ประเภทชุด"
+          open={sections.type}
+          onToggle={() => toggleSection("type")}
+        />
+        {sections.type && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 10 }}>
+            {DRESS_TYPE_GROUPS.map((group) => (
+              <div key={group.key}>
+                <SubGroupHeader
+                  label={group.label}
+                  open={typeGroups[group.key]}
+                  onToggle={() => toggleTypeGroup(group.key)}
+                />
+                {typeGroups[group.key] && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginTop: 6 }}>
+                    {group.items.map((item) => (
+                      <Chip
+                        key={item}
+                        label={item}
+                        active={activeType === item}
+                        onClick={() => setParam("type", activeType === item ? null : item)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ════ Section: สี ════ */}
+      <div style={sectionStyle}>
+        <SectionHeader
+          label="สี"
+          open={sections.color}
+          onToggle={() => toggleSection("color")}
+        />
+        {sections.color && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 10 }}>
+            {colorItems.map((c) => (
+              <ColorSwatch
+                key={c.value}
+                value={c.value}
+                label={c.label}
+                hex={c.hex}
+                active={props.color === c.value}
+                onClick={() => setParam("color", props.color === c.value ? null : c.value)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ════ Section: Size ════ */}
+      <div style={sectionStyle}>
+        <SectionHeader
+          label="Size"
+          open={sections.size}
+          onToggle={() => toggleSection("size")}
+        />
+        {sections.size && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 10 }}>
+            {["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "Free size"].map((sz) => (
+              <Chip
+                key={sz}
+                label={sz}
+                active={props.size === sz}
+                onClick={() => setParam("size", props.size === sz ? null : sz)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ════ Section: ราคา / วัน ════ */}
+      <div style={{ ...sectionStyle, borderBottom: "none" }}>
+        <SectionHeader
+          label="ราคา / วัน"
+          open={sections.price}
+          onToggle={() => toggleSection("price")}
+        />
+        {sections.price && (
+          <div style={{ marginTop: 12 }}>
+            <PriceRange
+              min={props.priceBounds.min}
+              max={props.priceBounds.max}
+              step={100}
+              lo={props.priceMin}
+              hi={props.priceMax}
+              onCommit={(lo, hi) =>
+                push((sp) => {
+                  if (lo <= props.priceBounds.min) sp.delete("priceMin");
+                  else sp.set("priceMin", String(lo));
+                  if (hi >= props.priceBounds.max) sp.delete("priceMax");
+                  else sp.set("priceMax", String(hi));
+                })
+              }
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+const sectionStyle: React.CSSProperties = {
+  paddingTop: 16,
+  paddingBottom: 16,
+  borderBottom: "1px solid var(--line)",
+};

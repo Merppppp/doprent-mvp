@@ -210,6 +210,12 @@ export default function MobileMenu({ user }: Props) {
               <Link href="/boutiques" style={drawerItem}>
                 ร้านเช่า
               </Link>
+              <Link
+                href="/sell/signup"
+                style={{ ...drawerItem, color: "var(--accent)", fontWeight: 500 }}
+              >
+                เปิดร้านกับ DopRent
+              </Link>
               {user ? (
                 <>
                   <Link

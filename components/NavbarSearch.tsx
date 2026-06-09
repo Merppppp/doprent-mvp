@@ -24,7 +24,6 @@ export default function NavbarSearch() {
         border: "1px solid rgba(255,255,255,0.2)",
         borderRadius: 999,
         overflow: "hidden",
-        maxWidth: 300,
         width: "100%",
         transition: "background .2s, border-color .2s",
       }}
