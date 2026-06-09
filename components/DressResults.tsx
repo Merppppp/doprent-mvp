@@ -192,17 +192,31 @@ export default function DressResults({
           {/* Infinite scroll sentinel */}
           <div ref={sentinelRef} style={{ height: 1 }} />
 
-          {/* Loading indicator */}
+          {/* Loading spinner */}
           {loadingMore && (
-            <div style={{ textAlign: "center", padding: "24px 0", color: "var(--ink-3)", fontSize: 14 }}>
-              กำลังโหลด...
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, padding: "28px 0", color: "var(--ink-3)" }}>
+              <LoadingSpinner />
+              <span style={{ fontSize: 13 }}>กำลังโหลด...</span>
             </div>
           )}
 
           {/* End of results */}
-          {!hasMore && allDresses.length > 25 && (
-            <div style={{ textAlign: "center", padding: "24px 0", color: "var(--ink-3)", fontSize: 13 }}>
-              แสดงครบ {allDresses.length} ชุดแล้ว
+          {!hasMore && !loadingMore && allDresses.length > 0 && (
+            <div style={{ textAlign: "center", padding: "28px 0" }}>
+              <span style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                color: "var(--ink-3)",
+                padding: "8px 20px",
+                border: "1px solid var(--line)",
+                borderRadius: 999,
+                background: "var(--surface)",
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><polyline points="20 6 9 17 4 12"/></svg>
+                {allDresses.length > 1 ? `แสดงครบทั้ง ${allDresses.length} ชุดแล้ว` : "หมดแล้ว"}
+              </span>
             </div>
           )}
         </>
@@ -216,6 +230,26 @@ function Pin() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
       <path d="M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11z" />
       <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}
+
+function LoadingSpinner() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      aria-hidden
+      style={{ animation: "dr-spin 0.8s linear infinite" }}
+    >
+      <style dangerouslySetInnerHTML={{ __html: `@keyframes dr-spin{to{transform:rotate(360deg)}}` }} />
+      <path d="M12 2a10 10 0 0 1 10 10" opacity="0.9" />
+      <path d="M12 2a10 10 0 0 0-10 10" opacity="0.25" />
     </svg>
   );
 }

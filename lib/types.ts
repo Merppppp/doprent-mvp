@@ -67,6 +67,14 @@ export type Area = {
   keywords: string[];
 };
 
+/** Lightweight dress preview used in banner card stacks. */
+export type DressCard = {
+  id: string;
+  name: string;
+  price_per_day: number;
+  image: string | null;
+};
+
 export type Boutique = {
   id: string;
   slug: string;
@@ -106,6 +114,8 @@ export type Boutique = {
   kyc_status: KycStatus;
   created_at: string;
   updated_at: string;
+  /** Optional dress card previews — populated by listSponsorBoutiques / listBoutiques for the hero banner card stack. */
+  dress_cards?: DressCard[];
 };
 
 /** One duration-based pricing bracket. per_day = THB/day; max=null means open-ended (X+ days). */

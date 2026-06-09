@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
-import type { Blackout, Boutique, Color, Dress, Occasion, OccasionKey, PriceTier, AdsTier, Status, KycStatus, Size } from "./types";
+import type { Blackout, Boutique, Color, Dress, DressCard, Occasion, OccasionKey, PriceTier, AdsTier, Status, KycStatus, Size } from "./types";
 
 const FALLBACK_OCCASIONS: Occasion[] = [
   { key: "engagement", th: "งานหมั้น", en: "Engagement", color_token: "rose", sort_order: 1 },
@@ -245,16 +245,26 @@ export async function listSponsorBoutiques(limit = 8): Promise<Boutique[]> {
       },
       include: {
         dresses: {
-          take: 1,
+          take: 5,
           where: { status: "live", available: true },
-          select: { images: true },
+          select: { id: true, name: true, images: true, pricePerDay: true },
           orderBy: { featured: "desc" },
         },
       },
       orderBy: [{ adsTier: "desc" }, { featured: "desc" }, { name: "asc" }],
       take: limit,
     });
-    return rows.map((r) => mapBoutique(r, (r.dresses?.[0]?.images as string[])?.[0] ?? null));
+    return rows.map((r) => {
+      const coverImage = (r.dresses?.[0]?.images as string[])?.[0] ?? null;
+      const boutique = mapBoutique(r, coverImage);
+      boutique.dress_cards = r.dresses.map((d) => ({
+        id: d.id,
+        name: d.name,
+        price_per_day: d.pricePerDay,
+        image: (d.images as string[])?.[0] ?? null,
+      } satisfies DressCard));
+      return boutique;
+    });
   } catch {
     return [];
   }
@@ -265,9 +275,9 @@ export async function listBoutiques(opts: { limit?: number; featuredFirst?: bool
     where: { status: "live" },
     include: {
       dresses: {
-        take: 1,
+        take: 5,
         where: { status: "live", available: true },
-        select: { images: true },
+        select: { id: true, name: true, images: true, pricePerDay: true },
         orderBy: { featured: "desc" },
       },
     },
@@ -277,7 +287,17 @@ export async function listBoutiques(opts: { limit?: number; featuredFirst?: bool
     ],
     take: opts.limit,
   });
-  return rows.map((r) => mapBoutique(r, (r.dresses?.[0]?.images as string[])?.[0] ?? null));
+  return rows.map((r) => {
+    const coverImage = (r.dresses?.[0]?.images as string[])?.[0] ?? null;
+    const boutique = mapBoutique(r, coverImage);
+    boutique.dress_cards = r.dresses.map((d) => ({
+      id: d.id,
+      name: d.name,
+      price_per_day: d.pricePerDay,
+      image: (d.images as string[])?.[0] ?? null,
+    } satisfies DressCard));
+    return boutique;
+  });
 }
 
 export async function getBoutiqueBySlug(slug: string): Promise<Boutique | null> {
