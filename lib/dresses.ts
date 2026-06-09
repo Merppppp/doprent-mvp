@@ -70,7 +70,7 @@ function mapDress(d: PrismaDress & { boutique?: { areaKey: string | null } | nul
   };
 }
 
-function mapBoutique(b: PrismaBoutique): Boutique {
+function mapBoutique(b: PrismaBoutique, coverImage?: string | null): Boutique {
   return {
     id: b.id,
     slug: b.slug,
@@ -93,6 +93,7 @@ function mapBoutique(b: PrismaBoutique): Boutique {
     instagram: b.instagram,
     since_year: b.sinceYear,
     cover_color: b.coverColor as Color,
+    cover_image: coverImage ?? null,
     tag: b.tag,
     story: b.story,
     delivery_info: b.deliveryInfo,
@@ -216,10 +217,18 @@ export async function listSponsorBoutiques(limit = 8): Promise<Boutique[]> {
         status: "live",
         adsTier: { in: ["boost", "featured"] },
       },
+      include: {
+        dresses: {
+          take: 1,
+          where: { status: "live", available: true },
+          select: { images: true },
+          orderBy: { featured: "desc" },
+        },
+      },
       orderBy: [{ adsTier: "desc" }, { featured: "desc" }, { name: "asc" }],
       take: limit,
     });
-    return rows.map(mapBoutique);
+    return rows.map((r) => mapBoutique(r, (r.dresses?.[0]?.images as string[])?.[0] ?? null));
   } catch {
     return [];
   }
@@ -228,18 +237,26 @@ export async function listSponsorBoutiques(limit = 8): Promise<Boutique[]> {
 export async function listBoutiques(opts: { limit?: number; featuredFirst?: boolean } = {}): Promise<Boutique[]> {
   const rows = await db.boutique.findMany({
     where: { status: "live" },
+    include: {
+      dresses: {
+        take: 1,
+        where: { status: "live", available: true },
+        select: { images: true },
+        orderBy: { featured: "desc" },
+      },
+    },
     orderBy: [
       ...(opts.featuredFirst ? [{ featured: "desc" as const }] : []),
       { name: "asc" },
     ],
     take: opts.limit,
   });
-  return rows.map(mapBoutique);
+  return rows.map((r) => mapBoutique(r, (r.dresses?.[0]?.images as string[])?.[0] ?? null));
 }
 
 export async function getBoutiqueBySlug(slug: string): Promise<Boutique | null> {
   const b = await db.boutique.findUnique({ where: { slug } });
-  return b ? mapBoutique(b) : null;
+  return b ? mapBoutique(b, null) : null;
 }
 
 export async function listDressesByBoutique(boutiqueId: string): Promise<Dress[]> {

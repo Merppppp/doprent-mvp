@@ -93,6 +93,7 @@ export type Boutique = {
   promptpay_id?: string | null;
   since_year: number | null;
   cover_color: Color;
+  cover_image: string | null;
   tag: string | null;
   story: string | null;
   delivery_info: string | null;

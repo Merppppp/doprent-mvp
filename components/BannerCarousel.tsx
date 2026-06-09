@@ -7,8 +7,8 @@ import Link from "next/link";
 import type { Boutique, Color } from "@/lib/types";
 
 import "swiper/css";
-import "swiper/modules/navigation.css";
-import "swiper/modules/pagination.css";
+import "swiper/css/navigation";
+import "swiper/css/pagination";
 
 /* ------------------------------------------------------------------
    Gradient palette per boutique cover_color
@@ -55,18 +55,24 @@ export default function BannerCarousel({ boutiques }: Props) {
       >
         {boutiques.map((b) => {
           const [from, to] = COLOR_GRAD[b.cover_color] ?? COLOR_GRAD.green;
+          const bgStyle = b.cover_image
+            ? {
+                backgroundImage: `linear-gradient(rgba(0,0,0,0.25), rgba(0,0,0,0.55)), url(${b.cover_image})`,
+                backgroundSize: "cover" as const,
+                backgroundPosition: "center" as const,
+              }
+            : { background: `linear-gradient(135deg, ${from} 0%, ${to} 100%)` };
+
           return (
             <SwiperSlide key={b.id}>
-              <div
-                className="bc-slide"
-                style={{
-                  background: `linear-gradient(135deg, ${from} 0%, ${to} 100%)`,
-                }}
-              >
+              <div className="bc-slide" style={bgStyle}>
                 {/* Noise texture overlay — adds editorial grain without images */}
                 <div className="bc-noise" aria-hidden />
                 {/* Content */}
                 <div className="bc-content">
+                  {/* Kicker label */}
+                  <span className="bc-kicker">ร้านค้าแนะนำ</span>
+
                   <div className="bc-badges">
                     {b.verified && (
                       <span className="bc-badge bc-badge--verified">
@@ -92,9 +98,13 @@ export default function BannerCarousel({ boutiques }: Props) {
                   </Link>
                 </div>
 
-                {/* Decorative shapes */}
-                <div className="bc-deco bc-deco--1" aria-hidden />
-                <div className="bc-deco bc-deco--2" aria-hidden />
+                {/* Decorative shapes — only shown when no cover image */}
+                {!b.cover_image && (
+                  <>
+                    <div className="bc-deco bc-deco--1" aria-hidden />
+                    <div className="bc-deco bc-deco--2" aria-hidden />
+                  </>
+                )}
               </div>
             </SwiperSlide>
           );
@@ -127,10 +137,11 @@ const BC_CSS = `
 
 /* --- Slide --- */
 .bc-slide{
-  position:relative;min-height:380px;display:flex;align-items:flex-end;overflow:hidden;
+  position:relative;min-height:420px;display:flex;align-items:flex-end;overflow:hidden;
   padding:0;
 }
-@media(min-width:768px){.bc-slide{min-height:460px}}
+@media(min-width:768px){.bc-slide{min-height:480px}}
+@media(min-width:1200px){.bc-slide{min-height:520px}}
 
 /* Noise overlay — SVG turbulence for grain without a PNG */
 .bc-noise{
@@ -153,6 +164,9 @@ const BC_CSS = `
 }
 @media(min-width:768px){.bc-content{padding:48px 40px 72px}}
 @media(min-width:1200px){.bc-content{padding:56px 48px 80px}}
+
+/* Kicker label */
+.bc-kicker{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.7);margin-bottom:2px}
 
 /* Badges row */
 .bc-badges{display:flex;gap:8px;flex-wrap:wrap}
@@ -186,25 +200,23 @@ const BC_CSS = `
   text-shadow:0 1px 8px rgba(0,0,0,0.15);
 }
 
-/* CTA button */
+/* CTA button — solid white */
 .bc-cta{
   display:inline-flex;align-items:center;gap:7px;
   padding:12px 22px;border-radius:999px;
-  background:rgba(255,255,255,0.18);
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-  border:1.5px solid rgba(255,255,255,0.45);
-  color:#fff;font-size:14.5px;font-weight:600;
+  background:#fff;
+  border:none;
+  color:#1a1815;font-size:14.5px;font-weight:600;
   text-decoration:none;letter-spacing:.01em;
-  transition:background .2s ease,border-color .2s ease,transform .2s ease;
+  transition:background .2s ease,transform .2s ease;
   margin-top:4px;
 }
 .bc-cta:hover{
-  background:rgba(255,255,255,0.28);
-  border-color:rgba(255,255,255,0.65);
+  background:rgba(255,255,255,0.9);
   transform:translateX(2px);
 }
 
-/* Nav arrows */
+/* Nav arrows — hidden by default, show on carousel hover */
 .bc-arrow{
   position:absolute;top:50%;transform:translateY(-50%);z-index:10;
   width:40px;height:40px;border-radius:50%;
@@ -213,10 +225,11 @@ const BC_CSS = `
   border:1.5px solid rgba(255,255,255,0.3);
   color:#fff;cursor:pointer;
   display:grid;place-items:center;
-  transition:background .2s ease,opacity .2s ease;
-  opacity:.8;
+  transition:opacity .2s ease,background .2s ease;
+  opacity:0;
 }
-.bc-arrow:hover{background:rgba(255,255,255,0.28);opacity:1}
+.banner-carousel:hover .bc-arrow{opacity:.8}
+.bc-arrow:hover{opacity:1;background:rgba(255,255,255,0.28)}
 .bc-arrow--prev{left:16px}
 .bc-arrow--next{right:16px}
 @media(max-width:480px){.bc-arrow{width:34px;height:34px}.bc-arrow--prev{left:10px}.bc-arrow--next{right:10px}}
