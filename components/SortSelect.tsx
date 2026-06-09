@@ -2,17 +2,18 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { t, type Locale } from "@/lib/i18n";
 
-const SORT_OPTIONS = [
-  { value: "featured", label: "เกี่ยวข้อง" },
-  { value: "price-asc", label: "ราคา ต่ำ→สูง" },
-  { value: "price-desc", label: "ราคา สูง→ต่ำ" },
-] as const;
-
-function SortSelectInner() {
+function SortSelectInner({ locale = "th" }: { locale?: Locale }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const current = searchParams.get("sort") ?? "featured";
+
+  const SORT_OPTIONS = [
+    { value: "featured",   labelKey: "sort.featured" },
+    { value: "price-asc",  labelKey: "sort.priceAsc" },
+    { value: "price-desc", labelKey: "sort.priceDesc" },
+  ] as const;
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -28,7 +29,7 @@ function SortSelectInner() {
     <select
       value={current}
       onChange={handleChange}
-      aria-label="เรียงลำดับ"
+      aria-label={t("sort.label", locale)}
       style={{
         padding: "7px 12px",
         border: "1px solid var(--line)",
@@ -42,16 +43,16 @@ function SortSelectInner() {
       }}
     >
       {SORT_OPTIONS.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
+        <option key={o.value} value={o.value}>{t(o.labelKey, locale)}</option>
       ))}
     </select>
   );
 }
 
-export default function SortSelect() {
+export default function SortSelect({ locale = "th" }: { locale?: Locale }) {
   return (
     <Suspense fallback={null}>
-      <SortSelectInner />
+      <SortSelectInner locale={locale} />
     </Suspense>
   );
 }

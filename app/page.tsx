@@ -19,6 +19,8 @@ import {
   type OccasionKey,
   SIZES,
 } from "@/lib/types";
+import { t } from "@/lib/i18n";
+import { getServerLocale } from "@/lib/i18n-server";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +61,8 @@ export default async function HomePage({
     | "price-desc"
     | "name";
 
+  const locale = getServerLocale();
+
   const [{ items: dresses, total, hasMore }, occasions, designers, user, sponsors, boutiques] = await Promise.all([
     listDresses({
       color: activeColor === "all" ? undefined : activeColor,
@@ -83,10 +87,14 @@ export default async function HomePage({
   const isLoggedIn = !!user;
   const bannerBoutiques = sponsors.length > 0 ? sponsors : boutiques;
 
-  const occasionOptions = occasions.map((o) => ({ value: o.key, label: o.th }));
+  // Locale-aware labels for filter chips
+  const occasionOptions = occasions.map((o) => ({
+    value: o.key,
+    label: locale === "en" ? t(`occasion.${o.key}`, "en") : o.th,
+  }));
   const colorOptions = COLORS.map((c) => ({
     value: c,
-    label: COLOR_LABELS_TH[c],
+    label: locale === "en" ? t(`color.${c}`, "en") : COLOR_LABELS_TH[c],
     swatch: COLOR_SWATCH[c],
   }));
   const sizeOptions = SIZES.map((sz) => ({ value: sz, label: sz }));
@@ -106,7 +114,7 @@ export default async function HomePage({
     <div className="home-revamp">
       {/* ======== BANNER CAROUSEL ======== */}
       <section className="hr-banner">
-        <BannerCarousel boutiques={bannerBoutiques} />
+        <BannerCarousel boutiques={bannerBoutiques} locale={locale} />
       </section>
 
       {/* ======== OCCASIONS ROW ======== */}
@@ -114,25 +122,28 @@ export default async function HomePage({
         <section className="hr-occasions">
           <div className="shell">
             <div className="hr-occ-head">
-              <h2 className="hr-occ-title">เลือกตามโอกาส</h2>
+              <h2 className="hr-occ-title">{t("browse.byOccasion", locale)}</h2>
               <Link href="/" className="hr-occ-more">
-                ดูทั้งหมด →
+                {t("browse.viewAll", locale)}
               </Link>
             </div>
             <div className="hr-occ-row">
-              {occasions.map((o) => (
-                <Link
-                  key={o.key}
-                  href={`/?occasion=${o.key}`}
-                  className="hr-occ-chip media-zoom"
-                  data-active={activeOcc === o.key ? "true" : undefined}
-                >
-                  <span className="hr-occ-tile">
-                    <OccasionTile color={o.color_token} />
-                  </span>
-                  <span className="hr-occ-label">{o.th}</span>
-                </Link>
-              ))}
+              {occasions.map((o) => {
+                const label = locale === "en" ? t(`occasion.${o.key}`, "en") : o.th;
+                return (
+                  <Link
+                    key={o.key}
+                    href={`/?occasion=${o.key}`}
+                    className="hr-occ-chip media-zoom"
+                    data-active={activeOcc === o.key ? "true" : undefined}
+                  >
+                    <span className="hr-occ-tile">
+                      <OccasionTile color={o.color_token} />
+                    </span>
+                    <span className="hr-occ-label">{label}</span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -157,6 +168,7 @@ export default async function HomePage({
                 colors={colorOptions}
                 sizes={sizeOptions}
                 designers={designerOptions}
+                locale={locale}
               />
             </aside>
 
@@ -164,21 +176,23 @@ export default async function HomePage({
             <main>
               <div className="hr-results-bar">
                 <div style={{ fontSize: 14, color: "var(--ink-2)" }}>
-                  พบ <b style={{ color: "var(--ink)" }}>{total}</b> ชุด
+                  {t("results.found", locale)}{" "}
+                  <b style={{ color: "var(--ink)" }}>{total}</b>{" "}
+                  {t("results.items", locale)}
                 </div>
-                <SortSelect />
+                <SortSelect locale={locale} />
               </div>
 
               {dresses.length === 0 ? (
                 <div className="hr-empty">
                   <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
-                    ไม่พบชุดที่ตรงกับตัวกรอง
+                    {t("empty.title", locale)}
                   </h3>
                   <p style={{ fontSize: 14, marginBottom: 18 }}>
-                    ลองล้างตัวกรองหรือทักหาเรา เราจะหาให้
+                    {t("empty.description", locale)}
                   </p>
                   <Link href="/" className="btn btn-outline">
-                    ล้างตัวกรองทั้งหมด
+                    {t("empty.clearAll", locale)}
                   </Link>
                 </div>
               ) : (
@@ -189,6 +203,7 @@ export default async function HomePage({
                   isLoggedIn={isLoggedIn}
                   total={total}
                   hasMore={hasMore}
+                  locale={locale}
                   searchParams={{
                     q: search || undefined,
                     color: activeColor === "all" ? undefined : activeColor,

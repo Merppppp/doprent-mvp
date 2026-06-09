@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import PriceRange from "./PriceRange";
 import type { SelectOption } from "./SearchSelect";
+import { t, DRESS_ITEM_EN, type Locale } from "@/lib/i18n";
 
 export type BrowseFiltersProps = {
   q: string;
@@ -18,11 +19,16 @@ export type BrowseFiltersProps = {
   colors: SelectOption[];
   sizes: SelectOption[];
   designers: SelectOption[];
+  locale?: Locale;
 };
 
 // ── Dress type sub-groups (client-side URL only — no server filtering yet) ──
 
-const DRESS_TYPE_GROUPS: { label: string; key: "top" | "bottom" | "dress"; items: string[] }[] = [
+const DRESS_TYPE_GROUPS: {
+  label: string;
+  key: "top" | "bottom" | "dress";
+  items: string[];
+}[] = [
   {
     label: "เสื้อ",
     key: "top",
@@ -212,6 +218,7 @@ function ColorSwatch({
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function BrowseFilters(props: BrowseFiltersProps) {
+  const locale = props.locale ?? "th";
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -288,7 +295,9 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
           marginBottom: 18,
         }}
       >
-        <span style={{ fontSize: 15, fontWeight: 700, color: "var(--ink)" }}>Filter</span>
+        <span style={{ fontSize: 15, fontWeight: 700, color: "var(--ink)" }}>
+          {t("filter.title", locale)}
+        </span>
         {hasAny ? (
           <button
             type="button"
@@ -303,15 +312,15 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
               fontWeight: 500,
             }}
           >
-            ล้างทั้งหมด
+            {t("filter.clearAll", locale)}
           </button>
         ) : null}
       </div>
 
-      {/* ════ Section: โอกาส ════ */}
+      {/* ════ Section: Occasion ════ */}
       <div style={sectionStyle}>
         <SectionHeader
-          label="โอกาส"
+          label={t("filter.occasion", locale)}
           open={sections.occasion}
           onToggle={() => toggleSection("occasion")}
         />
@@ -329,44 +338,51 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
         )}
       </div>
 
-      {/* ════ Section: ประเภทชุด ════ */}
+      {/* ════ Section: Dress Type ════ */}
       <div style={sectionStyle}>
         <SectionHeader
-          label="ประเภทชุด"
+          label={t("filter.type", locale)}
           open={sections.type}
           onToggle={() => toggleSection("type")}
         />
         {sections.type && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 10 }}>
-            {DRESS_TYPE_GROUPS.map((group) => (
-              <div key={group.key}>
-                <SubGroupHeader
-                  label={group.label}
-                  open={typeGroups[group.key]}
-                  onToggle={() => toggleTypeGroup(group.key)}
-                />
-                {typeGroups[group.key] && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginTop: 6 }}>
-                    {group.items.map((item) => (
-                      <Chip
-                        key={item}
-                        label={item}
-                        active={activeType === item}
-                        onClick={() => setParam("type", activeType === item ? null : item)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+            {DRESS_TYPE_GROUPS.map((group) => {
+              const groupLabel = t(`type.group.${group.key}`, locale);
+              return (
+                <div key={group.key}>
+                  <SubGroupHeader
+                    label={groupLabel}
+                    open={typeGroups[group.key]}
+                    onToggle={() => toggleTypeGroup(group.key)}
+                  />
+                  {typeGroups[group.key] && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginTop: 6 }}>
+                      {group.items.map((item) => {
+                        const itemLabel =
+                          locale === "en" ? (DRESS_ITEM_EN[item] ?? item) : item;
+                        return (
+                          <Chip
+                            key={item}
+                            label={itemLabel}
+                            active={activeType === item}
+                            onClick={() => setParam("type", activeType === item ? null : item)}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* ════ Section: สี ════ */}
+      {/* ════ Section: Color ════ */}
       <div style={sectionStyle}>
         <SectionHeader
-          label="สี"
+          label={t("filter.color", locale)}
           open={sections.color}
           onToggle={() => toggleSection("color")}
         />
@@ -389,7 +405,7 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
       {/* ════ Section: Size ════ */}
       <div style={sectionStyle}>
         <SectionHeader
-          label="Size"
+          label={t("filter.size", locale)}
           open={sections.size}
           onToggle={() => toggleSection("size")}
         />
@@ -407,10 +423,10 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
         )}
       </div>
 
-      {/* ════ Section: ราคา / วัน ════ */}
+      {/* ════ Section: Price / Day ════ */}
       <div style={{ ...sectionStyle, borderBottom: "none" }}>
         <SectionHeader
-          label="ราคา / วัน"
+          label={t("filter.price", locale)}
           open={sections.price}
           onToggle={() => toggleSection("price")}
         />

@@ -6,6 +6,7 @@ import { AREA_LIST, AREAS } from "@/lib/areas";
 import { haversineKm } from "@/lib/geo";
 import { useUserLocation } from "./LocationProvider";
 import type { Dress } from "@/lib/types";
+import { t, type Locale } from "@/lib/i18n";
 
 const RADII = [3, 5, 10] as const;
 
@@ -29,6 +30,7 @@ export default function DressResults({
   total,
   hasMore: initialHasMore,
   searchParams = {},
+  locale = "th",
 }: {
   dresses: Dress[];
   savedIds: string[];
@@ -36,6 +38,7 @@ export default function DressResults({
   total?: number;
   hasMore?: boolean;
   searchParams?: SearchParams;
+  locale?: Locale;
 }) {
   const { loc, label, source, status, requestGps, setArea, clear } = useUserLocation();
   const [radius, setRadius] = useState<number | null>(null);
@@ -135,43 +138,43 @@ export default function DressResults({
         {loc ? (
           <>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13.5, fontWeight: 600 }}>
-              <Pin /> ใกล้ {label}
+              <Pin /> {t("results.nearLocation", locale).replace("{label}", label ?? "")}
               {source === "gps" ? <span style={{ fontWeight: 400, color: "var(--ink-3)", fontSize: 12 }}>(GPS)</span> : null}
             </span>
             <div style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: 12, color: "var(--ink-3)" }}>ในระยะ</span>
+              <span style={{ fontSize: 12, color: "var(--ink-3)" }}>{t("results.within", locale)}</span>
               {RADII.map((r) => (
                 <button key={r} type="button" onClick={() => setRadius(radius === r ? null : r)} style={chip(radius === r)}>
-                  {r} กม
+                  {r} {t("results.km", locale)}
                 </button>
               ))}
               <button type="button" onClick={() => setRadius(null)} style={chip(radius === null)}>
-                ทั้งหมด
+                {t("results.all", locale)}
               </button>
             </div>
             <button type="button" onClick={clear} style={{ ...chip(false), marginLeft: "auto" }}>
-              เปลี่ยนตำแหน่ง
+              {t("results.changeLocation", locale)}
             </button>
           </>
         ) : (
           <>
             <button type="button" onClick={requestGps} disabled={status === "loading"} style={primaryBtn}>
-              <Pin /> {status === "loading" ? "กำลังหาตำแหน่ง…" : "ใกล้ฉัน"}
+              <Pin /> {status === "loading" ? t("results.findingLocation", locale) : t("results.nearMe", locale)}
             </button>
-            <span style={{ fontSize: 13, color: "var(--ink-3)" }}>หรือเลือกเขต</span>
+            <span style={{ fontSize: 13, color: "var(--ink-3)" }}>{t("results.orSelectDistrict", locale)}</span>
             <select
               defaultValue=""
               onChange={(e) => e.target.value && setArea(e.target.value)}
-              aria-label="เลือกเขตของคุณ"
+              aria-label={t("results.selectDistrict", locale)}
               style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, background: "var(--bg)", fontSize: 13, color: "var(--ink)" }}
             >
-              <option value="" disabled>เลือกเขต…</option>
+              <option value="" disabled>{t("results.selectDistrict", locale)}</option>
               {AREA_LIST.map((a) => (
                 <option key={a.key} value={a.key}>{a.th}</option>
               ))}
             </select>
             {status === "denied" ? (
-              <span style={{ fontSize: 12, color: "var(--ink-3)", flexBasis: "100%" }}>เปิดสิทธิ์ตำแหน่งไม่ได้ เลือกเขตแทนได้</span>
+              <span style={{ fontSize: 12, color: "var(--ink-3)", flexBasis: "100%" }}>{t("results.locationDenied", locale)}</span>
             ) : null}
           </>
         )}
@@ -179,7 +182,7 @@ export default function DressResults({
 
       {list.length === 0 ? (
         <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--ink-3)", border: "1px solid var(--line)", borderRadius: 8, background: "var(--surface)" }}>
-          ไม่มีชุดในระยะที่เลือก ลองขยายระยะหรือเลือก &ldquo;ทั้งหมด&rdquo;
+          {t("results.noneInRadius", locale)}
         </div>
       ) : (
         <>
@@ -196,7 +199,7 @@ export default function DressResults({
           {loadingMore && (
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, padding: "28px 0", color: "var(--ink-3)" }}>
               <LoadingSpinner />
-              <span style={{ fontSize: 13 }}>กำลังโหลด...</span>
+              <span style={{ fontSize: 13 }}>{t("results.loading", locale)}</span>
             </div>
           )}
 
@@ -215,7 +218,9 @@ export default function DressResults({
                 background: "var(--surface)",
               }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><polyline points="20 6 9 17 4 12"/></svg>
-                {allDresses.length > 1 ? `แสดงครบทั้ง ${allDresses.length} ชุดแล้ว` : "หมดแล้ว"}
+                {allDresses.length > 1
+                  ? t("results.allShown", locale).replace("{n}", String(allDresses.length))
+                  : t("results.noMore", locale)}
               </span>
             </div>
           )}

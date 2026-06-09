@@ -23,6 +23,8 @@ export default function LocaleToggle({ defaultLocale = "th" }: { defaultLocale?:
     const next = locale === "th" ? "en" : "th";
     setLocale(next);
     setLocaleCookie(next);
+    // Full reload so server components re-read the cookie and re-render
+    window.location.reload();
   };
 
   return (

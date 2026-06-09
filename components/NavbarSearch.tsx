@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { t, type Locale } from "@/lib/i18n";
 
-export default function NavbarSearch() {
+export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
   const [q, setQ] = useState("");
   const router = useRouter();
 
@@ -29,7 +30,7 @@ export default function NavbarSearch() {
       }}
       className="ns-form"
     >
-      <label htmlFor="ns-input" className="sr-only">ค้นหาชุดเช่า</label>
+      <label htmlFor="ns-input" className="sr-only">{t("search.label", locale)}</label>
       <span style={{ paddingLeft: 14, color: "rgba(255,255,255,0.65)", display: "grid", placeItems: "center", flexShrink: 0 }} aria-hidden>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
           <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" />
@@ -38,7 +39,7 @@ export default function NavbarSearch() {
       <input
         id="ns-input"
         type="search"
-        placeholder="ค้นหาชุด..."
+        placeholder={t("search.placeholder", locale)}
         value={q}
         onChange={(e) => setQ(e.target.value)}
         autoComplete="off"
@@ -72,7 +73,7 @@ export default function NavbarSearch() {
           whiteSpace: "nowrap",
         }}
       >
-        ค้นหา
+        {t("search.button", locale)}
       </button>
       <style dangerouslySetInnerHTML={{ __html: `
         .ns-form:focus-within { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.4); }

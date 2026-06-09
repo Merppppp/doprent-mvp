@@ -7,8 +7,11 @@ import NavbarSearch from "./NavbarSearch";
 import NavCategoryRow from "./NavCategoryRow";
 import LocaleToggle from "./LocaleToggle";
 import { listOccasions } from "@/lib/dresses";
+import { t } from "@/lib/i18n";
+import { getServerLocale } from "@/lib/i18n-server";
 
 export default async function Header() {
+  const locale = getServerLocale();
   const user = await getCurrentUser().catch(() => null);
 
   const fullName = user?.name || user?.email.split("@")[0] || "";
@@ -55,7 +58,7 @@ export default async function Header() {
 
         {/* Search bar — dominant center element */}
         <div style={{ flex: 1, minWidth: 0, maxWidth: 680 }}>
-          <NavbarSearch />
+          <NavbarSearch locale={locale} />
         </div>
 
         {/* Desktop right group */}
@@ -63,7 +66,7 @@ export default async function Header() {
           className="nav-cta-desktop"
           style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}
         >
-          {/* เปิดร้านกับ DopRent */}
+          {/* Open shop link */}
           <Link
             href="/sell/signup"
             style={{
@@ -76,16 +79,16 @@ export default async function Header() {
             }}
             className="hdr-sell-link"
           >
-            เปิดร้านกับ DopRent
+            {t("nav.openShop", locale)}
           </Link>
 
           {/* TH/EN toggle */}
-          <LocaleToggle />
+          <LocaleToggle defaultLocale={locale} />
 
           {/* Auth actions */}
           {user ? (
             <>
-              <SavedLink count={savedCount} />
+              <SavedLink count={savedCount} locale={locale} />
               <UserMenu
                 fullName={fullName}
                 email={user.email}
@@ -94,6 +97,7 @@ export default async function Header() {
                 initials={initials}
                 renterBadge={badges.renter}
                 sellerBadge={badges.seller}
+                locale={locale}
               />
             </>
           ) : (
@@ -109,10 +113,10 @@ export default async function Header() {
                   fontSize: 13,
                 }}
               >
-                เข้าสู่ระบบ
+                {t("nav.login", locale)}
               </Link>
               <Link href="/signup" className="btn btn-dark" style={{ fontSize: 13 }}>
-                สมัครสมาชิก
+                {t("nav.signup", locale)}
               </Link>
             </>
           )}
@@ -120,6 +124,7 @@ export default async function Header() {
 
         {/* Mobile hamburger */}
         <MobileMenu
+          locale={locale}
           user={
             user
               ? {
@@ -138,7 +143,7 @@ export default async function Header() {
       </div>
 
       {/* ── Category row ─────────────────────────────────────────────── */}
-      <NavCategoryRow occasions={occasions} />
+      <NavCategoryRow occasions={occasions} locale={locale} />
 
       <style dangerouslySetInnerHTML={{ __html: `
         header details > div a { color: var(--ink) !important; }
@@ -151,12 +156,15 @@ export default async function Header() {
 
 // ── SavedLink ────────────────────────────────────────────────────────────────
 
-function SavedLink({ count }: { count: number }) {
+import type { Locale } from "@/lib/i18n";
+
+function SavedLink({ count, locale = "th" }: { count: number; locale?: Locale }) {
+  const aria = `${t("nav.savedAria", locale)}${count > 0 ? ` (${count})` : ""}`;
   return (
     <Link
       href="/account"
-      aria-label={`ชุดที่ถูกใจ${count > 0 ? ` (${count})` : ""}`}
-      title="ชุดที่ถูกใจ"
+      aria-label={aria}
+      title={t("nav.savedAria", locale)}
       style={{
         position: "relative",
         width: 38,
@@ -248,6 +256,7 @@ function UserMenu({
   initials,
   renterBadge,
   sellerBadge,
+  locale = "th",
 }: {
   fullName: string;
   email: string;
@@ -256,6 +265,7 @@ function UserMenu({
   initials: string;
   renterBadge: number;
   sellerBadge: number;
+  locale?: Locale;
 }) {
   return (
     <details style={{ position: "relative" }}>
@@ -344,7 +354,7 @@ function UserMenu({
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{email}</div>
         </div>
 
-        {/* ── Group 1: ทุก user ── */}
+        {/* ── Group 1: all users ── */}
         <div style={{ paddingTop: 4, paddingBottom: 4 }}>
           <Link
             href="/account/bookings"
@@ -355,21 +365,21 @@ function UserMenu({
               justifyContent: "space-between",
             }}
           >
-            การจองของฉัน
+            {t("menu.myBookings", locale)}
             <Pill n={renterBadge} />
           </Link>
           <Link href="/account" style={menuItemStyle}>
-            สินค้าที่ชอบ
+            {t("menu.savedItems", locale)}
           </Link>
           <Link href="/boutiques" style={menuItemStyle}>
-            ร้านค้าที่ถูกใจ
+            {t("menu.likedShops", locale)}
           </Link>
           <Link href="/account" style={menuItemStyle}>
-            บัญชีของฉัน
+            {t("menu.myAccount", locale)}
           </Link>
         </div>
 
-        {/* ── Group 2: จัดการร้านค้า (seller only) ── */}
+        {/* ── Group 2: Manage shop (seller only) ── */}
         {isSeller && !isAdmin && (
           <>
             <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
@@ -383,10 +393,10 @@ function UserMenu({
                 textTransform: "uppercase",
               }}
             >
-              จัดการร้านค้า
+              {t("menu.manageShop", locale)}
             </div>
             <Link href="/sell/dashboard" style={menuItemStyle}>
-              Dashboard ร้านของฉัน
+              {t("menu.shopDashboard", locale)}
             </Link>
             <Link
               href="/sell/bookings"
@@ -397,13 +407,13 @@ function UserMenu({
                 justifyContent: "space-between",
               }}
             >
-              การจองของร้าน
+              {t("menu.shopBookings", locale)}
               <Pill n={sellerBadge} />
             </Link>
           </>
         )}
 
-        {/* ── Group 3: Admin (admin only, shown separately) ── */}
+        {/* ── Group 3: Admin (admin only) ── */}
         {isAdmin && (
           <>
             <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
@@ -417,10 +427,10 @@ function UserMenu({
                 textTransform: "uppercase",
               }}
             >
-              จัดการร้านค้า
+              {t("menu.manageShop", locale)}
             </div>
             <Link href="/sell/dashboard" style={menuItemStyle}>
-              Dashboard ร้านของฉัน
+              {t("menu.shopDashboard", locale)}
             </Link>
             <Link
               href="/sell/bookings"
@@ -431,7 +441,7 @@ function UserMenu({
                 justifyContent: "space-between",
               }}
             >
-              การจองของร้าน
+              {t("menu.shopBookings", locale)}
               <Pill n={sellerBadge} />
             </Link>
             <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
@@ -460,7 +470,7 @@ function UserMenu({
         <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
         <form action="/auth/signout" method="POST">
           <button type="submit" style={{ ...menuItemStyle, width: "100%", textAlign: "left" }}>
-            ออกจากระบบ
+            {t("menu.signOut", locale)}
           </button>
         </form>
       </div>

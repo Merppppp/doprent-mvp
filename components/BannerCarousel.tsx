@@ -10,6 +10,7 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import "swiper/css/effect-cards";
+import { t, type Locale } from "@/lib/i18n";
 
 /* ------------------------------------------------------------------
    Gradient palette per boutique cover_color
@@ -28,6 +29,7 @@ const COLOR_GRAD: Record<Color, [string, string]> = {
 
 type Props = {
   boutiques: Boutique[];
+  locale?: Locale;
 };
 
 /* ------------------------------------------------------------------
@@ -75,7 +77,7 @@ function DressCardStack({ cards }: { cards: DressCard[] }) {
   );
 }
 
-export default function BannerCarousel({ boutiques }: Props) {
+export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
   const prevRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
 
@@ -119,7 +121,7 @@ export default function BannerCarousel({ boutiques }: Props) {
 
                 {/* LEFT: Content */}
                 <div className="bc-content">
-                  <span className="bc-kicker">ร้านค้าแนะนำ</span>
+                  <span className="bc-kicker">{t("banner.kicker", locale)}</span>
 
                   <div className="bc-badges">
                     {b.verified && (
@@ -141,7 +143,7 @@ export default function BannerCarousel({ boutiques }: Props) {
                   )}
 
                   <Link href={`/boutique/${b.slug}`} className="bc-cta">
-                    ดูร้านค้า
+                    {t("banner.cta", locale)}
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                   </Link>
                 </div>
@@ -169,10 +171,10 @@ export default function BannerCarousel({ boutiques }: Props) {
       {boutiques.length >= 2 && (
         <>
           {/* Custom nav arrows */}
-          <button ref={prevRef} className="bc-arrow bc-arrow--prev" aria-label="ร้านก่อนหน้า">
+          <button ref={prevRef} className="bc-arrow bc-arrow--prev" aria-label={t("banner.prevAria", locale)}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
-          <button ref={nextRef} className="bc-arrow bc-arrow--next" aria-label="ร้านถัดไป">
+          <button ref={nextRef} className="bc-arrow bc-arrow--next" aria-label={t("banner.nextAria", locale)}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
           </button>
 

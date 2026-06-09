@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { t } from "@/lib/i18n";
+import { getServerLocale } from "@/lib/i18n-server";
 
-export default function Footer() {
+export default async function Footer() {
+  const locale = getServerLocale();
+
   return (
     <footer
       style={{
@@ -17,25 +21,25 @@ export default function Footer() {
         <div>
           <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 10 }}>DopRent</div>
           <p style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.55 }}>
-            เช่าชุดจากร้านเช่าในไทย จองตรงผ่าน LINE
+            {t("footer.tagline", locale)}
           </p>
         </div>
         <div>
-          <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>เลือกซื้อ</h5>
-          <FooterLink href="/">ทุกชุด</FooterLink>
-          <FooterLink href="/?occasion=engagement">งานหมั้น</FooterLink>
-          <FooterLink href="/?occasion=wedding">งานแต่ง</FooterLink>
-          <FooterLink href="/?occasion=cocktail">ค็อกเทล</FooterLink>
-          <FooterLink href="/?occasion=work">ชุดทำงาน</FooterLink>
+          <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>{t("footer.shop", locale)}</h5>
+          <FooterLink href="/">{t("footer.allDresses", locale)}</FooterLink>
+          <FooterLink href="/?occasion=engagement">{t("footer.engagement", locale)}</FooterLink>
+          <FooterLink href="/?occasion=wedding">{t("footer.wedding", locale)}</FooterLink>
+          <FooterLink href="/?occasion=cocktail">{t("footer.cocktail", locale)}</FooterLink>
+          <FooterLink href="/?occasion=work">{t("footer.workDress", locale)}</FooterLink>
         </div>
         <div>
-          <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>สำหรับร้านค้า</h5>
-          <FooterLink href="/sell">เปิดร้านบน DopRent</FooterLink>
-          <FooterLink href="/sell/dashboard">Dashboard ร้านของฉัน</FooterLink>
-          <FooterLink href="/boutiques">ร้านเช่าทั้งหมด</FooterLink>
+          <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>{t("footer.forShops", locale)}</h5>
+          <FooterLink href="/sell">{t("footer.openShop", locale)}</FooterLink>
+          <FooterLink href="/sell/dashboard">{t("footer.myDashboard", locale)}</FooterLink>
+          <FooterLink href="/boutiques">{t("footer.allBoutiques", locale)}</FooterLink>
         </div>
         <div>
-          <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>ติดต่อ</h5>
+          <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>{t("footer.contact", locale)}</h5>
           <a
             href={process.env.NEXT_PUBLIC_DEFAULT_LINE_URL ?? "https://line.me/R/ti/p/@doprent"}
             target="_blank"
@@ -70,7 +74,7 @@ export default function Footer() {
         <div>© {new Date().getFullYear()} DopRent · Bangkok</div>
         <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
           <Link href="/sell" style={{ color: "var(--ink-3)" }}>
-            เปิดร้านขาย →
+            {t("footer.sellLink", locale)}
           </Link>
           <span>ปลั๊กปลั่กออนไลน์</span>
         </div>
