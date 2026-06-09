@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import MobileMenu from "./MobileMenu";
 import { getBookingBadges } from "@/lib/booking-queries";
 import Logo from "./Logo";
+import NavbarSearch from "./NavbarSearch";
 
 export default async function Header() {
   const user = await getCurrentUser().catch(() => null);
@@ -21,8 +22,8 @@ export default async function Header() {
   return (
     <header
       style={{
-        borderBottom: "1px solid var(--line)",
-        background: "var(--surface)",
+        borderBottom: "1px solid #0d2b1f",
+        background: "#1B4332",
         position: "sticky",
         top: 0,
         zIndex: 40,
@@ -50,18 +51,20 @@ export default async function Header() {
             alignItems: "center",
             gap: 24,
             fontSize: 14,
-            color: "var(--ink-2)",
+            color: "rgba(255,255,255,0.85)",
             marginLeft: "auto",
             marginRight: 24,
           }}
         >
-          <Link href="/browse" style={{ padding: "6px 0" }}>
+          <Link href="/" style={{ padding: "6px 0", color: "inherit" }}>
             เลือกชุด
           </Link>
-          <Link href="/boutiques" style={{ padding: "6px 0" }}>
+          <Link href="/boutiques" style={{ padding: "6px 0", color: "inherit" }}>
             ร้านเช่า
           </Link>
         </nav>
+
+        <NavbarSearch />
 
         <div
           className="nav-cta-desktop"
@@ -85,7 +88,7 @@ export default async function Header() {
               <Link
                 href="/login"
                 className="btn btn-outline"
-                style={{ padding: "9px 14px" }}
+                style={{ padding: "9px 14px", border: "1.5px solid rgba(255,255,255,0.4)", color: "#fff", background: "transparent" }}
               >
                 เข้าสู่ระบบ
               </Link>
@@ -114,6 +117,12 @@ export default async function Header() {
           }
         />
       </div>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .nav-links a { color: rgba(255,255,255,0.85); text-decoration: none; transition: color .15s; }
+        .nav-links a:hover { color: #fff; }
+        header details > div a { color: var(--ink) !important; }
+        header details > div button { color: var(--ink) !important; }
+      ` }} />
     </header>
   );
 }
@@ -129,12 +138,12 @@ function SavedLink({ count }: { count: number }) {
         width: 38,
         height: 38,
         borderRadius: 999,
-        border: "1px solid var(--line)",
-        background: "var(--surface)",
+        border: "1px solid rgba(255,255,255,0.25)",
+        background: "rgba(255,255,255,0.1)",
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "var(--ink)",
+        color: "#fff",
       }}
     >
       <svg
@@ -142,7 +151,7 @@ function SavedLink({ count }: { count: number }) {
         height="18"
         viewBox="0 0 24 24"
         fill={count > 0 ? "var(--save)" : "none"}
-        stroke={count > 0 ? "var(--save)" : "var(--ink)"}
+        stroke={count > 0 ? "var(--save)" : "#fff"}
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -161,8 +170,8 @@ function SavedLink({ count }: { count: number }) {
             height: 18,
             padding: "0 5px",
             borderRadius: 999,
-            background: "var(--ink)",
-            color: "var(--on-dark)",
+            background: "#fff",
+            color: "#1B4332",
             fontSize: 10,
             fontWeight: 600,
             display: "inline-flex",
@@ -217,9 +226,10 @@ function UserMenu({
           gap: 8,
           padding: "6px 10px 6px 6px",
           borderRadius: 999,
-          border: "1px solid var(--line)",
-          background: "var(--surface)",
+          border: "1px solid rgba(255,255,255,0.25)",
+          background: "rgba(255,255,255,0.12)",
           cursor: "pointer",
+          color: "rgba(255,255,255,0.9)",
         }}
       >
         <span
@@ -246,11 +256,12 @@ function UserMenu({
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
+            color: "rgba(255,255,255,0.9)",
           }}
         >
           {fullName.split(" ")[0]}
         </span>
-        <span style={{ color: "var(--ink-3)", marginRight: 4, fontSize: 10 }}>▼</span>
+        <span style={{ color: "rgba(255,255,255,0.7)", marginRight: 4, fontSize: 10 }}>▼</span>
         {renterBadge + sellerBadge > 0 ? <Pill n={renterBadge + sellerBadge} /> : null}
       </summary>
       <div

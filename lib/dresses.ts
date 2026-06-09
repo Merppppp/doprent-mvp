@@ -29,6 +29,7 @@ export type DressFilters = {
   sort?: "featured" | "price-asc" | "price-desc" | "name";
   dateFrom?: string; // YYYY-MM-DD
   dateTo?: string;   // YYYY-MM-DD
+  page?: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -112,7 +113,12 @@ function mapBoutique(b: PrismaBoutique, coverImage?: string | null): Boutique {
 // Public queries
 // ---------------------------------------------------------------------------
 
-export async function listDresses(opts: DressFilters & { limit?: number } = {}): Promise<Dress[]> {
+export async function listDresses(
+  opts: DressFilters & { limit?: number } = {}
+): Promise<{ items: Dress[]; total: number; hasMore: boolean }> {
+  const PAGE_SIZE = 25;
+  const page = Math.max(1, opts.page ?? 1);
+
   // Build where clause
   const where: Prisma.DressWhereInput = {
     status: "live",
@@ -121,15 +127,40 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
 
   if (opts.color && opts.color !== "all") where.color = opts.color;
   if (opts.sizes?.length) where.size = { in: opts.sizes as unknown as Prisma.EnumSizeFilter<"Dress">["in"] };
-  if (typeof opts.priceMax === "number") where.pricePerDay = { lte: opts.priceMax };
+
+  // priceMin + priceMax
+  if (typeof opts.priceMin === "number" || typeof opts.priceMax === "number") {
+    where.pricePerDay = {
+      ...(typeof opts.priceMin === "number" ? { gte: opts.priceMin } : {}),
+      ...(typeof opts.priceMax === "number" ? { lte: opts.priceMax } : {}),
+    };
+  }
+
   if (opts.occasions?.length) where.occasions = { hasSome: opts.occasions };
+
+  // Designers filter (DB level)
+  if (opts.designers?.length) {
+    where.designer = { in: opts.designers };
+  }
+
+  // Boutique slugs filter (DB level via relation)
+  if (opts.boutiqueSlugs?.length) {
+    where.boutique = { slug: { in: opts.boutiqueSlugs } };
+  }
+
+  // Fuzzy search — split terms, each must match at least one field
   if (opts.search) {
-    where.OR = [
-      { name: { contains: opts.search, mode: "insensitive" } },
-      { designer: { contains: opts.search, mode: "insensitive" } },
-      { boutiqueName: { contains: opts.search, mode: "insensitive" } },
-      { description: { contains: opts.search, mode: "insensitive" } },
-    ];
+    const terms = opts.search.split(/\s+/).filter(Boolean);
+    if (terms.length > 0) {
+      where.AND = terms.map((term) => ({
+        OR: [
+          { name: { contains: term, mode: "insensitive" as const } },
+          { designer: { contains: term, mode: "insensitive" as const } },
+          { boutiqueName: { contains: term, mode: "insensitive" as const } },
+          { description: { contains: term, mode: "insensitive" as const } },
+        ],
+      }));
+    }
   }
 
   // Date range: exclude dresses with any blackout in range
@@ -147,43 +178,38 @@ export async function listDresses(opts: DressFilters & { limit?: number } = {}):
     if (blockedIds.length > 0) where.id = { notIn: blockedIds };
   }
 
-  const [rows, verifiedBoutiqueIds] = await Promise.all([
+  // DB-level sort
+  let orderBy: Prisma.DressOrderByWithRelationInput[];
+  switch (opts.sort) {
+    case "price-asc":  orderBy = [{ pricePerDay: "asc" }]; break;
+    case "price-desc": orderBy = [{ pricePerDay: "desc" }]; break;
+    case "name":       orderBy = [{ name: "asc" }]; break;
+    default:           orderBy = [{ featured: "desc" }, { sponsored: "desc" }, { createdAt: "desc" }];
+  }
+
+  // Pagination
+  const take = opts.limit ?? PAGE_SIZE;
+  const skip = opts.limit ? 0 : (page - 1) * PAGE_SIZE;
+
+  const [rows, total, verifiedBoutiqueIds] = await Promise.all([
     db.dress.findMany({
       where,
       include: { boutique: { select: { areaKey: true } } },
-      orderBy: [{ featured: "desc" }, { sponsored: "desc" }, { createdAt: "desc" }],
-      take: opts.limit,
+      orderBy,
+      take,
+      skip,
     }),
+    db.dress.count({ where }),
     db.boutique.findMany({
       where: { verified: true },
       select: { id: true },
     }).then((bs) => new Set(bs.map((b) => b.id))),
   ]);
 
-  let dresses = rows.map((d) => mapDress(d, verifiedBoutiqueIds.has(d.boutiqueId)));
+  const items = rows.map((d) => mapDress(d, verifiedBoutiqueIds.has(d.boutiqueId)));
+  const hasMore = opts.limit ? false : (page * PAGE_SIZE) < total;
 
-  // Application-layer filters
-  if (opts.designers?.length) {
-    dresses = dresses.filter((d) => opts.designers!.includes(d.designer ?? ""));
-  }
-  if (opts.boutiqueSlugs?.length) {
-    const slugSet = new Set(opts.boutiqueSlugs);
-    const boutiques = await db.boutique.findMany({
-      where: { slug: { in: opts.boutiqueSlugs } },
-      select: { id: true },
-    });
-    const boutiquesIds = new Set(boutiques.map((b) => b.id));
-    dresses = dresses.filter((d) => boutiquesIds.has(d.boutique_id));
-    void slugSet; // suppress unused warning
-  }
-
-  switch (opts.sort) {
-    case "price-asc":  dresses.sort((a, b) => a.price_per_day - b.price_per_day); break;
-    case "price-desc": dresses.sort((a, b) => b.price_per_day - a.price_per_day); break;
-    case "name":       dresses.sort((a, b) => a.name.localeCompare(b.name)); break;
-  }
-
-  return dresses;
+  return { items, total, hasMore };
 }
 
 export async function listDesigners(): Promise<string[]> {

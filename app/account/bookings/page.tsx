@@ -36,7 +36,7 @@ export default async function MyBookingsPage() {
       {bookings.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 0", color: "var(--ink-2)" }}>
           <p style={{ marginBottom: 20 }}>ยังไม่มีการจอง</p>
-          <Link href="/browse" className="btn btn-dark" style={{ padding: "12px 22px" }}>
+          <Link href="/" className="btn btn-dark" style={{ padding: "12px 22px" }}>
             เริ่มเลือกชุด
           </Link>
         </div>

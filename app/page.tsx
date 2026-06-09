@@ -2,7 +2,7 @@ import Link from "next/link";
 import DressResults from "@/components/DressResults";
 import BrowseFilters from "@/components/BrowseFilters";
 import BannerCarousel from "@/components/BannerCarousel";
-import SearchHero from "@/components/SearchHero";
+import SortSelect from "@/components/SortSelect";
 import { OccasionTile } from "@/components/DressArt";
 import {
   listDesigners,
@@ -59,7 +59,7 @@ export default async function HomePage({
     | "price-desc"
     | "name";
 
-  const [dresses, occasions, designers, user, sponsors, boutiques] = await Promise.all([
+  const [{ items: dresses, total, hasMore }, occasions, designers, user, sponsors, boutiques] = await Promise.all([
     listDresses({
       color: activeColor === "all" ? undefined : activeColor,
       occasions: activeOcc ? [activeOcc] : undefined,
@@ -109,18 +109,13 @@ export default async function HomePage({
         <BannerCarousel boutiques={bannerBoutiques} />
       </section>
 
-      {/* ======== SEARCH HERO ======== */}
-      <section className="hr-search">
-        <SearchHero />
-      </section>
-
       {/* ======== OCCASIONS ROW ======== */}
       {occasions.length > 0 && (
         <section className="hr-occasions">
           <div className="shell">
             <div className="hr-occ-head">
               <h2 className="hr-occ-title">เลือกตามโอกาส</h2>
-              <Link href="/browse" className="hr-occ-more">
+              <Link href="/" className="hr-occ-more">
                 ดูทั้งหมด →
               </Link>
             </div>
@@ -169,8 +164,9 @@ export default async function HomePage({
             <main>
               <div className="hr-results-bar">
                 <div style={{ fontSize: 14, color: "var(--ink-2)" }}>
-                  พบ <b style={{ color: "var(--ink)" }}>{dresses.length}</b> ชุด
+                  พบ <b style={{ color: "var(--ink)" }}>{total}</b> ชุด
                 </div>
+                <SortSelect />
               </div>
 
               {dresses.length === 0 ? (
@@ -187,9 +183,24 @@ export default async function HomePage({
                 </div>
               ) : (
                 <DressResults
+                  key={JSON.stringify(searchParams)}
                   dresses={dresses}
                   savedIds={[...savedSet]}
                   isLoggedIn={isLoggedIn}
+                  total={total}
+                  hasMore={hasMore}
+                  searchParams={{
+                    q: search || undefined,
+                    color: activeColor === "all" ? undefined : activeColor,
+                    occasion: activeOcc,
+                    size: activeSize,
+                    designer: activeDesigner,
+                    sort: sort === "featured" ? undefined : sort,
+                    dateFrom: activeDateFrom,
+                    dateTo: activeDateTo,
+                    priceMin: activePriceMin > PRICE_BOUNDS.min ? String(activePriceMin) : undefined,
+                    priceMax: activePriceMax < PRICE_BOUNDS.max ? String(activePriceMax) : undefined,
+                  }}
                 />
               )}
             </main>
@@ -209,14 +220,6 @@ export default async function HomePage({
 const HR_CSS = `
 /* ---- Banner ---- */
 .hr-banner{width:100%;background:var(--surface)}
-
-/* ---- Search strip ---- */
-.hr-search{
-  padding:24px 16px 20px;
-  background:var(--bg);
-  border-bottom:1px solid var(--line);
-}
-@media(min-width:768px){.hr-search{padding:28px 24px 24px}}
 
 /* ---- Occasions row ---- */
 .hr-occasions{
@@ -283,7 +286,6 @@ const HR_CSS = `
 
 /* ---- Responsive ---- */
 @media(max-width:600px){
-  .hr-search{padding:20px 14px 16px}
   .hr-occasions{padding:18px 0 0}
 }
 `;

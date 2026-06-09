@@ -22,11 +22,11 @@ export default function Footer() {
         </div>
         <div>
           <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>เลือกซื้อ</h5>
-          <FooterLink href="/browse">ทุกชุด</FooterLink>
-          <FooterLink href="/browse?occasion=engagement">งานหมั้น</FooterLink>
-          <FooterLink href="/browse?occasion=wedding">งานแต่ง</FooterLink>
-          <FooterLink href="/browse?occasion=cocktail">ค็อกเทล</FooterLink>
-          <FooterLink href="/browse?occasion=work">ชุดทำงาน</FooterLink>
+          <FooterLink href="/">ทุกชุด</FooterLink>
+          <FooterLink href="/?occasion=engagement">งานหมั้น</FooterLink>
+          <FooterLink href="/?occasion=wedding">งานแต่ง</FooterLink>
+          <FooterLink href="/?occasion=cocktail">ค็อกเทล</FooterLink>
+          <FooterLink href="/?occasion=work">ชุดทำงาน</FooterLink>
         </div>
         <div>
           <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>สำหรับร้านค้า</h5>

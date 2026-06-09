@@ -97,7 +97,7 @@ export default async function DressPage({ params }: { params: Params }) {
   return (
     <div className="shell" style={{ paddingTop: 20, paddingBottom: 60 }}>
       <div style={{ fontSize: 13, color: "var(--ink-3)", paddingBottom: 8 }}>
-        <Link href="/browse">← กลับไปดูทั้งหมด</Link>
+        <Link href="/">← กลับไปดูทั้งหมด</Link>
       </div>
 
       <div
@@ -391,7 +391,7 @@ export default async function DressPage({ params }: { params: Params }) {
             }}
           >
             <h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>ชุดที่คล้ายกัน</h2>
-            <Link href="/browse" style={{ fontSize: 14, color: "var(--ink-2)" }}>
+            <Link href="/" style={{ fontSize: 14, color: "var(--ink-2)" }}>
               ดูทั้งหมด →
             </Link>
           </div>

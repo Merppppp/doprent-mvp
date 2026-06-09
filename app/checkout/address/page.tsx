@@ -142,7 +142,7 @@ function Fallback({ msg }: { msg: string }) {
   return (
     <div className="shell" style={{ paddingTop: 80, paddingBottom: 100, maxWidth: 520, textAlign: "center" }}>
       <p style={{ fontSize: 16, color: "var(--ink-2)", marginBottom: 22 }}>{msg}</p>
-      <Link href="/browse" className="btn btn-dark" style={{ padding: "12px 22px" }}>
+      <Link href="/" className="btn btn-dark" style={{ padding: "12px 22px" }}>
         เลือกชุด
       </Link>
     </div>

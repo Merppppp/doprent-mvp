@@ -39,7 +39,7 @@ export default function BannerCarousel({ boutiques }: Props) {
     <div className="banner-carousel">
       <Swiper
         modules={[Navigation, Autoplay, Pagination]}
-        loop
+        loop={boutiques.length >= 2}
         speed={700}
         autoplay={{ delay: 5500, disableOnInteraction: false, pauseOnMouseEnter: true }}
         pagination={{ clickable: true, el: ".bc-dots" }}
@@ -111,16 +111,20 @@ export default function BannerCarousel({ boutiques }: Props) {
         })}
       </Swiper>
 
-      {/* Custom nav arrows */}
-      <button ref={prevRef} className="bc-arrow bc-arrow--prev" aria-label="ร้านก่อนหน้า">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
-      </button>
-      <button ref={nextRef} className="bc-arrow bc-arrow--next" aria-label="ร้านถัดไป">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
+      {boutiques.length >= 2 && (
+        <>
+          {/* Custom nav arrows */}
+          <button ref={prevRef} className="bc-arrow bc-arrow--prev" aria-label="ร้านก่อนหน้า">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <button ref={nextRef} className="bc-arrow bc-arrow--next" aria-label="ร้านถัดไป">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
 
-      {/* Custom pagination dots */}
-      <div className="bc-dots" />
+          {/* Custom pagination dots */}
+          <div className="bc-dots" />
+        </>
+      )}
 
       <style dangerouslySetInnerHTML={{ __html: BC_CSS }} />
     </div>

@@ -204,7 +204,7 @@ export default function MobileMenu({ user }: Props) {
             ) : null}
 
             <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <Link href="/browse" style={drawerItem}>
+              <Link href="/" style={drawerItem}>
                 เลือกชุด
               </Link>
               <Link href="/boutiques" style={drawerItem}>

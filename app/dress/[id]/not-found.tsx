@@ -7,7 +7,7 @@ export default function NotFound() {
       <p style={{ marginTop: 12, color: "var(--ink-2)" }}>
         ชุดอาจถูกถอดออกจากแคตตาล็อกแล้ว
       </p>
-      <Link href="/browse" className="btn btn-dark" style={{ marginTop: 32 }}>
+      <Link href="/" className="btn btn-dark" style={{ marginTop: 32 }}>
         ดูชุดอื่น ๆ
       </Link>
     </div>

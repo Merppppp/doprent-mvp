@@ -136,7 +136,7 @@ export async function setDressStatus(
   await writeAudit(auth.userId, `set_dress_${status}`, "dress", dressId, reason ?? null);
 
   revalidatePath("/admin/dresses");
-  revalidatePath("/browse");
+  revalidatePath("/");
   return { ok: true };
 }
 

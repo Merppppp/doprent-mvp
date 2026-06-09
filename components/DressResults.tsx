@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import DressCard from "./DressCard";
 import { AREA_LIST, AREAS } from "@/lib/areas";
 import { haversineKm } from "@/lib/geo";
@@ -9,27 +9,102 @@ import type { Dress } from "@/lib/types";
 
 const RADII = [3, 5, 10] as const;
 
-/**
- * Client wrapper for the /browse results grid: shows distance on each dress,
- * lets the visitor set a location (GPS or area), filter by radius, and sort
- * nearest-first. Server still does all category filtering; this is the
- * distance layer on top.
- */
+type SearchParams = {
+  q?: string;
+  color?: string;
+  occasion?: string;
+  size?: string;
+  designer?: string;
+  sort?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  priceMin?: string;
+  priceMax?: string;
+};
+
 export default function DressResults({
   dresses,
   savedIds,
   isLoggedIn,
+  total,
+  hasMore: initialHasMore,
+  searchParams = {},
 }: {
   dresses: Dress[];
   savedIds: string[];
   isLoggedIn: boolean;
+  total?: number;
+  hasMore?: boolean;
+  searchParams?: SearchParams;
 }) {
   const { loc, label, source, status, requestGps, setArea, clear } = useUserLocation();
   const [radius, setRadius] = useState<number | null>(null);
   const savedSet = useMemo(() => new Set(savedIds), [savedIds]);
 
+  // Infinite scroll state
+  const [allDresses, setAllDresses] = useState<Dress[]>(dresses);
+  const [page, setPage] = useState(2);
+  const [hasMore, setHasMore] = useState(initialHasMore ?? false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Reset when dresses prop changes (filter change)
+  useEffect(() => {
+    setAllDresses(dresses);
+    setPage(2);
+    setHasMore(initialHasMore ?? false);
+  }, [dresses, initialHasMore]);
+
+  const fetchMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams();
+      if (searchParams.q) params.set("q", searchParams.q);
+      if (searchParams.color) params.set("color", searchParams.color);
+      if (searchParams.occasion) params.set("occasion", searchParams.occasion);
+      if (searchParams.size) params.set("size", searchParams.size);
+      if (searchParams.designer) params.set("designer", searchParams.designer);
+      if (searchParams.sort) params.set("sort", searchParams.sort);
+      if (searchParams.dateFrom) params.set("dateFrom", searchParams.dateFrom);
+      if (searchParams.dateTo) params.set("dateTo", searchParams.dateTo);
+      if (searchParams.priceMin) params.set("priceMin", searchParams.priceMin);
+      if (searchParams.priceMax) params.set("priceMax", searchParams.priceMax);
+      params.set("page", String(page));
+
+      const res = await fetch(`/api/dresses?${params.toString()}`);
+      if (!res.ok) throw new Error("fetch failed");
+      const data = await res.json() as { items: Dress[]; hasMore: boolean };
+      setAllDresses((prev) => [...prev, ...data.items]);
+      setHasMore(data.hasMore);
+      setPage((p) => p + 1);
+    } catch (err) {
+      console.error("[DressResults] fetchMore error:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, page, searchParams]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          fetchMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, fetchMore]);
+
   const list = useMemo(() => {
-    let rows = dresses.map((d) => {
+    let rows = allDresses.map((d) => {
       const a = d.area_key ? AREAS[d.area_key] : undefined;
       const km = loc && a ? haversineKm(loc.lat, loc.lng, a.lat, a.lng) : null;
       return { d, km };
@@ -39,7 +114,7 @@ export default function DressResults({
       rows.sort((x, y) => (x.km == null ? 1 : y.km == null ? -1 : x.km - y.km));
     }
     return rows;
-  }, [dresses, loc, radius]);
+  }, [allDresses, loc, radius]);
 
   return (
     <div>
@@ -90,13 +165,9 @@ export default function DressResults({
               aria-label="เลือกเขตของคุณ"
               style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, background: "var(--bg)", fontSize: 13, color: "var(--ink)" }}
             >
-              <option value="" disabled>
-                เลือกเขต…
-              </option>
+              <option value="" disabled>เลือกเขต…</option>
               {AREA_LIST.map((a) => (
-                <option key={a.key} value={a.key}>
-                  {a.th}
-                </option>
+                <option key={a.key} value={a.key}>{a.th}</option>
               ))}
             </select>
             {status === "denied" ? (
@@ -111,11 +182,30 @@ export default function DressResults({
           ไม่มีชุดในระยะที่เลือก ลองขยายระยะหรือเลือก &ldquo;ทั้งหมด&rdquo;
         </div>
       ) : (
-        <div className="grid-3" style={{ gap: "24px 20px" }}>
-          {list.map(({ d }, i) => (
-            <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
-          ))}
-        </div>
+        <>
+          <div className="grid-3" style={{ gap: "24px 20px" }}>
+            {list.map(({ d }, i) => (
+              <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
+            ))}
+          </div>
+
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} style={{ height: 1 }} />
+
+          {/* Loading indicator */}
+          {loadingMore && (
+            <div style={{ textAlign: "center", padding: "24px 0", color: "var(--ink-3)", fontSize: 14 }}>
+              กำลังโหลด...
+            </div>
+          )}
+
+          {/* End of results */}
+          {!hasMore && allDresses.length > 25 && (
+            <div style={{ textAlign: "center", padding: "24px 0", color: "var(--ink-3)", fontSize: 13 }}>
+              แสดงครบ {allDresses.length} ชุดแล้ว
+            </div>
+          )}
+        </>
       )}
     </div>
   );

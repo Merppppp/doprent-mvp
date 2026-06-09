@@ -39,7 +39,7 @@ export default function GlobalError({
         <button type="button" onClick={() => reset()} className="btn btn-dark">
           ลองอีกครั้ง
         </button>
-        <Link href="/browse" className="btn btn-outline">
+        <Link href="/" className="btn btn-outline">
           ดูชุดทั้งหมด
         </Link>
       </div>

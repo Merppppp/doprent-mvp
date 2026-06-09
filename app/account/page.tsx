@@ -148,7 +148,7 @@ export default async function AccountPage() {
                 ยังไม่มีชุดที่บันทึก
               </h3>
               <p style={{ fontSize: 14, marginBottom: 18 }}>กดปุ่ม ❤️ ที่ชุดที่ชอบเพื่อบันทึก</p>
-              <Link href="/browse" className="btn btn-dark">
+              <Link href="/" className="btn btn-dark">
                 เลือกชุด
               </Link>
             </div>

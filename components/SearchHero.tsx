@@ -11,9 +11,9 @@ export default function SearchHero() {
     e.preventDefault();
     const trimmed = q.trim();
     if (trimmed) {
-      router.push(`/browse?q=${encodeURIComponent(trimmed)}`);
+      router.push(`/?q=${encodeURIComponent(trimmed)}`);
     } else {
-      router.push("/browse");
+      router.push("/");
     }
   };
 
