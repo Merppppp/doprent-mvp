@@ -16,18 +16,6 @@ type Props = {
 };
 
 export default function DressCard({ dress, variant = 0, savedSet, isLoggedIn }: Props) {
-  const badge = dress.featured ? (
-    <span className="ad-badge featured">
-      <span className="dot" />
-      Featured
-    </span>
-  ) : dress.sponsored ? (
-    <span className="ad-badge sponsored">
-      <span className="dot" />
-      Sponsored
-    </span>
-  ) : null;
-
   const hasImg = Array.isArray(dress.images) && dress.images.length > 0;
   const isSaved = savedSet ? savedSet.has(dress.id) : false;
 
@@ -55,7 +43,6 @@ export default function DressCard({ dress, variant = 0, savedSet, isLoggedIn }: 
           ) : (
             <DressArt color={dress.color} variant={variant} />
           )}
-          {badge}
           <SaveButton dressId={dress.id} initialSaved={isSaved} isLoggedIn={isLoggedIn} />
         </div>
         <div style={{ padding: "0 2px" }}>

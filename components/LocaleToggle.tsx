@@ -12,7 +12,13 @@ function setLocaleCookie(locale: string) {
   document.cookie = `NEXT_LOCALE=${locale}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 }
 
-export default function LocaleToggle({ defaultLocale = "th" }: { defaultLocale?: string }) {
+export default function LocaleToggle({
+  defaultLocale = "th",
+  variant = "navbar",
+}: {
+  defaultLocale?: string;
+  variant?: "navbar" | "navbar-top" | "dropdown" | "footer";
+}) {
   const [locale, setLocale] = useState(defaultLocale);
 
   useEffect(() => {
@@ -23,9 +29,14 @@ export default function LocaleToggle({ defaultLocale = "th" }: { defaultLocale?:
     const next = locale === "th" ? "en" : "th";
     setLocale(next);
     setLocaleCookie(next);
-    // Full reload so server components re-read the cookie and re-render
     window.location.reload();
   };
+
+  const isDark = variant === "dropdown" || variant === "footer";
+  const isTopBar = variant === "navbar-top";
+  const activeColor = isDark ? "var(--ink)" : "#fff";
+  const mutedColor = isDark ? "var(--ink-3)" : "rgba(255,255,255,0.4)";
+  const dividerColor = isDark ? "var(--ink-3)" : "rgba(255,255,255,0.3)";
 
   return (
     <button
@@ -36,35 +47,39 @@ export default function LocaleToggle({ defaultLocale = "th" }: { defaultLocale?:
         display: "flex",
         alignItems: "center",
         gap: 0,
-        padding: "6px 10px",
-        borderRadius: 999,
-        border: "1px solid rgba(255,255,255,0.25)",
-        background: "rgba(255,255,255,0.1)",
+        padding: isTopBar ? 0 : isDark ? "6px 0" : "0 12px",
+        height: isTopBar ? "auto" : isDark ? "auto" : 36,
+        borderRadius: isTopBar ? 0 : isDark ? 0 : 999,
+        border: isTopBar ? "none" : isDark ? "none" : "1px solid rgba(255,255,255,0.25)",
+        background: "transparent",
         cursor: "pointer",
         fontFamily: "inherit",
-        color: "rgba(255,255,255,0.9)",
         lineHeight: 1,
         flexShrink: 0,
+        width: isDark ? "100%" : undefined,
       }}
     >
+      {isDark && (
+        <span style={{ fontSize: 13, marginRight: 8, color: "var(--ink-2)" }}>🌐</span>
+      )}
       <span
         style={{
           fontSize: 12,
           fontWeight: locale === "th" ? 700 : 400,
-          color: locale === "th" ? "#fff" : "rgba(255,255,255,0.4)",
-          transition: "color .15s, font-weight .15s",
+          color: locale === "th" ? activeColor : mutedColor,
+          transition: "color .15s",
           letterSpacing: "0.03em",
         }}
       >
         TH
       </span>
-      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", margin: "0 3px" }}>/</span>
+      <span style={{ fontSize: 11, color: dividerColor, margin: "0 3px" }}>/</span>
       <span
         style={{
           fontSize: 12,
           fontWeight: locale === "en" ? 700 : 400,
-          color: locale === "en" ? "#fff" : "rgba(255,255,255,0.4)",
-          transition: "color .15s, font-weight .15s",
+          color: locale === "en" ? activeColor : mutedColor,
+          transition: "color .15s",
           letterSpacing: "0.03em",
         }}
       >

@@ -21,6 +21,8 @@ export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
       style={{
         display: "flex",
         alignItems: "center",
+        height: 36,
+        boxSizing: "border-box",
         background: "rgba(255,255,255,0.12)",
         border: "1px solid rgba(255,255,255,0.2)",
         borderRadius: 999,
@@ -48,7 +50,7 @@ export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
           border: "none",
           outline: "none",
           background: "transparent",
-          padding: "9px 10px",
+          padding: "0 10px",
           fontSize: 13.5,
           color: "#fff",
           fontFamily: "inherit",
@@ -58,22 +60,24 @@ export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
       />
       <button
         type="submit"
+        aria-label={t("search.button", locale)}
         style={{
           flexShrink: 0,
-          margin: 4,
-          padding: "6px 14px",
+          margin: 3,
+          width: 30,
+          height: 30,
           borderRadius: 999,
           background: "#fff",
-          color: "#1B4332",
+          color: "#4A6B5A",
           border: "none",
-          fontSize: 13,
-          fontWeight: 600,
           cursor: "pointer",
-          fontFamily: "inherit",
-          whiteSpace: "nowrap",
+          display: "grid",
+          placeItems: "center",
         }}
       >
-        {t("search.button", locale)}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" />
+        </svg>
       </button>
       <style dangerouslySetInnerHTML={{ __html: `
         .ns-form:focus-within { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.4); }

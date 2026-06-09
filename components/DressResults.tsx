@@ -112,8 +112,8 @@ export default function DressResults({
       const km = loc && a ? haversineKm(loc.lat, loc.lng, a.lat, a.lng) : null;
       return { d, km };
     });
-    if (loc && radius != null) rows = rows.filter((r) => r.km != null && r.km <= radius);
-    if (loc) {
+    if (loc && radius != null) {
+      rows = rows.filter((r) => r.km != null && r.km <= radius);
       rows.sort((x, y) => (x.km == null ? 1 : y.km == null ? -1 : x.km - y.km));
     }
     return rows;

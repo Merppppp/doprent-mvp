@@ -2,6 +2,7 @@ import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { getServerLocale } from "@/lib/i18n-server";
 import { version } from "@/package.json";
+import LocaleToggle from "./LocaleToggle";
 
 export default async function Footer() {
   const locale = getServerLocale();
@@ -77,7 +78,7 @@ export default async function Footer() {
           <Link href="/sell" style={{ color: "var(--ink-3)" }}>
             {t("footer.sellLink", locale)}
           </Link>
-          <span>ปลั๊กปลั่กออนไลน์</span>
+          <LocaleToggle defaultLocale={locale} variant="footer" />
           <span style={{ fontSize: 11, color: "var(--ink-3)" }}>v{version}</span>
         </div>
       </div>

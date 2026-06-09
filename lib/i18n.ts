@@ -11,6 +11,7 @@ export type Locale = "th" | "en";
 const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   // ── Nav ──────────────────────────────────────────────────────────────────
   "nav.openShop": { th: "เปิดร้านกับ DopRent", en: "Open Shop with DopRent" },
+  "nav.followUs": { th: "ติดตามเราบน", en: "Follow us on" },
   "nav.login":    { th: "เข้าสู่ระบบ",          en: "Sign In" },
   "nav.signup":   { th: "สมัครสมาชิก",           en: "Sign Up" },
   "nav.savedAria":{ th: "ชุดที่ถูกใจ",           en: "Liked dresses" },
