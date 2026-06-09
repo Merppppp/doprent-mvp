@@ -300,39 +300,67 @@ function UserMenu({
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{email}</div>
         </div>
 
-        {isAdmin ? (
-          <Link
-            href="/admin"
-            style={{
-              display: "block",
-              padding: "10px 16px",
-              fontSize: 14,
-              color: "var(--info)",
-              fontWeight: 500,
-            }}
-          >
-            Admin Dashboard
-          </Link>
-        ) : null}
+        {/* ---- Admin/Seller Group ---- */}
+        {(isAdmin || isSeller) && (
+          <>
+            <div
+              style={{
+                padding: "8px 16px 4px",
+                fontSize: 11,
+                fontWeight: 600,
+                color: "var(--ink-3)",
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}
+            >
+              จัดการร้านค้า
+            </div>
+            {isAdmin ? (
+              <Link
+                href="/admin"
+                style={{
+                  display: "block",
+                  padding: "10px 16px",
+                  fontSize: 14,
+                  color: "var(--info)",
+                  fontWeight: 500,
+                }}
+              >
+                Admin Dashboard
+              </Link>
+            ) : null}
+            {isSeller ? (
+              <Link href="/sell/dashboard" style={menuItemStyle}>
+                Dashboard ร้านของฉัน
+              </Link>
+            ) : null}
+            {isSeller ? (
+              <Link
+                href="/sell/bookings"
+                style={{ ...menuItemStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}
+              >
+                การจองของร้าน
+                <Pill n={sellerBadge} />
+              </Link>
+            ) : null}
+            <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
+          </>
+        )}
 
-        {isSeller ? (
-          <Link href="/sell/dashboard" style={menuItemStyle}>
-            Dashboard ร้านของฉัน
-          </Link>
-        ) : null}
-
-        {isSeller ? (
-          <Link href="/sell/bookings" style={{ ...menuItemStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            การจองของร้าน
-            <Pill n={sellerBadge} />
-          </Link>
-        ) : null}
-
-        <Link href="/account/bookings" style={{ ...menuItemStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        {/* ---- User Group ---- */}
+        <Link
+          href="/account/bookings"
+          style={{ ...menuItemStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}
+        >
           การจองของฉัน
           <Pill n={renterBadge} />
         </Link>
-
+        <Link href="/account" style={menuItemStyle}>
+          สินค้าที่ชอบ
+        </Link>
+        <Link href="/boutiques" style={menuItemStyle}>
+          ร้านค้าที่ถูกใจ
+        </Link>
         <Link href="/account" style={menuItemStyle}>
           บัญชีของฉัน
         </Link>
