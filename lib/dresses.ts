@@ -110,6 +110,19 @@ function mapBoutique(b: PrismaBoutique, coverImage?: string | null): Boutique {
 }
 
 // ---------------------------------------------------------------------------
+// Banner fallbacks — rotating set assigned to boutiques with no dress images
+// ---------------------------------------------------------------------------
+
+const FALLBACK_BANNERS = [
+  '/banners/banner-1.png',
+  '/banners/banner-2.png',
+  '/banners/banner-3.png',
+  '/banners/banner-4.png',
+  '/banners/banner-5.png',
+  '/banners/banner-6.png',
+] as const;
+
+// ---------------------------------------------------------------------------
 // Public queries
 // ---------------------------------------------------------------------------
 
@@ -254,8 +267,9 @@ export async function listSponsorBoutiques(limit = 8): Promise<Boutique[]> {
       orderBy: [{ adsTier: "desc" }, { featured: "desc" }, { name: "asc" }],
       take: limit,
     });
-    return rows.map((r) => {
-      const coverImage = (r.dresses?.[0]?.images as string[])?.[0] ?? null;
+    return rows.map((r, index) => {
+      const coverImage = (r.dresses?.[0]?.images as string[])?.[0]
+        ?? FALLBACK_BANNERS[index % FALLBACK_BANNERS.length];
       const boutique = mapBoutique(r, coverImage);
       boutique.dress_cards = r.dresses.map((d) => ({
         id: d.id,
@@ -287,8 +301,9 @@ export async function listBoutiques(opts: { limit?: number; featuredFirst?: bool
     ],
     take: opts.limit,
   });
-  return rows.map((r) => {
-    const coverImage = (r.dresses?.[0]?.images as string[])?.[0] ?? null;
+  return rows.map((r, index) => {
+    const coverImage = (r.dresses?.[0]?.images as string[])?.[0]
+      ?? FALLBACK_BANNERS[index % FALLBACK_BANNERS.length];
     const boutique = mapBoutique(r, coverImage);
     boutique.dress_cards = r.dresses.map((d) => ({
       id: d.id,
