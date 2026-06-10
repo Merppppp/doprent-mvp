@@ -156,7 +156,7 @@ export default async function HomePage({
         <div className="container">
           <div className="browse-grid">
             {/* SIDEBAR */}
-            <aside style={{ fontSize: 14 }}>
+            <aside className="sticky top-[120px] self-start max-h-[calc(100vh-140px)] overflow-y-auto text-sm">
               <BrowseFilters
                 q={search}
                 color={activeColor === "all" ? null : activeColor}

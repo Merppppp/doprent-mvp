@@ -61,27 +61,11 @@ function SectionHeader({
     <button
       type="button"
       onClick={onToggle}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        width: "100%",
-        padding: 0,
-        border: "none",
-        background: "none",
-        cursor: "pointer",
-        fontFamily: "inherit",
-      }}
+      className="flex items-center justify-between w-full p-0 border-none bg-transparent cursor-pointer font-[inherit]"
     >
-      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{label}</span>
+      <span className="text-xs font-bold text-[var(--ink)]">{label}</span>
       <span
-        style={{
-          fontSize: 11,
-          color: "var(--ink-3)",
-          transition: "transform .2s",
-          display: "inline-block",
-          transform: open ? "rotate(0deg)" : "rotate(-90deg)",
-        }}
+        className={`text-[11px] text-[var(--ink-3)] inline-block transition-transform duration-200 ${open ? "rotate-0" : "-rotate-90"}`}
       >
         ▼
       </span>
@@ -102,30 +86,13 @@ function SubGroupHeader({
     <button
       type="button"
       onClick={onToggle}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        width: "100%",
-        padding: 0,
-        border: "none",
-        background: "none",
-        cursor: "pointer",
-        fontFamily: "inherit",
-        marginBottom: open ? 6 : 0,
-      }}
+      className={`flex items-center justify-between w-full p-0 border-none bg-transparent cursor-pointer font-[inherit] ${open ? "mb-1.5" : "mb-0"}`}
     >
-      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+      <span className="text-[11px] font-semibold text-[var(--ink-3)] uppercase tracking-wider">
         {label}
       </span>
       <span
-        style={{
-          fontSize: 10,
-          color: "var(--ink-3)",
-          display: "inline-block",
-          transition: "transform .2s",
-          transform: open ? "rotate(0deg)" : "rotate(-90deg)",
-        }}
+        className={`text-[10px] text-[var(--ink-3)] inline-block transition-transform duration-200 ${open ? "rotate-0" : "-rotate-90"}`}
       >
         ▼
       </span>
@@ -146,20 +113,11 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      style={{
-        padding: "6px 10px",
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: active ? 600 : 400,
-        color: active ? "#fff" : "var(--ink-2)",
-        background: active ? "#1B4332" : "var(--surface)",
-        border: `1px solid ${active ? "#1B4332" : "var(--line)"}`,
-        cursor: "pointer",
-        fontFamily: "inherit",
-        transition: "all .15s",
-        whiteSpace: "nowrap",
-        textAlign: "center",
-      }}
+      className={`px-2 py-1 rounded-full text-[11px] cursor-pointer font-[inherit] transition-all duration-150 whitespace-nowrap text-center border ${
+        active
+          ? "bg-[var(--accent)] text-white font-semibold border-[var(--accent)]"
+          : "bg-[var(--surface)] text-[var(--ink-2)] font-normal border-[var(--line)]"
+      }`}
     >
       {label}
     </button>
@@ -184,31 +142,20 @@ function ColorSwatch({
       type="button"
       onClick={onClick}
       title={label}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 7,
-        padding: "5px 8px",
-        borderRadius: 8,
-        border: `1.5px solid ${active ? "#1B4332" : "var(--line)"}`,
-        background: active ? "var(--accent-soft)" : "var(--surface)",
-        cursor: "pointer",
-        fontFamily: "inherit",
-        transition: "all .15s",
-      }}
+      className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md cursor-pointer font-[inherit] transition-all duration-150 ${
+        active
+          ? "border border-[var(--accent)] bg-[var(--accent-soft)]"
+          : "border border-[var(--line)] bg-[var(--surface)]"
+      }`}
     >
       <span
+        className="w-3.5 h-3.5 rounded-full shrink-0 inline-block"
         style={{
-          width: 18,
-          height: 18,
-          borderRadius: 999,
           background: hex,
           border: hex === "#FFFFFF" || hex === "#FFFDD0" ? "1px solid var(--line)" : "none",
-          flexShrink: 0,
-          display: "inline-block",
         }}
       />
-      <span style={{ fontSize: 12, color: active ? "#1B4332" : "var(--ink-2)", fontWeight: active ? 600 : 400 }}>
+      <span className={`text-[11px] ${active ? "text-[var(--accent)] font-semibold" : "text-[var(--ink-2)] font-normal"}`}>
         {label}
       </span>
     </button>
@@ -249,9 +196,9 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
   // Section open/close state
   const [sections, setSections] = useState({
     occasion: true,
-    type: true,
-    color: true,
-    size: true,
+    type: false,
+    color: false,
+    size: false,
     price: true,
   });
 
@@ -285,32 +232,17 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
   }));
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+    <div className="flex flex-col">
       {/* ── Header row ── */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 18,
-        }}
-      >
-        <span style={{ fontSize: 15, fontWeight: 700, color: "var(--ink)" }}>
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm font-bold text-[var(--ink)]">
           {t("filter.title", locale)}
         </span>
         {hasAny ? (
           <button
             type="button"
             onClick={() => router.push(pathname, { scroll: false })}
-            style={{
-              fontSize: 12,
-              color: "var(--accent)",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontWeight: 500,
-            }}
+            className="text-xs text-[var(--accent)] bg-transparent border-none cursor-pointer font-[inherit] font-medium"
           >
             {t("filter.clearAll", locale)}
           </button>
@@ -318,14 +250,14 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
       </div>
 
       {/* ════ Section: Occasion ════ */}
-      <div style={sectionStyle}>
+      <div className="py-3 border-b border-[var(--line)]/50">
         <SectionHeader
           label={t("filter.occasion", locale)}
           open={sections.occasion}
           onToggle={() => toggleSection("occasion")}
         />
         {sections.occasion && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 10 }}>
+          <div className="grid grid-cols-2 gap-1.5 mt-2">
             {props.occasions.map((occ) => (
               <Chip
                 key={occ.value}
@@ -339,14 +271,14 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
       </div>
 
       {/* ════ Section: Dress Type ════ */}
-      <div style={sectionStyle}>
+      <div className="py-3 border-b border-[var(--line)]/50">
         <SectionHeader
           label={t("filter.type", locale)}
           open={sections.type}
           onToggle={() => toggleSection("type")}
         />
         {sections.type && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 10 }}>
+          <div className="flex flex-col gap-2 mt-2">
             {DRESS_TYPE_GROUPS.map((group) => {
               const groupLabel = t(`type.group.${group.key}`, locale);
               return (
@@ -357,7 +289,7 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
                     onToggle={() => toggleTypeGroup(group.key)}
                   />
                   {typeGroups[group.key] && (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginTop: 6 }}>
+                    <div className="grid grid-cols-2 gap-1 mt-1.5">
                       {group.items.map((item) => {
                         const itemLabel =
                           locale === "en" ? (DRESS_ITEM_EN[item] ?? item) : item;
@@ -380,14 +312,14 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
       </div>
 
       {/* ════ Section: Color ════ */}
-      <div style={sectionStyle}>
+      <div className="py-3 border-b border-[var(--line)]/50">
         <SectionHeader
           label={t("filter.color", locale)}
           open={sections.color}
           onToggle={() => toggleSection("color")}
         />
         {sections.color && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 10 }}>
+          <div className="grid grid-cols-2 gap-1.5 mt-2">
             {colorItems.map((c) => (
               <ColorSwatch
                 key={c.value}
@@ -403,14 +335,14 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
       </div>
 
       {/* ════ Section: Size ════ */}
-      <div style={sectionStyle}>
+      <div className="py-3 border-b border-[var(--line)]/50">
         <SectionHeader
           label={t("filter.size", locale)}
           open={sections.size}
           onToggle={() => toggleSection("size")}
         />
         {sections.size && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 10 }}>
+          <div className="grid grid-cols-2 gap-1.5 mt-2">
             {["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "Free size"].map((sz) => (
               <Chip
                 key={sz}
@@ -424,14 +356,14 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
       </div>
 
       {/* ════ Section: Price / Day ════ */}
-      <div style={{ ...sectionStyle, borderBottom: "none" }}>
+      <div className="py-3">
         <SectionHeader
           label={t("filter.price", locale)}
           open={sections.price}
           onToggle={() => toggleSection("price")}
         />
         {sections.price && (
-          <div style={{ marginTop: 12 }}>
+          <div className="mt-3">
             <PriceRange
               min={props.priceBounds.min}
               max={props.priceBounds.max}
@@ -453,9 +385,3 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     </div>
   );
 }
-
-const sectionStyle: React.CSSProperties = {
-  paddingTop: 16,
-  paddingBottom: 16,
-  borderBottom: "1px solid var(--line)",
-};
