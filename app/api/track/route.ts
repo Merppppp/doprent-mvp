@@ -3,13 +3,13 @@ import { createHash } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
-
-export const dynamic = "force-dynamic";
 import {
   FIRST_TOUCH_COOKIE,
   SESSION_COOKIE,
   decodeAttribution,
 } from "@/lib/attribution";
+
+export const dynamic = "force-dynamic";
 
 /** Lightweight client telemetry sink (Postgres/Prisma).
  *  - event "line_click": LINE CTA click-through
