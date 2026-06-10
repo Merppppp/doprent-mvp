@@ -26,12 +26,7 @@ export default async function Header() {
 
   return (
     <header
-      style={{
-        background: "#4A6B5A",
-        position: "sticky",
-        top: 0,
-        zIndex: 40,
-      }}
+      className="sticky top-0 z-40 bg-[rgba(46,156,101,0.95)] backdrop-blur-[12px] border-b border-b-[rgba(23,92,58,0.3)] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.25),0_1px_3px_rgba(0,0,0,0.1)]"
     >
       {/* ═══ TOP ROW ═══ (28px — utility links) */}
       <div
@@ -108,8 +103,8 @@ export default async function Header() {
           <Logo size={26} />
         </Link>
 
-        {/* Search — center */}
-        <div style={{ flex: 1, minWidth: 0, maxWidth: 620 }}>
+        {/* Search — center (desktop only) */}
+        <div className="hidden md:block" style={{ flex: 1, minWidth: 0, maxWidth: 620 }}>
           <NavbarSearch locale={locale} />
         </div>
 
@@ -170,6 +165,11 @@ export default async function Header() {
               : null
           }
         />
+      </div>
+
+      {/* ═══ MOBILE SEARCH ROW ═══ */}
+      <div className="block md:hidden border-t border-t-[rgba(255,255,255,0.08)] px-4 py-2">
+        <NavbarSearch locale={locale} />
       </div>
 
       {/* ═══ BOTTOM ROW ═══ (32px — product categories) */}

@@ -68,7 +68,7 @@ export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
           height: 30,
           borderRadius: 999,
           background: "#fff",
-          color: "#4A6B5A",
+          color: "#2e9c65",
           border: "none",
           cursor: "pointer",
           display: "grid",
