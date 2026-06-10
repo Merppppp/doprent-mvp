@@ -298,6 +298,7 @@ function DressCardStack({ cards }: { cards: DressCard[] }) {
 export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
   const prevRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
+  const paginationRef = useRef<HTMLDivElement>(null);
 
   const displayBoutiques = boutiques.length < 3 ? SAMPLE_BOUTIQUES : boutiques;
 
@@ -310,13 +311,15 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
         loop={displayBoutiques.length >= 2}
         speed={700}
         autoplay={{ delay: 5500, disableOnInteraction: false, pauseOnMouseEnter: true }}
-        pagination={{ clickable: true, el: ".bc-dots" }}
+        pagination={{ clickable: true, el: paginationRef.current }}
         navigation={{ prevEl: prevRef.current, nextEl: nextRef.current }}
         onBeforeInit={(swiper) => {
-          // wire refs before init so navigation works on first render
           if (typeof swiper.params.navigation !== "boolean" && swiper.params.navigation) {
             swiper.params.navigation.prevEl = prevRef.current;
             swiper.params.navigation.nextEl = nextRef.current;
+          }
+          if (typeof swiper.params.pagination !== "boolean" && swiper.params.pagination) {
+            swiper.params.pagination.el = paginationRef.current;
           }
         }}
         className="bc-swiper"
@@ -399,7 +402,7 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
           </button>
 
           {/* Custom pagination dots */}
-          <div className="bc-dots" />
+          <div ref={paginationRef} className="bc-dots" />
         </>
       )}
 

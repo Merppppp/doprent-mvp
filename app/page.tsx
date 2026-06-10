@@ -3,6 +3,7 @@ import DressResults from "@/components/DressResults";
 import BrowseFilters from "@/components/BrowseFilters";
 import BannerCarousel from "@/components/BannerCarousel";
 import SortSelect from "@/components/SortSelect";
+import MobileFilterDrawer from "@/components/MobileFilterDrawer";
 import { OccasionTile } from "@/components/DressArt";
 import {
   listDesigners,
@@ -155,8 +156,8 @@ export default async function HomePage({
       <section className="hr-browse">
         <div className="container">
           <div className="browse-grid">
-            {/* SIDEBAR */}
-            <aside className="sticky top-[120px] self-start max-h-[calc(100vh-140px)] overflow-y-auto text-sm">
+            {/* SIDEBAR — hidden on mobile, sticky on desktop */}
+            <aside className="hidden md:block sticky top-[120px] self-start max-h-[calc(100vh-140px)] overflow-y-auto text-sm">
               <BrowseFilters
                 q={search}
                 color={activeColor === "all" ? null : activeColor}
@@ -177,10 +178,27 @@ export default async function HomePage({
             {/* MAIN */}
             <main>
               <div className="hr-results-bar">
-                <div style={{ fontSize: 14, color: "var(--ink-2)" }}>
-                  {t("results.found", locale)}{" "}
-                  <b style={{ color: "var(--ink)" }}>{total}</b>{" "}
-                  {t("results.items", locale)}
+                <div className="flex items-center gap-3">
+                  <MobileFilterDrawer
+                    q={search}
+                    color={activeColor === "all" ? null : activeColor}
+                    occasion={activeOcc ?? null}
+                    size={activeSize ?? null}
+                    designer={activeDesigner ?? null}
+                    priceMin={activePriceMin}
+                    priceMax={activePriceMax}
+                    priceBounds={PRICE_BOUNDS}
+                    occasions={occasionOptions}
+                    colors={colorOptions}
+                    sizes={sizeOptions}
+                    designers={designerOptions}
+                    locale={locale}
+                  />
+                  <div className="text-sm text-[var(--ink-2)]">
+                    {t("results.found", locale)}{" "}
+                    <b className="text-[var(--ink)]">{total}</b>{" "}
+                    {t("results.items", locale)}
+                  </div>
                 </div>
                 <SortSelect locale={locale} />
               </div>

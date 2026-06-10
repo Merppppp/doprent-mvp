@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
-import MobileMenu from "./MobileMenu";
+
 import { getBookingBadges } from "@/lib/booking-queries";
 import Logo from "./Logo";
 import NavbarSearch from "./NavbarSearch";
@@ -147,24 +147,6 @@ export default async function Header() {
           )}
         </div>
 
-        {/* Mobile hamburger */}
-        <MobileMenu
-          locale={locale}
-          user={
-            user
-              ? {
-                  fullName,
-                  email: user.email,
-                  isAdmin: user.role === "admin",
-                  isSeller,
-                  initials,
-                  savedCount,
-                  renterBadge: badges.renter,
-                  sellerBadge: badges.seller,
-                }
-              : null
-          }
-        />
       </div>
 
       {/* ═══ MOBILE SEARCH ROW ═══ */}

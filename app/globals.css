@@ -103,6 +103,14 @@ body {
   font-feature-settings: "kern", "liga", "calt";
 }
 
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-in-left {
+  animation: slide-in-left 0.25s var(--ease) both;
+}
+
 /* Editorial display family — IBM Plex Serif Thai pairs natively with the
    Sans Thai Looped body, so they share metrics and OpenType features.
    Use for hero headlines and page titles where editorial weight matters. */
@@ -401,10 +409,6 @@ img {
   gap: 36px;
 }
 
-/* Mobile menu toggle visibility — hidden on desktop */
-.mobile-menu-toggle {
-  display: none;
-}
 .mobile-only {
   display: none;
 }
