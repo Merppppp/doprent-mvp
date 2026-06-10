@@ -157,7 +157,7 @@ export default async function HomePage({
         <div className="container">
           <div className="browse-grid">
             {/* SIDEBAR — hidden on mobile, sticky on desktop */}
-            <aside className="hidden md:block sticky top-[120px] self-start max-h-[calc(100vh-140px)] overflow-y-auto text-sm">
+            <aside className="hidden md:block sticky top-[15px] self-start max-h-[calc(100vh-135px)] overflow-y-auto overscroll-contain text-sm filter-sidebar pr-[15px]">
               <BrowseFilters
                 q={search}
                 color={activeColor === "all" ? null : activeColor}
@@ -301,10 +301,14 @@ const HR_CSS = `
   background:var(--bg);
 }
 
-/* Results bar */
+/* Results bar — sticky on mobile */
 .hr-results-bar{
   display:flex;justify-content:space-between;align-items:center;
   margin-bottom:16px;flex-wrap:wrap;gap:10px;
+  position:sticky;top:0;z-index:20;
+  background:var(--bg);
+  padding:10px 0;
+  border-bottom:1px solid var(--line);
 }
 
 /* Empty state */
@@ -315,6 +319,17 @@ const HR_CSS = `
   border:1px solid var(--line);
   border-radius:8px;
 }
+
+/* ---- Filter sidebar scrollbar ---- */
+.filter-sidebar{
+  scrollbar-width:thin;
+  scrollbar-color:var(--line) transparent;
+}
+.filter-sidebar::-webkit-scrollbar{width:4px}
+.filter-sidebar::-webkit-scrollbar-track{background:transparent}
+.filter-sidebar::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+.filter-sidebar::-webkit-scrollbar-thumb:hover{background:var(--ink-3)}
+
 
 /* ---- Responsive ---- */
 @media(max-width:600px){

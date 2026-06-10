@@ -28,16 +28,13 @@ export default function MobileFilterDrawer(props: BrowseFiltersProps) {
             onClick={() => setOpen(false)}
           />
           <div className="absolute left-0 top-0 bottom-0 w-[280px] max-w-[85vw] bg-[var(--bg)] overflow-y-auto p-4 shadow-xl animate-slide-in-left">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-bold text-[var(--ink)]">Filter</span>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="text-lg text-[var(--ink-3)] bg-transparent border-none cursor-pointer leading-none"
-              >
-                ✕
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-[var(--surface)] border border-[var(--line)] text-[var(--ink-3)] cursor-pointer text-sm"
+            >
+              ✕
+            </button>
             <BrowseFilters {...props} />
           </div>
         </div>
