@@ -416,12 +416,13 @@ const BC_CSS = `
 .banner-carousel{position:relative;width:100%;overflow:hidden;border-radius:25px}
 
 /* --- Swiper resets --- */
-.bc-swiper{width:100%;height:100%}
+.bc-swiper{width:100%;height:100%;overflow:hidden}
 .bc-swiper .swiper-wrapper{align-items:stretch}
+.bc-swiper .swiper-slide{width:100%;flex-shrink:0}
 
 /* --- Slide (single-column default) --- */
 .bc-slide{
-  position:relative;min-height:420px;display:flex;align-items:flex-end;overflow:hidden;
+  position:relative;min-height:320px;width:100%;display:flex;align-items:flex-end;overflow:hidden;
   border-radius:25px;padding:0;
 }
 @media(min-width:768px){.bc-slide{min-height:480px}}
@@ -460,12 +461,12 @@ const BC_CSS = `
 .bc-content{
   position:relative;z-index:2;
   width:100%;max-width:1160px;margin:0 auto;
-  padding:36px 24px 60px;
-  display:flex;flex-direction:column;align-items:flex-start;gap:14px;
+  padding:24px 16px 48px;
+  display:flex;flex-direction:column;align-items:flex-start;gap:10px;
 }
 .bc-slide--two-col .bc-content{
   max-width:none;
-  padding:36px 24px 60px 24px;
+  padding:24px 16px 48px 16px;
 }
 @media(min-width:768px){
   .bc-content{padding:48px 40px 72px}
