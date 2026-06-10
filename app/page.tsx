@@ -113,8 +113,10 @@ export default async function HomePage({
   return (
     <div className="home-revamp">
       {/* ======== BANNER CAROUSEL ======== */}
-      <section className="hr-banner">
-        <BannerCarousel boutiques={bannerBoutiques} locale={locale} />
+      <section className="bg-surface">
+        <div className="container">
+          <BannerCarousel boutiques={bannerBoutiques} locale={locale} />
+        </div>
       </section>
 
       {/* ======== OCCASIONS ROW ======== */}
@@ -233,9 +235,6 @@ export default async function HomePage({
 }
 
 const HR_CSS = `
-/* ---- Banner ---- */
-.hr-banner{width:100%;background:var(--surface)}
-
 /* ---- Occasions row ---- */
 .hr-occasions{
   padding:22px 0 8px;
