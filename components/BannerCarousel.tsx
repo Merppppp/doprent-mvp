@@ -58,7 +58,7 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
     instagram: null,
     since_year: 2020,
     cover_color: "rose",
-    cover_image: null,
+    cover_image: "/banners/banner-1.png",
     tag: "ชุดราตรีระดับ haute couture สำหรับทุกโอกาสพิเศษ",
     story: null,
     delivery_info: null,
@@ -93,7 +93,7 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
     instagram: null,
     since_year: 2019,
     cover_color: "ivory",
-    cover_image: null,
+    cover_image: "/banners/banner-2.png",
     tag: "ความงามแบบมินิมอล สง่างามในทุกรายละเอียด",
     story: null,
     delivery_info: null,
@@ -128,7 +128,7 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
     instagram: null,
     since_year: 2021,
     cover_color: "black",
-    cover_image: null,
+    cover_image: "/banners/banner-3.png",
     tag: "ชุดดำคลาสสิก กล้าหาญ และทรงพลัง",
     story: null,
     delivery_info: null,
@@ -163,7 +163,7 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
     instagram: null,
     since_year: 2022,
     cover_color: "navy",
-    cover_image: null,
+    cover_image: "/banners/banner-4.png",
     tag: "สีน้ำทะเลลึก หรูหราอย่างมีจิตวิญญาณ",
     story: null,
     delivery_info: null,
@@ -198,7 +198,7 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
     instagram: null,
     since_year: 2023,
     cover_color: "green",
-    cover_image: null,
+    cover_image: "/banners/banner-5.png",
     tag: "ธรรมชาติพบความหรูหรา ชุดสีเขียวที่ทำให้คุณเปล่งประกาย",
     story: null,
     delivery_info: null,
@@ -233,7 +233,7 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
     instagram: null,
     since_year: 2018,
     cover_color: "purple",
-    cover_image: null,
+    cover_image: "/banners/banner-6.png",
     tag: "กำมะหยี่ สีม่วงเข้ม ความหรูหราที่จับต้องได้",
     story: null,
     delivery_info: null,
@@ -598,7 +598,7 @@ const BC_CSS = `
   opacity:0;
 }
 .banner-carousel:hover .bc-arrow{opacity:.8}
-.bc-arrow:hover{opacity:1;background:rgba(255,255,255,0.28)}
+.bc-arrow:hover{opacity:1;background:rgba(46,156,101,0.85)}
 .bc-arrow--prev{left:16px}
 .bc-arrow--next{right:16px}
 @media(max-width:480px){.bc-arrow{width:34px;height:34px}.bc-arrow--prev{left:10px}.bc-arrow--next{right:10px}}
@@ -609,13 +609,19 @@ const BC_CSS = `
   display:flex;gap:6px;align-items:center;
 }
 .bc-dots .swiper-pagination-bullet{
-  width:6px;height:6px;border-radius:999px;
-  background:rgba(255,255,255,0.55);opacity:1;margin:0;
-  transition:width .3s ease,background .3s ease;
+  width:10px;height:10px;border-radius:999px;
+  background:rgba(255,255,255,0.5);opacity:1;margin:0;
+  border:2px solid rgba(255,255,255,0.7);
+  transition:width .3s ease,background .3s ease,border-color .3s ease;
+  cursor:pointer;
+}
+.bc-dots .swiper-pagination-bullet:hover{
+  background:rgba(255,255,255,0.8);
 }
 .bc-dots .swiper-pagination-bullet-active{
-  width:20px;
-  background:#fff;
+  width:28px;
+  background:rgba(46,156,101,0.9);
+  border-color:rgba(46,156,101,1);
 }
 
 /* Reduce motion */

@@ -27,19 +27,19 @@
      just-in sections so they read as one editorial composition. */
   --warm: oklch(0.945 0.014 80);
 
-  /* Brand accent — deep teal / emerald. The DopRent signature.
+  /* Brand accent — vibrant emerald green (#2e9c65 from revamp palette).
      Carries CTAs, brand mark, verified/trust. Pair with --accent-ink
-     for text on top (now a warm near-white — teal is dark). */
-  --accent: oklch(0.45 0.085 168);
-  --accent-2: oklch(0.33 0.072 168); /* darker hover state / deep */
-  --accent-soft: oklch(0.93 0.03 168); /* tint for badge / wash fills */
-  --accent-ink: oklch(0.985 0.012 168);  /* warm near-white text on teal */
+     for text on top. */
+  --accent: oklch(0.58 0.12 158);
+  --accent-2: oklch(0.47 0.10 158); /* darker hover state / deep */
+  --accent-soft: oklch(0.94 0.04 158); /* tint for badge / wash fills */
+  --accent-ink: oklch(0.985 0.012 158);  /* warm near-white text on green */
 
-  /* Cobalt slot — now the same teal family so links / verified badge /
+  /* Cobalt slot — same green family so links / verified badge /
      info / focus / saved state read on-brand. (name kept for compat) */
-  --cobalt: oklch(0.40 0.082 168);
-  --cobalt-2: oklch(0.32 0.072 168);  /* darker hover */
-  --cobalt-soft: oklch(0.93 0.03 168); /* tint fill */
+  --cobalt: oklch(0.55 0.11 158);
+  --cobalt-2: oklch(0.45 0.09 158);  /* darker hover */
+  --cobalt-soft: oklch(0.94 0.04 158); /* tint fill */
 
   /* Saved-heart — stays a warm red (universal "saved/favourite" signal),
      intentionally NOT the teal brand hue so the wishlist reads instantly. */

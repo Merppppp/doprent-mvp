@@ -113,7 +113,7 @@ export default async function HomePage({
   return (
     <div className="home-revamp">
       {/* ======== BANNER CAROUSEL ======== */}
-      <section className="bg-bg">
+      <section className="bg-bg pt-6">
         <div className="container">
           <BannerCarousel boutiques={bannerBoutiques} locale={locale} />
         </div>
