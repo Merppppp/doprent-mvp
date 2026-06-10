@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import DressForm from "@/app/sell/dresses/DressForm";
 import { getDressBySlug, listOccasions, getBoutiqueBySlug } from "@/lib/dresses";
 
+export const dynamic = "force-dynamic";
+
 type Params = { id: string };
 
 const DEFAULT_LINE = process.env.NEXT_PUBLIC_DEFAULT_LINE_URL ?? "https://line.me/R/ti/p/@doprent";

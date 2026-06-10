@@ -5,6 +5,8 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { r2, R2_PRIVATE_BUCKET } from "@/lib/r2";
 
+export const dynamic = "force-dynamic";
+
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB — slip อาจเป็น screenshot ใหญ่กว่ารูปชุด
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 

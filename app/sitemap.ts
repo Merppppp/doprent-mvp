@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { listBoutiques, listDresses } from "@/lib/dresses";
 
+export const dynamic = "force-dynamic";
+
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

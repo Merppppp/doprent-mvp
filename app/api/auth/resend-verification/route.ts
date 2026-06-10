@@ -3,6 +3,8 @@ import crypto from "crypto";
 import { db } from "@/lib/db";
 import { sendVerificationEmail } from "@/lib/email";
 
+export const dynamic = "force-dynamic";
+
 const TOKEN_EXPIRY_HOURS = 24;
 
 export async function POST(req: NextRequest) {

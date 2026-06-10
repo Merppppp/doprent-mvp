@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { listDresses } from "@/lib/dresses";
 import type { Color, OccasionKey } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const sp = req.nextUrl.searchParams;

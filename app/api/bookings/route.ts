@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 const BOOKING_INCLUDE = {
   dress: { select: { id: true, name: true, slug: true, images: true } },
   boutique: { select: { id: true, name: true, slug: true, lineUrl: true, promptpayId: true } },

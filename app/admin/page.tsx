@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Admin Overview",
   robots: { index: false, follow: false },
