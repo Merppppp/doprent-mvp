@@ -33,6 +33,222 @@ type Props = {
 };
 
 /* ------------------------------------------------------------------
+   Sample fallback data — shown when boutiques prop has < 3 entries
+------------------------------------------------------------------- */
+const SAMPLE_BOUTIQUES: Boutique[] = [
+  {
+    id: "sample-1",
+    slug: "maison-de-reve",
+    name: "Maison de Rêve",
+    owner_id: null,
+    owner_name: null,
+    area_key: "siam",
+    area_label: "สยาม",
+    address: null,
+    house_no: null,
+    street: null,
+    subdistrict: null,
+    district: null,
+    province: "กรุงเทพมหานคร",
+    postal_code: null,
+    lat: null,
+    lng: null,
+    hours: null,
+    line_url: "#",
+    instagram: null,
+    since_year: 2020,
+    cover_color: "rose",
+    cover_image: null,
+    tag: "ชุดราตรีระดับ haute couture สำหรับทุกโอกาสพิเศษ",
+    story: null,
+    delivery_info: null,
+    featured: true,
+    verified: true,
+    ads_tier: "featured",
+    status: "live",
+    reject_reason: null,
+    kyc_status: "verified",
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
+  },
+  {
+    id: "sample-2",
+    slug: "blanc-atelier",
+    name: "Blanc Atelier",
+    owner_id: null,
+    owner_name: null,
+    area_key: "thonglor",
+    area_label: "ทองหล่อ",
+    address: null,
+    house_no: null,
+    street: null,
+    subdistrict: null,
+    district: null,
+    province: "กรุงเทพมหานคร",
+    postal_code: null,
+    lat: null,
+    lng: null,
+    hours: null,
+    line_url: "#",
+    instagram: null,
+    since_year: 2019,
+    cover_color: "ivory",
+    cover_image: null,
+    tag: "ความงามแบบมินิมอล สง่างามในทุกรายละเอียด",
+    story: null,
+    delivery_info: null,
+    featured: true,
+    verified: true,
+    ads_tier: "featured",
+    status: "live",
+    reject_reason: null,
+    kyc_status: "verified",
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
+  },
+  {
+    id: "sample-3",
+    slug: "noir-studio",
+    name: "Noir Studio",
+    owner_id: null,
+    owner_name: null,
+    area_key: "silom",
+    area_label: "สีลม",
+    address: null,
+    house_no: null,
+    street: null,
+    subdistrict: null,
+    district: null,
+    province: "กรุงเทพมหานคร",
+    postal_code: null,
+    lat: null,
+    lng: null,
+    hours: null,
+    line_url: "#",
+    instagram: null,
+    since_year: 2021,
+    cover_color: "black",
+    cover_image: null,
+    tag: "ชุดดำคลาสสิก กล้าหาญ และทรงพลัง",
+    story: null,
+    delivery_info: null,
+    featured: false,
+    verified: true,
+    ads_tier: "boost",
+    status: "live",
+    reject_reason: null,
+    kyc_status: "verified",
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
+  },
+  {
+    id: "sample-4",
+    slug: "ocean-blue-couture",
+    name: "Ocean Blue Couture",
+    owner_id: null,
+    owner_name: null,
+    area_key: "ari",
+    area_label: "อารีย์",
+    address: null,
+    house_no: null,
+    street: null,
+    subdistrict: null,
+    district: null,
+    province: "กรุงเทพมหานคร",
+    postal_code: null,
+    lat: null,
+    lng: null,
+    hours: null,
+    line_url: "#",
+    instagram: null,
+    since_year: 2022,
+    cover_color: "navy",
+    cover_image: null,
+    tag: "สีน้ำทะเลลึก หรูหราอย่างมีจิตวิญญาณ",
+    story: null,
+    delivery_info: null,
+    featured: false,
+    verified: false,
+    ads_tier: "free",
+    status: "live",
+    reject_reason: null,
+    kyc_status: "verified",
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
+  },
+  {
+    id: "sample-5",
+    slug: "jardin-vert",
+    name: "Jardin Vert",
+    owner_id: null,
+    owner_name: null,
+    area_key: "charoenkriung",
+    area_label: "เจริญกรุง",
+    address: null,
+    house_no: null,
+    street: null,
+    subdistrict: null,
+    district: null,
+    province: "กรุงเทพมหานคร",
+    postal_code: null,
+    lat: null,
+    lng: null,
+    hours: null,
+    line_url: "#",
+    instagram: null,
+    since_year: 2023,
+    cover_color: "green",
+    cover_image: null,
+    tag: "ธรรมชาติพบความหรูหรา ชุดสีเขียวที่ทำให้คุณเปล่งประกาย",
+    story: null,
+    delivery_info: null,
+    featured: false,
+    verified: true,
+    ads_tier: "boost",
+    status: "live",
+    reject_reason: null,
+    kyc_status: "verified",
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
+  },
+  {
+    id: "sample-6",
+    slug: "velvet-house",
+    name: "Velvet House",
+    owner_id: null,
+    owner_name: null,
+    area_key: "sukhumvit",
+    area_label: "สุขุมวิท",
+    address: null,
+    house_no: null,
+    street: null,
+    subdistrict: null,
+    district: null,
+    province: "กรุงเทพมหานคร",
+    postal_code: null,
+    lat: null,
+    lng: null,
+    hours: null,
+    line_url: "#",
+    instagram: null,
+    since_year: 2018,
+    cover_color: "purple",
+    cover_image: null,
+    tag: "กำมะหยี่ สีม่วงเข้ม ความหรูหราที่จับต้องได้",
+    story: null,
+    delivery_info: null,
+    featured: true,
+    verified: true,
+    ads_tier: "featured",
+    status: "live",
+    reject_reason: null,
+    kyc_status: "verified",
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
+  },
+];
+
+/* ------------------------------------------------------------------
    DressCardStack — inner EffectCards Swiper for a boutique's dresses
 ------------------------------------------------------------------- */
 function DressCardStack({ cards }: { cards: DressCard[] }) {
@@ -43,6 +259,8 @@ function DressCardStack({ cards }: { cards: DressCard[] }) {
         effect="cards"
         grabCursor
         speed={600}
+        loop={true}
+        initialSlide={1}
         autoplay={{ delay: 3200, disableOnInteraction: true }}
         cardsEffect={{
           perSlideOffset: 9,
@@ -81,13 +299,15 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
   const prevRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
 
-  if (boutiques.length === 0) return null;
+  const displayBoutiques = boutiques.length < 3 ? SAMPLE_BOUTIQUES : boutiques;
+
+  if (displayBoutiques.length === 0) return null;
 
   return (
     <div className="banner-carousel">
       <Swiper
         modules={[Navigation, Autoplay, Pagination]}
-        loop={boutiques.length >= 2}
+        loop={displayBoutiques.length >= 2}
         speed={700}
         autoplay={{ delay: 5500, disableOnInteraction: false, pauseOnMouseEnter: true }}
         pagination={{ clickable: true, el: ".bc-dots" }}
@@ -101,7 +321,7 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
         }}
         className="bc-swiper"
       >
-        {boutiques.map((b) => {
+        {displayBoutiques.map((b) => {
           const [from, to] = COLOR_GRAD[b.cover_color] ?? COLOR_GRAD.green;
           const bgStyle = b.cover_image
             ? {
@@ -168,7 +388,7 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
         })}
       </Swiper>
 
-      {boutiques.length >= 2 && (
+      {displayBoutiques.length >= 2 && (
         <>
           {/* Custom nav arrows */}
           <button ref={prevRef} className="bc-arrow bc-arrow--prev" aria-label={t("banner.prevAria", locale)}>
@@ -190,7 +410,7 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
 
 const BC_CSS = `
 /* --- BannerCarousel wrapper --- */
-.banner-carousel{position:relative;width:100%;overflow:hidden;border-radius:0}
+.banner-carousel{position:relative;width:100%;overflow:hidden;border-radius:25px}
 
 /* --- Swiper resets --- */
 .bc-swiper{width:100%;height:100%}
@@ -199,7 +419,7 @@ const BC_CSS = `
 /* --- Slide (single-column default) --- */
 .bc-slide{
   position:relative;min-height:420px;display:flex;align-items:flex-end;overflow:hidden;
-  padding:0;
+  border-radius:25px;padding:0;
 }
 @media(min-width:768px){.bc-slide{min-height:480px}}
 @media(min-width:1200px){.bc-slide{min-height:520px}}
@@ -309,7 +529,7 @@ const BC_CSS = `
   position:relative;z-index:2;
   display:none;
   align-items:center;justify-content:center;
-  padding:32px 40px 32px 0;
+  padding:32px 56px 32px 0;
   flex-shrink:0;
 }
 @media(min-width:768px){
