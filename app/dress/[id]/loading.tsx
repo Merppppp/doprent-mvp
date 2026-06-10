@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/Skeleton";
 
 export default function Loading() {
   return (
-    <div className="shell" style={{ paddingTop: 20, paddingBottom: 60 }}>
+    <div className="container" style={{ paddingTop: 20, paddingBottom: 60 }}>
       <Skeleton style={{ height: 16, width: 160, marginBottom: 24 }} />
       <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 48 }}>
         <Skeleton style={{ aspectRatio: "4/5", width: "100%" }} />

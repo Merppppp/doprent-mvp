@@ -35,7 +35,7 @@ export default async function Header() {
     >
       {/* ═══ TOP ROW ═══ (28px — utility links) */}
       <div
-        className="shell hdr-top-row"
+        className="container hdr-top-row"
         style={{
           display: "flex",
           alignItems: "center",
@@ -90,7 +90,7 @@ export default async function Header() {
 
       {/* ═══ MIDDLE ROW ═══ (48px — logo + search + profile) */}
       <div
-        className="shell"
+        className="container"
         style={{
           display: "flex",
           alignItems: "center",
@@ -182,7 +182,7 @@ export default async function Header() {
         }}
       >
         <div
-          className="shell hdr-cats"
+          className="container hdr-cats"
           style={{
             display: "flex",
             alignItems: "center",

@@ -120,7 +120,7 @@ export default async function HomePage({
       {/* ======== OCCASIONS ROW ======== */}
       {occasions.length > 0 && (
         <section className="hr-occasions">
-          <div className="shell">
+          <div className="container">
             <div className="hr-occ-head">
               <h2 className="hr-occ-title">{t("browse.byOccasion", locale)}</h2>
               <Link href="/" className="hr-occ-more">
@@ -151,7 +151,7 @@ export default async function HomePage({
 
       {/* ======== BROWSE (FILTERS + RESULTS) ======== */}
       <section className="hr-browse">
-        <div className="shell">
+        <div className="container">
           <div className="browse-grid">
             {/* SIDEBAR */}
             <aside style={{ fontSize: 14 }}>

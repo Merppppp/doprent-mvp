@@ -35,7 +35,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
   const isLoggedIn = !!user;
 
   return (
-    <div className="shell" style={{ paddingBottom: 80 }}>
+    <div className="container" style={{ paddingBottom: 80 }}>
       <div style={{ fontSize: 13, color: "var(--ink-3)", padding: "20px 0 8px" }}>
         <Link href="/boutiques">← ดูร้านทั้งหมด</Link>
       </div>

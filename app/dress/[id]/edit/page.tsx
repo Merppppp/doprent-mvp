@@ -15,7 +15,7 @@ export default async function EditDressPage({ params }: { params: Params }) {
   const boutique = await getBoutiqueBySlug((dress.boutique_name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-"));
 
   return (
-    <div className="shell" style={{ paddingTop: 20, paddingBottom: 60 }}>
+    <div className="container" style={{ paddingTop: 20, paddingBottom: 60 }}>
       <h1 style={{ fontSize: 22, marginBottom: 18 }}>แก้ไขชุด</h1>
       <div style={{ maxWidth: 820 }}>
         <DressForm

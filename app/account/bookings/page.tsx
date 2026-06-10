@@ -25,7 +25,7 @@ export default async function MyBookingsPage() {
   const bookings = await getRenterBookings();
 
   return (
-    <div className="shell" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 720 }}>
+    <div className="container" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 720 }}>
       <h1
         className="page-title"
         style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", marginBottom: 20 }}

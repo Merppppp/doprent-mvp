@@ -193,11 +193,6 @@ img {
 /* ============================================================
    Utility component classes (reusable across pages)
    ============================================================ */
-.shell {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
 
 /* ============================================================
    Responsive grid helpers
@@ -421,9 +416,6 @@ img {
    Tablet breakpoint
    ============================================================ */
 @media (max-width: 900px) {
-  .shell {
-    padding: 0 16px;
-  }
   .grid-4 {
     grid-template-columns: repeat(2, 1fr);
   }

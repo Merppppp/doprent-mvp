@@ -28,7 +28,7 @@ export default async function KycPage({ searchParams }: { searchParams: { slug?:
   const boutique = { id: raw.id, slug: raw.slug, name: raw.name, kyc_status: raw.kycStatus, status: raw.status };
 
   return (
-    <div className="shell" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 760 }}>
+    <div className="container" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 760 }}>
       <h1 className="page-title" style={{ fontSize: 30, fontWeight: 600, marginBottom: 6, letterSpacing: "-0.01em" }}>
         ยืนยันตัวตน · {boutique.name}
       </h1>

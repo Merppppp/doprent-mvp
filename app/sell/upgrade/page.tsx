@@ -22,7 +22,7 @@ export default function UpgradePage({
   const label = PLAN_LABEL[plan];
 
   return (
-    <div className="shell" style={{ paddingTop: 80, paddingBottom: 100 }}>
+    <div className="container" style={{ paddingTop: 80, paddingBottom: 100 }}>
       <div style={{ maxWidth: 540, margin: "0 auto", textAlign: "center" }}>
         <div
           aria-hidden

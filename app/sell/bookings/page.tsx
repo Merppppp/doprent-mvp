@@ -28,7 +28,7 @@ export default async function SellerBookingsPage() {
   ).length;
 
   return (
-    <div className="shell" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 760 }}>
+    <div className="container" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 760 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <h1 className="page-title" style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em" }}>
           การจองของร้าน

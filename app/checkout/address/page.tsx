@@ -75,7 +75,7 @@ export default async function CheckoutAddressPage({
   const addresses = await getMyAddresses();
 
   return (
-    <div className="shell" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 640 }}>
+    <div className="container" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 640 }}>
       <Link href={`/dress/${dress.slug}`} style={{ fontSize: 14, color: "var(--ink-3)" }}>
         ← กลับไปหน้าชุด
       </Link>
@@ -140,7 +140,7 @@ export default async function CheckoutAddressPage({
 
 function Fallback({ msg }: { msg: string }) {
   return (
-    <div className="shell" style={{ paddingTop: 80, paddingBottom: 100, maxWidth: 520, textAlign: "center" }}>
+    <div className="container" style={{ paddingTop: 80, paddingBottom: 100, maxWidth: 520, textAlign: "center" }}>
       <p style={{ fontSize: 16, color: "var(--ink-2)", marginBottom: 22 }}>{msg}</p>
       <Link href="/" className="btn btn-dark" style={{ padding: "12px 22px" }}>
         เลือกชุด

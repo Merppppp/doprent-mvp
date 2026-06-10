@@ -17,7 +17,7 @@ export default function GlobalError({
 
   return (
     <div
-      className="shell"
+      className="container"
       style={{
         padding: "96px 24px",
         textAlign: "center",

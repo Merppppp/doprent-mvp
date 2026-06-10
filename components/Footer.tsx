@@ -17,7 +17,7 @@ export default async function Footer() {
       }}
     >
       <div
-        className="shell footer-grid"
+        className="container footer-grid"
         style={{ marginBottom: 28 }}
       >
         <div>
@@ -61,7 +61,7 @@ export default async function Footer() {
         </div>
       </div>
       <div
-        className="shell footer-bottom"
+        className="container footer-bottom"
         style={{
           borderTop: "1px solid var(--line)",
           paddingTop: 16,

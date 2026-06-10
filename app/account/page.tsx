@@ -42,7 +42,7 @@ export default async function AccountPage() {
     .toUpperCase();
 
   return (
-    <div className="shell" style={{ padding: "28px 0 80px" }}>
+    <div className="container" style={{ padding: "28px 0 80px" }}>
       <div className="account-grid">
         <aside>
           <div

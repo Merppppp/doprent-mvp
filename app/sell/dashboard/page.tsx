@@ -98,7 +98,7 @@ export default async function SellerDashboard({
   const quotaText = dressLimit == null ? `${dresses.length} ตัว (ไม่จำกัด)` : `${dresses.length}/${dressLimit} ตัว`;
 
   return (
-    <div className="shell" style={{ paddingTop: 32, paddingBottom: 80 }}>
+    <div className="container" style={{ paddingTop: 32, paddingBottom: 80 }}>
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <Link href="/" style={{ fontSize: 13, color: "var(--ink-3)" }}>

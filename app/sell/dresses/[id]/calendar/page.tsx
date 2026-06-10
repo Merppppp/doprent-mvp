@@ -37,7 +37,7 @@ export default async function DressCalendarPage({ params }: { params: { id: stri
   const blackouts = await listBlackouts(dressRaw.id);
 
   return (
-    <div className="shell" style={{ paddingTop: 32, paddingBottom: 80, maxWidth: 640 }}>
+    <div className="container" style={{ paddingTop: 32, paddingBottom: 80, maxWidth: 640 }}>
       <Link href="/sell/dashboard" style={{ fontSize: 13, color: "var(--ink-3)" }}>← กลับ Dashboard</Link>
       <h1 className="page-title" style={{ fontSize: 26, fontWeight: 600, margin: "12px 0 4px" }}>
         ปฏิทินวันว่าง · {dressRaw.name}

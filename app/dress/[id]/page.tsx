@@ -95,7 +95,7 @@ export default async function DressPage({ params }: { params: Params }) {
   };
 
   return (
-    <div className="shell" style={{ paddingTop: 20, paddingBottom: 60 }}>
+    <div className="container" style={{ paddingTop: 20, paddingBottom: 60 }}>
       <div style={{ fontSize: 13, color: "var(--ink-3)", paddingBottom: 8 }}>
         <Link href="/">← กลับไปดูทั้งหมด</Link>
       </div>

@@ -79,7 +79,7 @@ export default async function SellLanding() {
   }
 
   return (
-    <div className="shell" style={{ paddingTop: 60, paddingBottom: 80 }}>
+    <div className="container" style={{ paddingTop: 60, paddingBottom: 80 }}>
       {/* Hero */}
       <div style={{ textAlign: "center", maxWidth: 680, margin: "0 auto 56px" }}>
         <h1

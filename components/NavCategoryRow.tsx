@@ -24,7 +24,7 @@ function NavCategoryRowInner({ occasions, locale = "th" }: Props) {
       }}
     >
       <div
-        className="shell nav-cat-scroll"
+        className="container nav-cat-scroll"
         style={{
           display: "flex",
           alignItems: "center",

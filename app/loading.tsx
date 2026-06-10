@@ -22,7 +22,7 @@ export default function Loading() {
           background: "var(--bg)",
         }}
       >
-        <div className="shell">
+        <div className="container">
           {/* Title + link row */}
           <div
             style={{
@@ -52,7 +52,7 @@ export default function Loading() {
 
       {/* ======== BROWSE SECTION SKELETON ======== */}
       <section style={{ padding: "28px 0 80px", background: "var(--bg)" }}>
-        <div className="shell">
+        <div className="container">
           <div className="browse-grid">
             {/* SIDEBAR */}
             <aside>

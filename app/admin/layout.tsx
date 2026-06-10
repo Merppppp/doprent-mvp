@@ -19,7 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (user.role !== "admin") redirect("/");
 
   return (
-    <div className="shell" style={{ paddingTop: 24, paddingBottom: 60 }}>
+    <div className="container" style={{ paddingTop: 24, paddingBottom: 60 }}>
       <div
         style={{
           display: "flex",

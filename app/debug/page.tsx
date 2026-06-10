@@ -18,7 +18,7 @@ export default async function DebugPage() {
   }
 
   return (
-    <div className="shell" style={{ padding: "40px 24px 80px", fontFamily: "monospace" }}>
+    <div className="container" style={{ padding: "40px 24px 80px", fontFamily: "monospace" }}>
       <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 20 }}>Auth Debug (NextAuth)</h1>
 
       <Section title={`Auth Cookies (${authCookies.length})`}>

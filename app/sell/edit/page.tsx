@@ -25,7 +25,7 @@ export default async function EditBoutiquePage() {
   const areas = areasRaw as Array<{ key: string; th: string }>;
 
   return (
-    <div className="shell" style={{ paddingTop: 32, paddingBottom: 80, maxWidth: 680 }}>
+    <div className="container" style={{ paddingTop: 32, paddingBottom: 80, maxWidth: 680 }}>
       <Link href="/sell/dashboard" style={{ fontSize: 13, color: "var(--ink-3)" }}>← กลับ Dashboard</Link>
       <h1 className="page-title" style={{ fontSize: 28, fontWeight: 600, margin: "12px 0 24px" }}>
         แก้ไขข้อมูลร้าน

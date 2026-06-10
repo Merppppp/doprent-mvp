@@ -2,7 +2,7 @@ import { Skeleton, SkeletonCard } from "@/components/Skeleton";
 
 export default function Loading() {
   return (
-    <div className="shell" style={{ paddingTop: 36, paddingBottom: 80 }}>
+    <div className="container" style={{ paddingTop: 36, paddingBottom: 80 }}>
       <Skeleton style={{ height: 32, width: 200, marginBottom: 8 }} />
       <Skeleton style={{ height: 14, width: 300, marginBottom: 28 }} />
       <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 32 }}>

@@ -32,7 +32,7 @@ export default async function BoutiquesPage({
     : all;
 
   return (
-    <div className="shell boutiques-list" style={{ paddingTop: 28, paddingBottom: 80 }}>
+    <div className="container boutiques-list" style={{ paddingTop: 28, paddingBottom: 80 }}>
       <h1 className="page-title" style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.01em" }}>ร้านเช่าทั้งหมด</h1>
       <div style={{ color: "var(--ink-3)", fontSize: 14, marginTop: 6, marginBottom: 18 }}>
         {search ? (
