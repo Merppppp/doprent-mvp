@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import BoutiqueFinder from "@/components/BoutiqueFinder";
 import { listBoutiques } from "@/lib/dresses";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 
