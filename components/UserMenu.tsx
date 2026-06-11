@@ -119,6 +119,14 @@ export default function UserMenu({
       </summary>
 
       <div
+        className="um-menu"
+        // Close the dropdown when any menu item (link/button) is clicked —
+        // <details> stays open by default even after navigation.
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest("a, button")) {
+            if (detailsRef.current) detailsRef.current.open = false;
+          }
+        }}
         style={{
           position: "absolute",
           top: "calc(100% + 6px)",
@@ -290,6 +298,14 @@ export default function UserMenu({
           </button>
         </form>
       </div>
+
+      {/* Hover feedback for menu items (inline styles can't express :hover) */}
+      <style>{`
+        .um-menu a:hover,
+        .um-menu button:hover {
+          background: var(--bg-hover, rgba(0, 0, 0, 0.045));
+        }
+      `}</style>
     </details>
   );
 }
