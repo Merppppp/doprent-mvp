@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import DressForm from "@/app/sell/dresses/DressForm";
+import DressForm from "@/app/sell/(authed)/dresses/DressForm";
 import { getDressBySlug, listOccasions, getBoutiqueBySlug } from "@/lib/dresses";
 
 type Params = { id: string };

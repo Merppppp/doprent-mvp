@@ -8,6 +8,7 @@ import {
   toggleBoutiqueVerified,
   toggleBoutiqueFeatured,
 } from "@/app/actions/admin";
+import StatusBadge from "@/components/StatusBadge";
 
 type Boutique = {
   id: string;
@@ -73,21 +74,21 @@ export default function BoutiqueRow({ b }: { b: Boutique }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <Badge
+          <StatusBadge
             text={b.status}
-            color={b.status === "live" ? "#15803D" : b.status === "rejected" ? "#DC2626" : "#D97706"}
+            tone={b.status === "live" ? "success" : b.status === "rejected" ? "danger" : "warn"}
           />
-          <Badge
+          <StatusBadge
             text={`KYC: ${b.kyc_status}`}
-            color={
-              b.kyc_status === "verified" ? "#15803D" :
-              b.kyc_status === "rejected" ? "#DC2626" :
-              b.kyc_status === "submitted" ? "#11644c" :
-              "#6B7280"
+            tone={
+              b.kyc_status === "verified" ? "success" :
+              b.kyc_status === "rejected" ? "danger" :
+              b.kyc_status === "submitted" ? "info" :
+              "neutral"
             }
           />
-          {b.verified ? <Badge text="✓ Verified" color="#11644c" /> : null}
-          {b.featured ? <Badge text="★ Featured" color="#D97706" /> : null}
+          {b.verified ? <StatusBadge text="✓ Verified" tone="info" /> : null}
+          {b.featured ? <StatusBadge text="★ Featured" tone="warn" /> : null}
         </div>
       </div>
 
@@ -110,7 +111,7 @@ export default function BoutiqueRow({ b }: { b: Boutique }) {
             <button
               type="button"
               className="btn btn-outline"
-              style={{ ...btnSm, color: "#DC2626", borderColor: "#DC2626" }}
+              style={{ ...btnSm, color: "var(--danger)", borderColor: "var(--danger)" }}
               onClick={() => setShowReject((s) => !s)}
             >
               Reject
@@ -120,7 +121,7 @@ export default function BoutiqueRow({ b }: { b: Boutique }) {
           <button
             type="button"
             className="btn btn-outline"
-            style={{ ...btnSm, color: "#D97706" }}
+            style={{ ...btnSm, color: "var(--warn)" }}
             disabled={working}
             onClick={() => act(() => setBoutiqueStatus(b.id, "pending"))}
           >
@@ -182,7 +183,7 @@ export default function BoutiqueRow({ b }: { b: Boutique }) {
           <button
             type="button"
             className="btn btn-dark"
-            style={{ ...btnSm, background: "#DC2626", borderColor: "#DC2626" }}
+            style={{ ...btnSm, background: "var(--danger)", borderColor: "var(--danger)" }}
             disabled={working}
             onClick={() => act(() => setBoutiqueStatus(b.id, "rejected", reason))}
           >
@@ -191,25 +192,6 @@ export default function BoutiqueRow({ b }: { b: Boutique }) {
         </div>
       ) : null}
     </div>
-  );
-}
-
-function Badge({ text, color }: { text: string; color: string }) {
-  return (
-    <span
-      style={{
-        padding: "3px 8px",
-        background: `${color}1A`,
-        color,
-        fontSize: 10,
-        fontWeight: 600,
-        borderRadius: 3,
-        letterSpacing: "0.04em",
-        textTransform: "uppercase",
-      }}
-    >
-      {text}
-    </span>
   );
 }
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { setDressStatus, toggleDressFeatured } from "@/app/actions/admin";
 import { DressArt } from "@/components/DressArt";
+import StatusBadge from "@/components/StatusBadge";
 import type { Color } from "@/lib/types";
 
 type D = {
@@ -81,12 +82,12 @@ export default function DressRow({ d }: { d: D }) {
           {d.designer || "—"} · Size {d.size} · ฿{d.price_per_day.toLocaleString()}/วัน · {d.boutique_name}
         </div>
         <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-          <Badge
+          <StatusBadge
             text={d.status}
-            color={d.status === "live" ? "#15803D" : d.status === "rejected" ? "#DC2626" : "#D97706"}
+            tone={d.status === "live" ? "success" : d.status === "rejected" ? "danger" : "warn"}
           />
-          {!d.available ? <Badge text="ปิด" color="#6B7280" /> : null}
-          {d.featured ? <Badge text="★ Featured" color="#D97706" /> : null}
+          {!d.available ? <StatusBadge text="ปิด" tone="neutral" /> : null}
+          {d.featured ? <StatusBadge text="★ Featured" tone="warn" /> : null}
           <span style={{ fontSize: 11, color: "var(--ink-3)", alignSelf: "center" }}>· {d.views} views</span>
         </div>
 
@@ -113,7 +114,7 @@ export default function DressRow({ d }: { d: D }) {
             <button
               type="button"
               className="btn btn-dark"
-              style={{ background: "#DC2626", borderColor: "#DC2626", padding: "7px 12px", fontSize: 12 }}
+              style={{ background: "var(--danger)", borderColor: "var(--danger)", padding: "7px 12px", fontSize: 12 }}
               disabled={working}
               onClick={() => act(() => setDressStatus(d.id, "rejected", reason))}
             >
@@ -138,7 +139,7 @@ export default function DressRow({ d }: { d: D }) {
             <button
               type="button"
               className="btn btn-outline"
-              style={{ ...btnSm, color: "#DC2626", borderColor: "#DC2626" }}
+              style={{ ...btnSm, color: "var(--danger)", borderColor: "var(--danger)" }}
               onClick={() => setShowReject((s) => !s)}
             >
               Reject
@@ -166,25 +167,6 @@ export default function DressRow({ d }: { d: D }) {
         </button>
       </div>
     </div>
-  );
-}
-
-function Badge({ text, color }: { text: string; color: string }) {
-  return (
-    <span
-      style={{
-        padding: "2px 8px",
-        background: `${color}1A`,
-        color,
-        fontSize: 10,
-        fontWeight: 600,
-        borderRadius: 3,
-        letterSpacing: "0.04em",
-        textTransform: "uppercase",
-      }}
-    >
-      {text}
-    </span>
   );
 }
 
