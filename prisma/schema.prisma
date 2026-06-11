@@ -1,3 +1,25 @@
+// ============================================================================
+// DopRent — restructured schema (db-restructure Phase 1 DRAFT, rev 3)
+// ----------------------------------------------------------------------------
+// Conventions (see product/db-restructure/DESIGN.md):
+//   * Every table: id uuid PK, created_by/updated_by uuid NULL (no FK — must
+//     survive hard user deletes), created_at/updated_at timestamptz.
+//   * updated_at is also maintained by ONE shared DB trigger set_updated_at()
+//     (defined in migration SQL); Prisma @updatedAt kept where harmless.
+//   * camelCase model fields ↔ snake_case columns via @map/@@map (unchanged).
+//   * Hard delete everywhere; status enums below are real workflow states.
+//   * /// doc comments here mirror COMMENT ON TABLE/COLUMN in migration SQL.
+//   * rev 2 (host change orders): dresses→products, boutiques→shops,
+//     saved_dresses→favorites, seller_subscriptions→shop_subscriptions,
+//     dress_blackouts→product_blackout_dates; new product_types reference
+//     table; admin_audit merged into audit_logs (model dropped).
+//   * rev 3 (host change orders — taxonomy): new product_categories
+//     (hierarchical, per product_type) + products.category_id (exactly ONE
+//     category per product, nullable); new tag system (tag_groups / tags /
+//     product_tags); occasions + product_occasions DROPPED — occasions become
+//     tag_group key='occasion' with its tags seeded from the old occasion keys.
+// ============================================================================
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,62 +34,209 @@ datasource db {
 // Reference tables
 // ---------------------------------------------------------------------------
 
-model Occasion {
-  key        String @id
-  th         String
-  en         String
-  colorToken String @map("color_token")
-  sortOrder  Int    @default(0) @map("sort_order")
+/// ตารางอ้างอิงประเภทสินค้าให้เช่า (เช่น dress, suit) — DopRent เป็นแพลตฟอร์มเช่าหลายประเภทสินค้า
+model ProductType {
+  /// Primary key (uuid)
+  id       String  @id @default(uuid()) @db.Uuid
+  /// Business key (เช่น "dress", "suit") — UNIQUE, ใช้ใน URL/filter
+  key      String  @unique
+  /// ชื่อแสดงผล (ไทย)
+  label    String
+  /// ปิดการใช้งานประเภทสินค้าโดยไม่ต้องลบ (FK เป็น RESTRICT — ห้ามลบถ้ามีสินค้าอ้างอยู่)
+  isActive Boolean @default(true) @map("is_active")
 
-  @@map("occasions")
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  products   Product[]
+  categories ProductCategory[]
+
+  @@map("product_types")
 }
 
+/// หมวดหมู่สินค้าแบบลำดับชั้น (dynamic, adjacency list) — ต้นไม้หมวดหมู่ 1 ต้นสังกัด 1 ประเภทสินค้า
+/// (เช่น dress → ชุดราตรี/ชุดไทย, suit → สูทลำลอง) เพิ่ม/ย้ายหมวดได้โดยไม่ต้องแก้ schema
+model ProductCategory {
+  /// Primary key (uuid)
+  id            String  @id @default(uuid()) @db.Uuid
+  /// FK → product_categories.id หมวดแม่ (NULL = หมวดราก; RESTRICT — ห้ามลบหมวดที่ยังมีหมวดลูก, ดูเหตุผลใน DESIGN §3.2)
+  parentId      String? @map("parent_id") @db.Uuid
+  /// FK → product_types.id ประเภทสินค้าเจ้าของต้นไม้หมวดหมู่นี้ (RESTRICT — ปิดใช้งานผ่าน is_active แทนการลบ)
+  productTypeId String  @map("product_type_id") @db.Uuid
+  /// Business key (เช่น "evening-dress") — UNIQUE ทั้งระบบ, ใช้ใน URL/filter
+  key           String  @unique
+  /// ชื่อแสดงผล (ไทย)
+  label         String
+  /// ลำดับการแสดงผลภายในหมวดแม่เดียวกัน
+  sortOrder     Int     @default(0) @map("sort_order")
+  /// ปิดการใช้งานหมวดโดยไม่ต้องลบ
+  isActive      Boolean @default(true) @map("is_active")
+
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  parent      ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children    ProductCategory[] @relation("CategoryTree")
+  productType ProductType       @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
+  products    Product[]
+
+  @@index([parentId])
+  @@index([productTypeId])
+  @@map("product_categories")
+}
+
+/// กลุ่มแท็ก (เช่น color, style, occasion) — มิติ filter แบบ dynamic, เพิ่มกลุ่มใหม่ได้โดยไม่แก้ schema
+/// (rev 3: ตาราง occasions เดิมถูกแทนด้วยกลุ่มแท็ก key='occasion')
+model TagGroup {
+  /// Primary key (uuid)
+  id        String  @id @default(uuid()) @db.Uuid
+  /// Business key (เช่น "occasion", "style") — UNIQUE
+  key       String  @unique
+  /// ชื่อแสดงผล (ไทย)
+  label     String
+  /// ลำดับการแสดงผลของกลุ่มใน UI filter
+  sortOrder Int     @default(0) @map("sort_order")
+  /// ปิดการใช้งานกลุ่มโดยไม่ต้องลบ
+  isActive  Boolean @default(true) @map("is_active")
+
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tags Tag[]
+
+  @@map("tag_groups")
+}
+
+/// แท็กในกลุ่ม (เช่น "wedding" ในกลุ่ม occasion) — แทน occasions เดิม + รองรับมิติใหม่ในอนาคต
+model Tag {
+  /// Primary key (uuid)
+  id         String  @id @default(uuid()) @db.Uuid
+  /// FK → tag_groups.id กลุ่มของแท็กนี้ (RESTRICT — ลบกลุ่มไม่ได้ถ้ายังมีแท็ก, ปิดผ่าน is_active)
+  tagGroupId String  @map("tag_group_id") @db.Uuid
+  /// Business key (เช่น "wedding") — UNIQUE ทั้งระบบ, ใช้ใน URL/filter
+  key        String  @unique
+  /// ชื่อแสดงผล (ไทย)
+  label      String
+  /// ปิดการใช้งานแท็กโดยไม่ต้องลบ
+  isActive   Boolean @default(true) @map("is_active")
+
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tagGroup    TagGroup     @relation(fields: [tagGroupId], references: [id], onDelete: Restrict)
+  productTags ProductTag[]
+
+  @@index([tagGroupId])
+  @@map("tags")
+}
+
+/// ตารางอ้างอิงย่าน/พื้นที่ให้บริการ (เดิมกรุงเทพฯ) ใช้ค้นหาร้านใกล้เคียง
 model Area {
-  key      String    @id
+  /// Primary key (uuid)
+  id       String   @id @default(uuid()) @db.Uuid
+  /// Business key เดิม (เช่น "siam") — UNIQUE, ใช้ใน URL/filter
+  key      String   @unique
+  /// ชื่อย่านภาษาไทย
   th       String
-  lat      Decimal   @db.Decimal(9, 6)
-  lng      Decimal   @db.Decimal(9, 6)
+  /// ละติจูดจุดศูนย์กลางย่าน
+  lat      Decimal  @db.Decimal(9, 6)
+  /// ลองจิจูดจุดศูนย์กลางย่าน
+  lng      Decimal  @db.Decimal(9, 6)
+  /// คำค้นที่ map มาที่ย่านนี้
   keywords String[]
-  boutiques Boutique[]
+  /// ปิดการใช้งานย่านโดยไม่ต้องลบ
+  isActive Boolean  @default(true) @map("is_active")
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  shops Shop[]
 
   @@map("areas")
 }
 
 // ---------------------------------------------------------------------------
-// Users / Auth
+// Users / Auth (NextAuth v5 + @auth/prisma-adapter — field names must stay
+// adapter-compatible: User{id,name,email,emailVerified,image},
+// Account{userId,type,provider,providerAccountId,refresh_token,...},
+// Session{sessionToken,userId,expires}, VerificationToken{identifier,token,expires})
 // ---------------------------------------------------------------------------
 
+/// ผู้ใช้ทุกบทบาท (customer / seller / admin) — สร้างผ่าน NextAuth (Google) หรือ email+password
 model User {
+  /// Primary key (uuid) — อ้างโดย NextAuth JWT
   id            String    @id @default(uuid()) @db.Uuid
+  /// อีเมล (UNIQUE) — NULL ได้กรณี provider ไม่ส่งอีเมล
   email         String?   @unique
-  emailVerified DateTime? @map("email_verified")
+  /// เวลายืนยันอีเมลสำเร็จ (NULL = ยังไม่ยืนยัน)
+  emailVerified DateTime? @map("email_verified") @db.Timestamptz(6)
+  /// bcrypt hash สำหรับ login แบบ credentials (NULL = OAuth-only)
   passwordHash  String?   @map("password_hash")
+  /// ชื่อ-นามสกุล (NextAuth adapter field ชื่อ `name`)
   name          String?   @map("full_name")
+  /// LINE id ของผู้ใช้ (ติดต่อกลับ)
   lineId        String?   @map("line_id")
+  /// บทบาทในระบบ
   role          Role      @default(customer)
-  savedDressIds String[]  @map("saved_dress_ids") @db.Uuid
+  /// URL รูปโปรไฟล์ (จาก OAuth)
   image         String?
-  // Acquisition attribution (first-touch) + activity recency for MAU
+  // -- Acquisition attribution (first-touch) + activity recency for MAU --
+  /// utm_source แรกที่พามาสมัคร
   signupSource   String?   @map("signup_source")
+  /// utm_medium แรก
   signupMedium   String?   @map("signup_medium")
+  /// utm_campaign แรก
   signupCampaign String?   @map("signup_campaign")
+  /// referrer แรก
   signupReferrer String?   @map("signup_referrer")
+  /// ช่องทางที่สรุปแล้ว (organic/social/ads/...)
   signupChannel  String?   @map("signup_channel")
-  lastActiveAt   DateTime? @map("last_active_at")
+  /// เวลา activity ล่าสุด (ใช้คำนวณ MAU)
+  lastActiveAt   DateTime? @map("last_active_at") @db.Timestamptz(6)
+  /// จังหวัดล่าสุดที่ใช้งาน
   lastProvince   String?   @map("last_province")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  accounts       Account[]
-  sessions       Session[]
-  boutiques      Boutique[]
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  accounts          Account[]
+  sessions          Session[]
+  shops             Shop[]
   kycSubmissions    KycSubmission[]
   lineClicks        LineClick[]
-  adminAuditLogs    AdminAudit[]
-  addresses          Address[]
-  bookings           Booking[]
-  pageViews          PageView[]
-  sellerSubscriptions SellerSubscription[]
+  addresses         Address[]
+  bookings          Booking[]
+  pageViews         PageView[]
+  shopSubscriptions ShopSubscription[]
+  favorites         Favorite[]
 
   @@index([lastActiveAt(sort: Desc)])
   @@index([signupChannel])
@@ -75,236 +244,502 @@ model User {
   @@map("users")
 }
 
+/// บทบาทผู้ใช้
 enum Role {
   customer
   seller
   admin
+
+  @@map("user_role")
 }
 
-// NextAuth adapter tables
+/// บัญชี OAuth ที่ผูกกับผู้ใช้ (NextAuth adapter table — ห้ามเปลี่ยนชื่อ field มาตรฐาน)
 model Account {
+  /// Primary key (uuid)
   id                String  @id @default(uuid()) @db.Uuid
+  /// FK → users.id
   userId            String  @map("user_id") @db.Uuid
+  /// ชนิดบัญชี (oauth/email/credentials) — กำหนดโดย NextAuth
   type              String
+  /// ชื่อ provider (google)
   provider          String
+  /// id ผู้ใช้ฝั่ง provider
   providerAccountId String  @map("provider_account_id")
+  /// OAuth refresh token
   refresh_token     String? @db.Text
+  /// OAuth access token
   access_token      String? @db.Text
+  /// เวลา access token หมดอายุ (epoch seconds)
   expires_at        Int?
+  /// ชนิด token (bearer)
   token_type        String?
+  /// OAuth scopes ที่ได้รับ
   scope             String?
+  /// OIDC id_token
   id_token          String? @db.Text
+  /// OAuth session_state
   session_state     String?
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
   @@map("accounts")
 }
 
+/// session ฝั่ง DB ของ NextAuth (ปัจจุบันใช้ JWT strategy — ตารางนี้แทบไม่ถูกเขียน แต่คงไว้ตาม adapter มาตรฐาน)
 model Session {
+  /// Primary key (uuid)
   id           String   @id @default(uuid()) @db.Uuid
+  /// token ประจำ session (UNIQUE)
   sessionToken String   @unique @map("session_token")
+  /// FK → users.id
   userId       String   @map("user_id") @db.Uuid
-  expires      DateTime
+  /// เวลาหมดอายุ session
+  expires      DateTime @db.Timestamptz(6)
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("sessions")
 }
 
-// Standard NextAuth adapter schema (used by Email provider + our custom email verify flow)
+/// token ยืนยันอีเมล (NextAuth standard + custom email-verify flow)
+/// เดิม composite PK (identifier, token) → เพิ่ม id uuid PK, คง UNIQUE เดิมไว้
+/// (@auth/prisma-adapter รุ่น >=2 ลบ field `id` ออกจากผลลัพธ์เองอยู่แล้ว — ปลอดภัย)
 model VerificationToken {
+  /// Primary key (uuid) — เพิ่มใหม่ตามมาตรฐานทุกตาราง
+  id         String   @id @default(uuid()) @db.Uuid
+  /// อีเมล/ตัวระบุผู้รับ token
   identifier String
+  /// token (UNIQUE)
   token      String   @unique
-  expires    DateTime
+  /// เวลาหมดอายุ token
+  expires    DateTime @db.Timestamptz(6)
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@unique([identifier, token])
   @@map("verification_tokens")
 }
 
 // ---------------------------------------------------------------------------
-// Boutiques
+// Shops (เดิม boutiques)
 // ---------------------------------------------------------------------------
 
-model Boutique {
-  id           String     @id @default(uuid()) @db.Uuid
-  slug         String     @unique
+/// ร้านให้เช่าสินค้า (เดิม boutiques) — 1 ร้านมีเจ้าของ 1 คน (owner), มีสินค้าหลายรายการ
+model Shop {
+  /// Primary key (uuid)
+  id           String    @id @default(uuid()) @db.Uuid
+  /// slug สำหรับ URL (UNIQUE)
+  slug         String    @unique
+  /// ชื่อร้าน
   name         String
-  ownerId      String?    @map("owner_id") @db.Uuid
-  ownerName    String?    @map("owner_name")
-  areaKey      String?    @map("area_key")
-  areaLabel    String     @map("area_label")
+  /// FK → users.id เจ้าของร้าน (SetNull เมื่อ user ถูกลบ)
+  ownerId      String?   @map("owner_id") @db.Uuid
+  /// ชื่อเจ้าของร้านที่แสดงผล (กรอกเอง — ไม่ใช่ snapshot ของ users.full_name)
+  ownerName    String?   @map("owner_name")
+  /// FK → areas.id ย่านที่ตั้งร้าน (เดิมอ้างด้วย area key string)
+  areaId       String?   @map("area_id") @db.Uuid
+  /// ป้ายชื่อย่านที่แสดงผล (รองรับย่านอิสระที่ไม่อยู่ใน areas)
+  areaLabel    String    @map("area_label")
+  /// ที่อยู่แบบข้อความเต็ม (legacy/รวม)
   address      String?
-  houseNo      String?    @map("house_no")
+  /// บ้านเลขที่
+  houseNo      String?   @map("house_no")
+  /// ถนน/ซอย
   street       String?
+  /// แขวง/ตำบล
   subdistrict  String?
+  /// เขต/อำเภอ
   district     String?
-  province     String     @default("กรุงเทพมหานคร")
-  postalCode   String?    @map("postal_code")
-  lat          Decimal?   @db.Decimal(9, 6)
-  lng          Decimal?   @db.Decimal(9, 6)
+  /// จังหวัด
+  province     String    @default("กรุงเทพมหานคร")
+  /// รหัสไปรษณีย์
+  postalCode   String?   @map("postal_code")
+  /// ละติจูดที่ตั้งร้าน
+  lat          Decimal?  @db.Decimal(9, 6)
+  /// ลองจิจูดที่ตั้งร้าน
+  lng          Decimal?  @db.Decimal(9, 6)
+  /// เวลาทำการ (ข้อความอิสระ)
   hours        String?
-  lineUrl      String     @map("line_url")
+  /// LINE OA deep-link ของร้าน (CTA หลัก)
+  lineUrl      String    @map("line_url")
+  /// Instagram handle/URL
   instagram    String?
-  promptpayId  String?    @map("promptpay_id")
-  sinceYear    Int?       @map("since_year")
-  coverColor   Color      @default(rose) @map("cover_color")
+  /// PromptPay id รับเงิน (เบอร์/เลขบัตร ปชช.)
+  promptpayId  String?   @map("promptpay_id")
+  /// ปีที่เปิดร้าน
+  sinceYear    Int?      @map("since_year")
+  /// โทนสี cover การ์ดร้าน
+  coverColor   Color     @default(rose) @map("cover_color")
+  /// ป้าย tag การตลาดสั้น ๆ
   tag          String?
+  /// เรื่องราว/คำแนะนำร้าน
   story        String?
-  deliveryInfo  String?    @map("delivery_info")
-  featured      Boolean    @default(false)
-  adsTier      AdsTier    @default(free) @map("ads_tier")
-  verified     Boolean    @default(false)
-  status       Status     @default(live)
-  rejectReason String?    @map("reject_reason")
-  kycStatus    KycStatus  @default(none) @map("kyc_status")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  updatedAt    DateTime   @updatedAt @map("updated_at")
+  /// ข้อมูลการจัดส่ง
+  deliveryInfo String?   @map("delivery_info")
+  /// ร้านแนะนำ (คัดโดย admin)
+  featured     Boolean   @default(false)
+  /// ระดับแผนโฆษณาปัจจุบันของร้าน
+  adsTier      PlanTier  @default(free) @map("ads_tier")
+  /// ผ่านการยืนยันตัวตนแล้ว (badge)
+  verified     Boolean   @default(false)
+  /// สถานะ workflow การเผยแพร่ร้าน
+  status       Status    @default(live)
+  /// เหตุผลเมื่อถูก reject
+  rejectReason String?   @map("reject_reason")
+  /// สถานะ KYC ล่าสุด (rollup จาก kyc_submissions เพื่อ gate ฟีเจอร์เร็ว ๆ)
+  kycStatus    KycStatus @default(none) @map("kyc_status")
 
-  owner          User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  area           Area?          @relation(fields: [areaKey], references: [key])
-  dresses        Dress[]
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner          User?              @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  area           Area?              @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  products       Product[]
   kycSubmissions KycSubmission[]
   lineClicks     LineClick[]
   bookings       Booking[]
-  subscriptions  SellerSubscription[]
+  subscriptions  ShopSubscription[]
 
   @@index([status])
   @@index([featured])
-  @@index([areaKey])
+  @@index([areaId])
   @@index([verified])
   @@index([district])
-  @@map("boutiques")
+  @@map("shops")
 }
 
 // ---------------------------------------------------------------------------
-// Dresses
+// Products + child tables (เดิม dresses — normalized from Json/array columns)
 // ---------------------------------------------------------------------------
 
-model Dress {
-  id            String    @id @default(uuid()) @db.Uuid
-  slug          String    @unique
-  tagCode       String    @unique @map("tag_code")
+/// สินค้าให้เช่า (เดิม dresses) — สินค้า 1 รายการของร้าน, แยกประเภทผ่าน product_types
+/// เปลี่ยนแปลงสำคัญ: ตัด boutique_name (denormalized) ออก → join shops.name,
+/// ย้าย images/price_tiers/occasions ออกเป็นตารางลูก, เพิ่ม product_type_id
+model Product {
+  /// Primary key (uuid)
+  id            String                   @id @default(uuid()) @db.Uuid
+  /// slug สำหรับ URL (UNIQUE)
+  slug          String                   @unique
+  /// รหัส tag ติดสินค้า (UNIQUE, สร้างอัตโนมัติ)
+  tagCode       String                   @unique @map("tag_code")
+  /// ชื่อสินค้า
   name          String
+  /// ชื่อดีไซเนอร์/แบรนด์
   designer      String?
-  boutiqueId    String    @map("boutique_id") @db.Uuid
-  boutiqueName  String    @map("boutique_name")
+  /// FK → shops.id ร้านเจ้าของสินค้า
+  shopId        String                   @map("shop_id") @db.Uuid
+  /// FK → product_types.id ประเภทสินค้า (RESTRICT — ลบประเภทไม่ได้ถ้ามีสินค้าอ้างอยู่; ใช้ is_active แทน)
+  productTypeId String                   @map("product_type_id") @db.Uuid
+  /// FK → product_categories.id หมวดหมู่ของสินค้า (host decision: สินค้า 1 ชิ้นมีได้ 1 หมวดเท่านั้น;
+  /// NULL ได้ — สินค้าสร้างก่อนจัดหมวดได้; SET NULL — ลบหมวดแล้วสินค้ากลายเป็น "ยังไม่จัดหมวด", ดู DESIGN §3.2)
+  categoryId    String?                  @map("category_id") @db.Uuid
+  /// ไซซ์
   size          Size
+  /// สีหลักของสินค้า (ใช้ filter)
   color         Color
-  pricePerDay   Int       @map("price_per_day")
-  deposit       Int       @default(0)
-  priceTiers    Json      @default("[]") @map("price_tiers")
+  /// ราคาเช่าต่อวัน (บาท จำนวนเต็ม)
+  pricePerDay   Int                      @map("price_per_day")
+  /// ค่ามัดจำ (บาท)
+  deposit       Int                      @default(0)
+  /// คำอธิบายสินค้า
   description   String?
-  images        Json      @default("[]")
-  occasions     String[]
-  lineUrl       String    @map("line_url")
-  adsTier       AdsTier   @default(free) @map("ads_tier")
-  featured      Boolean   @default(false)
-  sponsored     Boolean   @default(false)
-  status        Status    @default(live)
-  rejectReason  String?   @map("reject_reason")
-  available     Boolean   @default(true)
-  views         Int       @default(0)
+  /// LINE deep-link ของสินค้า (CTA หลัก)
+  lineUrl       String                   @map("line_url")
+  /// ระดับแผนโฆษณาของสินค้า
+  adsTier       PlanTier                 @default(free) @map("ads_tier")
+  /// สินค้าแนะนำ (คัดโดย admin)
+  featured      Boolean                  @default(false)
+  /// ติดป้าย sponsored
+  sponsored     Boolean                  @default(false)
+  /// สถานะ workflow การเผยแพร่สินค้า
+  status        Status                   @default(live)
+  /// เหตุผลเมื่อถูก reject
+  rejectReason  String?                  @map("reject_reason")
+  /// เปิดให้เช่าอยู่ (toggle โดยร้าน)
+  available     Boolean                  @default(true)
+  /// ตัวนับยอดเข้าชมหน้า detail
+  views         Int                      @default(0)
+  /// full-text search vector (จัดการผ่าน raw SQL/trigger)
   searchVector  Unsupported("tsvector")? @map("search_vector")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  boutique   Boutique        @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
-  blackouts  DressBlackout[]
-  lineClicks LineClick[]
-  bookings   Booking[]
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  shop        Shop                  @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  productType ProductType           @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
+  category    ProductCategory?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  images      ProductImage[]
+  priceTiers  ProductPriceTier[]
+  productTags ProductTag[]
+  blackouts   ProductBlackoutDate[]
+  lineClicks  LineClick[]
+  bookings    Booking[]
+  favoritedBy Favorite[]
 
   @@index([color])
   @@index([size])
   @@index([status])
   @@index([available])
-  @@index([boutiqueId])
+  @@index([shopId])
+  @@index([productTypeId])
+  @@index([categoryId])
   @@index([pricePerDay])
-  @@map("dresses")
+  @@map("products")
+}
+
+/// รูปภาพของสินค้า (เดิมเก็บเป็น Json array ใน dresses.images)
+model ProductImage {
+  /// Primary key (uuid)
+  id        String  @id @default(uuid()) @db.Uuid
+  /// FK → products.id (Cascade)
+  productId String  @map("product_id") @db.Uuid
+  /// URL รูป (MinIO/R2)
+  url       String
+  /// ข้อความ alt สำหรับ accessibility/SEO
+  alt       String?
+  /// ลำดับการแสดง (0 = รูปหลัก/cover)
+  sortOrder Int     @default(0) @map("sort_order")
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+  @@map("product_images")
+}
+
+/// ราคาเช่าแบบขั้นบันไดตามจำนวนวัน (เดิมเก็บเป็น Json ใน dresses.price_tiers)
+model ProductPriceTier {
+  /// Primary key (uuid)
+  id          String @id @default(uuid()) @db.Uuid
+  /// FK → products.id (Cascade)
+  productId   String @map("product_id") @db.Uuid
+  /// จำนวนวันขั้นต่ำที่ tier นี้เริ่มใช้
+  minDays     Int    @map("min_days")
+  /// ราคาต่อวันของ tier นี้ (บาท)
+  pricePerDay Int    @map("price_per_day")
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, minDays])
+  @@map("product_price_tiers")
+}
+
+/// ตารางเชื่อมสินค้า↔แท็ก (rev 3: แทน product_occasions เดิม — เดิมสุดคือ String[] ใน dresses.occasions)
+model ProductTag {
+  /// Primary key (uuid)
+  id        String @id @default(uuid()) @db.Uuid
+  /// FK → products.id (Cascade)
+  productId String @map("product_id") @db.Uuid
+  /// FK → tags.id (Cascade)
+  tagId     String @map("tag_id") @db.Uuid
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, tagId])
+  @@index([tagId])
+  @@map("product_tags")
+}
+
+/// สินค้าที่ผู้ใช้บันทึกไว้ (wishlist — เดิม saved_dresses / users.saved_dress_ids uuid[])
+model Favorite {
+  /// Primary key (uuid)
+  id        String @id @default(uuid()) @db.Uuid
+  /// FK → users.id (Cascade)
+  userId    String @map("user_id") @db.Uuid
+  /// FK → products.id (Cascade — ลบสินค้าแล้วรายการ favorite หายตาม, แก้ปัญหา id ค้างของ array เดิม)
+  productId String @map("product_id") @db.Uuid
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([productId])
+  @@map("favorites")
 }
 
 // ---------------------------------------------------------------------------
 // KYC
 // ---------------------------------------------------------------------------
 
+/// คำขอยืนยันตัวตนผู้ขาย (KYC) — 1 ร้านยื่นได้หลายครั้ง
+/// เปลี่ยนแปลง: submitted_at เดิม → created_at มาตรฐาน
 model KycSubmission {
-  id           String      @id @default(uuid()) @db.Uuid
-  boutiqueId   String      @map("boutique_id") @db.Uuid
-  ownerId      String?     @map("owner_id") @db.Uuid
-  businessType BusinessType @map("business_type")
-  legalName    String      @map("legal_name")
-  taxId        String      @map("tax_id")
-  dbdRegNo     String?     @map("dbd_reg_no")
-  bankName     String?     @map("bank_name")
-  bankAccNo    String?     @map("bank_acc_no")
-  bankAccName  String?     @map("bank_acc_name")
-  idCardUrl    String?     @map("id_card_url")
-  dbdDocUrl    String?     @map("dbd_doc_url")
-  bookBankUrl  String?     @map("book_bank_url")
-  vatDocUrl    String?     @map("vat_doc_url")
-  plan         KycPlan     @default(Boost)
+  /// Primary key (uuid)
+  id           String          @id @default(uuid()) @db.Uuid
+  /// FK → shops.id (Cascade)
+  shopId       String          @map("shop_id") @db.Uuid
+  /// FK → users.id เจ้าของผู้ยื่น (SetNull)
+  ownerId      String?         @map("owner_id") @db.Uuid
+  /// ประเภทธุรกิจ (บุคคล/นิติบุคคล)
+  businessType BusinessType    @map("business_type")
+  /// ชื่อตามกฎหมาย (บุคคล/บริษัท)
+  legalName    String          @map("legal_name")
+  /// เลขประจำตัวผู้เสียภาษี
+  taxId        String          @map("tax_id")
+  /// เลขทะเบียน DBD (กรณีนิติบุคคล)
+  dbdRegNo     String?         @map("dbd_reg_no")
+  /// ธนาคารบัญชีรับเงิน
+  bankName     String?         @map("bank_name")
+  /// เลขบัญชีรับเงิน
+  bankAccNo    String?         @map("bank_acc_no")
+  /// ชื่อบัญชีรับเงิน
+  bankAccName  String?         @map("bank_acc_name")
+  /// URL เอกสารบัตรประชาชน (private bucket)
+  idCardUrl    String?         @map("id_card_url")
+  /// URL หนังสือรับรอง DBD
+  dbdDocUrl    String?         @map("dbd_doc_url")
+  /// URL หน้า book bank
+  bookBankUrl  String?         @map("book_bank_url")
+  /// URL ภ.พ.20 (VAT)
+  vatDocUrl    String?         @map("vat_doc_url")
+  /// แผนที่สมัครตอนยื่น KYC
+  plan         PlanTier        @default(boost)
+  /// สถานะการตรวจ KYC
   status       KycReviewStatus @default(pending)
-  reviewerId   String?     @map("reviewer_id") @db.Uuid
-  reviewNotes  String?     @map("review_notes")
-  submittedAt  DateTime    @default(now()) @map("submitted_at")
-  reviewedAt   DateTime?   @map("reviewed_at")
+  /// FK → users.id แอดมินผู้ตรวจ
+  reviewerId   String?         @map("reviewer_id") @db.Uuid
+  /// บันทึกผลการตรวจ
+  reviewNotes  String?         @map("review_notes")
+  /// เวลาที่ตรวจเสร็จ
+  reviewedAt   DateTime?       @map("reviewed_at") @db.Timestamptz(6)
 
-  boutique Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
-  owner    User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  /// uuid ผู้สร้าง record (= ผู้ยื่น)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลายื่นคำขอ (เดิมชื่อ submitted_at)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  shop  Shop  @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
   @@index([status])
-  @@index([boutiqueId])
+  @@index([shopId])
   @@map("kyc_submissions")
 }
 
 // ---------------------------------------------------------------------------
-// Analytics
+// Analytics (append-only, high volume)
 // ---------------------------------------------------------------------------
 
+/// เหตุการณ์คลิกปุ่ม LINE (success metric หลักของ v0.1) — append-only
+/// เปลี่ยนแปลง: PK BigInt → uuid ตามมาตรฐานทุกตาราง
 model LineClick {
-  id          BigInt    @id @default(autoincrement())
-  dressId     String?   @map("dress_id") @db.Uuid
-  boutiqueId  String?   @map("boutique_id") @db.Uuid
-  source      String?
-  userId      String?   @map("user_id") @db.Uuid
-  channel     String?
-  utmSource   String?   @map("utm_source")
-  referrer    String?
-  province    String?
-  sessionId   String?   @map("session_id")
-  userAgent   String?   @map("user_agent")
-  ipHash      String?   @map("ip_hash")
-  createdAt   DateTime  @default(now()) @map("created_at")
+  /// Primary key (uuid) — เดิม bigserial
+  id        String  @id @default(uuid()) @db.Uuid
+  /// FK → products.id สินค้าที่ถูกคลิก (SetNull)
+  productId String? @map("product_id") @db.Uuid
+  /// FK → shops.id ร้านที่ถูกคลิก (SetNull)
+  shopId    String? @map("shop_id") @db.Uuid
+  /// ตำแหน่งปุ่มบนหน้า (detail/card/...)
+  source    String?
+  /// FK → users.id ผู้คลิก (NULL = anonymous)
+  userId    String? @map("user_id") @db.Uuid
+  /// ช่องทาง acquisition ของ session
+  channel   String?
+  /// utm_source ของ session
+  utmSource String? @map("utm_source")
+  /// referrer ของ session
+  referrer  String?
+  /// จังหวัดผู้ใช้ (geo)
+  province  String?
+  /// session id ฝั่ง client
+  sessionId String? @map("session_id")
+  /// user agent
+  userAgent String? @map("user_agent")
+  /// hash ของ IP (privacy)
+  ipHash    String? @map("ip_hash")
 
-  dress    Dress?    @relation(fields: [dressId], references: [id], onDelete: SetNull)
-  boutique Boutique? @relation(fields: [boutiqueId], references: [id], onDelete: SetNull)
-  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@index([dressId])
-  @@index([boutiqueId])
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  shop    Shop?    @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([shopId])
   @@index([channel])
   @@index([createdAt(sort: Desc)])
   @@map("line_clicks")
 }
 
-// Visitor pageviews — general traffic analytics (anon + authed). Fills the gap
-// that line_clicks (authed-only) can't measure: top-of-funnel visitors.
+/// pageview ผู้เยี่ยมชม (anon + authed) — top-of-funnel analytics, append-only
+/// เปลี่ยนแปลง: PK BigInt → uuid
 model PageView {
-  id          BigInt   @id @default(autoincrement())
-  sessionId   String?  @map("session_id")
-  userId      String?  @map("user_id") @db.Uuid
+  /// Primary key (uuid) — เดิม bigserial
+  id          String  @id @default(uuid()) @db.Uuid
+  /// session id ฝั่ง client
+  sessionId   String? @map("session_id")
+  /// FK → users.id (NULL = anonymous)
+  userId      String? @map("user_id") @db.Uuid
+  /// path ของหน้า
   path        String?
+  /// ช่องทาง acquisition
   channel     String?
-  utmSource   String?  @map("utm_source")
-  utmMedium   String?  @map("utm_medium")
-  utmCampaign String?  @map("utm_campaign")
+  /// utm_source
+  utmSource   String? @map("utm_source")
+  /// utm_medium
+  utmMedium   String? @map("utm_medium")
+  /// utm_campaign
+  utmCampaign String? @map("utm_campaign")
+  /// referrer
   referrer    String?
+  /// จังหวัด (geo)
   province    String?
+  /// ประเทศ (geo)
   country     String?
-  userAgent   String?  @map("user_agent")
-  ipHash      String?  @map("ip_hash")
-  createdAt   DateTime @default(now()) @map("created_at")
+  /// user agent
+  userAgent   String? @map("user_agent")
+  /// hash ของ IP (privacy)
+  ipHash      String? @map("ip_hash")
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -316,47 +751,80 @@ model PageView {
   @@map("page_views")
 }
 
-// Seller paid-plan record — drives subscription adoption-rate -> revenue (MRR).
-model SellerSubscription {
+// ---------------------------------------------------------------------------
+// Monetization
+// ---------------------------------------------------------------------------
+
+/// แผนสมาชิกแบบเสียเงินของร้าน (เดิม seller_subscriptions) — ขับเคลื่อน MRR
+model ShopSubscription {
+  /// Primary key (uuid)
   id               String       @id @default(uuid()) @db.Uuid
-  boutiqueId       String?      @map("boutique_id") @db.Uuid
+  /// FK → shops.id (Cascade)
+  shopId           String?      @map("shop_id") @db.Uuid
+  /// FK → users.id เจ้าของ (SetNull)
   ownerId          String?      @map("owner_id") @db.Uuid
-  plan             SubPlan      @default(free)
+  /// แผนที่สมัคร
+  plan             PlanTier     @default(free)
+  /// สถานะ subscription
   status           SubStatus    @default(active)
+  /// ยอดจ่ายต่อรอบ (บาท)
   amount           Int          @default(0)
+  /// รอบบิล (รายเดือน/รายปี)
   billingCycle     BillingCycle @default(monthly) @map("billing_cycle")
-  startedAt        DateTime?    @default(now()) @map("started_at")
-  currentPeriodEnd DateTime?    @map("current_period_end")
-  cancelledAt      DateTime?    @map("cancelled_at")
-  createdAt        DateTime     @default(now()) @map("created_at")
-  updatedAt        DateTime     @updatedAt @map("updated_at")
+  /// เวลาเริ่ม subscription
+  startedAt        DateTime?    @default(now()) @map("started_at") @db.Timestamptz(6)
+  /// เวลาสิ้นสุดรอบบิลปัจจุบัน
+  currentPeriodEnd DateTime?    @map("current_period_end") @db.Timestamptz(6)
+  /// เวลายกเลิก
+  cancelledAt      DateTime?    @map("cancelled_at") @db.Timestamptz(6)
 
-  boutique Boutique? @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
-  owner    User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@index([boutiqueId])
+  shop  Shop? @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([shopId])
   @@index([status])
   @@index([plan])
-  @@map("seller_subscriptions")
+  @@map("shop_subscriptions")
 }
 
 // ---------------------------------------------------------------------------
 // Bookings (Phase 1: self-serve booking + PromptPay slip upload)
 // ---------------------------------------------------------------------------
 
+/// ที่อยู่จัดส่งของผู้ใช้
 model Address {
-  id            String   @id @default(uuid()) @db.Uuid
-  userId        String   @map("user_id") @db.Uuid
+  /// Primary key (uuid)
+  id            String  @id @default(uuid()) @db.Uuid
+  /// FK → users.id (Cascade)
+  userId        String  @map("user_id") @db.Uuid
+  /// ป้ายชื่อที่อยู่ (บ้าน/ที่ทำงาน)
   label         String
-  recipientName String   @map("recipient_name")
+  /// ชื่อผู้รับ
+  recipientName String  @map("recipient_name")
+  /// เบอร์โทรผู้รับ
   phone         String
-  addressLine   String   @map("address_line")
+  /// ที่อยู่บรรทัดหลัก
+  addressLine   String  @map("address_line")
+  /// แขวง/ตำบล
   subdistrict   String?
+  /// เขต/อำเภอ
   district      String?
-  province      String?  @default("กรุงเทพมหานคร")
-  postalCode    String   @map("postal_code")
-  isDefault     Boolean  @default(false) @map("is_default")
-  createdAt     DateTime @default(now()) @map("created_at")
+  /// จังหวัด
+  province      String? @default("กรุงเทพมหานคร")
+  /// รหัสไปรษณีย์
+  postalCode    String  @map("postal_code")
+  /// ที่อยู่หลัก (default) ของผู้ใช้
+  isDefault     Boolean @default(false) @map("is_default")
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookings Booking[]
@@ -365,86 +833,142 @@ model Address {
   @@map("addresses")
 }
 
+/// การจอง — state machine 9 สถานะ, snapshot ราคา/ค่าคอม/ที่อยู่ ณ เวลาจอง
 model Booking {
-  id               String        @id @default(uuid()) @db.Uuid
-  renterId         String        @map("renter_id") @db.Uuid
-  boutiqueId       String        @map("boutique_id") @db.Uuid
-  dressId          String        @map("dress_id") @db.Uuid
-  startDate        DateTime      @map("start_date") @db.Date
-  endDate          DateTime      @map("end_date") @db.Date
-  // price snapshot at booking time (THB, integer baht)
-  rentalTotal      Int           @map("rental_total")
-  deposit          Int           @default(0)
-  shippingFee      Int?          @map("shipping_fee")
-  // platform commission snapshot (stable even if rate later changes)
-  commissionRate   Decimal       @default(0.10) @map("commission_rate") @db.Decimal(5, 4)
-  commissionAmount Int?          @map("commission_amount")
-  // renter's first-touch acquisition channel (attribution)
+  /// Primary key (uuid)
+  id               String         @id @default(uuid()) @db.Uuid
+  /// FK → users.id ผู้เช่า (Cascade)
+  renterId         String         @map("renter_id") @db.Uuid
+  /// FK → shops.id (Cascade)
+  shopId           String         @map("shop_id") @db.Uuid
+  /// FK → products.id (Cascade)
+  productId        String         @map("product_id") @db.Uuid
+  /// วันเริ่มเช่า
+  startDate        DateTime       @map("start_date") @db.Date
+  /// วันคืนสินค้า
+  endDate          DateTime       @map("end_date") @db.Date
+  /// ค่าเช่ารวม snapshot ณ เวลาจอง (บาท)
+  rentalTotal      Int            @map("rental_total")
+  /// ค่ามัดจำ snapshot (บาท)
+  deposit          Int            @default(0)
+  /// ค่าส่ง (บาท)
+  shippingFee      Int?           @map("shipping_fee")
+  /// อัตราค่าคอมแพลตฟอร์ม snapshot (คงที่แม้ปรับ rate ภายหลัง)
+  commissionRate   Decimal        @default(0.10) @map("commission_rate") @db.Decimal(5, 4)
+  /// ยอดค่าคอมที่คำนวณแล้ว (บาท)
+  commissionAmount Int?           @map("commission_amount")
+  /// ช่องทาง acquisition (first-touch) ของผู้เช่า
   channel          String?
-  status           BookingStatus @default(booking_pending)
-  slipPath         String?       @map("slip_path")
-  // delivery address snapshot
-  addressId        String?       @map("address_id") @db.Uuid
-  recipientName    String?       @map("recipient_name")
+  /// สถานะการจองตาม state machine
+  status           BookingStatus  @default(booking_pending)
+  /// path ไฟล์สลิปโอนเงิน (private bucket)
+  slipPath         String?        @map("slip_path")
+  /// FK → addresses.id ที่อยู่ที่เลือกตอนจอง (SetNull — ใช้ snapshot ด้านล่างแสดงผล)
+  addressId        String?        @map("address_id") @db.Uuid
+  /// snapshot ชื่อผู้รับ
+  recipientName    String?        @map("recipient_name")
+  /// snapshot เบอร์โทร
   phone            String?
-  addressText      String?       @map("address_text")
-  currentDueAt     DateTime?     @map("current_due_at")
-  cancelReason     String?       @map("cancel_reason")
-  cancelFromStatus String?       @map("cancel_from_status")
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  /// snapshot ที่อยู่เต็ม (ข้อความ)
+  addressText      String?        @map("address_text")
+  /// เส้นตายของสถานะปัจจุบัน (เช่น หมดเวลาชำระเงิน)
+  currentDueAt     DateTime?      @map("current_due_at") @db.Timestamptz(6)
+  /// เหตุผลการยกเลิก
+  cancelReason     String?        @map("cancel_reason")
+  /// สถานะก่อนยกเลิก (เดิมเป็น String → ใช้ enum เดียวกับ status)
+  cancelFromStatus BookingStatus? @map("cancel_from_status")
 
-  renter   User     @relation(fields: [renterId], references: [id], onDelete: Cascade)
-  boutique Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
-  dress    Dress    @relation(fields: [dressId], references: [id], onDelete: Cascade)
-  address  Address? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  renter  User     @relation(fields: [renterId], references: [id], onDelete: Cascade)
+  shop    Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  product Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  address Address? @relation(fields: [addressId], references: [id], onDelete: SetNull)
 
   @@index([renterId])
-  @@index([boutiqueId])
-  @@index([dressId])
+  @@index([shopId])
+  @@index([productId])
   @@index([status])
   @@index([createdAt(sort: Desc)])
   @@map("bookings")
-}
-
-model AdminAudit {
-  id         BigInt   @id @default(autoincrement())
-  adminId    String?  @map("admin_id") @db.Uuid
-  action     String
-  targetType String   @map("target_type")
-  targetId   String?  @map("target_id") @db.Uuid
-  reason     String?
-  payload    Json?
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  admin User? @relation(fields: [adminId], references: [id], onDelete: SetNull)
-
-  @@index([targetType, targetId])
-  @@index([createdAt(sort: Desc)])
-  @@map("admin_audit")
 }
 
 // ---------------------------------------------------------------------------
 // Availability
 // ---------------------------------------------------------------------------
 
-model DressBlackout {
-  dressId   String   @map("dress_id") @db.Uuid
+/// วันที่ร้านปิดไม่ให้จองสินค้า (blackout — เดิม dress_blackouts, composite PK (dress_id, date))
+model ProductBlackoutDate {
+  /// Primary key (uuid) — เพิ่มใหม่, คง UNIQUE(product_id, date)
+  id        String   @id @default(uuid()) @db.Uuid
+  /// FK → products.id (Cascade)
+  productId String   @map("product_id") @db.Uuid
+  /// วันที่ปิดจอง
   date      DateTime @db.Date
-  createdAt DateTime @default(now()) @map("created_at")
 
-  dress Dress @relation(fields: [dressId], references: [id], onDelete: Cascade)
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@id([dressId, date])
-  @@index([dressId])
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, date])
+  @@index([productId])
   @@index([date])
-  @@map("dress_blackouts")
+  @@map("product_blackout_dates")
 }
 
 // ---------------------------------------------------------------------------
-// Enums
+// Audit
 // ---------------------------------------------------------------------------
 
+/// Audit log รวม (host decision: merge admin_audit เข้าตารางนี้)
+/// 1) mechanical before/after ของทุก mutating operation — เขียนโดย Prisma client extension
+/// 2) admin business actions (approve KYC, reject product, ...) — เขียน explicit
+///    โดย admin actions; เหตุผลของแอดมินเก็บใน after->>'reason'
+/// append-only, ไม่มี FK ไป users (ต้องอยู่รอดแม้ user ถูก hard delete)
+model AuditLog {
+  /// Primary key (uuid)
+  id         String      @id @default(uuid()) @db.Uuid
+  /// ชนิด operation (admin business actions ใช้ UPDATE/DELETE ตาม mutation จริง)
+  action     AuditAction
+  /// ชื่อ entity/ตาราง (เช่น "Product", "Booking") หรือ business entity ("kyc")
+  entityType String      @map("entity_type")
+  /// uuid ของ row ที่ถูกกระทำ
+  entityId   String?     @map("entity_id") @db.Uuid
+  /// uuid ผู้กระทำจาก session (NULL = system/cron/anonymous)
+  actorId    String?     @map("actor_id") @db.Uuid
+  /// สภาพ row ก่อนแก้ (NULL สำหรับ CREATE)
+  before     Json?
+  /// สภาพ row หลังแก้ (NULL สำหรับ DELETE); admin actions ใส่ reason/action ชื่อธุรกิจที่นี่
+  after      Json?
+  /// เวลาเกิดเหตุการณ์
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+/// ชนิด operation ใน audit_logs
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+
+  @@map("audit_action")
+}
+
+// ---------------------------------------------------------------------------
+// Enums (workflow states — kept; hard delete policy means no "deleted" states)
+// ---------------------------------------------------------------------------
+
+/// โทนสีสินค้า/ร้าน (ใช้ filter + UI)
 enum Color {
   rose
   ivory
@@ -454,53 +978,69 @@ enum Color {
   red
   blue
   purple
+
+  @@map("color")
 }
 
+/// ไซซ์สินค้า
 enum Size {
   XS
   S
   M
   L
   XL
+
+  @@map("size")
 }
 
-enum AdsTier {
+/// ระดับแผน/โฆษณา — รวม AdsTier + KycPlan + SubPlan เดิมให้เหลือ enum เดียว
+/// (KycPlan เดิมใช้ตัวพิมพ์ใหญ่ Free/Boost/Featured → migrate เป็นตัวเล็ก)
+enum PlanTier {
   free
   boost
   featured
+
+  @@map("plan_tier")
 }
 
+/// สถานะ workflow การเผยแพร่ (shop/product)
 enum Status {
   pending
   live
   rejected
   draft
+
+  @@map("listing_status")
 }
 
+/// สถานะ KYC rollup บนร้าน
 enum KycStatus {
   none
   submitted
   verified
   rejected
+
+  @@map("kyc_status")
 }
 
+/// สถานะการตรวจคำขอ KYC รายใบ
 enum KycReviewStatus {
   pending
   approved
   rejected
+
+  @@map("kyc_review_status")
 }
 
-enum KycPlan {
-  Free
-  Boost
-  Featured
-}
-
+/// ประเภทธุรกิจผู้ขาย
 enum BusinessType {
   individual
   company
+
+  @@map("business_type")
 }
 
+/// state machine การจอง
 enum BookingStatus {
   booking_pending
   waiting_for_payment
@@ -511,22 +1051,24 @@ enum BookingStatus {
   rejected
   cancelled
   payment_expired
+
+  @@map("booking_status")
 }
 
-enum SubPlan {
-  free
-  boost
-  featured
-}
-
+/// สถานะ subscription
 enum SubStatus {
   active
   past_due
   cancelled
   expired
+
+  @@map("sub_status")
 }
 
+/// รอบบิล subscription
 enum BillingCycle {
   monthly
   yearly
+
+  @@map("billing_cycle")
 }
