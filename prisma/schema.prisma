@@ -1,5 +1,5 @@
 // ============================================================================
-// DopRent — restructured schema (db-restructure Phase 1 DRAFT, rev 2)
+// DopRent — restructured schema (db-restructure Phase 1 DRAFT, rev 3)
 // ----------------------------------------------------------------------------
 // Conventions (see product/db-restructure/DESIGN.md):
 //   * Every table: id uuid PK, created_by/updated_by uuid NULL (no FK — must
@@ -13,6 +13,11 @@
 //     saved_dresses→favorites, seller_subscriptions→shop_subscriptions,
 //     dress_blackouts→product_blackout_dates; new product_types reference
 //     table; admin_audit merged into audit_logs (model dropped).
+//   * rev 3 (host change orders — taxonomy): new product_categories
+//     (hierarchical, per product_type) + products.category_id (exactly ONE
+//     category per product, nullable); new tag system (tag_groups / tags /
+//     product_tags); occasions + product_occasions DROPPED — occasions become
+//     tag_group key='occasion' with its tags seeded from the old occasion keys.
 // ============================================================================
 
 generator client {
@@ -49,26 +54,88 @@ model ProductType {
   /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  products Product[]
+  products   Product[]
+  categories ProductCategory[]
 
   @@map("product_types")
 }
 
-/// ตารางอ้างอิงประเภทงาน/โอกาสที่ใช้สินค้า (เช่น งานแต่ง, รับปริญญา)
-model Occasion {
+/// หมวดหมู่สินค้าแบบลำดับชั้น (dynamic, adjacency list) — ต้นไม้หมวดหมู่ 1 ต้นสังกัด 1 ประเภทสินค้า
+/// (เช่น dress → ชุดราตรี/ชุดไทย, suit → สูทลำลอง) เพิ่ม/ย้ายหมวดได้โดยไม่ต้องแก้ schema
+model ProductCategory {
+  /// Primary key (uuid)
+  id            String  @id @default(uuid()) @db.Uuid
+  /// FK → product_categories.id หมวดแม่ (NULL = หมวดราก; RESTRICT — ห้ามลบหมวดที่ยังมีหมวดลูก, ดูเหตุผลใน DESIGN §3.2)
+  parentId      String? @map("parent_id") @db.Uuid
+  /// FK → product_types.id ประเภทสินค้าเจ้าของต้นไม้หมวดหมู่นี้ (RESTRICT — ปิดใช้งานผ่าน is_active แทนการลบ)
+  productTypeId String  @map("product_type_id") @db.Uuid
+  /// Business key (เช่น "evening-dress") — UNIQUE ทั้งระบบ, ใช้ใน URL/filter
+  key           String  @unique
+  /// ชื่อแสดงผล (ไทย)
+  label         String
+  /// ลำดับการแสดงผลภายในหมวดแม่เดียวกัน
+  sortOrder     Int     @default(0) @map("sort_order")
+  /// ปิดการใช้งานหมวดโดยไม่ต้องลบ
+  isActive      Boolean @default(true) @map("is_active")
+
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  parent      ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children    ProductCategory[] @relation("CategoryTree")
+  productType ProductType       @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
+  products    Product[]
+
+  @@index([parentId])
+  @@index([productTypeId])
+  @@map("product_categories")
+}
+
+/// กลุ่มแท็ก (เช่น color, style, occasion) — มิติ filter แบบ dynamic, เพิ่มกลุ่มใหม่ได้โดยไม่แก้ schema
+/// (rev 3: ตาราง occasions เดิมถูกแทนด้วยกลุ่มแท็ก key='occasion')
+model TagGroup {
+  /// Primary key (uuid)
+  id        String  @id @default(uuid()) @db.Uuid
+  /// Business key (เช่น "occasion", "style") — UNIQUE
+  key       String  @unique
+  /// ชื่อแสดงผล (ไทย)
+  label     String
+  /// ลำดับการแสดงผลของกลุ่มใน UI filter
+  sortOrder Int     @default(0) @map("sort_order")
+  /// ปิดการใช้งานกลุ่มโดยไม่ต้องลบ
+  isActive  Boolean @default(true) @map("is_active")
+
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tags Tag[]
+
+  @@map("tag_groups")
+}
+
+/// แท็กในกลุ่ม (เช่น "wedding" ในกลุ่ม occasion) — แทน occasions เดิม + รองรับมิติใหม่ในอนาคต
+model Tag {
   /// Primary key (uuid)
   id         String  @id @default(uuid()) @db.Uuid
-  /// Business key เดิม (เช่น "wedding") — ยังใช้ใน URL/filter ได้, UNIQUE
+  /// FK → tag_groups.id กลุ่มของแท็กนี้ (RESTRICT — ลบกลุ่มไม่ได้ถ้ายังมีแท็ก, ปิดผ่าน is_active)
+  tagGroupId String  @map("tag_group_id") @db.Uuid
+  /// Business key (เช่น "wedding") — UNIQUE ทั้งระบบ, ใช้ใน URL/filter
   key        String  @unique
-  /// ชื่อภาษาไทย
-  th         String
-  /// ชื่อภาษาอังกฤษ
-  en         String
-  /// design-token สีประจำ occasion สำหรับ UI chip
-  colorToken String  @map("color_token")
-  /// ลำดับการแสดงผล
-  sortOrder  Int     @default(0) @map("sort_order")
-  /// ปิดการใช้งานชั่วคราวโดยไม่ต้องลบ (ของเก่าที่อ้างถึงยังอยู่)
+  /// ชื่อแสดงผล (ไทย)
+  label      String
+  /// ปิดการใช้งานแท็กโดยไม่ต้องลบ
   isActive   Boolean @default(true) @map("is_active")
 
   /// uuid ผู้สร้าง record (NULL = system/seed)
@@ -80,9 +147,11 @@ model Occasion {
   /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  productOccasions ProductOccasion[]
+  tagGroup    TagGroup     @relation(fields: [tagGroupId], references: [id], onDelete: Restrict)
+  productTags ProductTag[]
 
-  @@map("occasions")
+  @@index([tagGroupId])
+  @@map("tags")
 }
 
 /// ตารางอ้างอิงย่าน/พื้นที่ให้บริการ (เดิมกรุงเทพฯ) ใช้ค้นหาร้านใกล้เคียง
@@ -379,6 +448,9 @@ model Product {
   shopId        String                   @map("shop_id") @db.Uuid
   /// FK → product_types.id ประเภทสินค้า (RESTRICT — ลบประเภทไม่ได้ถ้ามีสินค้าอ้างอยู่; ใช้ is_active แทน)
   productTypeId String                   @map("product_type_id") @db.Uuid
+  /// FK → product_categories.id หมวดหมู่ของสินค้า (host decision: สินค้า 1 ชิ้นมีได้ 1 หมวดเท่านั้น;
+  /// NULL ได้ — สินค้าสร้างก่อนจัดหมวดได้; SET NULL — ลบหมวดแล้วสินค้ากลายเป็น "ยังไม่จัดหมวด", ดู DESIGN §3.2)
+  categoryId    String?                  @map("category_id") @db.Uuid
   /// ไซซ์
   size          Size
   /// สีหลักของสินค้า (ใช้ filter)
@@ -415,9 +487,10 @@ model Product {
 
   shop        Shop                  @relation(fields: [shopId], references: [id], onDelete: Cascade)
   productType ProductType           @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
+  category    ProductCategory?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   images      ProductImage[]
   priceTiers  ProductPriceTier[]
-  occasions   ProductOccasion[]
+  productTags ProductTag[]
   blackouts   ProductBlackoutDate[]
   lineClicks  LineClick[]
   bookings    Booking[]
@@ -429,6 +502,7 @@ model Product {
   @@index([available])
   @@index([shopId])
   @@index([productTypeId])
+  @@index([categoryId])
   @@index([pricePerDay])
   @@map("products")
 }
@@ -479,26 +553,26 @@ model ProductPriceTier {
   @@map("product_price_tiers")
 }
 
-/// ตารางเชื่อมสินค้า↔โอกาสใช้งาน (เดิมเก็บเป็น String[] ใน dresses.occasions — ไม่มี FK integrity)
-model ProductOccasion {
+/// ตารางเชื่อมสินค้า↔แท็ก (rev 3: แทน product_occasions เดิม — เดิมสุดคือ String[] ใน dresses.occasions)
+model ProductTag {
   /// Primary key (uuid)
-  id         String @id @default(uuid()) @db.Uuid
+  id        String @id @default(uuid()) @db.Uuid
   /// FK → products.id (Cascade)
-  productId  String @map("product_id") @db.Uuid
-  /// FK → occasions.id (Cascade)
-  occasionId String @map("occasion_id") @db.Uuid
+  productId String @map("product_id") @db.Uuid
+  /// FK → tags.id (Cascade)
+  tagId     String @map("tag_id") @db.Uuid
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedBy String?  @map("updated_by") @db.Uuid
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  occasion Occasion @relation(fields: [occasionId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
-  @@unique([productId, occasionId])
-  @@index([occasionId])
-  @@map("product_occasions")
+  @@unique([productId, tagId])
+  @@index([tagId])
+  @@map("product_tags")
 }
 
 /// สินค้าที่ผู้ใช้บันทึกไว้ (wishlist — เดิม saved_dresses / users.saved_dress_ids uuid[])
