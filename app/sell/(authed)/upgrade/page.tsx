@@ -53,12 +53,13 @@ export default function UpgradePage({
         ) : null}
         <p style={{ fontSize: 16, color: "var(--ink-2)", lineHeight: 1.65, marginBottom: 28 }}>
           เรากำลังต่อระบบจ่ายเงินผ่านบัตรเครดิต PromptPay และโอนบัญชีบริษัท
-          เร็วๆ นี้คุณจะอัปเกรดแพ็กเกจได้เองในเว็บ ระหว่างนี้เริ่มเปิดร้านฟรีไว้ก่อนได้เลย
-          แล้วทักทีมงานเพื่ออัปเกรดล่วงหน้าได้
+          เร็วๆ นี้คุณจะอัปเกรดแพ็กเกจได้เองในเว็บ ระหว่างนี้ทักทีมงานเพื่ออัปเกรดล่วงหน้าได้เลย
         </p>
         <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-          <Link href="/sell/signup" className="btn btn-dark" style={{ padding: "12px 22px" }}>
-            เริ่มเปิดร้านฟรี
+          {/* Visitors here already own a boutique (hit the dress-quota limit) —
+              /sell/signup would just bounce them back. Send them to the dashboard. */}
+          <Link href="/sell/dashboard" className="btn btn-dark" style={{ padding: "12px 22px" }}>
+            กลับไปที่ร้านของฉัน
           </Link>
           <a
             href="https://line.me/R/ti/p/@doprent"

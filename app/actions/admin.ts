@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { dueAt } from "@/lib/bookings";
 
 async function requireAdmin(): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
   const user = await getCurrentUser();
@@ -149,5 +150,134 @@ export async function toggleDressFeatured(dressId: string, featured: boolean): P
 
   revalidatePath("/admin/dresses");
   revalidatePath("/");
+  return { ok: true };
+}
+
+/* --------------------------- booking resolution --------------------------- */
+/* Admin resolves the two dead-end statuses (cancel_requested, slip_disputed).
+ * Same atomic updateMany status-guard pattern as app/actions/bookings.ts:
+ * the WHERE clause pins the expected source status so concurrent moves lose. */
+
+function revalidateBookingPaths(bookingId: string) {
+  revalidatePath("/admin/bookings");
+  revalidatePath(`/admin/bookings/${bookingId}`);
+  revalidatePath("/account/bookings");
+  revalidatePath("/sell/bookings");
+}
+
+/** cancel_requested → cancelled (admin approves the seller's cancel request).
+ *  NOTE on refunds: if the renter already paid (request raised from
+ *  payment_review/confirmed), the refund is handled MANUALLY off-platform —
+ *  admin coordinates a PromptPay transfer back to the renter. There is no
+ *  automated refund in the MVP; the audit row is the paper trail. */
+export async function adminApproveCancel(bookingId: string, note?: string): Promise<{ ok: boolean; error?: string }> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth;
+
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: { status: true, cancelReason: true, cancelFromStatus: true },
+  });
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.status !== "cancel_requested")
+    return { ok: false, error: "การจองนี้ไม่ได้อยู่ในสถานะรอยกเลิก" };
+
+  const res = await db.booking.updateMany({
+    where: { id: bookingId, status: "cancel_requested" },
+    data: { status: "cancelled" },
+  });
+  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  await writeAudit(auth.userId, "approve_booking_cancel", "booking", bookingId, note ?? null, {
+    sellerReason: booking.cancelReason,
+    fromStatus: booking.cancelFromStatus,
+    refundRequired: booking.cancelFromStatus === "confirmed",
+  });
+  revalidateBookingPaths(bookingId);
+  return { ok: true };
+}
+
+/** cancel_requested → previous active status (admin denies the cancel request).
+ *  Reverts to cancel_from_status when it is a known active state; falls back
+ *  to confirmed when the origin is unknown (safest for the renter, who has
+ *  already paid in every flow that can reach cancel_requested). */
+export async function adminDenyCancel(bookingId: string, note?: string): Promise<{ ok: boolean; error?: string }> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth;
+
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: { status: true, cancelReason: true, cancelFromStatus: true },
+  });
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.status !== "cancel_requested")
+    return { ok: false, error: "การจองนี้ไม่ได้อยู่ในสถานะรอยกเลิก" };
+
+  const revertTo =
+    booking.cancelFromStatus === "payment_review" || booking.cancelFromStatus === "confirmed"
+      ? (booking.cancelFromStatus as "payment_review" | "confirmed")
+      : "confirmed";
+
+  const res = await db.booking.updateMany({
+    where: { id: bookingId, status: "cancel_requested" },
+    data: { status: revertTo, cancelReason: null, cancelFromStatus: null },
+  });
+  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  await writeAudit(auth.userId, "deny_booking_cancel", "booking", bookingId, note ?? null, {
+    sellerReason: booking.cancelReason,
+    revertedTo: revertTo,
+  });
+  revalidateBookingPaths(bookingId);
+  return { ok: true };
+}
+
+/** slip_disputed → confirmed (admin checked the slip and it is valid). */
+export async function adminAcceptSlip(bookingId: string, note?: string): Promise<{ ok: boolean; error?: string }> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth;
+
+  const res = await db.booking.updateMany({
+    where: { id: bookingId, status: "slip_disputed" },
+    data: { status: "confirmed", cancelReason: null, cancelFromStatus: null },
+  });
+  if (res.count === 0) return { ok: false, error: "การจองนี้ไม่ได้อยู่ในสถานะสลิปมีปัญหา" };
+
+  await writeAudit(auth.userId, "accept_disputed_slip", "booking", bookingId, note ?? null);
+  revalidateBookingPaths(bookingId);
+  return { ok: true };
+}
+
+/** slip_disputed → waiting_for_payment with a fresh payment window:
+ *  the slip really was invalid, so the renter must pay/re-upload again. */
+export async function adminRejectSlip(bookingId: string, note?: string): Promise<{ ok: boolean; error?: string }> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth;
+
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: { status: true, slipPath: true },
+  });
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.status !== "slip_disputed")
+    return { ok: false, error: "การจองนี้ไม่ได้อยู่ในสถานะสลิปมีปัญหา" };
+
+  const res = await db.booking.updateMany({
+    where: { id: bookingId, status: "slip_disputed" },
+    data: {
+      status: "waiting_for_payment",
+      currentDueAt: new Date(dueAt()),
+      // Old slip key stays in R2 for the audit trail; uploading a new slip
+      // overwrites slipPath with a fresh key.
+      cancelReason: null,
+      cancelFromStatus: null,
+    },
+  });
+  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  await writeAudit(auth.userId, "reject_disputed_slip", "booking", bookingId, note ?? null, {
+    rejectedSlipPath: booking.slipPath,
+  });
+  revalidateBookingPaths(bookingId);
   return { ok: true };
 }

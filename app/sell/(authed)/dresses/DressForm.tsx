@@ -235,7 +235,7 @@ export default function DressForm(props: Props) {
                   width: 22,
                   height: 22,
                   borderRadius: 999,
-                  background: "oklch(0.18 0.008 70 / 0.72)",
+                  background: "color-mix(in oklch, var(--ink) 75%, transparent)",
                   color: "var(--on-dark)",
                   border: "none",
                   fontSize: 11,

@@ -941,3 +941,129 @@ img {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Dashboard shell (admin + seller sidebar layouts) ───────── */
+.dash-shell {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+}
+.dash-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 84px;
+}
+.dash-main {
+  flex: 1;
+  min-width: 0;
+}
+.dash-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: var(--shadow-1);
+}
+.dash-nav-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 10px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--line-2);
+}
+.dash-nav-badge {
+  background: var(--info);
+  color: var(--on-dark);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+.dash-nav-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dash-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition:
+    background var(--dur-1) var(--ease),
+    color var(--dur-1) var(--ease);
+}
+.dash-link:hover {
+  background: var(--warm);
+  color: var(--ink);
+}
+.dash-link.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-2);
+  font-weight: 600;
+}
+.dash-link svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+.dash-link.is-active svg {
+  opacity: 1;
+}
+@media (max-width: 767px) {
+  .dash-shell {
+    flex-direction: column;
+    gap: 18px;
+  }
+  .dash-sidebar {
+    width: 100%;
+    position: static;
+  }
+  .dash-nav {
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    padding: 8px;
+    border-radius: 12px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .dash-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .dash-nav-head {
+    border-bottom: none;
+    border-right: 1px solid var(--line-2);
+    padding: 4px 12px 4px 6px;
+    margin: 0 6px 0 0;
+  }
+  .dash-nav-title {
+    display: none;
+  }
+  .dash-link {
+    padding: 8px 12px;
+  }
+}
+
+/* Pages moved under the sidebar shells still render their own `.container`
+   (with inline padding). Neutralize it so spacing comes from the shell and
+   horizontal padding isn't doubled. Inline `maxWidth` on forms still wins. */
+.dash-main > .container {
+  max-width: none;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}

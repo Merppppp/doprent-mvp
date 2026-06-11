@@ -1,15 +1,14 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Autoplay, Pagination, EffectCards } from "swiper/modules";
+import { Autoplay, Pagination } from "swiper/modules";
+import type { Swiper as SwiperType } from "swiper";
 import Link from "next/link";
-import type { Boutique, Color, DressCard } from "@/lib/types";
+import type { Boutique, Color } from "@/lib/types";
 
 import "swiper/css";
-import "swiper/css/navigation";
 import "swiper/css/pagination";
-import "swiper/css/effect-cards";
 import { t, type Locale } from "@/lib/i18n";
 
 /* ------------------------------------------------------------------
@@ -248,79 +247,41 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
   },
 ];
 
-/* ------------------------------------------------------------------
-   DressCardStack — inner EffectCards Swiper for a boutique's dresses
-------------------------------------------------------------------- */
-function DressCardStack({ cards }: { cards: DressCard[] }) {
-  return (
-    <div className="bcs-wrap">
-      <Swiper
-        modules={[EffectCards, Autoplay]}
-        effect="cards"
-        grabCursor
-        speed={600}
-        loop={true}
-        initialSlide={1}
-        autoplay={{ delay: 3200, disableOnInteraction: true }}
-        cardsEffect={{
-          perSlideOffset: 9,
-          perSlideRotate: 3,
-          rotate: true,
-          slideShadows: true,
-        }}
-        className="bcs-swiper"
-      >
-        {cards.map((card) => (
-          <SwiperSlide key={card.id} className="bcs-slide">
-            <div className="bcs-card">
-              <div
-                className="bcs-card__img"
-                style={
-                  card.image
-                    ? { backgroundImage: `url(${card.image})` }
-                    : { background: "rgba(255,255,255,0.12)" }
-                }
-              />
-              <div className="bcs-card__label">
-                <span className="bcs-card__name">{card.name}</span>
-                <span className="bcs-card__price">
-                  ฿{card.price_per_day.toLocaleString()}<span style={{ fontWeight: 400, opacity: 0.75 }}>/วัน</span>
-                </span>
-              </div>
-            </div>
-          </SwiperSlide>
-        ))}
-      </Swiper>
-    </div>
-  );
-}
-
 export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
-  const prevRef = useRef<HTMLButtonElement>(null);
-  const nextRef = useRef<HTMLButtonElement>(null);
+  const swiperRef = useRef<SwiperType | null>(null);
   const paginationRef = useRef<HTMLDivElement>(null);
+  const [swiperReady, setSwiperReady] = useState(false);
 
   const displayBoutiques = boutiques.length < 3 ? SAMPLE_BOUTIQUES : boutiques;
+
+  // After Swiper mounts and the pagination DOM element is in the tree,
+  // wire up the custom pagination container (refs are null during render phase).
+  useEffect(() => {
+    const swiper = swiperRef.current;
+    if (!swiper || !paginationRef.current) return;
+
+    const pag = swiper.params.pagination;
+    if (pag && typeof pag !== "boolean") {
+      pag.el = paginationRef.current;
+    }
+    swiper.pagination.destroy();
+    swiper.pagination.init();
+    swiper.pagination.update();
+  }, [swiperReady]);
 
   if (displayBoutiques.length === 0) return null;
 
   return (
     <div className="banner-carousel">
       <Swiper
-        modules={[Navigation, Autoplay, Pagination]}
+        modules={[Autoplay, Pagination]}
         loop={displayBoutiques.length >= 2}
         speed={700}
         autoplay={{ delay: 5500, disableOnInteraction: false, pauseOnMouseEnter: true }}
-        pagination={{ clickable: true, el: paginationRef.current }}
-        navigation={{ prevEl: prevRef.current, nextEl: nextRef.current }}
-        onBeforeInit={(swiper) => {
-          if (typeof swiper.params.navigation !== "boolean" && swiper.params.navigation) {
-            swiper.params.navigation.prevEl = prevRef.current;
-            swiper.params.navigation.nextEl = nextRef.current;
-          }
-          if (typeof swiper.params.pagination !== "boolean" && swiper.params.pagination) {
-            swiper.params.pagination.el = paginationRef.current;
-          }
+        pagination={{ clickable: true }}
+        onSwiper={(swiper) => {
+          swiperRef.current = swiper;
+          setSwiperReady(true);
         }}
         className="bc-swiper"
       >
@@ -334,11 +295,9 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
               }
             : { background: `linear-gradient(135deg, ${from} 0%, ${to} 100%)` };
 
-          const showCards = (b.dress_cards?.length ?? 0) >= 3;
-
           return (
             <SwiperSlide key={b.id}>
-              <div className={`bc-slide${showCards ? " bc-slide--two-col" : ""}`} style={bgStyle}>
+              <div className="bc-slide" style={bgStyle}>
                 {/* Noise texture overlay */}
                 <div className="bc-noise" aria-hidden />
 
@@ -371,15 +330,8 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
                   </Link>
                 </div>
 
-                {/* RIGHT: Dress card stack (only when ≥3 dresses) */}
-                {showCards && (
-                  <div className="bc-cards" aria-hidden>
-                    <DressCardStack cards={b.dress_cards!} />
-                  </div>
-                )}
-
-                {/* Decorative shapes — only when no cover image and no card stack */}
-                {!b.cover_image && !showCards && (
+                {/* Decorative shapes — only when no cover image */}
+                {!b.cover_image && (
                   <>
                     <div className="bc-deco bc-deco--1" aria-hidden />
                     <div className="bc-deco bc-deco--2" aria-hidden />
@@ -393,11 +345,19 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
 
       {displayBoutiques.length >= 2 && (
         <>
-          {/* Custom nav arrows */}
-          <button ref={prevRef} className="bc-arrow bc-arrow--prev" aria-label={t("banner.prevAria", locale)}>
+          {/* Custom nav arrows — direct slidePrev/slideNext avoids ref timing issues */}
+          <button
+            className="bc-arrow bc-arrow--prev"
+            aria-label={t("banner.prevAria", locale)}
+            onClick={() => swiperRef.current?.slidePrev()}
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
-          <button ref={nextRef} className="bc-arrow bc-arrow--next" aria-label={t("banner.nextAria", locale)}>
+          <button
+            className="bc-arrow bc-arrow--next"
+            aria-label={t("banner.nextAria", locale)}
+            onClick={() => swiperRef.current?.slideNext()}
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
           </button>
 
@@ -427,23 +387,6 @@ const BC_CSS = `
 @media(min-width:768px){.bc-slide{min-height:480px}}
 @media(min-width:1200px){.bc-slide{min-height:520px}}
 
-/* --- Two-column variant (when dress cards are present) --- */
-.bc-slide--two-col{
-  align-items:center;
-}
-.bc-slide--two-col .bc-content{
-  flex:1 1 0;
-  min-width:0;
-}
-@media(min-width:768px){
-  .bc-slide--two-col{
-    display:grid;
-    grid-template-columns:1fr auto;
-    gap:0;
-    align-items:center;
-  }
-}
-
 /* Noise overlay */
 .bc-noise{
   position:absolute;inset:0;z-index:1;opacity:.06;pointer-events:none;
@@ -463,17 +406,11 @@ const BC_CSS = `
   padding:36px 24px 60px;
   display:flex;flex-direction:column;align-items:flex-start;gap:14px;
 }
-.bc-slide--two-col .bc-content{
-  max-width:none;
-  padding:36px 24px 60px 24px;
-}
 @media(min-width:768px){
   .bc-content{padding:48px 40px 72px}
-  .bc-slide--two-col .bc-content{padding:48px 32px 72px 48px}
 }
 @media(min-width:1200px){
   .bc-content{padding:56px 48px 80px}
-  .bc-slide--two-col .bc-content{padding:60px 40px 80px 56px}
 }
 
 /* Kicker label */
@@ -527,67 +464,6 @@ const BC_CSS = `
   transform:translateX(2px);
 }
 
-/* --- Cards column (right side) --- */
-.bc-cards{
-  position:relative;z-index:2;
-  display:none;
-  align-items:center;justify-content:center;
-  padding:32px 56px 32px 0;
-  flex-shrink:0;
-}
-@media(min-width:768px){
-  .bc-cards{display:flex}
-}
-
-/* --- DressCardStack (inner EffectCards Swiper) --- */
-.bcs-wrap{
-  width:200px;height:280px;
-}
-@media(min-width:1024px){
-  .bcs-wrap{width:240px;height:330px}
-}
-@media(min-width:1200px){
-  .bcs-wrap{width:260px;height:360px}
-}
-
-.bcs-swiper{width:100%;height:100%}
-
-.bcs-slide{
-  border-radius:16px;overflow:hidden;
-}
-
-.bcs-card{
-  width:100%;height:100%;
-  display:flex;flex-direction:column;
-  border-radius:16px;overflow:hidden;
-  background:#1a1815;
-  box-shadow:0 8px 32px rgba(0,0,0,0.4),0 2px 8px rgba(0,0,0,0.2);
-}
-
-.bcs-card__img{
-  flex:1 1 0;
-  background-size:cover;
-  background-position:center;
-  background-color:rgba(255,255,255,0.08);
-}
-
-.bcs-card__label{
-  padding:10px 14px 12px;
-  background:rgba(15,12,10,0.88);
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  display:flex;flex-direction:column;gap:3px;
-  border-top:1px solid rgba(255,255,255,0.08);
-}
-
-.bcs-card__name{
-  font-size:12.5px;font-weight:600;color:#fff;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-
-.bcs-card__price{
-  font-size:12px;font-weight:700;color:rgba(255,255,255,0.9);
-}
-
 /* Nav arrows */
 .bc-arrow{
   position:absolute;top:50%;transform:translateY(-50%);z-index:10;
@@ -630,7 +506,6 @@ const BC_CSS = `
 /* Reduce motion */
 @media(prefers-reduced-motion:reduce){
   .bc-swiper .swiper-wrapper{transition-duration:0ms!important}
-  .bcs-swiper .swiper-wrapper{transition-duration:0ms!important}
   .bc-cta{transition:none}
   .bc-arrow{transition:none}
 }
