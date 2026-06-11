@@ -1,7 +1,6 @@
 import Link from "next/link";
 import DressCardImage from "./DressCardImage";
 import SaveButton from "./SaveButton";
-import { localProductImage } from "@/lib/product-images";
 import VerifiedBadge from "./VerifiedBadge";
 import DistanceBadge from "./DistanceBadge";
 import { hasMultipleRates, startingPerDay } from "@/lib/pricing";
@@ -18,7 +17,7 @@ type Props = {
 
 export default function DressCard({ dress, variant = 0, savedSet, isLoggedIn }: Props) {
   const hasImg = Array.isArray(dress.images) && dress.images.length > 0;
-  const imgSrc = hasImg ? dress.images[0] : localProductImage(dress.slug);
+  const imgSrc = hasImg ? dress.images[0] : null;
   const isSaved = savedSet ? savedSet.has(dress.id) : false;
 
   return (
