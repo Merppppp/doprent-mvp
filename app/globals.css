@@ -496,11 +496,8 @@ img {
     grid-template-columns: 1fr;
     gap: 24px;
   }
-  .footer-bottom {
-    flex-direction: column;
-    gap: 6px;
-    text-align: center;
-  }
+  /* .footer-bottom is a single centered wrapping line at all breakpoints
+     (inline styles on the component) — no mobile override needed. */
   /* Section / shell paddings tighter */
   .section-pad {
     padding: 40px 0 !important;
