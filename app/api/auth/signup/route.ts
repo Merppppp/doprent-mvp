@@ -4,8 +4,6 @@ import crypto from "crypto";
 import { db } from "@/lib/db";
 import { sendVerificationEmail } from "@/lib/email";
 
-export const dynamic = "force-dynamic";
-
 const ADMIN_EMAILS = ["admin@doprent.com", "prem@doprent.com", "hgcovuf@gmail.com"];
 const TOKEN_EXPIRY_HOURS = 24;
 

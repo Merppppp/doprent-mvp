@@ -5,8 +5,6 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { r2, R2_PRIVATE_BUCKET } from "@/lib/r2";
 
-export const dynamic = "force-dynamic";
-
 const EXPIRES_IN = 60 * 15; // 15 นาที
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {

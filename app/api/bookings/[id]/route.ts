@@ -3,8 +3,6 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { expireStaleBookings } from "@/lib/booking";
 
-export const dynamic = "force-dynamic";
-
 const BOOKING_INCLUDE = {
   dress: { select: { id: true, name: true, slug: true, images: true } },
   boutique: { select: { id: true, name: true, slug: true, lineUrl: true, promptpayId: true } },

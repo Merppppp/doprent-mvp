@@ -3,8 +3,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getBlackoutsByMonth } from "@/lib/dresses";
 
-export const dynamic = "force-dynamic";
-
 const MONTH_REGEX = /^\d{4}-\d{2}$/;
 
 export async function GET(request: Request) {

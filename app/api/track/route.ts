@@ -9,8 +9,6 @@ import {
   decodeAttribution,
 } from "@/lib/attribution";
 
-export const dynamic = "force-dynamic";
-
 /** Lightweight client telemetry sink (Postgres/Prisma).
  *  - event "line_click": LINE CTA click-through
  *  - event "pageview":   general visitor analytics (anon + authed)

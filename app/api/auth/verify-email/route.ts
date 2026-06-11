@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-export const dynamic = "force-dynamic";
-
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
