@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import PriceRange from "./PriceRange";
 import type { SelectOption } from "./SearchSelect";
@@ -73,30 +73,133 @@ function SectionHeader({
   );
 }
 
-function SubGroupHeader({
+function SelectedBadge({
   label,
-  open,
-  onToggle,
+  onRemove,
+  removeAria,
 }: {
   label: string;
-  open: boolean;
-  onToggle: () => void;
+  onRemove: () => void;
+  removeAria: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={`flex items-center justify-between w-full p-0 border-none bg-transparent cursor-pointer font-[inherit] ${open ? "mb-1.5" : "mb-0"}`}
-    >
-      <span className="text-[11px] font-semibold text-[var(--ink-3)] uppercase tracking-wider">
-        {label}
-      </span>
-      <span
-        className={`text-[10px] text-[var(--ink-3)] inline-block transition-transform duration-200 ${open ? "rotate-0" : "-rotate-90"}`}
+    <span className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-[var(--accent-soft)] border border-[var(--accent)]/40 text-[11px] font-medium text-[var(--accent)] whitespace-nowrap">
+      {label}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`${removeAria}: ${label}`}
+        className="w-4 h-4 flex items-center justify-center rounded-full bg-transparent border-none cursor-pointer text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition-colors duration-150 text-[10px] leading-none font-[inherit]"
       >
-        ▼
-      </span>
-    </button>
+        ✕
+      </button>
+    </span>
+  );
+}
+
+function SectionSearchInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="relative">
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ink-3)] pointer-events-none"
+      >
+        <circle cx="11" cy="11" r="8" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </svg>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full pl-8 pr-2.5 py-1.5 rounded-md border border-[var(--line)] bg-[var(--surface)] text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] outline-none focus:border-[var(--accent)] font-[inherit]"
+      />
+    </div>
+  );
+}
+
+type SearchableItem = {
+  value: string;
+  label: string;
+  /** Extra text (th + en labels) matched against the search query. */
+  searchText: string;
+};
+
+const VISIBLE_COUNT = 6;
+
+/**
+ * Searchable chip list: search input + first 6 chips + "show all (N)" toggle.
+ * While a query is typed, every match is shown (expand state is ignored).
+ */
+function SearchableChipSection({
+  items,
+  active,
+  onSelect,
+  searchPlaceholder,
+  locale,
+}: {
+  items: SearchableItem[];
+  active: string | null;
+  onSelect: (value: string | null) => void;
+  searchPlaceholder: string;
+  locale: Locale;
+}) {
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState(false);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? items.filter((it) => it.searchText.toLowerCase().includes(q))
+    : items;
+  const visible = q || expanded ? filtered : filtered.slice(0, VISIBLE_COUNT);
+  const hiddenCount = items.length - VISIBLE_COUNT;
+
+  return (
+    <div className="flex flex-col gap-2 mt-2">
+      <SectionSearchInput value={query} onChange={setQuery} placeholder={searchPlaceholder} />
+      {visible.length === 0 ? (
+        <div className="text-[11px] text-[var(--ink-3)] py-1.5 text-center">
+          {t("filter.noResults", locale)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-1.5">
+          {visible.map((it) => (
+            <Chip
+              key={it.value}
+              label={it.label}
+              active={active === it.value}
+              onClick={() => onSelect(active === it.value ? null : it.value)}
+            />
+          ))}
+        </div>
+      )}
+      {!q && hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="text-[11px] text-[var(--accent)] bg-transparent border-none cursor-pointer font-[inherit] font-medium text-left p-0"
+        >
+          {expanded
+            ? t("filter.showLess", locale)
+            : t("filter.showAll", locale).replace("{n}", String(items.length))}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -202,17 +305,8 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     price: true,
   });
 
-  const [typeGroups, setTypeGroups] = useState({
-    top: true,
-    bottom: true,
-    dress: true,
-  });
-
   const toggleSection = (key: keyof typeof sections) =>
     setSections((prev) => ({ ...prev, [key]: !prev[key] }));
-
-  const toggleTypeGroup = (key: keyof typeof typeGroups) =>
-    setTypeGroups((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const hasAny =
     !!props.color ||
@@ -230,6 +324,79 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     label: c.label,
     hex: (c as SelectOption & { swatch?: string }).swatch ?? "#ccc",
   }));
+
+  // ── Searchable items (match both th + en labels) ──────────────────────────
+  const occasionItems: SearchableItem[] = useMemo(
+    () =>
+      props.occasions.map((o) => ({
+        value: o.value,
+        label: o.label,
+        searchText: [o.value, o.label, t(`occasion.${o.value}`, "th"), t(`occasion.${o.value}`, "en")].join(" "),
+      })),
+    [props.occasions],
+  );
+
+  const typeItems: SearchableItem[] = useMemo(
+    () =>
+      DRESS_TYPE_GROUPS.flatMap((group) =>
+        group.items.map((item) => ({
+          value: item,
+          label: locale === "en" ? (DRESS_ITEM_EN[item] ?? item) : item,
+          searchText: [item, DRESS_ITEM_EN[item] ?? ""].join(" "),
+        })),
+      ),
+    [locale],
+  );
+
+  // ── Selected filter badges (top of sidebar) ───────────────────────────────
+  const selectedBadges: { key: string; label: string; onRemove: () => void }[] = [];
+  if (props.q) {
+    selectedBadges.push({ key: "q", label: `"${props.q}"`, onRemove: () => setParam("q", null) });
+  }
+  if (props.occasion) {
+    const occ = props.occasions.find((o) => o.value === props.occasion);
+    selectedBadges.push({
+      key: "occasion",
+      label: occ?.label ?? props.occasion,
+      onRemove: () => setParam("occasion", null),
+    });
+  }
+  if (activeType) {
+    selectedBadges.push({
+      key: "type",
+      label: locale === "en" ? (DRESS_ITEM_EN[activeType] ?? activeType) : activeType,
+      onRemove: () => setParam("type", null),
+    });
+  }
+  if (props.color) {
+    const col = colorItems.find((c) => c.value === props.color);
+    selectedBadges.push({
+      key: "color",
+      label: col?.label ?? props.color,
+      onRemove: () => setParam("color", null),
+    });
+  }
+  if (props.size) {
+    selectedBadges.push({ key: "size", label: props.size, onRemove: () => setParam("size", null) });
+  }
+  if (props.designer) {
+    selectedBadges.push({
+      key: "designer",
+      label: props.designer,
+      onRemove: () => setParam("designer", null),
+    });
+  }
+  if (props.priceMin > props.priceBounds.min || props.priceMax < props.priceBounds.max) {
+    selectedBadges.push({
+      key: "price",
+      label: `฿${props.priceMin.toLocaleString()}–฿${props.priceMax.toLocaleString()}`,
+      onRemove: () =>
+        push((sp) => {
+          sp.delete("priceMin");
+          sp.delete("priceMax");
+        }),
+    });
+  }
 
   return (
     <div className="flex flex-col">
@@ -249,7 +416,26 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
         ) : null}
       </div>
 
-      {/* ════ Section: Occasion ════ */}
+      {/* ════ Selected filters zone ════ */}
+      {selectedBadges.length > 0 && (
+        <div className="pb-3 border-b border-[var(--line)]/50 mb-1">
+          <div className="text-[11px] font-semibold text-[var(--ink-3)] uppercase tracking-wider mb-2">
+            {t("filter.selected", locale)}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {selectedBadges.map((b) => (
+              <SelectedBadge
+                key={b.key}
+                label={b.label}
+                onRemove={b.onRemove}
+                removeAria={t("filter.removeFilter", locale)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ════ Section: Occasion (searchable) ════ */}
       <div className="py-3 border-b border-[var(--line)]/50">
         <SectionHeader
           label={t("filter.occasion", locale)}
@@ -257,20 +443,17 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
           onToggle={() => toggleSection("occasion")}
         />
         {sections.occasion && (
-          <div className="grid grid-cols-2 gap-1.5 mt-2">
-            {props.occasions.map((occ) => (
-              <Chip
-                key={occ.value}
-                label={occ.label}
-                active={props.occasion === occ.value}
-                onClick={() => setParam("occasion", props.occasion === occ.value ? null : occ.value)}
-              />
-            ))}
-          </div>
+          <SearchableChipSection
+            items={occasionItems}
+            active={props.occasion}
+            onSelect={(value) => setParam("occasion", value)}
+            searchPlaceholder={t("filter.searchOccasion", locale)}
+            locale={locale}
+          />
         )}
       </div>
 
-      {/* ════ Section: Dress Type ════ */}
+      {/* ════ Section: Dress Type (searchable) ════ */}
       <div className="py-3 border-b border-[var(--line)]/50">
         <SectionHeader
           label={t("filter.type", locale)}
@@ -278,36 +461,13 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
           onToggle={() => toggleSection("type")}
         />
         {sections.type && (
-          <div className="flex flex-col gap-2 mt-2">
-            {DRESS_TYPE_GROUPS.map((group) => {
-              const groupLabel = t(`type.group.${group.key}`, locale);
-              return (
-                <div key={group.key}>
-                  <SubGroupHeader
-                    label={groupLabel}
-                    open={typeGroups[group.key]}
-                    onToggle={() => toggleTypeGroup(group.key)}
-                  />
-                  {typeGroups[group.key] && (
-                    <div className="grid grid-cols-2 gap-1 mt-1.5">
-                      {group.items.map((item) => {
-                        const itemLabel =
-                          locale === "en" ? (DRESS_ITEM_EN[item] ?? item) : item;
-                        return (
-                          <Chip
-                            key={item}
-                            label={itemLabel}
-                            active={activeType === item}
-                            onClick={() => setParam("type", activeType === item ? null : item)}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <SearchableChipSection
+            items={typeItems}
+            active={activeType}
+            onSelect={(value) => setParam("type", value)}
+            searchPlaceholder={t("filter.searchType", locale)}
+            locale={locale}
+          />
         )}
       </div>
 
