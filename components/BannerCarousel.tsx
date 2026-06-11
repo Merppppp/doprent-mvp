@@ -1,13 +1,13 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Autoplay, Pagination, EffectCards } from "swiper/modules";
+import { Autoplay, Pagination, EffectCards } from "swiper/modules";
+import type { Swiper as SwiperType } from "swiper";
 import Link from "next/link";
 import type { Boutique, Color, DressCard } from "@/lib/types";
 
 import "swiper/css";
-import "swiper/css/navigation";
 import "swiper/css/pagination";
 import "swiper/css/effect-cards";
 import { t, type Locale } from "@/lib/i18n";
@@ -296,31 +296,40 @@ function DressCardStack({ cards }: { cards: DressCard[] }) {
 }
 
 export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
-  const prevRef = useRef<HTMLButtonElement>(null);
-  const nextRef = useRef<HTMLButtonElement>(null);
+  const swiperRef = useRef<SwiperType | null>(null);
   const paginationRef = useRef<HTMLDivElement>(null);
+  const [swiperReady, setSwiperReady] = useState(false);
 
   const displayBoutiques = boutiques.length < 3 ? SAMPLE_BOUTIQUES : boutiques;
+
+  // After Swiper mounts and the pagination DOM element is in the tree,
+  // wire up the custom pagination container (refs are null during render phase).
+  useEffect(() => {
+    const swiper = swiperRef.current;
+    if (!swiper || !paginationRef.current) return;
+
+    const pag = swiper.params.pagination;
+    if (pag && typeof pag !== "boolean") {
+      pag.el = paginationRef.current;
+    }
+    swiper.pagination.destroy();
+    swiper.pagination.init();
+    swiper.pagination.update();
+  }, [swiperReady]);
 
   if (displayBoutiques.length === 0) return null;
 
   return (
     <div className="banner-carousel">
       <Swiper
-        modules={[Navigation, Autoplay, Pagination]}
+        modules={[Autoplay, Pagination]}
         loop={displayBoutiques.length >= 2}
         speed={700}
         autoplay={{ delay: 5500, disableOnInteraction: false, pauseOnMouseEnter: true }}
-        pagination={{ clickable: true, el: paginationRef.current }}
-        navigation={{ prevEl: prevRef.current, nextEl: nextRef.current }}
-        onBeforeInit={(swiper) => {
-          if (typeof swiper.params.navigation !== "boolean" && swiper.params.navigation) {
-            swiper.params.navigation.prevEl = prevRef.current;
-            swiper.params.navigation.nextEl = nextRef.current;
-          }
-          if (typeof swiper.params.pagination !== "boolean" && swiper.params.pagination) {
-            swiper.params.pagination.el = paginationRef.current;
-          }
+        pagination={{ clickable: true }}
+        onSwiper={(swiper) => {
+          swiperRef.current = swiper;
+          setSwiperReady(true);
         }}
         className="bc-swiper"
       >
@@ -393,11 +402,19 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
 
       {displayBoutiques.length >= 2 && (
         <>
-          {/* Custom nav arrows */}
-          <button ref={prevRef} className="bc-arrow bc-arrow--prev" aria-label={t("banner.prevAria", locale)}>
+          {/* Custom nav arrows — direct slidePrev/slideNext avoids ref timing issues */}
+          <button
+            className="bc-arrow bc-arrow--prev"
+            aria-label={t("banner.prevAria", locale)}
+            onClick={() => swiperRef.current?.slidePrev()}
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
-          <button ref={nextRef} className="bc-arrow bc-arrow--next" aria-label={t("banner.nextAria", locale)}>
+          <button
+            className="bc-arrow bc-arrow--next"
+            aria-label={t("banner.nextAria", locale)}
+            onClick={() => swiperRef.current?.slideNext()}
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
           </button>
 
