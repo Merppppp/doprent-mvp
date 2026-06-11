@@ -17,7 +17,7 @@ export default function LocaleToggle({
   variant = "navbar",
 }: {
   defaultLocale?: string;
-  variant?: "navbar" | "navbar-top" | "dropdown" | "footer";
+  variant?: "navbar" | "navbar-top" | "dropdown" | "footer" | "footer-inline";
 }) {
   const [locale, setLocale] = useState(defaultLocale);
 
@@ -32,7 +32,8 @@ export default function LocaleToggle({
     window.location.reload();
   };
 
-  const isDark = variant === "dropdown" || variant === "footer";
+  const isInline = variant === "footer-inline";
+  const isDark = variant === "dropdown" || variant === "footer" || isInline;
   const isTopBar = variant === "navbar-top";
   const activeColor = isDark ? "var(--ink)" : "#fff";
   const mutedColor = isDark ? "var(--ink-3)" : "rgba(255,255,255,0.4)";
@@ -47,19 +48,20 @@ export default function LocaleToggle({
         display: "flex",
         alignItems: "center",
         gap: 0,
-        padding: isTopBar ? 0 : isDark ? "6px 0" : "0 12px",
-        height: isTopBar ? "auto" : isDark ? "auto" : 36,
-        borderRadius: isTopBar ? 0 : isDark ? 0 : 999,
-        border: isTopBar ? "none" : isDark ? "none" : "1px solid rgba(255,255,255,0.25)",
+        padding: isTopBar || isInline ? 0 : isDark ? "6px 0" : "0 12px",
+        height: isTopBar || isInline ? "auto" : isDark ? "auto" : 36,
+        borderRadius: isTopBar || isInline ? 0 : isDark ? 0 : 999,
+        border: isTopBar || isDark ? "none" : "1px solid rgba(255,255,255,0.25)",
         background: "transparent",
         cursor: "pointer",
         fontFamily: "inherit",
         lineHeight: 1,
         flexShrink: 0,
-        width: isDark ? "100%" : undefined,
+        width: isDark && !isInline ? "100%" : undefined,
+        verticalAlign: isInline ? "middle" : undefined,
       }}
     >
-      {isDark && (
+      {isDark && !isInline && (
         <span style={{ fontSize: 13, marginRight: 8, color: "var(--ink-2)" }}>🌐</span>
       )}
       <span
