@@ -32,6 +32,12 @@ type Props = {
 };
 
 /* ------------------------------------------------------------------
+   Banner images are served from object storage (MinIO dev / R2 prod).
+   NEXT_PUBLIC_ASSET_BASE_URL e.g. https://s3.doprent.com/doprent-dev
+------------------------------------------------------------------- */
+const ASSET_BASE = process.env.NEXT_PUBLIC_ASSET_BASE_URL ?? "";
+
+/* ------------------------------------------------------------------
    Sample fallback data — shown when boutiques prop has < 3 entries
 ------------------------------------------------------------------- */
 const SAMPLE_BOUTIQUES: Boutique[] = [
@@ -57,7 +63,7 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
     instagram: null,
     since_year: 2020,
     cover_color: "rose",
-    cover_image: "/banners/banner-1.png",
+    cover_image: `${ASSET_BASE}/banners/banner-1.png`,
     tag: "ชุดราตรีระดับ haute couture สำหรับทุกโอกาสพิเศษ",
     story: null,
     delivery_info: null,
@@ -92,7 +98,7 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
     instagram: null,
     since_year: 2019,
     cover_color: "ivory",
-    cover_image: "/banners/banner-2.png",
+    cover_image: `${ASSET_BASE}/banners/banner-2.png`,
     tag: "ความงามแบบมินิมอล สง่างามในทุกรายละเอียด",
     story: null,
     delivery_info: null,
@@ -127,7 +133,7 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
     instagram: null,
     since_year: 2021,
     cover_color: "black",
-    cover_image: "/banners/banner-3.png",
+    cover_image: `${ASSET_BASE}/banners/banner-3.png`,
     tag: "ชุดดำคลาสสิก กล้าหาญ และทรงพลัง",
     story: null,
     delivery_info: null,
@@ -162,7 +168,7 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
     instagram: null,
     since_year: 2022,
     cover_color: "navy",
-    cover_image: "/banners/banner-4.png",
+    cover_image: `${ASSET_BASE}/banners/banner-4.png`,
     tag: "สีน้ำทะเลลึก หรูหราอย่างมีจิตวิญญาณ",
     story: null,
     delivery_info: null,
@@ -197,7 +203,7 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
     instagram: null,
     since_year: 2023,
     cover_color: "green",
-    cover_image: "/banners/banner-5.png",
+    cover_image: `${ASSET_BASE}/banners/banner-5.png`,
     tag: "ธรรมชาติพบความหรูหรา ชุดสีเขียวที่ทำให้คุณเปล่งประกาย",
     story: null,
     delivery_info: null,
@@ -232,7 +238,7 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
     instagram: null,
     since_year: 2018,
     cover_color: "purple",
-    cover_image: "/banners/banner-6.png",
+    cover_image: `${ASSET_BASE}/banners/banner-6.png`,
     tag: "กำมะหยี่ สีม่วงเข้ม ความหรูหราที่จับต้องได้",
     story: null,
     delivery_info: null,
@@ -426,8 +432,9 @@ const BC_CSS = `
   border:1px solid rgba(255,255,255,0.3);
 }
 .bc-badge--verified{
-  background:rgba(255,255,255,0.22);
+  background:rgba(74,107,90,0.5); /* sage green, translucent over blur */
   color:#fff;
+  border-color:rgba(154,196,173,0.45);
 }
 .bc-badge--area{
   background:rgba(0,0,0,0.18);
