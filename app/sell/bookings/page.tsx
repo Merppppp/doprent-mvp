@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getSellerBookings } from "@/lib/booking-queries";
 import { amountDue } from "@/lib/bookings";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
+import { DressArt } from "@/components/DressArt";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ const fmtThai = (s: string) => {
 };
 
 export default async function SellerBookingsPage() {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?next=/sell/bookings");
 
   const bookings = await getSellerBookings();
@@ -55,7 +56,7 @@ export default async function SellerBookingsPage() {
         </div>
       ) : (
         <div style={{ display: "grid", gap: 12 }}>
-          {bookings.map((b) => (
+          {bookings.map((b, i) => (
             <Link
               key={b.id}
               href={`/sell/bookings/${b.id}`}
@@ -83,7 +84,9 @@ export default async function SellerBookingsPage() {
                 {b.dress_image ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={b.dress_image} alt={b.dress_name ?? ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : null}
+                ) : (
+                  <DressArt color="rose" variant={i} />
+                )}
               </div>
               <div style={{ flex: 1, fontSize: 14, minWidth: 0 }}>
                 <div style={{ fontWeight: 600 }}>{b.dress_name ?? "ชุด"}</div>
