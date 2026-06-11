@@ -76,8 +76,6 @@ export default async function Header() {
             <>
               <span style={topDividerStyle}>|</span>
               <Link href="/signup" style={topLinkStyle}>{t("nav.signup", locale)}</Link>
-              <span style={topDividerStyle}>|</span>
-              <Link href="/login" style={topLinkStyle}>{t("nav.login", locale)}</Link>
             </>
           )}
         </div>
