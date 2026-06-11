@@ -127,8 +127,8 @@ export default async function Header() {
                 style={{
                   fontSize: 13,
                   fontWeight: 600,
-                  color: "#fff",
-                  background: "rgba(255,255,255,0.15)",
+                  color: "#4A6B5A",
+                  background: "#fff",
                   padding: "0 16px",
                   height: 38,
                   display: "inline-flex",
@@ -136,7 +136,7 @@ export default async function Header() {
                   borderRadius: 6,
                   whiteSpace: "nowrap",
                   textDecoration: "none",
-                  border: "1px solid rgba(255,255,255,0.25)",
+                  border: "1px solid #fff",
                 }}
               >
                 {t("nav.login", locale)}
