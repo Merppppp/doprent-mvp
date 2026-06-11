@@ -8,6 +8,7 @@ const NAV = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/metrics", label: "Metrics" },
   { href: "/admin/kyc", label: "KYC Review" },
+  { href: "/admin/bookings", label: "การจอง" },
   { href: "/admin/boutiques", label: "Boutiques" },
   { href: "/admin/dresses", label: "Dresses" },
   { href: "/admin/clicks", label: "LINE Clicks" },

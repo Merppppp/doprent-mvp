@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { getRenterBookings } from "@/lib/booking-queries";
+import { expireOverdueBookings } from "@/lib/booking-expiry";
 import { amountDue } from "@/lib/bookings";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 
@@ -22,6 +23,8 @@ export default async function MyBookingsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/account/bookings");
 
+  // Lazy payment-expiry sweep so stale waiting_for_payment rows never show.
+  await expireOverdueBookings();
   const bookings = await getRenterBookings();
 
   return (
