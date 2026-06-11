@@ -93,13 +93,34 @@ export default function DressResults({
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
 
+    // The app scrolls inside a nested overflow container (#main in
+    // app/layout.tsx), not the window. rootMargin only expands the rect of
+    // the observer's root — with the default (document) root the sentinel is
+    // clipped by the scroll container first, so prefetching would never
+    // trigger early. Use the actual scroll container as root.
+    const getScrollParent = (el: HTMLElement): HTMLElement | null => {
+      let p = el.parentElement;
+      while (p) {
+        const { overflowY } = getComputedStyle(p);
+        if (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") return p;
+        p = p.parentElement;
+      }
+      return null;
+    };
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !loadingMore) {
           fetchMore();
         }
       },
-      { threshold: 0.1 }
+      // Large rootMargin prefetches the next page ~1500px before the user
+      // reaches the end of the grid. Near the very bottom the sticky filter
+      // sidebar / results bar are "parked" against their containing block's
+      // bottom edge, so appending items there would visibly shift them.
+      // Loading early keeps the append below the viewport while they are
+      // still stuck.
+      { root: getScrollParent(sentinel), rootMargin: "1500px 0px", threshold: 0 }
     );
 
     observer.observe(sentinel);
@@ -192,12 +213,24 @@ export default function DressResults({
             ))}
           </div>
 
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} style={{ height: 1 }} />
-
-          {/* Loading spinner */}
-          {loadingMore && (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, padding: "28px 0", color: "var(--ink-3)" }}>
+          {/* Infinite scroll sentinel + reserved loader area.
+              Fixed height that is always present while more pages exist, so
+              mounting/unmounting the spinner causes zero layout shift (which
+              would otherwise nudge the sticky filter sidebar / results bar). */}
+          {hasMore && (
+            <div
+              ref={sentinelRef}
+              aria-hidden={!loadingMore}
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: 10,
+                height: 76,
+                color: "var(--ink-3)",
+                visibility: loadingMore ? "visible" : "hidden",
+              }}
+            >
               <LoadingSpinner />
               <span style={{ fontSize: 13 }}>{t("results.loading", locale)}</span>
             </div>
