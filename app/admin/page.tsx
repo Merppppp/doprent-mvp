@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default async function AdminHomePage() {
   const since7d = new Date(Date.now() - 7 * 86_400_000);
 
-  const [bPending, bLive, dPending, dLive, kycPending, clicks7d, totalClicks] = await Promise.all([
+  const [bPending, bLive, dPending, dLive, kycPending, clicks7d, totalClicks, bookingAttention] = await Promise.all([
     db.boutique.count({ where: { status: "pending" } }),
     db.boutique.count({ where: { status: "live" } }),
     db.dress.count({ where: { status: "pending" } }),
@@ -20,6 +20,7 @@ export default async function AdminHomePage() {
     db.kycSubmission.count({ where: { status: "pending" } }),
     db.lineClick.count({ where: { createdAt: { gte: since7d } } }),
     db.lineClick.count(),
+    db.booking.count({ where: { status: { in: ["cancel_requested", "slip_disputed", "payment_review"] } } }),
   ]);
 
   return (
@@ -34,10 +35,11 @@ export default async function AdminHomePage() {
         ภาพรวมและคิวงานที่รออนุมัติ
       </p>
 
-      <div className="grid-3" style={{ gap: 14, marginBottom: 36 }}>
+      <div className="grid-4" style={{ gap: 14, marginBottom: 36 }}>
         <Stat label="KYC รออนุมัติ" value={kycPending} href="/admin/kyc" accent={!!kycPending} />
         <Stat label="ร้านรออนุมัติ" value={bPending} href="/admin/boutiques?status=pending" accent={!!bPending} />
         <Stat label="ชุดรออนุมัติ" value={dPending} href="/admin/dresses?status=pending" accent={!!dPending} />
+        <Stat label="การจองรอแอดมิน" value={bookingAttention} href="/admin/bookings" accent={!!bookingAttention} />
       </div>
 
       <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>สถิติแพลตฟอร์ม</h2>
@@ -67,6 +69,13 @@ export default async function AdminHomePage() {
             style={{ padding: "9px 14px", fontSize: 13 }}
           >
             ตรวจร้านใหม่ ({bPending})
+          </Link>
+          <Link
+            href="/admin/bookings"
+            className="btn btn-outline"
+            style={{ padding: "9px 14px", fontSize: 13 }}
+          >
+            จัดการการจอง ({bookingAttention})
           </Link>
         </div>
       </div>

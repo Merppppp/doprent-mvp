@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { getSellerBookings } from "@/lib/booking-queries";
+import { expireOverdueBookings } from "@/lib/booking-expiry";
 import { amountDue } from "@/lib/bookings";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import { DressArt } from "@/components/DressArt";
@@ -23,6 +24,8 @@ export default async function SellerBookingsPage() {
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?next=/sell/bookings");
 
+  // Lazy payment-expiry sweep so stale waiting_for_payment rows never show.
+  await expireOverdueBookings();
   const bookings = await getSellerBookings();
   const pending = bookings.filter(
     (b) => b.status === "booking_pending" || b.status === "payment_review"

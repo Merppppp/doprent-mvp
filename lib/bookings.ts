@@ -1,6 +1,8 @@
 import type { Booking, BookingStatus } from "@/lib/types";
 
-/** Hours a renter has to pay after the seller accepts (Phase 2 cron enforces). */
+/** Hours a renter has to pay after the seller accepts. Enforced lazily by
+ *  expireOverdueBookings() (lib/booking-expiry.ts) on the booking list pages
+ *  and via POST /api/cron/expire-payments for scheduled sweeps. */
 export const PAYMENT_WINDOW_HOURS = 24;
 
 /**
