@@ -15,6 +15,13 @@ import {
   rentalDays,
 } from "@/lib/bookings";
 import { normalizeTiers, priceForNights } from "@/lib/pricing";
+import {
+  notifyBookingAccepted,
+  notifyBookingConfirmed,
+  notifyBookingRejected,
+  notifyNewBookingRequest,
+  notifySlipDisputed,
+} from "@/lib/notifications";
 import { FIRST_TOUCH_COOKIE, decodeAttribution } from "@/lib/attribution";
 
 type Result<T = unknown> =
@@ -95,7 +102,17 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   // price snapshot from the dress (must be live + available)
   const dress = await db.dress.findUnique({
     where: { id: dressId },
-    select: { id: true, boutiqueId: true, pricePerDay: true, priceTiers: true, deposit: true, status: true, available: true },
+    select: {
+      id: true,
+      name: true,
+      boutiqueId: true,
+      pricePerDay: true,
+      priceTiers: true,
+      deposit: true,
+      status: true,
+      available: true,
+      boutique: { select: { owner: { select: { email: true } } } },
+    },
   });
   if (!dress) return { ok: false, error: "ไม่พบชุดนี้" };
   if (dress.status !== "live" || !dress.available)
@@ -140,6 +157,15 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
     select: { id: true },
   });
 
+  // Fire-and-forget: notify the boutique owner about the new request.
+  notifyNewBookingRequest({
+    sellerEmail: dress.boutique?.owner?.email,
+    dressName: dress.name,
+    startDate,
+    endDate,
+    bookingId: created.id,
+  });
+
   revalidatePath("/account/bookings");
   return { ok: true, id: created.id };
 }
@@ -154,6 +180,8 @@ async function loadBooking(bookingId: string) {
       boutiqueId: true,
       status: true,
       boutique: { select: { ownerId: true } },
+      renter: { select: { email: true } },
+      dress: { select: { name: true } },
     },
   });
 }
@@ -182,6 +210,13 @@ export async function acceptBooking(bookingId: string, shippingFee: number): Pro
     },
   });
   if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  notifyBookingAccepted({
+    renterEmail: booking.renter?.email,
+    dressName: booking.dress?.name ?? "ชุดที่จอง",
+    bookingId,
+  });
+
   revalidatePath("/sell/bookings");
   revalidatePath("/account/bookings");
   return { ok: true };
@@ -222,6 +257,17 @@ async function sellerSimpleMove(
     },
   });
   if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  // Fire-and-forget renter notifications per transition.
+  const renterNotify = {
+    renterEmail: booking.renter?.email,
+    dressName: booking.dress?.name ?? "ชุดที่จอง",
+    bookingId,
+  };
+  if (to === "rejected") notifyBookingRejected(renterNotify);
+  else if (to === "confirmed") notifyBookingConfirmed(renterNotify);
+  else if (to === "slip_disputed") notifySlipDisputed(renterNotify);
+
   revalidatePath("/sell/bookings");
   revalidatePath("/account/bookings");
   return { ok: true };

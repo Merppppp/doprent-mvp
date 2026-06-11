@@ -10,6 +10,7 @@ export default function LoginPage() {
   const next = sp.get("next") || "/";
   const urlErr = sp.get("err");
   const verified = sp.get("verified");
+  const reset = sp.get("reset");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,9 +23,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (verified === "1") setInfo("ยืนยันอีเมลสำเร็จแล้ว สามารถเข้าสู่ระบบได้เลย");
+    if (reset === "1") setInfo("ตั้งรหัสผ่านใหม่สำเร็จแล้ว เข้าสู่ระบบด้วยรหัสผ่านใหม่ได้เลย");
     if (urlErr === "token_expired") setError("ลิงก์ยืนยันหมดอายุ กรุณาขอลิงก์ใหม่");
     if (urlErr === "invalid_token") setError("ลิงก์ยืนยันไม่ถูกต้อง");
-  }, [urlErr, verified]);
+  }, [urlErr, verified, reset]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -134,6 +136,11 @@ export default function LoginPage() {
         <Field label="อีเมล" type="email" value={email} onChange={setEmail} required />
         <Field label="รหัสผ่าน" type="password" value={password} onChange={setPassword} required
           showToggle showPassword={showPassword} onToggleShowPassword={() => setShowPassword(p => !p)} />
+        <div style={{ textAlign: "right", marginTop: -6, marginBottom: 4 }}>
+          <Link href="/forgot-password" style={{ color: "var(--accent)", fontSize: 13, fontWeight: 500 }}>
+            ลืมรหัสผ่าน?
+          </Link>
+        </div>
         <button type="submit" disabled={loading} className="btn btn-dark btn-block btn-lg"
           style={{ marginTop: 12, opacity: loading ? 0.6 : 1 }}>
           {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
