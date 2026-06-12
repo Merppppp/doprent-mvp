@@ -49,6 +49,7 @@ jobs:
           npx prisma migrate deploy
         env:
           DATABASE_URL: postgresql://admin:12345678@localhost:5432/doprent_uat
+          DIRECT_DATABASE_URL: postgresql://admin:12345678@localhost:5432/doprent_uat
 
       - uses: docker/login-action@v3
         with:
