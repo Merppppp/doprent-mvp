@@ -21,7 +21,7 @@ export default async function Header() {
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const savedCount = user?.savedDressIds?.length ?? 0;
+  const savedCount = user?.savedProductIds?.length ?? 0;
   const badges = user ? await getBookingBadges() : { renter: 0, seller: 0 };
   const isSeller = user?.role === "seller" || user?.role === "admin";
 

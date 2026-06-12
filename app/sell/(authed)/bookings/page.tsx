@@ -6,7 +6,7 @@ import { getSellerBookings } from "@/lib/booking-queries";
 import { expireOverdueBookings } from "@/lib/booking-expiry";
 import { amountDue } from "@/lib/bookings";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
-import { DressArt } from "@/components/DressArt";
+import { ProductArt } from "@/components/ProductArt";
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +88,7 @@ export default async function SellerBookingsPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={b.dress_image} alt={b.dress_name ?? ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : (
-                  <DressArt color="rose" variant={i} />
+                  <ProductArt color="rose" variant={i} />
                 )}
               </div>
               <div style={{ flex: 1, fontSize: 14, minWidth: 0 }}>

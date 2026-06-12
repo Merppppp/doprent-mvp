@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { BoutiqueCover } from "@/components/DressArt";
-import DressCard from "@/components/DressCard";
+import { ShopCover } from "@/components/ProductArt";
+import ProductCard from "@/components/ProductCard";
 import LineButton from "@/components/LineButton";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { getCurrentUser } from "@/lib/auth";
-import { getBoutiqueBySlug, listDressesByBoutique } from "@/lib/dresses";
+import { getShopBySlug, listProductsByShop } from "@/lib/products";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 type Params = { slug: string };
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const b = await getBoutiqueBySlug(params.slug);
+  const b = await getShopBySlug(params.slug);
   if (!b) return { title: "ไม่พบร้าน", robots: { index: false } };
   return {
     title: b.name,
@@ -25,13 +25,13 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 export default async function BoutiquePage({ params }: { params: Params }) {
-  const b = await getBoutiqueBySlug(params.slug);
+  const b = await getShopBySlug(params.slug);
   if (!b) notFound();
   const [dresses, user] = await Promise.all([
-    listDressesByBoutique(b.id),
+    listProductsByShop(b.id),
     getCurrentUser().catch(() => null),
   ]);
-  const savedSet = new Set<string>(user?.savedDressIds ?? []);
+  const savedSet = new Set<string>(user?.savedProductIds ?? []);
   const isLoggedIn = !!user;
 
   return (
@@ -42,7 +42,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
 
       {/* Cover */}
       <div style={{ aspectRatio: "5/2", borderRadius: 8, overflow: "hidden", margin: "28px 0 0" }}>
-        <BoutiqueCover color={b.cover_color} />
+        <ShopCover color={b.cover_color} />
       </div>
 
       {/* Head */}
@@ -152,7 +152,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
       ) : (
         <div className="grid-3" style={{ gap: 20 }}>
           {dresses.map((d, i) => (
-            <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
+            <ProductCard key={d.id} product={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
           ))}
         </div>
       )}

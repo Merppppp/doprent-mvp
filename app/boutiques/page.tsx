@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import BoutiqueFinder from "@/components/BoutiqueFinder";
-import { listBoutiques } from "@/lib/dresses";
+import ShopFinder from "@/components/ShopFinder";
+import { listShops } from "@/lib/products";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export default async function BoutiquesPage({
   searchParams: SearchParams;
 }) {
   const search = (searchParams?.q ?? "").trim();
-  const all = await listBoutiques({ featuredFirst: true });
+  const all = await listShops({ featuredFirst: true });
   const needle = search.toLowerCase();
   const boutiques = needle
     ? all.filter((b) =>
@@ -101,7 +101,7 @@ export default async function BoutiquesPage({
           </Link>
         </div>
       ) : (
-      <BoutiqueFinder
+      <ShopFinder
         shops={boutiques.map((b) => ({
           id: b.id,
           slug: b.slug,

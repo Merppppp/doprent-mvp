@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { setDressStatus, toggleDressFeatured } from "@/app/actions/admin";
-import { DressArt } from "@/components/DressArt";
+import { ProductArt } from "@/components/ProductArt";
 import StatusBadge from "@/components/StatusBadge";
 import type { Color } from "@/lib/types";
 
@@ -70,7 +70,7 @@ export default function DressRow({ d }: { d: D }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={d.images[0]} alt={d.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
-          <DressArt color={d.color as Color} variant={0} />
+          <ProductArt color={d.color as Color} variant={0} />
         )}
       </div>
 

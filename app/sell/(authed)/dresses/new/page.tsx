@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { listOccasions } from "@/lib/dresses";
+import { listOccasions } from "@/lib/products";
 import DressForm from "../DressForm";
 
 export const dynamic = "force-dynamic";

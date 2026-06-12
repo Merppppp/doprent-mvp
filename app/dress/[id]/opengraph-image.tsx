@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { getDressBySlug } from "@/lib/dresses";
+import { getProductBySlug } from "@/lib/products";
 
 export const runtime = "edge";
 export const alt = "DopRent · Bangkok boutique rental";
@@ -7,13 +7,13 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 export default async function OG({ params }: { params: { id: string } }) {
-  const dress = await getDressBySlug(params.id);
+  const dress = await getProductBySlug(params.id);
 
   // Fallback brand card when listing not found
   const title = dress?.name ?? "DopRent";
   const designer = dress?.designer ?? "Bangkok boutique rentals";
   const price = dress ? `฿${dress.price_per_day.toLocaleString()} / วัน` : "เช่าชุดดีไซเนอร์ในกรุงเทพฯ";
-  const tag = dress ? `${dress.boutique_name} · ไซส์ ${dress.size}` : "ติดต่อจองผ่าน LINE";
+  const tag = dress ? `${dress.shop_name} · ไซส์ ${dress.size}` : "ติดต่อจองผ่าน LINE";
 
   return new ImageResponse(
     (

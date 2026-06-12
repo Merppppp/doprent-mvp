@@ -1,11 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { DressArt } from "@/components/DressArt";
+import { ProductArt } from "@/components/ProductArt";
 import Gallery from "@/components/Gallery";
 import DistanceBadge from "@/components/DistanceBadge";
 import LineButton from "@/components/LineButton";
-import DressCard from "@/components/DressCard";
+import ProductCard from "@/components/ProductCard";
 import SaveButton from "@/components/SaveButton";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import DateRangePicker from "@/components/DateRangePicker";
@@ -13,12 +13,12 @@ import DressAvailabilityCalendar from "@/components/DressAvailabilityCalendar";
 import LineMessageCopyBox from "@/components/LineMessageCopyBox";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  getBoutiqueBySlug,
-  getDressBySlug,
+  getShopBySlug,
+  getProductBySlug,
   listBlackouts,
   listOccasions,
-  listSimilarDresses,
-} from "@/lib/dresses";
+  listSimilarProducts,
+} from "@/lib/products";
 import { hasMultipleRates, startingPerDay } from "@/lib/pricing";
 import { COLOR_LABELS_TH } from "@/lib/types";
 
@@ -31,12 +31,12 @@ const DEFAULT_LINE =
   process.env.NEXT_PUBLIC_DEFAULT_LINE_URL ?? "https://line.me/R/ti/p/@doprent";
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const dress = await getDressBySlug(params.id);
+  const dress = await getProductBySlug(params.id);
   if (!dress) {
     return { title: "ไม่พบชุด", robots: { index: false, follow: true } };
   }
   const title = dress.designer ? `${dress.name} · ${dress.designer}` : dress.name;
-  const description = `${dress.description ?? dress.name} ค่าเช่า ฿${dress.price_per_day.toLocaleString()}/วัน · จองผ่าน LINE กับ ${dress.boutique_name}`;
+  const description = `${dress.description ?? dress.name} ค่าเช่า ฿${dress.price_per_day.toLocaleString()}/วัน · จองผ่าน LINE กับ ${dress.shop_name}`;
   const url = `${SITE}/dress/${dress.slug}`;
   return {
     title,
@@ -47,17 +47,17 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 export default async function DressPage({ params }: { params: Params }) {
-  const dress = await getDressBySlug(params.id);
+  const dress = await getProductBySlug(params.id);
   if (!dress) notFound();
 
   const [occasions, boutique, related, user, blackouts] = await Promise.all([
     listOccasions(),
-    getBoutiqueBySlug(slugify(dress.boutique_name)).catch(() => null),
-    listSimilarDresses(dress, 4),
+    getShopBySlug(slugify(dress.shop_name)).catch(() => null),
+    listSimilarProducts(dress, 4),
     getCurrentUser().catch(() => null),
     listBlackouts(dress.id),
   ]);
-  const savedSet = new Set<string>(user?.savedDressIds ?? []);
+  const savedSet = new Set<string>(user?.savedProductIds ?? []);
   const isLoggedIn = !!user;
   const isSaved = savedSet.has(dress.id);
 
@@ -90,7 +90,7 @@ export default async function DressPage({ params }: { params: Params }) {
       availability: dress.available
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
-      seller: { "@type": "Organization", name: dress.boutique_name },
+      seller: { "@type": "Organization", name: dress.shop_name },
     },
   };
 
@@ -117,7 +117,7 @@ export default async function DressPage({ params }: { params: Params }) {
                 overflow: "hidden",
               }}
             >
-              <DressArt color={dress.color} variant={0} />
+              <ProductArt color={dress.color} variant={0} />
             </div>
           )}
         </div>
@@ -240,11 +240,11 @@ export default async function DressPage({ params }: { params: Params }) {
               }}
             >
               <div style={{ width: 44, height: 44, borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
-                <DressArt color={boutique?.cover_color ?? dress.color} variant={0} />
+                <ProductArt color={boutique?.cover_color ?? dress.color} variant={0} />
               </div>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 14, display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  {dress.boutique_name}
+                  {dress.shop_name}
                   {boutique?.verified ? <VerifiedBadge size="sm" /> : null}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 1, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -268,7 +268,7 @@ export default async function DressPage({ params }: { params: Params }) {
                 color: "var(--ink-2)",
               }}
             >
-              ร้าน: <b>{dress.boutique_name}</b>
+              ร้าน: <b>{dress.shop_name}</b>
             </div>
           )}
 
@@ -283,7 +283,7 @@ export default async function DressPage({ params }: { params: Params }) {
               variant="inline"
               source="detail_inline_ask"
               dressId={dress.id}
-              boutiqueId={dress.boutique_id}
+              boutiqueId={dress.shop_id}
               isLoggedIn={isLoggedIn}
               loginNext={`/dress/${dress.slug}`}
             />
@@ -303,7 +303,7 @@ export default async function DressPage({ params }: { params: Params }) {
           >
             <Spec lbl="ขนาด" val={dress.size} />
             <Spec lbl="สี" val={COLOR_LABELS_TH[dress.color]} />
-            <Spec lbl="ร้านเช่า" val={dress.boutique_name} />
+            <Spec lbl="ร้านเช่า" val={dress.shop_name} />
             <Spec lbl="ดีไซเนอร์" val={dress.designer ?? "—"} />
           </div>
 
@@ -335,7 +335,7 @@ export default async function DressPage({ params }: { params: Params }) {
           <DateRangePicker
             lineUrl={isLoggedIn ? boutiqueLine : ""}
             dressName={dress.name}
-            boutiqueName={dress.boutique_name}
+            boutiqueName={dress.shop_name}
             dressPageUrl={url}
             dressImageUrl={dress.images?.[0]}
             pricePerDay={dress.price_per_day}
@@ -343,7 +343,7 @@ export default async function DressPage({ params }: { params: Params }) {
             deposit={dress.deposit}
             blackouts={blackouts}
             dressId={dress.id}
-            boutiqueId={dress.boutique_id}
+            boutiqueId={dress.shop_id}
             dressTagCode={dress.tag_code}
             isLoggedIn={isLoggedIn}
             loginNext={`/dress/${dress.slug}`}
@@ -397,7 +397,7 @@ export default async function DressPage({ params }: { params: Params }) {
           </div>
           <div className="grid-4" style={{ gap: 20 }}>
             {related.map((d, i) => (
-              <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
+              <ProductCard key={d.id} product={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
             ))}
           </div>
         </div>
