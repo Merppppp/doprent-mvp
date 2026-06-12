@@ -32,21 +32,21 @@ export default async function ClicksAdmin({
     orderBy: { createdAt: "desc" },
     take: 1500,
     include: {
-      dress: { select: { name: true, slug: true, boutiqueName: true } },
-      boutique: { select: { name: true, slug: true } },
+      product: { select: { name: true, slug: true, shop: { select: { name: true } } } },
+      shop: { select: { name: true, slug: true } },
     },
   });
 
   const rows = rawClicks.map((r) => ({
-    id: Number(r.id), dress_id: r.dressId, boutique_id: r.boutiqueId,
+    id: r.id, product_id: r.productId, shop_id: r.shopId,
     source: r.source, created_at: r.createdAt.toISOString(),
-    dresses: r.dress ? { name: r.dress.name, slug: r.dress.slug, boutique_name: r.dress.boutiqueName } : null,
-    boutiques: r.boutique ? { name: r.boutique.name, slug: r.boutique.slug } : null,
+    products: r.product ? { name: r.product.name, slug: r.product.slug, shop_name: r.product.shop?.name ?? null } : null,
+    shops: r.shop ? { name: r.shop.name, slug: r.shop.slug } : null,
   }));
 
   // Aggregations
-  const byBoutique = new Map<string, { name: string; slug: string; count: number }>();
-  const byDress = new Map<string, { name: string; slug: string; boutique: string; count: number }>();
+  const byShop = new Map<string, { name: string; slug: string; count: number }>();
+  const byProduct = new Map<string, { name: string; slug: string; shop_name: string | null; count: number }>();
   const bySource: Record<string, number> = {};
   // Daily counts for last N days
   const dailyMap = new Map<string, number>();
@@ -58,25 +58,25 @@ export default async function ClicksAdmin({
   }
 
   for (const r of rows) {
-    if (r.boutique_id && r.boutiques) {
-      const key = r.boutique_id;
-      const curr = byBoutique.get(key);
+    if (r.shop_id && r.shops) {
+      const key = r.shop_id;
+      const curr = byShop.get(key);
       if (curr) {
         curr.count++;
       } else {
-        byBoutique.set(key, { name: r.boutiques.name, slug: r.boutiques.slug, count: 1 });
+        byShop.set(key, { name: r.shops.name, slug: r.shops.slug, count: 1 });
       }
     }
-    if (r.dress_id && r.dresses) {
-      const key = r.dress_id;
-      const curr = byDress.get(key);
+    if (r.product_id && r.products) {
+      const key = r.product_id;
+      const curr = byProduct.get(key);
       if (curr) {
         curr.count++;
       } else {
-        byDress.set(key, {
-          name: r.dresses.name,
-          slug: r.dresses.slug,
-          boutique: r.dresses.boutique_name,
+        byProduct.set(key, {
+          name: r.products.name,
+          slug: r.products.slug,
+          shop_name: r.products.shop_name,
           count: 1,
         });
       }
@@ -88,8 +88,8 @@ export default async function ClicksAdmin({
     if (dailyMap.has(day)) dailyMap.set(day, (dailyMap.get(day) ?? 0) + 1);
   }
 
-  const topBoutiques = Array.from(byBoutique.values()).sort((a, b) => b.count - a.count).slice(0, 20);
-  const topDresses = Array.from(byDress.values()).sort((a, b) => b.count - a.count).slice(0, 20);
+  const topShops = Array.from(byShop.values()).sort((a, b) => b.count - a.count).slice(0, 20);
+  const topProducts = Array.from(byProduct.values()).sort((a, b) => b.count - a.count).slice(0, 20);
   const daily = Array.from(dailyMap.entries());
   const maxDaily = Math.max(1, ...daily.map(([, v]) => v));
 
@@ -124,8 +124,8 @@ export default async function ClicksAdmin({
 
       <div className="grid-3" style={{ gap: 14, marginBottom: 32 }}>
         <Stat label="Total clicks" value={rows.length} />
-        <Stat label="Unique boutiques" value={byBoutique.size} />
-        <Stat label="Unique dresses" value={byDress.size} />
+        <Stat label="Unique shops" value={byShop.size} />
+        <Stat label="Unique products" value={byProduct.size} />
       </div>
 
       {/* Daily bar chart */}
@@ -175,7 +175,7 @@ export default async function ClicksAdmin({
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>Top ร้านค้า</h2>
           <Table
-            rows={topBoutiques.map((b) => ({
+            rows={topShops.map((b) => ({
               label: (
                 <Link href={`/boutique/${b.slug}`} target="_blank" style={{ fontWeight: 500 }}>
                   {b.name}
@@ -187,13 +187,13 @@ export default async function ClicksAdmin({
           />
         </div>
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>Top ชุด</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>Top สินค้า</h2>
           <Table
-            rows={topDresses.map((d) => ({
+            rows={topProducts.map((d) => ({
               label: (
                 <Link href={`/dress/${d.slug}`} target="_blank" style={{ fontWeight: 500 }}>
                   {d.name}
-                  <span style={{ fontSize: 11, color: "var(--ink-3)", marginLeft: 6 }}>· {d.boutique}</span>
+                  {d.shop_name ? <span style={{ fontSize: 11, color: "var(--ink-3)", marginLeft: 6 }}>· {d.shop_name}</span> : null}
                 </Link>
               ),
               count: d.count,

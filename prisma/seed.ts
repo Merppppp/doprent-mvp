@@ -4,26 +4,86 @@ const db = new PrismaClient({
   datasources: { db: { url: process.env.DIRECT_DATABASE_URL } },
 });
 
+/**
+ * Base seed — reference data only (DESIGN.md §10 host-specified order):
+ *   1. product_types
+ *   2. product_categories (dress tree, suit tree)
+ *   3. tag_groups + tags (occasion group — replaces the old occasions table)
+ *   4. areas
+ */
 export async function seedBase() {
   // ---------------------------------------------------------------------------
-  // Occasions
+  // 1. Product types
   // ---------------------------------------------------------------------------
-  await db.occasion.createMany({
-    data: [
-      { key: "engagement", th: "งานหมั้น",  en: "Engagement", colorToken: "rose",   sortOrder: 1 },
-      { key: "wedding",    th: "งานแต่ง",   en: "Wedding",    colorToken: "ivory",  sortOrder: 2 },
-      { key: "cocktail",   th: "ค็อกเทล",   en: "Cocktail",   colorToken: "green",  sortOrder: 3 },
-      { key: "evening",    th: "ราตรี",     en: "Evening",    colorToken: "navy",   sortOrder: 4 },
-      { key: "gala",       th: "กาล่า",    en: "Gala",       colorToken: "red",    sortOrder: 5 },
-      { key: "party",      th: "ปาร์ตี้",   en: "Party",      colorToken: "purple", sortOrder: 6 },
-      { key: "work",       th: "ทำงาน",    en: "Work",       colorToken: "black",  sortOrder: 7 },
-      { key: "casual",     th: "ลำลอง",    en: "Casual",     colorToken: "blue",   sortOrder: 8 },
-    ],
-    skipDuplicates: true,
-  });
+  const productTypes = [
+    { key: "dress", label: "ชุดเดรส" },
+    { key: "suit", label: "สูท" },
+  ];
+  for (const t of productTypes) {
+    await db.productType.upsert({ where: { key: t.key }, update: {}, create: t });
+  }
 
   // ---------------------------------------------------------------------------
-  // Areas
+  // 2. Product categories — one tree per product type (adjacency list)
+  // ---------------------------------------------------------------------------
+  const dressType = await db.productType.findUniqueOrThrow({ where: { key: "dress" } });
+  const suitType = await db.productType.findUniqueOrThrow({ where: { key: "suit" } });
+
+  // roots
+  const dressRoot = await db.productCategory.upsert({
+    where: { key: "dress-all" },
+    update: {},
+    create: { key: "dress-all", label: "ชุดเดรสทั้งหมด", productTypeId: dressType.id, sortOrder: 0 },
+  });
+  await db.productCategory.upsert({
+    where: { key: "suit-all" },
+    update: {},
+    create: { key: "suit-all", label: "สูททั้งหมด", productTypeId: suitType.id, sortOrder: 0 },
+  });
+
+  // dress subcategories
+  const dressChildren = [
+    { key: "evening-dress", label: "ชุดราตรี", sortOrder: 1 },
+    { key: "thai-traditional", label: "ชุดไทย", sortOrder: 2 },
+  ];
+  for (const c of dressChildren) {
+    await db.productCategory.upsert({
+      where: { key: c.key },
+      update: {},
+      create: { ...c, productTypeId: dressType.id, parentId: dressRoot.id },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3. Tag groups + tags — occasion group replaces the old `occasions` table
+  //    (tags.label = old occasions.th; color_token/en moved to a UI constant)
+  // ---------------------------------------------------------------------------
+  const occasionGroup = await db.tagGroup.upsert({
+    where: { key: "occasion" },
+    update: {},
+    create: { key: "occasion", label: "โอกาสใช้งาน", sortOrder: 0 },
+  });
+
+  const occasionTags = [
+    { key: "engagement", label: "งานหมั้น" },
+    { key: "wedding", label: "งานแต่ง" },
+    { key: "cocktail", label: "ค็อกเทล" },
+    { key: "evening", label: "ราตรี" },
+    { key: "gala", label: "กาล่า" },
+    { key: "party", label: "ปาร์ตี้" },
+    { key: "work", label: "ทำงาน" },
+    { key: "casual", label: "ลำลอง" },
+  ];
+  for (const t of occasionTags) {
+    await db.tag.upsert({
+      where: { key: t.key },
+      update: {},
+      create: { ...t, tagGroupId: occasionGroup.id },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 4. Areas (uuid PK + key UNIQUE — data unchanged from the old seed)
   // ---------------------------------------------------------------------------
   await db.area.createMany({
     data: [
@@ -56,13 +116,17 @@ export async function seedBase() {
     skipDuplicates: true,
   });
 
-  console.log("✅ Base seed complete (occasions + areas)");
+  console.log("✅ Base seed complete (product_types + product_categories + tag_groups/tags + areas)");
 }
 
 async function main() {
   await seedBase();
 }
 
-main()
-  .catch((e) => { console.error(e); process.exit(1); })
-  .finally(() => db.$disconnect());
+// Run only when executed directly (`tsx prisma/seed.ts`) — seed.dev.ts imports
+// seedBase and must not trigger a second concurrent run on import.
+if (require.main === module) {
+  main()
+    .catch((e) => { console.error(e); process.exit(1); })
+    .finally(() => db.$disconnect());
+}

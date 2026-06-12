@@ -5,7 +5,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Pagination } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
 import Link from "next/link";
-import type { Boutique, Color } from "@/lib/types";
+import type { Shop, Color } from "@/lib/types";
 
 import "swiper/css";
 import "swiper/css/pagination";
@@ -27,7 +27,7 @@ const COLOR_GRAD: Record<Color, [string, string]> = {
 };
 
 type Props = {
-  boutiques: Boutique[];
+  shops: Shop[];
   locale?: Locale;
 };
 
@@ -38,9 +38,9 @@ type Props = {
 const ASSET_BASE = process.env.NEXT_PUBLIC_ASSET_BASE_URL ?? "";
 
 /* ------------------------------------------------------------------
-   Sample fallback data — shown when boutiques prop has < 3 entries
+   Sample fallback data — shown when shops prop has < 3 entries
 ------------------------------------------------------------------- */
-const SAMPLE_BOUTIQUES: Boutique[] = [
+const SAMPLE_SHOPS: Shop[] = [
   {
     id: "sample-1",
     slug: "maison-de-reve",
@@ -253,12 +253,12 @@ const SAMPLE_BOUTIQUES: Boutique[] = [
   },
 ];
 
-export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
+export default function BannerCarousel({ shops, locale = "th" }: Props) {
   const swiperRef = useRef<SwiperType | null>(null);
   const paginationRef = useRef<HTMLDivElement>(null);
   const [swiperReady, setSwiperReady] = useState(false);
 
-  const displayBoutiques = boutiques.length < 3 ? SAMPLE_BOUTIQUES : boutiques;
+  const displayShops = shops.length < 3 ? SAMPLE_SHOPS : shops;
 
   // After Swiper mounts and the pagination DOM element is in the tree,
   // wire up the custom pagination container (refs are null during render phase).
@@ -275,13 +275,13 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
     swiper.pagination.update();
   }, [swiperReady]);
 
-  if (displayBoutiques.length === 0) return null;
+  if (displayShops.length === 0) return null;
 
   return (
     <div className="banner-carousel">
       <Swiper
         modules={[Autoplay, Pagination]}
-        loop={displayBoutiques.length >= 2}
+        loop={displayShops.length >= 2}
         speed={700}
         autoplay={{ delay: 5500, disableOnInteraction: false, pauseOnMouseEnter: true }}
         pagination={{ clickable: true }}
@@ -291,7 +291,7 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
         }}
         className="bc-swiper"
       >
-        {displayBoutiques.map((b) => {
+        {displayShops.map((b) => {
           const [from, to] = COLOR_GRAD[b.cover_color] ?? COLOR_GRAD.green;
           const bgStyle = b.cover_image
             ? {
@@ -330,7 +330,7 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
                     <p className="bc-tag">{b.tag}</p>
                   )}
 
-                  <Link href={`/boutique/${b.slug}`} className="bc-cta">
+                  <Link href={`/shop/${b.slug}`} className="bc-cta">
                     {t("banner.cta", locale)}
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                   </Link>
@@ -349,7 +349,7 @@ export default function BannerCarousel({ boutiques, locale = "th" }: Props) {
         })}
       </Swiper>
 
-      {displayBoutiques.length >= 2 && (
+      {displayShops.length >= 2 && (
         <>
           {/* Custom nav arrows — direct slidePrev/slideNext avoids ref timing issues */}
           <button

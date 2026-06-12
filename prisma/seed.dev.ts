@@ -5,13 +5,21 @@ const db = new PrismaClient({
   datasources: { db: { url: process.env.DIRECT_DATABASE_URL } },
 });
 
+/**
+ * Dev seed — base reference data + mock shops/products (DESIGN.md §10).
+ *   5. shops (connect areas by key lookup)
+ *   6. products (connect product_types by key "dress"; category by key lookup,
+ *      nullable; occasions → product_tags rows; price tiers → product_price_tiers).
+ *   product_images stays empty — like the old seed, images are generated and
+ *   uploaded post-seed by scripts/gen-product-images.mjs (adapted in Phase 4).
+ */
 async function main() {
   await seedBase();
 
   // ---------------------------------------------------------------------------
-  // Mock Boutiques (dev only)
+  // Mock shops (dev only) — เดิม boutiques; area_key เดิม → area_id FK lookup
   // ---------------------------------------------------------------------------
-  const boutiquesData = [
+  const shopsData = [
     { slug: "siam-couture",        name: "Siam Couture",             ownerName: "คุณนิด",         areaKey: "Siam",        areaLabel: "Siam · ปทุมวัน",         address: "ชั้น 3, Siam Paragon · BTS สยาม",                  hours: "จันทร์-เสาร์ 11:00-19:00", lineUrl: "https://line.me/R/ti/p/@siamcouture",       instagram: "@siamcouture.bkk",    sinceYear: 2018, coverColor: "rose",   tag: "ชุดราตรีและงานหมั้นโทนหวานคลาสสิก ผ้าซิลค์ ลูกไม้ ออร์แกนซ่า — คัดจากดีไซเนอร์ไทย",     story: "Siam Couture เริ่มจากร้านชุดเจ้าสาวเล็กๆ ในสยามตั้งแต่ปี 2018",           featured: true,  district: "ปทุมวัน",     subdistrict: "ปทุมวัน",     province: "กรุงเทพมหานคร", postalCode: "10330" },
     { slug: "thonglor-atelier",    name: "Thonglor Atelier",         ownerName: "คุณแอน",         areaKey: "Thonglor",    areaLabel: "Thonglor · วัฒนา",        address: "Eight Thonglor (ชั้น 2), ซอย 13 · BTS ทองหล่อ",     hours: "ทุกวัน 12:00-20:00",       lineUrl: "https://line.me/R/ti/p/@thonglor",          instagram: "@thonglor.atelier",   sinceYear: 2020, coverColor: "navy",   tag: "ดีไซน์โมเดิร์น ทรงคม สีสะดุดตา — งานเลี้ยงค่ำ ปาร์ตี้ ค็อกเทล หรือชุดทำงาน statement",  story: "Thonglor Atelier ก่อตั้งปี 2020 คัดดีไซเนอร์ที่มี vision ชัด",            featured: true,  district: "วัฒนา",       subdistrict: "คลองตันเหนือ", province: "กรุงเทพมหานคร", postalCode: "10110" },
     { slug: "ekkamai-edit",        name: "Ekkamai Edit",             ownerName: "คุณเฟิร์น",      areaKey: "Ekkamai",     areaLabel: "Ekkamai · วัฒนา",         address: "Ekkamai 12 · BTS เอกมัย",                           hours: "จันทร์-เสาร์ 12:00-19:00", lineUrl: "https://line.me/R/ti/p/@ekkamai.edit",      instagram: "@ekkamai.edit",       sinceYear: 2021, coverColor: "ivory",  tag: "Modern minimalist — ผ้าโทนกลาง ทรงคอลัมน์สะอาดตา",                         story: "Ekkamai Edit คัดเฉพาะชุดที่ออกแบบมาเรียบง่ายที่สุด",                      featured: true,  district: "วัฒนา",       subdistrict: "พระโขนงเหนือ", province: "กรุงเทพมหานคร", postalCode: "10110" },
@@ -44,113 +52,148 @@ async function main() {
     { slug: "closet-at-park",      name: "The Closet at Park",       ownerName: "คุณมิว",         areaKey: "Lumpini",     areaLabel: "Lumpini Park · ปทุมวัน",  address: "ใกล้ Lumpini Park · MRT ลุมพินี",                  hours: "นัดล่วงหน้าเท่านั้น",      lineUrl: "https://line.me/R/ti/p/@closetatpark",      instagram: "@theclosetatpark",    sinceYear: 2023, coverColor: "rose",   tag: "Community closet — เกิดจากกลุ่มแม่บ้านที่จัดเก็บชุดร่วมกัน",               story: "The Closet at Park เริ่มจากกลุ่มเพื่อน 10 คนที่นำชุดมาเก็บไว้ในที่เดียว", featured: false, district: "ปทุมวัน",    subdistrict: "ลุมพินี",      province: "กรุงเทพมหานคร", postalCode: "10330" },
   ] as const;
 
-  for (const b of boutiquesData) {
-    await db.boutique.upsert({
-      where: { slug: b.slug },
+  const areas = await db.area.findMany({ select: { id: true, key: true } });
+  const areaByKey = new Map(areas.map((a) => [a.key, a.id]));
+
+  for (const s of shopsData) {
+    const areaId = areaByKey.get(s.areaKey);
+    if (!areaId) console.warn(`area key not found: ${s.areaKey} (shop ${s.slug} seeded without area)`);
+    await db.shop.upsert({
+      where: { slug: s.slug },
       update: {},
       create: {
-        slug: b.slug, name: b.name, ownerName: b.ownerName,
-        areaKey: b.areaKey, areaLabel: b.areaLabel, address: b.address,
-        district: b.district, subdistrict: b.subdistrict,
-        province: b.province, postalCode: b.postalCode,
-        hours: b.hours, lineUrl: b.lineUrl, instagram: b.instagram,
-        sinceYear: b.sinceYear, coverColor: b.coverColor,
-        tag: b.tag, story: b.story, featured: b.featured,
+        slug: s.slug, name: s.name, ownerName: s.ownerName,
+        areaId: areaId ?? null, areaLabel: s.areaLabel, address: s.address,
+        district: s.district, subdistrict: s.subdistrict,
+        province: s.province, postalCode: s.postalCode,
+        hours: s.hours, lineUrl: s.lineUrl, instagram: s.instagram,
+        sinceYear: s.sinceYear, coverColor: s.coverColor,
+        tag: s.tag, story: s.story, featured: s.featured,
         status: "live", kycStatus: "none",
       },
     });
   }
 
   // ---------------------------------------------------------------------------
-  // Mock Dresses (dev only)
+  // Mock products (dev only) — เดิม dresses
+  //   * productType: ทุกตัวเป็น "dress" (lookup by key)
+  //   * category: nullable — heuristic: สินค้าที่มี occasion evening/gala → evening-dress
+  //   * occasions[] เดิม → product_tags (lookup tag by key)
+  //   * price tiers ตัวอย่าง: ส่วนลดเช่า 3 วันขึ้นไป → product_price_tiers
+  //   * product_images ว่างไว้ — gen-product-images.mjs เติมภายหลัง (Phase 4)
   // ---------------------------------------------------------------------------
-  type BoutiqueRow = { id: string; slug: string; lineUrl: string };
-  const boutiques: BoutiqueRow[] = await db.boutique.findMany({ select: { id: true, slug: true, lineUrl: true } });
-  const bySlug = new Map<string, BoutiqueRow>(boutiques.map((b) => [b.slug, b]));
+  type ShopRow = { id: string; slug: string; lineUrl: string };
+  const shops: ShopRow[] = await db.shop.findMany({ select: { id: true, slug: true, lineUrl: true } });
+  const bySlug = new Map<string, ShopRow>(shops.map((s) => [s.slug, s]));
 
-  const dressesData = [
-    { slug: "rose-silk-midi",           boutique: "siam-couture",          name: "Rose Silk Midi",           designer: "Atelier Bangkok",   size: "S", color: "rose",   price: 1800, deposit: 8000,  desc: "ชุดเดรสผ้าซิลค์สีกุหลาบ ทรง midi คอวี เหมาะกับงานเลี้ยงค่ำ", occasions: ["engagement","evening"],       adsTier: "free",     featured: false, sponsored: false },
-    { slug: "ivory-pleated-gown",       boutique: "thonglor-atelier",      name: "Ivory Pleated Gown",       designer: "Praewa Studio",     size: "M", color: "ivory",  price: 2400, deposit: 12000, desc: "ชุดราตรีสีงาช้าง ผ้าพลีทอัดร้อน ทรงยาวพื้น เหมาะกับงานแต่งงาน", occasions: ["wedding","gala"],             adsTier: "free",     featured: false, sponsored: false },
-    { slug: "emerald-velvet-cocktail",  boutique: "siam-couture",          name: "Emerald Velvet Cocktail",  designer: "Asava",             size: "S", color: "green",  price: 2000, deposit: 10000, desc: "เดรสผ้ากำมะหยี่สีมรกต ทรงเข้ารูป เหมาะกับงานค็อกเทล",          occasions: ["cocktail","party"],           adsTier: "free",     featured: false, sponsored: false },
-    { slug: "noir-silk-slip",           boutique: "thonglor-atelier",      name: "Noir Silk Slip",           designer: "Kloset",            size: "M", color: "black",  price: 1600, deposit: 8000,  desc: "ชุดสลิปเดรสผ้าซิลค์สีดำ สายเดี่ยว ทรงเรียบหรู",               occasions: ["evening","cocktail","party"], adsTier: "free",     featured: false, sponsored: false },
-    { slug: "blush-tulle-ball",         boutique: "siam-couture",          name: "Blush Tulle Ball Gown",    designer: "Theatre",           size: "S", color: "rose",   price: 3200, deposit: 15000, desc: "ชุดบอลกาวน์ผ้าทูลล์สีชมพูบลัช กระโปรงพอง",                     occasions: ["engagement","gala"],          adsTier: "featured", featured: true,  sponsored: false },
-    { slug: "navy-sequin-mini",         boutique: "thonglor-atelier",      name: "Navy Sequin Mini",         designer: "Disaya",            size: "S", color: "navy",   price: 1900, deposit: 9000,  desc: "เดรสสั้นสีกรมท่า ผ้าปักเลื่อม ใส่ออกงานเลี้ยง",               occasions: ["party","evening"],            adsTier: "free",     featured: false, sponsored: false },
-    { slug: "champagne-lace-midi",      boutique: "siam-couture",          name: "Champagne Lace Midi",      designer: "Asava",             size: "M", color: "ivory",  price: 2200, deposit: 11000, desc: "ชุดลูกไม้สีแชมเปญ ทรง midi แขนยาว",                             occasions: ["wedding","engagement"],       adsTier: "free",     featured: false, sponsored: false },
-    { slug: "scarlet-satin-column",     boutique: "thonglor-atelier",      name: "Scarlet Satin Column",     designer: "Kloset",            size: "S", color: "red",    price: 2600, deposit: 13000, desc: "ชุดราตรีผ้าซาตินสีแดงสด ทรงคอลัมน์ เปิดหลัง",                  occasions: ["evening","gala"],             adsTier: "boost",    featured: false, sponsored: true  },
-    { slug: "powder-blue-tea",          boutique: "siam-couture",          name: "Powder Blue Tea Dress",    designer: "Theatre",           size: "M", color: "blue",   price: 1700, deposit: 8500,  desc: "เดรสสีฟ้าพาวเดอร์ ทรง tea length ผ้าชีฟอง บางเบา",             occasions: ["casual","wedding"],           adsTier: "free",     featured: false, sponsored: false },
-    { slug: "onyx-tuxedo-jumpsuit",     boutique: "thonglor-atelier",      name: "Onyx Tuxedo Jumpsuit",     designer: "Disaya",            size: "S", color: "black",  price: 2100, deposit: 10000, desc: "จัมป์สูทสีดำสไตล์ทักซิโด้ ตัดเย็บเข้ารูป",                    occasions: ["work","party"],               adsTier: "free",     featured: false, sponsored: false },
-    { slug: "lilac-organza-gown",       boutique: "siam-couture",          name: "Lilac Organza Gown",       designer: "Praewa Studio",     size: "M", color: "purple", price: 2800, deposit: 13000, desc: "ชุดราตรีผ้าออร์แกนซ่าสีม่วงไลแลค ทรงเอ-ไลน์",                  occasions: ["engagement","wedding"],       adsTier: "free",     featured: false, sponsored: false },
-    { slug: "sage-linen-suit",          boutique: "thonglor-atelier",      name: "Sage Linen Suit Set",      designer: "Asava",             size: "M", color: "green",  price: 1500, deposit: 7500,  desc: "เซ็ตเสื้อเบลเซอร์กับกระโปรงผ้าลินินสีเสจ ใส่ทำงาน",           occasions: ["work","casual"],              adsTier: "free",     featured: false, sponsored: false },
-    { slug: "navy-sequin-mini-2",       boutique: "ekkamai-edit",          name: "Navy Sequin Mini",         designer: "Local Atelier",     size: "M", color: "navy",   price: 2000, deposit: 10000, desc: "Sequin Mini จาก Ekkamai Edit — ทรงทันสมัย",                     occasions: ["party","cocktail"],           adsTier: "free",     featured: false, sponsored: false },
-    { slug: "sage-chiffon-tea",         boutique: "ekkamai-edit",          name: "Sage Chiffon Tea Dress",   designer: "Bangkok Designer",  size: "L", color: "green",  price: 1700, deposit: 8500,  desc: "Chiffon Tea Dress จาก Ekkamai Edit",                            occasions: ["casual"],                     adsTier: "free",     featured: false, sponsored: false },
-    { slug: "ivory-linen-suit",         boutique: "ekkamai-edit",          name: "Ivory Linen Suit",         designer: "— Curated —",       size: "S", color: "ivory",  price: 1800, deposit: 9000,  desc: "Linen Suit จาก Ekkamai Edit — เรียบ หรู ใส่ทำงาน",             occasions: ["work","casual"],              adsTier: "free",     featured: false, sponsored: false },
-    { slug: "ivory-tulle-cocktail",     boutique: "phrom-phong-bridal",    name: "Ivory Tulle Cocktail",     designer: "Bangkok Designer",  size: "S", color: "ivory",  price: 2300, deposit: 11500, desc: "Tulle Cocktail จาก Phrom Phong Bridal",                         occasions: ["cocktail"],                   adsTier: "boost",    featured: false, sponsored: true  },
-    { slug: "black-silk-slip",          boutique: "ari-vintage-closet",    name: "Noir Silk Slip",           designer: "— Curated —",       size: "L", color: "black",  price: 2000, deposit: 10000, desc: "Silk Slip จาก Ari Vintage Closet",                              occasions: ["evening","cocktail"],         adsTier: "featured", featured: true,  sponsored: false },
-    { slug: "rose-lace-midi",           boutique: "ari-vintage-closet",    name: "Rose Lace Midi",           designer: "— Studio —",        size: "S", color: "rose",   price: 2600, deposit: 13000, desc: "Lace Midi จาก Ari Vintage Closet",                              occasions: ["wedding"],                    adsTier: "free",     featured: false, sponsored: false },
-    { slug: "navy-satin-column",        boutique: "asok-style-co",         name: "Navy Satin Column",        designer: "— Studio —",        size: "M", color: "navy",   price: 3000, deposit: 15000, desc: "Satin Column จาก Asok Style Co.",                               occasions: ["gala"],                       adsTier: "free",     featured: false, sponsored: false },
-    { slug: "rose-organza-ball-gown",   boutique: "asok-style-co",         name: "Rose Organza Ball Gown",   designer: "Local Atelier",     size: "L", color: "rose",   price: 2800, deposit: 14000, desc: "Organza Ball Gown จาก Asok Style Co.",                          occasions: ["engagement","gala"],          adsTier: "free",     featured: false, sponsored: false },
-    { slug: "black-sequin-mini",        boutique: "sathorn-atelier",       name: "Noir Sequin Mini",         designer: "Local Atelier",     size: "S", color: "black",  price: 1800, deposit: 9000,  desc: "Sequin Mini จาก Sathorn Atelier",                               occasions: ["party","cocktail"],           adsTier: "free",     featured: false, sponsored: false },
-    { slug: "rose-tulle-cocktail",      boutique: "silom-eveningwear",     name: "Rose Tulle Cocktail",      designer: "Bangkok Designer",  size: "L", color: "rose",   price: 2100, deposit: 10500, desc: "Tulle Cocktail จาก Silom Eveningwear",                          occasions: ["cocktail"],                   adsTier: "free",     featured: false, sponsored: false },
-    { slug: "red-crepe-jumpsuit",       boutique: "silom-eveningwear",     name: "Crimson Crepe Jumpsuit",   designer: "— Curated —",       size: "S", color: "red",    price: 1900, deposit: 9500,  desc: "Crepe Jumpsuit จาก Silom Eveningwear",                          occasions: ["work","party"],               adsTier: "free",     featured: false, sponsored: false },
-    { slug: "ivory-silk-slip",          boutique: "ploenchit-premier",     name: "Ivory Silk Slip",          designer: "— Curated —",       size: "M", color: "ivory",  price: 1700, deposit: 8500,  desc: "Silk Slip จาก Ploenchit Premier",                               occasions: ["evening","cocktail"],         adsTier: "free",     featured: false, sponsored: false },
-    { slug: "rose-lace-midi-2",         boutique: "ploenchit-premier",     name: "Rose Lace Midi",           designer: "— Studio —",        size: "L", color: "rose",   price: 2300, deposit: 11500, desc: "Lace Midi จาก Ploenchit Premier",                               occasions: ["wedding"],                    adsTier: "free",     featured: false, sponsored: false },
-    { slug: "navy-velvet-gown",         boutique: "ploenchit-premier",     name: "Navy Velvet Gown",         designer: "Local Atelier",     size: "S", color: "navy",   price: 3100, deposit: 15500, desc: "Velvet Gown จาก Ploenchit Premier",                             occasions: ["gala","evening"],             adsTier: "free",     featured: false, sponsored: false },
-    { slug: "red-satin-column",         boutique: "watthana-bridal",       name: "Crimson Satin Column",     designer: "— Studio —",        size: "S", color: "red",    price: 2700, deposit: 13500, desc: "Satin Column จาก Watthana Bridal",                              occasions: ["gala"],                       adsTier: "free",     featured: false, sponsored: false },
-    { slug: "navy-sequin-mini-3",       boutique: "the-dress-library",     name: "Navy Sequin Mini",         designer: "Local Atelier",     size: "L", color: "navy",   price: 2200, deposit: 11000, desc: "Sequin Mini จาก The Dress Library",                             occasions: ["party","cocktail"],           adsTier: "boost",    featured: false, sponsored: true  },
-    { slug: "sage-chiffon-tea-2",       boutique: "the-dress-library",     name: "Sage Chiffon Tea Dress",   designer: "Bangkok Designer",  size: "S", color: "green",  price: 1900, deposit: 9500,  desc: "Chiffon Tea Dress จาก The Dress Library",                       occasions: ["casual"],                     adsTier: "free",     featured: false, sponsored: false },
-    { slug: "rose-tulle-cocktail-2",    boutique: "chitlom-boutique",      name: "Rose Tulle Cocktail",      designer: "Bangkok Designer",  size: "M", color: "rose",   price: 2500, deposit: 12500, desc: "Tulle Cocktail จาก Chitlom Boutique",                           occasions: ["cocktail"],                   adsTier: "free",     featured: false, sponsored: false },
-    { slug: "black-crepe-jumpsuit",     boutique: "chitlom-boutique",      name: "Noir Crepe Jumpsuit",      designer: "— Curated —",       size: "L", color: "black",  price: 1700, deposit: 8500,  desc: "Crepe Jumpsuit จาก Chitlom Boutique",                           occasions: ["work","party"],               adsTier: "free",     featured: false, sponsored: false },
-    { slug: "lilac-beaded-gown",        boutique: "chitlom-boutique",      name: "Lilac Beaded Gown",        designer: "— Studio —",        size: "S", color: "purple", price: 3100, deposit: 15500, desc: "Beaded Gown จาก Chitlom Boutique",                              occasions: ["gala"],                       adsTier: "free",     featured: false, sponsored: false },
-    { slug: "navy-silk-slip",           boutique: "sukhumvit-11",          name: "Navy Silk Slip",           designer: "— Curated —",       size: "S", color: "navy",   price: 1500, deposit: 7500,  desc: "Silk Slip จาก Sukhumvit 11 Studio",                             occasions: ["evening","cocktail"],         adsTier: "free",     featured: false, sponsored: false },
-    { slug: "red-satin-column-2",       boutique: "sala-daeng-couture",    name: "Crimson Satin Column",     designer: "— Studio —",        size: "L", color: "red",    price: 2400, deposit: 12000, desc: "Satin Column จาก Sala Daeng Couture",                           occasions: ["gala"],                       adsTier: "featured", featured: true,  sponsored: false },
-    { slug: "lilac-organza-ball-gown",  boutique: "sala-daeng-couture",    name: "Lilac Organza Ball Gown",  designer: "Local Atelier",     size: "S", color: "purple", price: 3100, deposit: 15500, desc: "Organza Ball Gown จาก Sala Daeng Couture",                      occasions: ["engagement","gala"],          adsTier: "free",     featured: false, sponsored: false },
-    { slug: "navy-sequin-mini-4",       boutique: "bangrak-bridal",        name: "Navy Sequin Mini",         designer: "Local Atelier",     size: "M", color: "navy",   price: 2000, deposit: 10000, desc: "Sequin Mini จาก Bangrak Bridal Co.",                            occasions: ["party","cocktail"],           adsTier: "free",     featured: false, sponsored: false },
-    { slug: "lilac-tulle-cocktail",     boutique: "pra-sai-couture",       name: "Lilac Tulle Cocktail",     designer: "Bangkok Designer",  size: "S", color: "purple", price: 2300, deposit: 11500, desc: "Tulle Cocktail จาก Pra Sai Couture",                            occasions: ["cocktail"],                   adsTier: "free",     featured: false, sponsored: false },
-    { slug: "black-silk-slip-2",        boutique: "sai-mai",               name: "Noir Silk Slip",           designer: "— Curated —",       size: "L", color: "black",  price: 2000, deposit: 10000, desc: "Silk Slip จาก Sai Mai Designs",                                 occasions: ["evening","cocktail"],         adsTier: "free",     featured: false, sponsored: false },
-    { slug: "rose-lace-midi-3",         boutique: "sai-mai",               name: "Rose Lace Midi",           designer: "— Studio —",        size: "S", color: "rose",   price: 2600, deposit: 13000, desc: "Lace Midi จาก Sai Mai Designs",                                 occasions: ["wedding"],                    adsTier: "free",     featured: false, sponsored: false },
-    { slug: "red-satin-column-3",       boutique: "bangkok-bridal-studio", name: "Crimson Satin Column",     designer: "— Studio —",        size: "M", color: "red",    price: 3000, deposit: 15000, desc: "Satin Column จาก Bangkok Bridal Studio",                        occasions: ["gala"],                       adsTier: "boost",    featured: false, sponsored: true  },
-    { slug: "rose-organza-ball-gown-2", boutique: "bangkok-bridal-studio", name: "Rose Organza Ball Gown",   designer: "Local Atelier",     size: "L", color: "rose",   price: 2800, deposit: 14000, desc: "Organza Ball Gown จาก Bangkok Bridal Studio",                   occasions: ["engagement","gala"],          adsTier: "free",     featured: false, sponsored: false },
-    { slug: "navy-sequin-mini-5",       boutique: "closet-collective",     name: "Navy Sequin Mini",         designer: "Local Atelier",     size: "S", color: "navy",   price: 1800, deposit: 9000,  desc: "Sequin Mini จาก Closet Collective",                             occasions: ["party","cocktail"],           adsTier: "free",     featured: false, sponsored: false },
-    { slug: "rose-tulle-cocktail-3",    boutique: "riverside-atelier",     name: "Rose Tulle Cocktail",      designer: "Bangkok Designer",  size: "L", color: "rose",   price: 2100, deposit: 10500, desc: "Tulle Cocktail จาก Riverside Atelier",                          occasions: ["cocktail"],                   adsTier: "free",     featured: false, sponsored: false },
-    { slug: "black-silk-slip-3",        boutique: "lumpini-lookbook",      name: "Noir Silk Slip",           designer: "— Curated —",       size: "M", color: "black",  price: 1700, deposit: 8500,  desc: "Silk Slip จาก Lumpini Lookbook",                                occasions: ["evening","cocktail"],         adsTier: "free",     featured: false, sponsored: false },
-    { slug: "navy-velvet-gown-2",       boutique: "lumpini-lookbook",      name: "Navy Velvet Gown",         designer: "Local Atelier",     size: "S", color: "navy",   price: 3100, deposit: 15500, desc: "Velvet Gown จาก Lumpini Lookbook",                              occasions: ["gala","evening"],             adsTier: "free",     featured: false, sponsored: false },
-    { slug: "black-satin-column",       boutique: "phra-khanong-edit",     name: "Noir Satin Column",        designer: "— Studio —",        size: "S", color: "black",  price: 2700, deposit: 13500, desc: "Satin Column จาก Phra Khanong Edit",                            occasions: ["gala"],                       adsTier: "free",     featured: false, sponsored: false },
-    { slug: "navy-sequin-mini-6",       boutique: "onnut-atelier",         name: "Navy Sequin Mini",         designer: "Local Atelier",     size: "L", color: "navy",   price: 2200, deposit: 11000, desc: "Sequin Mini จาก Onnut Atelier",                                 occasions: ["party","cocktail"],           adsTier: "featured", featured: true,  sponsored: false },
-    { slug: "rose-tulle-cocktail-4",    boutique: "yaowarat-heritage",     name: "Rose Tulle Cocktail",      designer: "Bangkok Designer",  size: "M", color: "rose",   price: 2500, deposit: 12500, desc: "Tulle Cocktail จาก Yaowarat Heritage",                          occasions: ["cocktail"],                   adsTier: "free",     featured: false, sponsored: false },
-    { slug: "navy-silk-slip-2",         boutique: "wireless-couture",      name: "Navy Silk Slip",           designer: "— Curated —",       size: "S", color: "navy",   price: 1500, deposit: 7500,  desc: "Silk Slip จาก Wireless Couture",                                occasions: ["evening","cocktail"],         adsTier: "boost",    featured: false, sponsored: true  },
-    { slug: "red-satin-column-4",       boutique: "soi-49-studio",         name: "Crimson Satin Column",     designer: "— Studio —",        size: "L", color: "red",    price: 2400, deposit: 12000, desc: "Satin Column จาก Soi 49 Studio",                                occasions: ["gala"],                       adsTier: "free",     featured: false, sponsored: false },
-    { slug: "red-sequin-mini",          boutique: "surawong-suite",        name: "Crimson Sequin Mini",      designer: "Local Atelier",     size: "M", color: "red",    price: 2000, deposit: 10000, desc: "Sequin Mini จาก Surawong Suite",                                occasions: ["party","cocktail"],           adsTier: "free",     featured: false, sponsored: false },
-    { slug: "lilac-tulle-cocktail-2",   boutique: "sathorn-soiree",        name: "Lilac Tulle Cocktail",     designer: "Bangkok Designer",  size: "S", color: "purple", price: 2300, deposit: 11500, desc: "Tulle Cocktail จาก Sathorn Soiree",                             occasions: ["cocktail"],                   adsTier: "free",     featured: false, sponsored: false },
-    { slug: "ivory-silk-slip-2",        boutique: "sukhumvit-couture",     name: "Ivory Silk Slip",          designer: "— Curated —",       size: "L", color: "ivory",  price: 2000, deposit: 10000, desc: "Silk Slip จาก Sukhumvit Couture",                               occasions: ["evening","cocktail"],         adsTier: "free",     featured: false, sponsored: false },
-    { slug: "red-satin-column-5",       boutique: "closet-at-park",        name: "Crimson Satin Column",     designer: "— Studio —",        size: "M", color: "red",    price: 3000, deposit: 15000, desc: "Satin Column จาก The Closet at Park",                           occasions: ["gala"],                       adsTier: "free",     featured: false, sponsored: false },
-    { slug: "rose-organza-ball-gown-3", boutique: "closet-at-park",        name: "Rose Organza Ball Gown",   designer: "Local Atelier",     size: "L", color: "rose",   price: 2800, deposit: 14000, desc: "Organza Ball Gown จาก The Closet at Park",                      occasions: ["engagement","gala"],          adsTier: "free",     featured: false, sponsored: false },
+  const dressType = await db.productType.findUniqueOrThrow({ where: { key: "dress" } });
+  const eveningCategory = await db.productCategory.findUniqueOrThrow({ where: { key: "evening-dress" } });
+  const tags = await db.tag.findMany({ select: { id: true, key: true } });
+  const tagByKey = new Map(tags.map((t) => [t.key, t.id]));
+
+  const productsData = [
+    { slug: "rose-silk-midi",           shop: "siam-couture",          name: "Rose Silk Midi",           designer: "Atelier Bangkok",   size: "S", color: "rose",   price: 1800, deposit: 8000,  desc: "ชุดเดรสผ้าซิลค์สีกุหลาบ ทรง midi คอวี เหมาะกับงานเลี้ยงค่ำ", occasions: ["engagement","evening"],       adsTier: "free",     featured: false, sponsored: false },
+    { slug: "ivory-pleated-gown",       shop: "thonglor-atelier",      name: "Ivory Pleated Gown",       designer: "Praewa Studio",     size: "M", color: "ivory",  price: 2400, deposit: 12000, desc: "ชุดราตรีสีงาช้าง ผ้าพลีทอัดร้อน ทรงยาวพื้น เหมาะกับงานแต่งงาน", occasions: ["wedding","gala"],             adsTier: "free",     featured: false, sponsored: false },
+    { slug: "emerald-velvet-cocktail",  shop: "siam-couture",          name: "Emerald Velvet Cocktail",  designer: "Asava",             size: "S", color: "green",  price: 2000, deposit: 10000, desc: "เดรสผ้ากำมะหยี่สีมรกต ทรงเข้ารูป เหมาะกับงานค็อกเทล",          occasions: ["cocktail","party"],           adsTier: "free",     featured: false, sponsored: false },
+    { slug: "noir-silk-slip",           shop: "thonglor-atelier",      name: "Noir Silk Slip",           designer: "Kloset",            size: "M", color: "black",  price: 1600, deposit: 8000,  desc: "ชุดสลิปเดรสผ้าซิลค์สีดำ สายเดี่ยว ทรงเรียบหรู",               occasions: ["evening","cocktail","party"], adsTier: "free",     featured: false, sponsored: false },
+    { slug: "blush-tulle-ball",         shop: "siam-couture",          name: "Blush Tulle Ball Gown",    designer: "Theatre",           size: "S", color: "rose",   price: 3200, deposit: 15000, desc: "ชุดบอลกาวน์ผ้าทูลล์สีชมพูบลัช กระโปรงพอง",                     occasions: ["engagement","gala"],          adsTier: "featured", featured: true,  sponsored: false },
+    { slug: "navy-sequin-mini",         shop: "thonglor-atelier",      name: "Navy Sequin Mini",         designer: "Disaya",            size: "S", color: "navy",   price: 1900, deposit: 9000,  desc: "เดรสสั้นสีกรมท่า ผ้าปักเลื่อม ใส่ออกงานเลี้ยง",               occasions: ["party","evening"],            adsTier: "free",     featured: false, sponsored: false },
+    { slug: "champagne-lace-midi",      shop: "siam-couture",          name: "Champagne Lace Midi",      designer: "Asava",             size: "M", color: "ivory",  price: 2200, deposit: 11000, desc: "ชุดลูกไม้สีแชมเปญ ทรง midi แขนยาว",                             occasions: ["wedding","engagement"],       adsTier: "free",     featured: false, sponsored: false },
+    { slug: "scarlet-satin-column",     shop: "thonglor-atelier",      name: "Scarlet Satin Column",     designer: "Kloset",            size: "S", color: "red",    price: 2600, deposit: 13000, desc: "ชุดราตรีผ้าซาตินสีแดงสด ทรงคอลัมน์ เปิดหลัง",                  occasions: ["evening","gala"],             adsTier: "boost",    featured: false, sponsored: true  },
+    { slug: "powder-blue-tea",          shop: "siam-couture",          name: "Powder Blue Tea Dress",    designer: "Theatre",           size: "M", color: "blue",   price: 1700, deposit: 8500,  desc: "เดรสสีฟ้าพาวเดอร์ ทรง tea length ผ้าชีฟอง บางเบา",             occasions: ["casual","wedding"],           adsTier: "free",     featured: false, sponsored: false },
+    { slug: "onyx-tuxedo-jumpsuit",     shop: "thonglor-atelier",      name: "Onyx Tuxedo Jumpsuit",     designer: "Disaya",            size: "S", color: "black",  price: 2100, deposit: 10000, desc: "จัมป์สูทสีดำสไตล์ทักซิโด้ ตัดเย็บเข้ารูป",                    occasions: ["work","party"],               adsTier: "free",     featured: false, sponsored: false },
+    { slug: "lilac-organza-gown",       shop: "siam-couture",          name: "Lilac Organza Gown",       designer: "Praewa Studio",     size: "M", color: "purple", price: 2800, deposit: 13000, desc: "ชุดราตรีผ้าออร์แกนซ่าสีม่วงไลแลค ทรงเอ-ไลน์",                  occasions: ["engagement","wedding"],       adsTier: "free",     featured: false, sponsored: false },
+    { slug: "sage-linen-suit",          shop: "thonglor-atelier",      name: "Sage Linen Suit Set",      designer: "Asava",             size: "M", color: "green",  price: 1500, deposit: 7500,  desc: "เซ็ตเสื้อเบลเซอร์กับกระโปรงผ้าลินินสีเสจ ใส่ทำงาน",           occasions: ["work","casual"],              adsTier: "free",     featured: false, sponsored: false },
+    { slug: "navy-sequin-mini-2",       shop: "ekkamai-edit",          name: "Navy Sequin Mini",         designer: "Local Atelier",     size: "M", color: "navy",   price: 2000, deposit: 10000, desc: "Sequin Mini จาก Ekkamai Edit — ทรงทันสมัย",                     occasions: ["party","cocktail"],           adsTier: "free",     featured: false, sponsored: false },
+    { slug: "sage-chiffon-tea",         shop: "ekkamai-edit",          name: "Sage Chiffon Tea Dress",   designer: "Bangkok Designer",  size: "L", color: "green",  price: 1700, deposit: 8500,  desc: "Chiffon Tea Dress จาก Ekkamai Edit",                            occasions: ["casual"],                     adsTier: "free",     featured: false, sponsored: false },
+    { slug: "ivory-linen-suit",         shop: "ekkamai-edit",          name: "Ivory Linen Suit",         designer: "— Curated —",       size: "S", color: "ivory",  price: 1800, deposit: 9000,  desc: "Linen Suit จาก Ekkamai Edit — เรียบ หรู ใส่ทำงาน",             occasions: ["work","casual"],              adsTier: "free",     featured: false, sponsored: false },
+    { slug: "ivory-tulle-cocktail",     shop: "phrom-phong-bridal",    name: "Ivory Tulle Cocktail",     designer: "Bangkok Designer",  size: "S", color: "ivory",  price: 2300, deposit: 11500, desc: "Tulle Cocktail จาก Phrom Phong Bridal",                         occasions: ["cocktail"],                   adsTier: "boost",    featured: false, sponsored: true  },
+    { slug: "black-silk-slip",          shop: "ari-vintage-closet",    name: "Noir Silk Slip",           designer: "— Curated —",       size: "L", color: "black",  price: 2000, deposit: 10000, desc: "Silk Slip จาก Ari Vintage Closet",                              occasions: ["evening","cocktail"],         adsTier: "featured", featured: true,  sponsored: false },
+    { slug: "rose-lace-midi",           shop: "ari-vintage-closet",    name: "Rose Lace Midi",           designer: "— Studio —",        size: "S", color: "rose",   price: 2600, deposit: 13000, desc: "Lace Midi จาก Ari Vintage Closet",                              occasions: ["wedding"],                    adsTier: "free",     featured: false, sponsored: false },
+    { slug: "navy-satin-column",        shop: "asok-style-co",         name: "Navy Satin Column",        designer: "— Studio —",        size: "M", color: "navy",   price: 3000, deposit: 15000, desc: "Satin Column จาก Asok Style Co.",                               occasions: ["gala"],                       adsTier: "free",     featured: false, sponsored: false },
+    { slug: "rose-organza-ball-gown",   shop: "asok-style-co",         name: "Rose Organza Ball Gown",   designer: "Local Atelier",     size: "L", color: "rose",   price: 2800, deposit: 14000, desc: "Organza Ball Gown จาก Asok Style Co.",                          occasions: ["engagement","gala"],          adsTier: "free",     featured: false, sponsored: false },
+    { slug: "black-sequin-mini",        shop: "sathorn-atelier",       name: "Noir Sequin Mini",         designer: "Local Atelier",     size: "S", color: "black",  price: 1800, deposit: 9000,  desc: "Sequin Mini จาก Sathorn Atelier",                               occasions: ["party","cocktail"],           adsTier: "free",     featured: false, sponsored: false },
+    { slug: "rose-tulle-cocktail",      shop: "silom-eveningwear",     name: "Rose Tulle Cocktail",      designer: "Bangkok Designer",  size: "L", color: "rose",   price: 2100, deposit: 10500, desc: "Tulle Cocktail จาก Silom Eveningwear",                          occasions: ["cocktail"],                   adsTier: "free",     featured: false, sponsored: false },
+    { slug: "red-crepe-jumpsuit",       shop: "silom-eveningwear",     name: "Crimson Crepe Jumpsuit",   designer: "— Curated —",       size: "S", color: "red",    price: 1900, deposit: 9500,  desc: "Crepe Jumpsuit จาก Silom Eveningwear",                          occasions: ["work","party"],               adsTier: "free",     featured: false, sponsored: false },
+    { slug: "ivory-silk-slip",          shop: "ploenchit-premier",     name: "Ivory Silk Slip",          designer: "— Curated —",       size: "M", color: "ivory",  price: 1700, deposit: 8500,  desc: "Silk Slip จาก Ploenchit Premier",                               occasions: ["evening","cocktail"],         adsTier: "free",     featured: false, sponsored: false },
+    { slug: "rose-lace-midi-2",         shop: "ploenchit-premier",     name: "Rose Lace Midi",           designer: "— Studio —",        size: "L", color: "rose",   price: 2300, deposit: 11500, desc: "Lace Midi จาก Ploenchit Premier",                               occasions: ["wedding"],                    adsTier: "free",     featured: false, sponsored: false },
+    { slug: "navy-velvet-gown",         shop: "ploenchit-premier",     name: "Navy Velvet Gown",         designer: "Local Atelier",     size: "S", color: "navy",   price: 3100, deposit: 15500, desc: "Velvet Gown จาก Ploenchit Premier",                             occasions: ["gala","evening"],             adsTier: "free",     featured: false, sponsored: false },
+    { slug: "red-satin-column",         shop: "watthana-bridal",       name: "Crimson Satin Column",     designer: "— Studio —",        size: "S", color: "red",    price: 2700, deposit: 13500, desc: "Satin Column จาก Watthana Bridal",                              occasions: ["gala"],                       adsTier: "free",     featured: false, sponsored: false },
+    { slug: "navy-sequin-mini-3",       shop: "the-dress-library",     name: "Navy Sequin Mini",         designer: "Local Atelier",     size: "L", color: "navy",   price: 2200, deposit: 11000, desc: "Sequin Mini จาก The Dress Library",                             occasions: ["party","cocktail"],           adsTier: "boost",    featured: false, sponsored: true  },
+    { slug: "sage-chiffon-tea-2",       shop: "the-dress-library",     name: "Sage Chiffon Tea Dress",   designer: "Bangkok Designer",  size: "S", color: "green",  price: 1900, deposit: 9500,  desc: "Chiffon Tea Dress จาก The Dress Library",                       occasions: ["casual"],                     adsTier: "free",     featured: false, sponsored: false },
+    { slug: "rose-tulle-cocktail-2",    shop: "chitlom-boutique",      name: "Rose Tulle Cocktail",      designer: "Bangkok Designer",  size: "M", color: "rose",   price: 2500, deposit: 12500, desc: "Tulle Cocktail จาก Chitlom Boutique",                           occasions: ["cocktail"],                   adsTier: "free",     featured: false, sponsored: false },
+    { slug: "black-crepe-jumpsuit",     shop: "chitlom-boutique",      name: "Noir Crepe Jumpsuit",      designer: "— Curated —",       size: "L", color: "black",  price: 1700, deposit: 8500,  desc: "Crepe Jumpsuit จาก Chitlom Boutique",                           occasions: ["work","party"],               adsTier: "free",     featured: false, sponsored: false },
+    { slug: "lilac-beaded-gown",        shop: "chitlom-boutique",      name: "Lilac Beaded Gown",        designer: "— Studio —",        size: "S", color: "purple", price: 3100, deposit: 15500, desc: "Beaded Gown จาก Chitlom Boutique",                              occasions: ["gala"],                       adsTier: "free",     featured: false, sponsored: false },
+    { slug: "navy-silk-slip",           shop: "sukhumvit-11",          name: "Navy Silk Slip",           designer: "— Curated —",       size: "S", color: "navy",   price: 1500, deposit: 7500,  desc: "Silk Slip จาก Sukhumvit 11 Studio",                             occasions: ["evening","cocktail"],         adsTier: "free",     featured: false, sponsored: false },
+    { slug: "red-satin-column-2",       shop: "sala-daeng-couture",    name: "Crimson Satin Column",     designer: "— Studio —",        size: "L", color: "red",    price: 2400, deposit: 12000, desc: "Satin Column จาก Sala Daeng Couture",                           occasions: ["gala"],                       adsTier: "featured", featured: true,  sponsored: false },
+    { slug: "lilac-organza-ball-gown",  shop: "sala-daeng-couture",    name: "Lilac Organza Ball Gown",  designer: "Local Atelier",     size: "S", color: "purple", price: 3100, deposit: 15500, desc: "Organza Ball Gown จาก Sala Daeng Couture",                      occasions: ["engagement","gala"],          adsTier: "free",     featured: false, sponsored: false },
+    { slug: "navy-sequin-mini-4",       shop: "bangrak-bridal",        name: "Navy Sequin Mini",         designer: "Local Atelier",     size: "M", color: "navy",   price: 2000, deposit: 10000, desc: "Sequin Mini จาก Bangrak Bridal Co.",                            occasions: ["party","cocktail"],           adsTier: "free",     featured: false, sponsored: false },
+    { slug: "lilac-tulle-cocktail",     shop: "pra-sai-couture",       name: "Lilac Tulle Cocktail",     designer: "Bangkok Designer",  size: "S", color: "purple", price: 2300, deposit: 11500, desc: "Tulle Cocktail จาก Pra Sai Couture",                            occasions: ["cocktail"],                   adsTier: "free",     featured: false, sponsored: false },
+    { slug: "black-silk-slip-2",        shop: "sai-mai",               name: "Noir Silk Slip",           designer: "— Curated —",       size: "L", color: "black",  price: 2000, deposit: 10000, desc: "Silk Slip จาก Sai Mai Designs",                                 occasions: ["evening","cocktail"],         adsTier: "free",     featured: false, sponsored: false },
+    { slug: "rose-lace-midi-3",         shop: "sai-mai",               name: "Rose Lace Midi",           designer: "— Studio —",        size: "S", color: "rose",   price: 2600, deposit: 13000, desc: "Lace Midi จาก Sai Mai Designs",                                 occasions: ["wedding"],                    adsTier: "free",     featured: false, sponsored: false },
+    { slug: "red-satin-column-3",       shop: "bangkok-bridal-studio", name: "Crimson Satin Column",     designer: "— Studio —",        size: "M", color: "red",    price: 3000, deposit: 15000, desc: "Satin Column จาก Bangkok Bridal Studio",                        occasions: ["gala"],                       adsTier: "boost",    featured: false, sponsored: true  },
+    { slug: "rose-organza-ball-gown-2", shop: "bangkok-bridal-studio", name: "Rose Organza Ball Gown",   designer: "Local Atelier",     size: "L", color: "rose",   price: 2800, deposit: 14000, desc: "Organza Ball Gown จาก Bangkok Bridal Studio",                   occasions: ["engagement","gala"],          adsTier: "free",     featured: false, sponsored: false },
+    { slug: "navy-sequin-mini-5",       shop: "closet-collective",     name: "Navy Sequin Mini",         designer: "Local Atelier",     size: "S", color: "navy",   price: 1800, deposit: 9000,  desc: "Sequin Mini จาก Closet Collective",                             occasions: ["party","cocktail"],           adsTier: "free",     featured: false, sponsored: false },
+    { slug: "rose-tulle-cocktail-3",    shop: "riverside-atelier",     name: "Rose Tulle Cocktail",      designer: "Bangkok Designer",  size: "L", color: "rose",   price: 2100, deposit: 10500, desc: "Tulle Cocktail จาก Riverside Atelier",                          occasions: ["cocktail"],                   adsTier: "free",     featured: false, sponsored: false },
+    { slug: "black-silk-slip-3",        shop: "lumpini-lookbook",      name: "Noir Silk Slip",           designer: "— Curated —",       size: "M", color: "black",  price: 1700, deposit: 8500,  desc: "Silk Slip จาก Lumpini Lookbook",                                occasions: ["evening","cocktail"],         adsTier: "free",     featured: false, sponsored: false },
+    { slug: "navy-velvet-gown-2",       shop: "lumpini-lookbook",      name: "Navy Velvet Gown",         designer: "Local Atelier",     size: "S", color: "navy",   price: 3100, deposit: 15500, desc: "Velvet Gown จาก Lumpini Lookbook",                              occasions: ["gala","evening"],             adsTier: "free",     featured: false, sponsored: false },
+    { slug: "black-satin-column",       shop: "phra-khanong-edit",     name: "Noir Satin Column",        designer: "— Studio —",        size: "S", color: "black",  price: 2700, deposit: 13500, desc: "Satin Column จาก Phra Khanong Edit",                            occasions: ["gala"],                       adsTier: "free",     featured: false, sponsored: false },
+    { slug: "navy-sequin-mini-6",       shop: "onnut-atelier",         name: "Navy Sequin Mini",         designer: "Local Atelier",     size: "L", color: "navy",   price: 2200, deposit: 11000, desc: "Sequin Mini จาก Onnut Atelier",                                 occasions: ["party","cocktail"],           adsTier: "featured", featured: true,  sponsored: false },
+    { slug: "rose-tulle-cocktail-4",    shop: "yaowarat-heritage",     name: "Rose Tulle Cocktail",      designer: "Bangkok Designer",  size: "M", color: "rose",   price: 2500, deposit: 12500, desc: "Tulle Cocktail จาก Yaowarat Heritage",                          occasions: ["cocktail"],                   adsTier: "free",     featured: false, sponsored: false },
+    { slug: "navy-silk-slip-2",         shop: "wireless-couture",      name: "Navy Silk Slip",           designer: "— Curated —",       size: "S", color: "navy",   price: 1500, deposit: 7500,  desc: "Silk Slip จาก Wireless Couture",                                occasions: ["evening","cocktail"],         adsTier: "boost",    featured: false, sponsored: true  },
+    { slug: "red-satin-column-4",       shop: "soi-49-studio",         name: "Crimson Satin Column",     designer: "— Studio —",        size: "L", color: "red",    price: 2400, deposit: 12000, desc: "Satin Column จาก Soi 49 Studio",                                occasions: ["gala"],                       adsTier: "free",     featured: false, sponsored: false },
+    { slug: "red-sequin-mini",          shop: "surawong-suite",        name: "Crimson Sequin Mini",      designer: "Local Atelier",     size: "M", color: "red",    price: 2000, deposit: 10000, desc: "Sequin Mini จาก Surawong Suite",                                occasions: ["party","cocktail"],           adsTier: "free",     featured: false, sponsored: false },
+    { slug: "lilac-tulle-cocktail-2",   shop: "sathorn-soiree",        name: "Lilac Tulle Cocktail",     designer: "Bangkok Designer",  size: "S", color: "purple", price: 2300, deposit: 11500, desc: "Tulle Cocktail จาก Sathorn Soiree",                             occasions: ["cocktail"],                   adsTier: "free",     featured: false, sponsored: false },
+    { slug: "ivory-silk-slip-2",        shop: "sukhumvit-couture",     name: "Ivory Silk Slip",          designer: "— Curated —",       size: "L", color: "ivory",  price: 2000, deposit: 10000, desc: "Silk Slip จาก Sukhumvit Couture",                               occasions: ["evening","cocktail"],         adsTier: "free",     featured: false, sponsored: false },
+    { slug: "red-satin-column-5",       shop: "closet-at-park",        name: "Crimson Satin Column",     designer: "— Studio —",        size: "M", color: "red",    price: 3000, deposit: 15000, desc: "Satin Column จาก The Closet at Park",                           occasions: ["gala"],                       adsTier: "free",     featured: false, sponsored: false },
+    { slug: "rose-organza-ball-gown-3", shop: "closet-at-park",        name: "Rose Organza Ball Gown",   designer: "Local Atelier",     size: "L", color: "rose",   price: 2800, deposit: 14000, desc: "Organza Ball Gown จาก The Closet at Park",                      occasions: ["engagement","gala"],          adsTier: "free",     featured: false, sponsored: false },
   ];
 
   let tagSeq = 1;
-  for (const d of dressesData) {
-    const b = bySlug.get(d.boutique);
-    if (!b) { console.warn(`boutique not found: ${d.boutique}`); continue; }
+  for (const p of productsData) {
+    const shop = bySlug.get(p.shop);
+    if (!shop) { console.warn(`shop not found: ${p.shop}`); continue; }
     const tagCode = `DR${String(tagSeq++).padStart(4, "0")}`;
-    await db.dress.upsert({
-      where: { slug: d.slug },
+
+    // heuristic dev categorization: evening/gala products → "evening-dress"; else uncategorized (legal)
+    const isEvening = p.occasions.includes("evening") || p.occasions.includes("gala");
+
+    await db.product.upsert({
+      where: { slug: p.slug },
       update: {},
       create: {
-        slug: d.slug, tagCode,
-        name: d.name, designer: d.designer,
-        boutiqueId: b.id, boutiqueName: bySlug.get(d.boutique)!.slug.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" "),
-        size: d.size as "XS"|"S"|"M"|"L"|"XL",
-        color: d.color as "rose"|"ivory"|"green"|"black"|"navy"|"red"|"blue"|"purple",
-        pricePerDay: d.price, deposit: d.deposit,
-        description: d.desc, occasions: d.occasions,
-        lineUrl: b.lineUrl,
-        adsTier: d.adsTier as "free"|"boost"|"featured",
-        featured: d.featured, sponsored: d.sponsored,
+        slug: p.slug, tagCode,
+        name: p.name, designer: p.designer,
+        shopId: shop.id,
+        productTypeId: dressType.id,
+        categoryId: isEvening ? eveningCategory.id : null,
+        size: p.size as "XS"|"S"|"M"|"L"|"XL",
+        color: p.color as "rose"|"ivory"|"green"|"black"|"navy"|"red"|"blue"|"purple",
+        pricePerDay: p.price, deposit: p.deposit,
+        description: p.desc,
+        lineUrl: shop.lineUrl,
+        adsTier: p.adsTier as "free"|"boost"|"featured",
+        featured: p.featured, sponsored: p.sponsored,
         status: "live", available: true,
+        // child rows
+        productTags: {
+          create: p.occasions.flatMap((key) => {
+            const tagId = tagByKey.get(key);
+            if (!tagId) { console.warn(`tag not found: ${key} (product ${p.slug})`); return []; }
+            return [{ tagId }];
+          }),
+        },
+        priceTiers: {
+          create: [
+            { minDays: 1, pricePerDay: p.price },
+            { minDays: 3, pricePerDay: Math.round((p.price * 0.85) / 50) * 50 },
+          ],
+        },
       },
     });
   }
 
-  console.log("✅ Dev seed complete (base + mock boutiques + dresses)");
+  console.log("✅ Dev seed complete (base + mock shops + products + product_tags + price tiers)");
 }
 
 main()

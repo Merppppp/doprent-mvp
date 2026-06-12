@@ -8,7 +8,7 @@ import StatusBadge from "@/components/StatusBadge";
 
 type Kyc = {
   id: string;
-  boutique_id: string;
+  shop_id: string;
   business_type: string;
   legal_name: string;
   tax_id: string;
@@ -22,8 +22,8 @@ type Kyc = {
   plan: string;
   status: string;
   review_notes: string | null;
-  submitted_at: string;
-  boutiques: { name: string; slug: string; area_label: string };
+  created_at: string;
+  shop: { name: string; slug: string; area_label: string };
 };
 
 export default function KycRow({ kyc }: { kyc: Kyc }) {
@@ -79,14 +79,14 @@ export default function KycRow({ kyc }: { kyc: Kyc }) {
       >
         <div>
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 4 }}>
-            {kyc.boutiques.area_label} · ส่งเมื่อ {new Date(kyc.submitted_at).toLocaleString("th-TH")}
+            {kyc.shop.area_label} · ส่งเมื่อ {new Date(kyc.created_at).toLocaleString("th-TH")}
           </div>
           <Link
-            href={`/boutique/${kyc.boutiques.slug}`}
+            href={`/boutique/${kyc.shop.slug}`}
             target="_blank"
             style={{ fontWeight: 600, fontSize: 17 }}
           >
-            {kyc.boutiques.name}
+            {kyc.shop.name}
           </Link>
           <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 4 }}>
             {kyc.business_type === "company" ? "นิติบุคคล" : "บุคคลธรรมดา"} · plan: {kyc.plan}

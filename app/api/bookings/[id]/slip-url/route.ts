@@ -15,13 +15,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const booking = await db.booking.findUnique({
     where: { id: params.id },
-    include: { boutique: true },
+    include: { shop: true },
   });
 
   if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (!booking.slipPath) return NextResponse.json({ error: "ยังไม่มีสลิป" }, { status: 404 });
 
-  const isSeller = booking.boutique.ownerId === session.user.id;
+  const isSeller = booking.shop.ownerId === session.user.id;
   const isAdmin = session.user.role === "admin";
 
   if (!isSeller && !isAdmin) {

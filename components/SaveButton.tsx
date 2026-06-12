@@ -2,17 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { toggleSavedDress } from "@/app/actions/saved";
+import { toggleSavedProduct } from "@/app/actions/saved";
 
 type Props = {
-  dressId: string;
+  productId: string;
   initialSaved?: boolean;
   isLoggedIn?: boolean;
   variant?: "card" | "detail";
 };
 
 export default function SaveButton({
-  dressId,
+  productId,
   initialSaved = false,
   isLoggedIn = false,
   variant = "card",
@@ -37,7 +37,7 @@ export default function SaveButton({
       return !s;
     });
     startTransition(async () => {
-      const res = await toggleSavedDress(dressId);
+      const res = await toggleSavedProduct(productId);
       if (!res.ok) {
         setSaved((s) => !s); // revert
       } else {

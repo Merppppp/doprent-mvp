@@ -11,8 +11,8 @@ type Props = {
   label: string;
   variant?: Variant;
   source?: string;
-  dressId?: string;
-  boutiqueId?: string;
+  productId?: string;
+  shopId?: string;
   fullWidth?: boolean;
   /**
    * Whether the viewer is signed in. Strictly gates contact: when false,
@@ -42,8 +42,8 @@ export default function LineButton({
   label,
   variant = "primary",
   source,
-  dressId,
-  boutiqueId,
+  productId,
+  shopId,
   fullWidth,
   isLoggedIn,
   loginNext,
@@ -51,7 +51,7 @@ export default function LineButton({
   // useCallback must always run (rules of hooks) — kept outside the branch.
   const trackClick = useCallback(() => {
     try {
-      const payload = JSON.stringify({ source, dress_id: dressId, boutique_id: boutiqueId });
+      const payload = JSON.stringify({ source, product_id: productId, shop_id: shopId });
       if (typeof navigator !== "undefined" && "sendBeacon" in navigator) {
         navigator.sendBeacon(
           "/api/track",
@@ -61,7 +61,7 @@ export default function LineButton({
     } catch {
       /* noop */
     }
-  }, [source, dressId, boutiqueId]);
+  }, [source, productId, shopId]);
 
   // "inline" is a low-visual-weight link with icon — used when LineButton
   // is a SECONDARY action (e.g., "ask shop") that shouldn't compete with

@@ -51,7 +51,7 @@ function DefaultFooter({ locale, year }: { locale: Locale; year: number }) {
           <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>{t("footer.forShops", locale)}</h5>
           <FooterLink href="/sell">{t("footer.openShop", locale)}</FooterLink>
           <FooterLink href="/sell/dashboard">{t("footer.myDashboard", locale)}</FooterLink>
-          <FooterLink href="/boutiques">{t("footer.allBoutiques", locale)}</FooterLink>
+          <FooterLink href="/shops">{t("footer.allBoutiques", locale)}</FooterLink>
         </div>
         <div>
           <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>{t("footer.contact", locale)}</h5>

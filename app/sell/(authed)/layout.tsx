@@ -9,11 +9,11 @@ export default async function SellerLayout({ children }: { children: React.React
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?next=/sell/dashboard");
 
-  const boutique = await db.boutique.findFirst({
+  const shop = await db.shop.findFirst({
     where: { ownerId: user.id },
     select: { id: true },
   });
-  if (!boutique) redirect("/sell/signup");
+  if (!shop) redirect("/sell/signup");
 
   return (
     <div className="container" style={{ paddingTop: 24, paddingBottom: 60 }}>
