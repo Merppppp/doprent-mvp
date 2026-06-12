@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og";
 import { getProductBySlug } from "@/lib/products";
 
-export const runtime = "edge";
+// nodejs runtime required: lib/products → lib/db uses Prisma + AsyncLocalStorage (not edge-compatible)
+export const runtime = "nodejs";
 export const alt = "DopRent · Bangkok boutique rental";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
