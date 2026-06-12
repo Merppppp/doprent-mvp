@@ -12,6 +12,21 @@ export const metadata: Metadata = {
 const STATUS_OPTS = ["pending", "approved", "rejected"] as const;
 type StatusOpt = (typeof STATUS_OPTS)[number];
 
+/**
+ * Resolve a stored KYC doc reference to a viewable href.
+ * - New rows store a PRIVATE-bucket key (`kyc/<uuid>.<ext>`) → served via the
+ *   admin-guarded signed-URL route /api/admin/kyc-doc.
+ * - Legacy rows store a full public URL (https://…) → rendered as-is.
+ */
+function resolveKycDocHref(value: string | null): string | null {
+  if (!value) return null;
+  if (value.startsWith("kyc/")) {
+    return `/api/admin/kyc-doc?key=${encodeURIComponent(value)}`;
+  }
+  if (/^https?:\/\//.test(value)) return value; // legacy public-bucket URL
+  return null;
+}
+
 export default async function KycReviewPage({
   searchParams,
 }: {
@@ -31,7 +46,9 @@ export default async function KycReviewPage({
     id: r.id, shop_id: r.shopId, business_type: r.businessType,
     legal_name: r.legalName, tax_id: r.taxId, dbd_reg_no: r.dbdRegNo,
     bank_name: r.bankName, bank_acc_no: r.bankAccNo, bank_acc_name: r.bankAccName,
-    id_card_url: r.idCardUrl, dbd_doc_url: r.dbdDocUrl, book_bank_url: r.bookBankUrl,
+    id_card_url: resolveKycDocHref(r.idCardUrl),
+    dbd_doc_url: resolveKycDocHref(r.dbdDocUrl),
+    book_bank_url: resolveKycDocHref(r.bookBankUrl),
     plan: r.plan, status: r.status, review_notes: r.reviewNotes,
     created_at: r.createdAt.toISOString(),
     shop: { name: r.shop.name, slug: r.shop.slug, area_label: r.shop.areaLabel },

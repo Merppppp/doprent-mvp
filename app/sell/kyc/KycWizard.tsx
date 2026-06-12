@@ -56,17 +56,20 @@ export default function KycWizard({ boutiqueId }: Props) {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      // KYC docs are sensitive → PRIVATE bucket. The route returns an object
+      // KEY (e.g. `kyc/<uuid>.png`), not a public URL; admins resolve it via
+      // a guarded signed-URL route.
+      const res = await fetch("/api/upload/kyc", { method: "POST", body: fd });
       if (!res.ok) {
         setError("อัปโหลดไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง");
         setUploading(null);
         return;
       }
       const json = await res.json();
-      const url = json.urls?.large ?? json.url ?? "";
-      if (field === "id_card") setIdCardUrl(url);
-      if (field === "dbd_doc") setDbdDocUrl(url);
-      if (field === "book_bank") setBookBankUrl(url);
+      const key = json.key ?? "";
+      if (field === "id_card") setIdCardUrl(key);
+      if (field === "dbd_doc") setDbdDocUrl(key);
+      if (field === "book_bank") setBookBankUrl(key);
       setUploading(null);
     } catch (err) {
       setError((err as Error).message);

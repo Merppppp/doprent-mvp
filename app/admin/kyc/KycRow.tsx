@@ -112,12 +112,10 @@ export default function KycRow({ kyc }: { kyc: Kyc }) {
         {kyc.bank_acc_no ? <Info label="เลขบัญชี" value={kyc.bank_acc_no} /> : null}
       </div>
 
-      {/* KYC doc URLs are PUBLIC-bucket objects: KycWizard uploads via
-          /api/upload → uploadToR2 (public bucket, returns `${R2_PUBLIC_URL}/key`),
-          so plain <a href> works — no presigned URL needed (verified 2026-06-11).
-          If KYC uploads ever move to uploadPrivateToR2 / R2_PRIVATE_BUCKET,
-          switch these to an admin-guarded signed-URL API route, following
-          app/api/bookings/[id]/slip-url/route.ts. */}
+      {/* KYC doc hrefs are pre-resolved server-side in page.tsx:
+          new rows store a PRIVATE-bucket key (`kyc/…`) → href points at the
+          admin-guarded /api/admin/kyc-doc route (302 → short-lived signed URL);
+          legacy rows with full public URLs are rendered as-is. */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
         {kyc.id_card_url ? (
           <a href={kyc.id_card_url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={btnSm}>
