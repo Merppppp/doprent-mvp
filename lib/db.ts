@@ -27,12 +27,23 @@ const AUDIT_EXCLUDED = new Set([
  * injection can never set a field that does not exist on the model
  * (e.g. AuditLog has neither createdBy nor updatedBy).
  */
-const MODEL_AUDIT_FIELDS: Record<string, { createdBy: boolean; updatedBy: boolean }> = {};
-for (const m of Prisma.dmmf.datamodel.models) {
-  MODEL_AUDIT_FIELDS[m.name] = {
-    createdBy: m.fields.some((f) => f.name === "createdBy"),
-    updatedBy: m.fields.some((f) => f.name === "updatedBy"),
-  };
+// LAZY: must NOT run at module top-level. middleware.ts (edge runtime) imports
+// @/auth → lib/db, where @prisma/client resolves to the browser stub whose
+// `Prisma.dmmf` is undefined — a top-level loop crashes EVERY request with 500.
+// The stub import itself is harmless as long as nothing executes at import time
+// (JWT-strategy middleware never touches the DB).
+let MODEL_AUDIT_FIELDS: Record<string, { createdBy: boolean; updatedBy: boolean }> | null = null;
+function getModelAuditFields() {
+  if (!MODEL_AUDIT_FIELDS) {
+    MODEL_AUDIT_FIELDS = {};
+    for (const m of Prisma.dmmf.datamodel.models) {
+      MODEL_AUDIT_FIELDS[m.name] = {
+        createdBy: m.fields.some((f) => f.name === "createdBy"),
+        updatedBy: m.fields.some((f) => f.name === "updatedBy"),
+      };
+    }
+  }
+  return MODEL_AUDIT_FIELDS;
 }
 
 /** Stamp createdBy/updatedBy onto a data object, guarded per model. */
@@ -42,7 +53,7 @@ function stampActor(
   actorId: string | undefined,
   opts: { created: boolean; updated: boolean },
 ): Record<string, unknown> {
-  const fields = MODEL_AUDIT_FIELDS[model];
+  const fields = getModelAuditFields()[model];
   const out = { ...data };
   if (opts.created && fields?.createdBy && out.createdBy === undefined) out.createdBy = actorId;
   if (opts.updated && fields?.updatedBy && out.updatedBy === undefined) out.updatedBy = actorId;
@@ -116,7 +127,8 @@ async function readBefore(model: string, where: unknown): Promise<unknown> {
  *   (fetching them would turn bulk ops into N+1).
  * - $queryRaw / $executeRaw bypass the extension entirely.
  */
-export const db = base.$extends({
+function createExtendedDb() {
+  return base.$extends({
   query: {
     $allModels: {
       async create({ model, args, query }) {
@@ -226,5 +238,27 @@ export const db = base.$extends({
         return result;
       },
     },
+    },
+  });
+}
+
+type ExtendedDb = ReturnType<typeof createExtendedDb>;
+let _db: ExtendedDb | null = null;
+
+/**
+ * LAZY proxy: `base.$extends(...)` must not run at module import time —
+ * middleware.ts (edge runtime) imports @/auth → lib/db, and any property
+ * access on the browser-stub PrismaClient throws ("PrismaClient is not
+ * configured to run in Edge Runtime"). The extended client is created on
+ * first real use, which only ever happens in the node runtime.
+ */
+export const db: ExtendedDb = new Proxy({} as ExtendedDb, {
+  get(_target, prop) {
+    _db ??= createExtendedDb();
+    return (_db as any)[prop];
+  },
+  has(_target, prop) {
+    _db ??= createExtendedDb();
+    return prop in (_db as any);
   },
 });
