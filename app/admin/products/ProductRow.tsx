@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { setDressStatus, toggleDressFeatured } from "@/app/actions/admin";
+import { setProductStatus, toggleProductFeatured } from "@/app/actions/admin";
 import { ProductArt } from "@/components/ProductArt";
 import StatusBadge from "@/components/StatusBadge";
 import type { Color } from "@/lib/types";
@@ -11,9 +11,10 @@ import type { Color } from "@/lib/types";
 type D = {
   id: string;
   slug: string;
+  tag_code: string | null;
   name: string;
   designer: string | null;
-  boutique_name: string;
+  shop_name: string;
   size: string;
   color: string;
   price_per_day: number;
@@ -26,7 +27,7 @@ type D = {
   views: number;
 };
 
-export default function DressRow({ d }: { d: D }) {
+export default function ProductRow({ d }: { d: D }) {
   const router = useRouter();
   const [working, setWorking] = useState(false);
   const [showReject, setShowReject] = useState(false);
@@ -79,7 +80,7 @@ export default function DressRow({ d }: { d: D }) {
           {d.name}
         </Link>
         <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>
-          {d.designer || "—"} · Size {d.size} · ฿{d.price_per_day.toLocaleString()}/วัน · {d.boutique_name}
+          {d.designer || "—"} · Size {d.size} · ฿{d.price_per_day.toLocaleString()}/วัน · {d.shop_name}
         </div>
         <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
           <StatusBadge
@@ -116,7 +117,7 @@ export default function DressRow({ d }: { d: D }) {
               className="btn btn-dark"
               style={{ background: "var(--danger)", borderColor: "var(--danger)", padding: "7px 12px", fontSize: 12 }}
               disabled={working}
-              onClick={() => act(() => setDressStatus(d.id, "rejected", reason))}
+              onClick={() => act(() => setProductStatus(d.id, "rejected", reason))}
             >
               ยืนยัน
             </button>
@@ -132,7 +133,7 @@ export default function DressRow({ d }: { d: D }) {
               className="btn btn-dark"
               style={btnSm}
               disabled={working}
-              onClick={() => act(() => setDressStatus(d.id, "live"))}
+              onClick={() => act(() => setProductStatus(d.id, "live"))}
             >
               ✓ Approve
             </button>
@@ -151,7 +152,7 @@ export default function DressRow({ d }: { d: D }) {
             className="btn btn-outline"
             style={btnSm}
             disabled={working}
-            onClick={() => act(() => setDressStatus(d.id, "pending"))}
+            onClick={() => act(() => setProductStatus(d.id, "pending"))}
           >
             กลับ pending
           </button>
@@ -161,7 +162,7 @@ export default function DressRow({ d }: { d: D }) {
           className="btn btn-outline"
           style={btnSm}
           disabled={working}
-          onClick={() => act(() => toggleDressFeatured(d.id, !d.featured))}
+          onClick={() => act(() => toggleProductFeatured(d.id, !d.featured))}
         >
           {d.featured ? "ถอด ★" : "ติด ★"}
         </button>

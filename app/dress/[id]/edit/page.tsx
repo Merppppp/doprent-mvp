@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import DressForm from "@/app/sell/(authed)/dresses/DressForm";
+import ProductForm from "@/app/sell/(authed)/products/ProductForm";
 import { getProductBySlug, listOccasions, getShopBySlug } from "@/lib/products";
 
 type Params = { id: string };
@@ -18,10 +18,10 @@ export default async function EditDressPage({ params }: { params: Params }) {
     <div className="container" style={{ paddingTop: 20, paddingBottom: 60 }}>
       <h1 style={{ fontSize: 22, marginBottom: 18 }}>แก้ไขชุด</h1>
       <div style={{ maxWidth: 820 }}>
-        <DressForm
+        <ProductForm
           mode="edit"
-          dressId={dress.id}
-          boutiqueId={dress.shop_id}
+          productId={dress.id}
+          shopId={dress.shop_id}
           defaultLineUrl={boutique?.line_url ?? DEFAULT_LINE}
           occasions={occasions}
           initial={{
@@ -39,6 +39,7 @@ export default async function EditDressPage({ params }: { params: Params }) {
             price_tiers: dress.price_tiers ?? [],
           }}
         />
+
       </div>
     </div>
   );

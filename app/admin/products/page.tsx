@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
-import DressRow from "./DressRow";
+import ProductRow from "./ProductRow";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Dresses · Admin",
+  title: "Products · Admin",
   robots: { index: false, follow: false },
 };
 
 const STATUS_OPTS = ["pending", "live", "rejected", "all"] as const;
 type StatusOpt = (typeof STATUS_OPTS)[number];
 
-export default async function DressesAdmin({
+export default async function ProductsAdmin({
   searchParams,
 }: {
   searchParams: { status?: string };
@@ -21,34 +21,37 @@ export default async function DressesAdmin({
     ? (searchParams!.status as StatusOpt)
     : "pending";
 
-  const rawRows = await db.dress.findMany({
+  const rawRows = await db.product.findMany({
     where: activeStatus !== "all" ? { status: activeStatus } : undefined,
     orderBy: { createdAt: "desc" },
-    select: { id: true, slug: true, tagCode: true, name: true, designer: true, boutiqueName: true, size: true, color: true, pricePerDay: true, status: true, available: true, featured: true, sponsored: true, images: true, createdAt: true, views: true },
+    include: {
+      shop: { select: { name: true } },
+      images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+    },
   });
 
   const rows = rawRows.map((d) => ({
     id: d.id, slug: d.slug, tag_code: d.tagCode, name: d.name, designer: d.designer,
-    boutique_name: d.boutiqueName, size: d.size, color: d.color, price_per_day: d.pricePerDay,
+    shop_name: d.shop.name, size: d.size, color: d.color, price_per_day: d.pricePerDay,
     status: d.status, available: d.available, featured: d.featured, sponsored: d.sponsored,
-    images: d.images as string[], created_at: d.createdAt.toISOString(), views: d.views,
+    images: d.images.map((img) => img.url), created_at: d.createdAt.toISOString(), views: d.views,
   }));
   const error = null as { message: string } | null;
 
   return (
     <div>
       <h1 className="page-title" style={{ fontSize: 26, fontWeight: 600, marginBottom: 4 }}>
-        Dresses
+        Products
       </h1>
       <p style={{ fontSize: 14, color: "var(--ink-3)", marginBottom: 18 }}>
-        จัดการประกาศชุด อนุมัติชุดใหม่ ติ๊ก Featured
+        จัดการประกาศสินค้า อนุมัติสินค้าใหม่ ติ๊ก Featured
       </p>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
         {STATUS_OPTS.map((s) => (
           <a
             key={s}
-            href={`/admin/dresses?status=${s}`}
+            href={`/admin/products?status=${s}`}
             style={{
               padding: "7px 14px",
               fontSize: 13,
@@ -77,12 +80,12 @@ export default async function DressesAdmin({
             color: "var(--ink-3)",
           }}
         >
-          ไม่มีชุดในสถานะ &ldquo;{activeStatus}&rdquo;
+          ไม่มีสินค้าในสถานะ &ldquo;{activeStatus}&rdquo;
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {rows.map((d) => (
-            <DressRow key={d.id} d={d} />
+            <ProductRow key={d.id} d={d} />
           ))}
         </div>
       )}

@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
-  setBoutiqueStatus,
-  toggleBoutiqueVerified,
-  toggleBoutiqueFeatured,
+  setShopStatus,
+  toggleShopVerified,
+  toggleShopFeatured,
 } from "@/app/actions/admin";
 import StatusBadge from "@/components/StatusBadge";
 
-type Boutique = {
+type Shop = {
   id: string;
   slug: string;
   name: string;
@@ -27,11 +27,11 @@ type Boutique = {
   owner_id: string | null;
 };
 
-export default function BoutiqueRow({ b }: { b: Boutique }) {
+export default function ShopRow({ b }: { b: Shop }) {
   const router = useRouter();
   const [working, setWorking] = useState(false);
   const [showReject, setShowReject] = useState(false);
-  const [reason, setReason] = useState(b.status === "rejected" ? "" : "");
+  const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function act(fn: () => Promise<{ ok: boolean; error?: string }>) {
@@ -104,7 +104,7 @@ export default function BoutiqueRow({ b }: { b: Boutique }) {
               className="btn btn-dark"
               style={btnSm}
               disabled={working}
-              onClick={() => act(() => setBoutiqueStatus(b.id, "live"))}
+              onClick={() => act(() => setShopStatus(b.id, "live"))}
             >
               ✓ Approve
             </button>
@@ -123,7 +123,7 @@ export default function BoutiqueRow({ b }: { b: Boutique }) {
             className="btn btn-outline"
             style={{ ...btnSm, color: "var(--warn)" }}
             disabled={working}
-            onClick={() => act(() => setBoutiqueStatus(b.id, "pending"))}
+            onClick={() => act(() => setShopStatus(b.id, "pending"))}
           >
             กลับเป็น pending
           </button>
@@ -133,7 +133,7 @@ export default function BoutiqueRow({ b }: { b: Boutique }) {
             className="btn btn-outline"
             style={btnSm}
             disabled={working}
-            onClick={() => act(() => setBoutiqueStatus(b.id, "pending"))}
+            onClick={() => act(() => setShopStatus(b.id, "pending"))}
           >
             กลับเป็น pending
           </button>
@@ -144,7 +144,7 @@ export default function BoutiqueRow({ b }: { b: Boutique }) {
           className="btn btn-outline"
           style={btnSm}
           disabled={working}
-          onClick={() => act(() => toggleBoutiqueVerified(b.id, !b.verified))}
+          onClick={() => act(() => toggleShopVerified(b.id, !b.verified))}
         >
           {b.verified ? "✕ ถอด Verified" : "✓ ติด Verified"}
         </button>
@@ -154,7 +154,7 @@ export default function BoutiqueRow({ b }: { b: Boutique }) {
           className="btn btn-outline"
           style={btnSm}
           disabled={working}
-          onClick={() => act(() => toggleBoutiqueFeatured(b.id, !b.featured))}
+          onClick={() => act(() => toggleShopFeatured(b.id, !b.featured))}
         >
           {b.featured ? "✕ ถอด Featured" : "★ ติด Featured"}
         </button>
@@ -185,7 +185,7 @@ export default function BoutiqueRow({ b }: { b: Boutique }) {
             className="btn btn-dark"
             style={{ ...btnSm, background: "var(--danger)", borderColor: "var(--danger)" }}
             disabled={working}
-            onClick={() => act(() => setBoutiqueStatus(b.id, "rejected", reason))}
+            onClick={() => act(() => setShopStatus(b.id, "rejected", reason))}
           >
             ยืนยัน Reject
           </button>

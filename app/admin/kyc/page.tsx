@@ -23,18 +23,18 @@ export default async function KycReviewPage({
 
   const rawRows = await db.kycSubmission.findMany({
     where: { status: activeStatus },
-    orderBy: { submittedAt: "desc" },
-    include: { boutique: { select: { name: true, slug: true, areaLabel: true } } },
+    orderBy: { createdAt: "desc" },
+    include: { shop: { select: { name: true, slug: true, areaLabel: true } } },
   });
 
   const rows = rawRows.map((r) => ({
-    id: r.id, boutique_id: r.boutiqueId, business_type: r.businessType,
+    id: r.id, shop_id: r.shopId, business_type: r.businessType,
     legal_name: r.legalName, tax_id: r.taxId, dbd_reg_no: r.dbdRegNo,
     bank_name: r.bankName, bank_acc_no: r.bankAccNo, bank_acc_name: r.bankAccName,
     id_card_url: r.idCardUrl, dbd_doc_url: r.dbdDocUrl, book_bank_url: r.bookBankUrl,
     plan: r.plan, status: r.status, review_notes: r.reviewNotes,
-    submitted_at: r.submittedAt.toISOString(),
-    boutiques: { name: r.boutique.name, slug: r.boutique.slug, area_label: r.boutique.areaLabel },
+    created_at: r.createdAt.toISOString(),
+    shop: { name: r.shop.name, slug: r.shop.slug, area_label: r.shop.areaLabel },
   }));
   const error = null as { message: string } | null;
 

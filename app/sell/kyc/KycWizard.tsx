@@ -5,7 +5,7 @@ import { useState } from "react";
 import { submitKyc } from "@/app/actions/seller";
 
 type BusinessType = "individual" | "company";
-type Plan = "Free" | "Boost" | "Featured";
+type Plan = "free" | "boost" | "featured";
 
 type Step = 1 | 2 | 3;
 
@@ -38,7 +38,7 @@ export default function KycWizard({ boutiqueId }: Props) {
 
   // form state
   const [businessType, setBusinessType] = useState<BusinessType>("individual");
-  const [plan, setPlan] = useState<Plan>("Free");
+  const [plan, setPlan] = useState<Plan>("free");
   const [legalName, setLegalName] = useState("");
   const [taxId, setTaxId] = useState("");
   const [dbdRegNo, setDbdRegNo] = useState("");
@@ -306,7 +306,7 @@ function Step1({
         เริ่มฟรีก่อนได้ อัปเกรดผ่าน LINE ของ DopRent ภายหลัง
       </p>
       <div style={{ display: "grid", gap: 10 }}>
-        {(["Free", "Boost", "Featured"] as Plan[]).map((p) => (
+        {(["free", "boost", "featured"] as Plan[]).map((p) => (
           <label
             key={p}
             style={{
@@ -328,9 +328,9 @@ function Step1({
               style={{ marginTop: 2 }}
             />
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600 }}>{p}</div>
+              <div style={{ fontWeight: 600, textTransform: "capitalize" }}>{p}</div>
               <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 2 }}>
-                {p === "Free" ? "ฟรี ตลอดชีพ" : p === "Boost" ? "฿990/เดือน" : "฿2,900/เดือน"}
+                {p === "free" ? "ฟรี ตลอดชีพ" : p === "boost" ? "฿990/เดือน" : "฿2,900/เดือน"}
               </div>
             </div>
           </label>
