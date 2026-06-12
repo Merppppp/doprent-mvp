@@ -189,7 +189,7 @@ export default function UserMenu({
             {t("menu.savedItems", locale)}
             {savedCount > 0 && <Pill n={savedCount} />}
           </Link>
-          <Link href="/boutiques" style={menuItemStyle}>
+          <Link href="/shops" style={menuItemStyle}>
             {t("menu.likedShops", locale)}
           </Link>
           <Link href="/account" style={menuItemStyle}>

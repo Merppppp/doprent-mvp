@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   }
   const title = dress.designer ? `${dress.name} · ${dress.designer}` : dress.name;
   const description = `${dress.description ?? dress.name} ค่าเช่า ฿${dress.price_per_day.toLocaleString()}/วัน · จองผ่าน LINE กับ ${dress.shop_name}`;
-  const url = `${SITE}/dress/${dress.slug}`;
+  const url = `${SITE}/product/${dress.slug}`;
   return {
     title,
     description,
@@ -62,7 +62,7 @@ export default async function DressPage({ params }: { params: Params }) {
   const isSaved = savedSet.has(dress.id);
 
   const lineUrl = dress.line_url || boutique?.line_url || DEFAULT_LINE;
-  const url = `${SITE}/dress/${dress.slug}`;
+  const url = `${SITE}/product/${dress.slug}`;
 
   // Get boutique-specific data from DB-fetched record (preferred), or denormalized name
   const boutiqueLine = boutique?.line_url || dress.line_url || DEFAULT_LINE;
@@ -148,7 +148,7 @@ export default async function DressPage({ params }: { params: Params }) {
               {dress.name}
             </h1>
             <SaveButton
-              dressId={dress.id}
+              productId={dress.id}
               initialSaved={isSaved}
               isLoggedIn={isLoggedIn}
               variant="detail"
@@ -227,7 +227,7 @@ export default async function DressPage({ params }: { params: Params }) {
               dates before booking). */}
           {boutiqueSlug ? (
             <Link
-              href={`/boutique/${boutiqueSlug}`}
+              href={`/shop/${boutiqueSlug}`}
               style={{
                 display: "flex",
                 gap: 12,
@@ -282,10 +282,10 @@ export default async function DressPage({ params }: { params: Params }) {
               label="ติดต่อร้านสอบถาม"
               variant="inline"
               source="detail_inline_ask"
-              dressId={dress.id}
-              boutiqueId={dress.shop_id}
+              productId={dress.id}
+              shopId={dress.shop_id}
               isLoggedIn={isLoggedIn}
-              loginNext={`/dress/${dress.slug}`}
+              loginNext={`/product/${dress.slug}`}
             />
           </div>
 
@@ -342,11 +342,11 @@ export default async function DressPage({ params }: { params: Params }) {
             priceTiers={dress.price_tiers}
             deposit={dress.deposit}
             blackouts={blackouts}
-            dressId={dress.id}
-            boutiqueId={dress.shop_id}
+            productId={dress.id}
+            shopId={dress.shop_id}
             dressTagCode={dress.tag_code}
             isLoggedIn={isLoggedIn}
-            loginNext={`/dress/${dress.slug}`}
+            loginNext={`/product/${dress.slug}`}
           />
 
 

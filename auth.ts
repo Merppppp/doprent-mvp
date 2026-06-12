@@ -4,7 +4,7 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
-import { db } from "@/lib/db";
+import { base, db } from "@/lib/db";
 import type { Role } from "@prisma/client";
 
 const ADMIN_EMAILS = ["admin@doprent.com", "prem@doprent.com", "hgcovuf@gmail.com"];
@@ -19,7 +19,11 @@ class EmailNotVerifiedError extends CredentialsSignin {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  adapter: PrismaAdapter(db),
+  // IMPORTANT: the adapter gets the UN-extended client. Passing the extended
+  // `db` would actor-stamp/audit adapter ops and serialize Account/Session/
+  // VerificationToken rows (OAuth + verification tokens) into audit_logs jsonb
+  // (DESIGN §8.4). The exclusion set in lib/db.ts is defense-in-depth only.
+  adapter: PrismaAdapter(base),
   // JWT strategy: session lives in a cookie — no DB call needed in middleware
   // Prisma adapter still handles OAuth accounts + user storage
   session: { strategy: "jwt" },

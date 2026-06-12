@@ -10,7 +10,7 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 export const metadata: Metadata = {
   title: "ร้านเช่าทั้งหมด",
   description: "รวมร้านเช่าชุดในกรุงเทพฯ ทักร้านผ่าน LINE ได้โดยตรง",
-  alternates: { canonical: `${SITE}/boutiques` },
+  alternates: { canonical: `${SITE}/shops` },
 };
 
 type SearchParams = { q?: string };
@@ -39,7 +39,7 @@ export default async function BoutiquesPage({
           <>
             พบ <b style={{ color: "var(--ink)" }}>{boutiques.length}</b> ร้านสำหรับ &ldquo;{search}&rdquo;
             {" · "}
-            <Link href="/boutiques" style={{ color: "var(--ink-2)" }}>
+            <Link href="/shops" style={{ color: "var(--ink-2)" }}>
               ล้างการค้นหา
             </Link>
           </>
@@ -96,7 +96,7 @@ export default async function BoutiquesPage({
             ไม่พบร้านที่ตรงกับคำค้นหา
           </h3>
           <p style={{ fontSize: 14, marginBottom: 18 }}>ลองค้นด้วยชื่อย่าน เช่น &ldquo;ทองหล่อ&rdquo; หรือ &ldquo;สยาม&rdquo;</p>
-          <Link href="/boutiques" className="btn btn-outline">
+          <Link href="/shops" className="btn btn-outline">
             ดูร้านทั้งหมด
           </Link>
         </div>

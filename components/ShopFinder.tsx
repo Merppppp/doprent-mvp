@@ -117,7 +117,7 @@ export default function ShopFinder({ shops }: { shops: FinderShop[] }) {
         {withDist.map(({ shop: b, km }) => (
           <Link
             key={b.id}
-            href={`/boutique/${b.slug}`}
+            href={`/shop/${b.slug}`}
             className="boutique-card"
             style={{
               background: "var(--surface)",

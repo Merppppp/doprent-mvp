@@ -22,7 +22,7 @@ export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn
 
   return (
     <div className="card" style={{ position: "relative" }}>
-      <Link href={`/dress/${product.slug}`} style={{ display: "block", cursor: "pointer" }}>
+      <Link href={`/product/${product.slug}`} style={{ display: "block", cursor: "pointer" }}>
         <div
           style={{
             aspectRatio: "3/4",
@@ -34,7 +34,7 @@ export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn
           }}
         >
           <ProductCardImage src={imgSrc} alt={product.name} color={product.color} variant={variant} />
-          <SaveButton dressId={product.id} initialSaved={isSaved} isLoggedIn={isLoggedIn} />
+          <SaveButton productId={product.id} initialSaved={isSaved} isLoggedIn={isLoggedIn} />
         </div>
         <div style={{ padding: "0 2px" }}>
           <div
