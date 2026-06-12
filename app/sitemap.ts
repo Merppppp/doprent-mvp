@@ -11,18 +11,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticPages: MetadataRoute.Sitemap = [
     { url: `${SITE}/`, lastModified: now, changeFrequency: "daily", priority: 1 },
-    { url: `${SITE}/boutiques`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${SITE}/shops`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
   ];
 
   const dressPages: MetadataRoute.Sitemap = products.map((d) => ({
-    url: `${SITE}/dress/${d.slug}`,
+    url: `${SITE}/product/${d.slug}`,
     lastModified: now,
     changeFrequency: "weekly",
     priority: 0.7,
   }));
 
   const boutiquePages: MetadataRoute.Sitemap = shops.map((b) => ({
-    url: `${SITE}/boutique/${b.slug}`,
+    url: `${SITE}/shop/${b.slug}`,
     lastModified: now,
     changeFrequency: "weekly",
     priority: 0.7,

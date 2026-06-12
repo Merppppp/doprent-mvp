@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { withActor } from "@/lib/db-context";
 import { r2, R2_PRIVATE_BUCKET } from "@/lib/r2";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB — slip อาจเป็น screenshot ใหญ่กว่ารูปชุด
@@ -49,10 +50,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     ContentType: file.type,
   }));
 
-  const updated = await db.booking.update({
-    where: { id: params.id },
-    data: { status: "payment_review", slipPath: key },
-  });
+  const updated = await withActor(session.user.id, () =>
+    db.booking.update({
+      where: { id: params.id },
+      data: { status: "payment_review", slipPath: key },
+    }),
+  );
 
   return NextResponse.json(updated);
 }

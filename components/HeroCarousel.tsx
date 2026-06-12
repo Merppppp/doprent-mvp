@@ -73,7 +73,7 @@ export default function HeroCarousel({ items }: { items: HeroItem[] }) {
       onKeyDown={(e) => {
         if (e.key === "ArrowRight") { e.preventDefault(); next(); }
         else if (e.key === "ArrowLeft") { e.preventDefault(); prev(); }
-        else if (e.key === "Enter") router.push(`/dress/${items[active].slug}`);
+        else if (e.key === "Enter") router.push(`/product/${items[active].slug}`);
       }}
     >
       <div className="hc-stage">
@@ -100,7 +100,7 @@ export default function HeroCarousel({ items }: { items: HeroItem[] }) {
               aria-label={isCenter ? `เปิดดู ${it.name}` : `ไปที่ ${it.name}`}
               tabIndex={isCenter ? 0 : -1}
               onClick={() => {
-                if (isCenter) router.push(`/dress/${it.slug}`);
+                if (isCenter) router.push(`/product/${it.slug}`);
                 else setActive(i);
               }}
             >

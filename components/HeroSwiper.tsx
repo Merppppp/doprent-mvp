@@ -50,7 +50,7 @@ export default function HeroSwiper({ slides }: { slides: SlideData[] }) {
         {items.map((d, i) => (
           <SwiperSlide key={d.id} className="hero-card-slide">
             {d.slug ? (
-              <Link href={`/dress/${d.slug}`} className="hero-card-inner">
+              <Link href={`/product/${d.slug}`} className="hero-card-inner">
                 <div className="hero-card-img">
                   {d.image ? (
                     // eslint-disable-next-line @next/next/no-img-element

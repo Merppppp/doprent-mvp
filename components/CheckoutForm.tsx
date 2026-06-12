@@ -7,7 +7,7 @@ import { priceForNights } from "@/lib/pricing";
 import type { Address, PriceTier } from "@/lib/types";
 
 type Props = {
-  dressId: string;
+  productId: string;
   startDate: string;
   endDate: string;
   days: number;
@@ -23,7 +23,7 @@ const fmtThai = (s: string) => {
 };
 
 export default function CheckoutForm({
-  dressId,
+  productId,
   startDate,
   endDate,
   days,
@@ -76,7 +76,7 @@ export default function CheckoutForm({
     setError("");
     setBusy(true);
     const fd = new FormData();
-    fd.set("dress_id", dressId);
+    fd.set("product_id", productId);
     fd.set("address_id", selectedId);
     fd.set("start_date", startDate);
     fd.set("end_date", endDate);

@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return {
     title: b.name,
     description: b.tag ?? `${b.name} · ${b.area_label}`,
-    alternates: { canonical: `${SITE}/boutique/${b.slug}` },
+    alternates: { canonical: `${SITE}/shop/${b.slug}` },
   };
 }
 
@@ -37,7 +37,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
   return (
     <div className="container" style={{ paddingBottom: 80 }}>
       <div style={{ fontSize: 13, color: "var(--ink-3)", padding: "20px 0 8px" }}>
-        <Link href="/boutiques">← ดูร้านทั้งหมด</Link>
+        <Link href="/shops">← ดูร้านทั้งหมด</Link>
       </div>
 
       {/* Cover */}
@@ -72,9 +72,9 @@ export default async function BoutiquePage({ params }: { params: Params }) {
             label="ทักร้านทาง LINE"
             variant="primary"
             source="boutique_primary"
-            boutiqueId={b.id}
+            shopId={b.id}
             isLoggedIn={isLoggedIn}
-            loginNext={`/boutique/${b.slug}`}
+            loginNext={`/shop/${b.slug}`}
           />
         </div>
       </div>
