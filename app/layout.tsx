@@ -68,7 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body>
+      <body style={{ overflow: "hidden", height: "100vh", display: "flex", flexDirection: "column" }}>
         <a
           href="#main"
           style={{
@@ -81,8 +81,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
         <LocationProvider>
           <Header />
-          <main id="main">{children}</main>
-          <Footer />
+          <div id="main" style={{ flex: 1, overflowY: "auto" }}>
+            <main>{children}</main>
+            <Footer />
+          </div>
           <ScrollReveal />
           <PageViewTracker />
           <ClarityAnalytics />

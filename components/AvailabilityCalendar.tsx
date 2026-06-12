@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toggleBlackout } from "@/app/actions/availability";
 
 type Props = {
-  dressId: string;
+  productId: string;
   /** Existing blackout dates as YYYY-MM-DD strings. */
   initialBlackouts: string[];
 };
@@ -36,7 +36,7 @@ function toLocalDateString(d: Date): string {
 
 const TODAY_STR = toLocalDateString(new Date());
 
-export default function AvailabilityCalendar({ dressId, initialBlackouts }: Props) {
+export default function AvailabilityCalendar({ productId, initialBlackouts }: Props) {
   const router = useRouter();
   const [blackouts, setBlackouts] = useState<Set<string>>(new Set(initialBlackouts));
   const [pending, startTransition] = useTransition();
@@ -90,7 +90,7 @@ export default function AvailabilityCalendar({ dressId, initialBlackouts }: Prop
     setBlackouts(next);
 
     startTransition(async () => {
-      const res = await toggleBlackout(dressId, dateStr);
+      const res = await toggleBlackout(productId, dateStr);
       if (!res.ok) {
         // Revert
         setBlackouts(blackouts);

@@ -64,7 +64,7 @@ export default function SellerAvailabilityPicker({ dresses }: { dresses: DressOp
       const monthKey = getMonthKey(selectedYear, selectedMonth);
       try {
         const res = await fetch(
-          `/api/dress-blackouts?dress_id=${encodeURIComponent(selectedDressId)}&month=${encodeURIComponent(
+          `/api/product-blackout-dates?product_id=${encodeURIComponent(selectedDressId)}&month=${encodeURIComponent(
             monthKey,
           )}`,
           { signal: controller.signal },
@@ -175,7 +175,7 @@ export default function SellerAvailabilityPicker({ dresses }: { dresses: DressOp
           }}
         >
           <AvailabilityCalendar
-            dressId={selectedDressId}
+            productId={selectedDressId}
             initialBlackouts={blackouts}
           />
         </div>

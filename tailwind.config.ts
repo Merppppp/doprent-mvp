@@ -3,6 +3,14 @@ import type { Config } from "tailwindcss";
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
+    container: {
+      center: true,
+      padding: {
+        DEFAULT: "24px",
+        sm: "16px",
+        lg: "24px",
+      },
+    },
     extend: {
       // Tailwind color tokens kept in sync with the CSS custom properties
       // in app/globals.css (which are the source of truth — OKLCH, warm-tinted).
@@ -33,9 +41,6 @@ const config: Config = {
           "Roboto",
           "sans-serif",
         ],
-      },
-      maxWidth: {
-        shell: "1280px",
       },
     },
   },

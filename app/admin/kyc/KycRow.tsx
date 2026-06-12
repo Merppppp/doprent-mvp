@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { approveKyc, rejectKyc } from "@/app/actions/admin";
+import StatusBadge from "@/components/StatusBadge";
 
 type Kyc = {
   id: string;
-  boutique_id: string;
+  shop_id: string;
   business_type: string;
   legal_name: string;
   tax_id: string;
@@ -21,8 +22,8 @@ type Kyc = {
   plan: string;
   status: string;
   review_notes: string | null;
-  submitted_at: string;
-  boutiques: { name: string; slug: string; area_label: string };
+  created_at: string;
+  shop: { name: string; slug: string; area_label: string };
 };
 
 export default function KycRow({ kyc }: { kyc: Kyc }) {
@@ -78,39 +79,28 @@ export default function KycRow({ kyc }: { kyc: Kyc }) {
       >
         <div>
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 4 }}>
-            {kyc.boutiques.area_label} · ส่งเมื่อ {new Date(kyc.submitted_at).toLocaleString("th-TH")}
+            {kyc.shop.area_label} · ส่งเมื่อ {new Date(kyc.created_at).toLocaleString("th-TH")}
           </div>
           <Link
-            href={`/boutique/${kyc.boutiques.slug}`}
+            href={`/boutique/${kyc.shop.slug}`}
             target="_blank"
             style={{ fontWeight: 600, fontSize: 17 }}
           >
-            {kyc.boutiques.name}
+            {kyc.shop.name}
           </Link>
           <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 4 }}>
             {kyc.business_type === "company" ? "นิติบุคคล" : "บุคคลธรรมดา"} · plan: {kyc.plan}
           </div>
         </div>
-        <span
-          style={{
-            padding: "3px 10px",
-            background:
-              kyc.status === "approved" ? "rgba(21,128,61,0.1)" :
-              kyc.status === "rejected" ? "rgba(220,38,38,0.1)" :
-              "rgba(217,119,6,0.1)",
-            color:
-              kyc.status === "approved" ? "#15803D" :
-              kyc.status === "rejected" ? "#DC2626" :
-              "#D97706",
-            fontSize: 11,
-            fontWeight: 600,
-            borderRadius: 3,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-          }}
-        >
-          {kyc.status}
-        </span>
+        <StatusBadge
+          text={kyc.status}
+          tone={
+            kyc.status === "approved" ? "success" :
+            kyc.status === "rejected" ? "danger" :
+            "warn"
+          }
+          style={{ padding: "3px 10px", fontSize: 11 }}
+        />
       </div>
 
       <div className="grid-2" style={{ gap: 14, marginBottom: 14, fontSize: 13 }}>
@@ -122,6 +112,10 @@ export default function KycRow({ kyc }: { kyc: Kyc }) {
         {kyc.bank_acc_no ? <Info label="เลขบัญชี" value={kyc.bank_acc_no} /> : null}
       </div>
 
+      {/* KYC doc hrefs are pre-resolved server-side in page.tsx:
+          new rows store a PRIVATE-bucket key (`kyc/…`) → href points at the
+          admin-guarded /api/admin/kyc-doc route (302 → short-lived signed URL);
+          legacy rows with full public URLs are rendered as-is. */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
         {kyc.id_card_url ? (
           <a href={kyc.id_card_url} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={btnSm}>
@@ -181,7 +175,7 @@ export default function KycRow({ kyc }: { kyc: Kyc }) {
               onClick={onReject}
               disabled={working}
               className="btn btn-dark"
-              style={{ background: "#DC2626", borderColor: "#DC2626", padding: "9px 14px", fontSize: 13 }}
+              style={{ background: "var(--danger)", borderColor: "var(--danger)", padding: "9px 14px", fontSize: 13 }}
             >
               ยืนยันตีกลับ
             </button>
@@ -209,7 +203,7 @@ export default function KycRow({ kyc }: { kyc: Kyc }) {
               type="button"
               onClick={() => setShowReject(true)}
               className="btn btn-outline"
-              style={{ padding: "9px 16px", fontSize: 13, color: "#DC2626", borderColor: "#DC2626" }}
+              style={{ padding: "9px 16px", fontSize: 13, color: "var(--danger)", borderColor: "var(--danger)" }}
             >
               Reject
             </button>

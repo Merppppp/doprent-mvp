@@ -199,18 +199,17 @@
   },
   {
     "id": "12",
-    "slug": "sage-linen-suit",
-    "name": "Sage Linen Suit Set",
+    "slug": "classic-black-suit",
+    "name": "Classic Black Suit",
     "designer": "Asava",
     "boutique": "Thonglor Atelier",
     "size": "M",
-    "color": "green",
+    "color": "black",
     "price_per_day": 1500,
     "deposit": 7500,
-    "description": "เซ็ตเสื้อเบลเซอร์กับกระโปรงผ้าลินินสีเสจ ใส่ทำงาน งานสัมมนา หรือเดทกลางวัน",
+    "description": "สูทสีดำทรงเข้ารูปสำหรับเช่า ใส่ได้ทั้งงานแต่ง งานทางการ และงานเลี้ยงค่ำ",
     "images": [
-      "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=1200",
-      "https://images.unsplash.com/photo-1551803091-e20673f15770?w=1200"
+      "/products/suit-rental-hero.png"
     ],
     "line_url": "https://line.me/R/ti/p/@thonglor",
     "available": true

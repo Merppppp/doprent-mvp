@@ -15,39 +15,40 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-type SP = { dress?: string; start?: string; end?: string };
+type SP = { product?: string; dress?: string; start?: string; end?: string };
 
 export default async function CheckoutAddressPage({
   searchParams,
 }: {
   searchParams: SP;
 }) {
-  const dressId = searchParams.dress ?? "";
+  // `?dress=` accepted as a legacy alias during the rename deploy window.
+  const productId = searchParams.product ?? searchParams.dress ?? "";
   const start = searchParams.start ?? "";
   const end = searchParams.end ?? "";
 
-  const backHref = `/checkout/address?dress=${dressId}&start=${start}&end=${end}`;
+  const backHref = `/checkout/address?product=${productId}&start=${start}&end=${end}`;
 
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(backHref)}`);
 
-  if (!dressId || !start || !end) {
+  if (!productId || !start || !end) {
     return <Fallback msg="ลิงก์การจองไม่สมบูรณ์ กรุณาเลือกชุดและวันที่จากหน้าชุดอีกครั้ง" />;
   }
 
-  const row = await db.dress.findUnique({
-    where: { id: dressId },
+  const row = await db.product.findUnique({
+    where: { id: productId },
     select: {
       id: true,
       name: true,
       slug: true,
-      images: true,
+      images: { orderBy: { sortOrder: "asc" }, select: { url: true } },
       pricePerDay: true,
-      priceTiers: true,
+      priceTiers: { orderBy: { minDays: "asc" }, select: { minDays: true, pricePerDay: true } },
       deposit: true,
       status: true,
       available: true,
-      boutiqueName: true,
+      shop: { select: { name: true } },
     },
   });
   const dress = row
@@ -55,13 +56,17 @@ export default async function CheckoutAddressPage({
         id: row.id,
         name: row.name,
         slug: row.slug,
-        images: row.images,
+        images: row.images.map((img) => img.url),
         price_per_day: row.pricePerDay,
-        price_tiers: row.priceTiers,
+        price_tiers: row.priceTiers.map((t, i) => ({
+          min: t.minDays,
+          max: i < row.priceTiers.length - 1 ? row.priceTiers[i + 1].minDays - 1 : null,
+          per_day: t.pricePerDay,
+        })),
         deposit: row.deposit,
         status: row.status,
         available: row.available,
-        boutique_name: row.boutiqueName,
+        boutique_name: row.shop.name,
       }
     : null;
 
@@ -75,8 +80,8 @@ export default async function CheckoutAddressPage({
   const addresses = await getMyAddresses();
 
   return (
-    <div className="shell" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 640 }}>
-      <Link href={`/dress/${dress.slug}`} style={{ fontSize: 14, color: "var(--ink-3)" }}>
+    <div className="container" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 640 }}>
+      <Link href={`/product/${dress.slug}`} style={{ fontSize: 14, color: "var(--ink-3)" }}>
         ← กลับไปหน้าชุด
       </Link>
       <h1
@@ -125,7 +130,7 @@ export default async function CheckoutAddressPage({
       </div>
 
       <CheckoutForm
-        dressId={dress.id}
+        productId={dress.id}
         startDate={start}
         endDate={end}
         days={days}
@@ -140,9 +145,9 @@ export default async function CheckoutAddressPage({
 
 function Fallback({ msg }: { msg: string }) {
   return (
-    <div className="shell" style={{ paddingTop: 80, paddingBottom: 100, maxWidth: 520, textAlign: "center" }}>
+    <div className="container" style={{ paddingTop: 80, paddingBottom: 100, maxWidth: 520, textAlign: "center" }}>
       <p style={{ fontSize: 16, color: "var(--ink-2)", marginBottom: 22 }}>{msg}</p>
-      <Link href="/browse" className="btn btn-dark" style={{ padding: "12px 22px" }}>
+      <Link href="/" className="btn btn-dark" style={{ padding: "12px 22px" }}>
         เลือกชุด
       </Link>
     </div>

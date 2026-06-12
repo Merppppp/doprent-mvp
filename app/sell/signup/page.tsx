@@ -16,7 +16,7 @@ export default async function SellSignupPage() {
   if (!user) redirect("/login?next=/sell/signup");
 
   const [existing, areasRaw] = await Promise.all([
-    db.boutique.findFirst({ where: { ownerId: user.id }, select: { slug: true } }),
+    db.shop.findFirst({ where: { ownerId: user.id }, select: { slug: true } }),
     db.area.findMany({ orderBy: { th: "asc" }, select: { key: true, th: true } }),
   ]);
   if (existing) redirect("/sell/dashboard");
@@ -24,7 +24,7 @@ export default async function SellSignupPage() {
   const areas = areasRaw as Array<{ key: string; th: string }>;
 
   return (
-    <div className="shell" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 680 }}>
+    <div className="container" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 680 }}>
       <h1
         className="page-title"
         style={{ fontSize: 30, fontWeight: 600, marginBottom: 6, letterSpacing: "-0.01em" }}

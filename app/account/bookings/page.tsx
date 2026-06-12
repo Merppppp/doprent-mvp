@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { getRenterBookings } from "@/lib/booking-queries";
+import { expireOverdueBookings } from "@/lib/booking-expiry";
 import { amountDue } from "@/lib/bookings";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 
@@ -22,10 +23,12 @@ export default async function MyBookingsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/account/bookings");
 
+  // Lazy payment-expiry sweep so stale waiting_for_payment rows never show.
+  await expireOverdueBookings();
   const bookings = await getRenterBookings();
 
   return (
-    <div className="shell" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 720 }}>
+    <div className="container" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 720 }}>
       <h1
         className="page-title"
         style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", marginBottom: 20 }}
@@ -36,7 +39,7 @@ export default async function MyBookingsPage() {
       {bookings.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 0", color: "var(--ink-2)" }}>
           <p style={{ marginBottom: 20 }}>ยังไม่มีการจอง</p>
-          <Link href="/browse" className="btn btn-dark" style={{ padding: "12px 22px" }}>
+          <Link href="/" className="btn btn-dark" style={{ padding: "12px 22px" }}>
             เริ่มเลือกชุด
           </Link>
         </div>

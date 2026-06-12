@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { t, type Locale } from "@/lib/i18n";
 
 type Props = {
   user: {
@@ -15,6 +16,7 @@ type Props = {
     renterBadge: number;
     sellerBadge: number;
   } | null;
+  locale?: Locale;
 };
 
 function MPill({ n }: { n: number }) {
@@ -25,7 +27,7 @@ function MPill({ n }: { n: number }) {
   );
 }
 
-export default function MobileMenu({ user }: Props) {
+export default function MobileMenu({ user, locale = "th" }: Props) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -49,7 +51,7 @@ export default function MobileMenu({ user }: Props) {
     <>
       <button
         type="button"
-        aria-label="เปิดเมนู"
+        aria-label={t("mobile.openMenu", locale)}
         aria-expanded={open}
         onClick={() => setOpen(true)}
         className="mobile-menu-toggle"
@@ -94,7 +96,7 @@ export default function MobileMenu({ user }: Props) {
             className="mobile-drawer-panel"
             role="dialog"
             aria-modal="true"
-            aria-label="เมนู"
+            aria-label={t("mobile.menu", locale)}
           >
             <div
               style={{
@@ -113,7 +115,7 @@ export default function MobileMenu({ user }: Props) {
               </Link>
               <button
                 type="button"
-                aria-label="ปิดเมนู"
+                aria-label={t("mobile.closeMenu", locale)}
                 onClick={() => setOpen(false)}
                 style={{
                   width: 36,
@@ -204,11 +206,17 @@ export default function MobileMenu({ user }: Props) {
             ) : null}
 
             <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <Link href="/browse" style={drawerItem}>
-                เลือกชุด
+              <Link href="/" style={drawerItem}>
+                {t("mobile.browseDresses", locale)}
               </Link>
-              <Link href="/boutiques" style={drawerItem}>
-                ร้านเช่า
+              <Link href="/shops" style={drawerItem}>
+                {t("mobile.boutiques", locale)}
+              </Link>
+              <Link
+                href="/sell/signup"
+                style={{ ...drawerItem, color: "var(--accent)", fontWeight: 500 }}
+              >
+                {t("nav.openShop", locale)}
               </Link>
               {user ? (
                 <>
@@ -231,7 +239,7 @@ export default function MobileMenu({ user }: Props) {
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                       </svg>
                     </span>
-                    ชุดที่ถูกใจ
+                    {t("mobile.likedDresses", locale)}
                     {user.savedCount > 0 ? (
                       <span
                         style={{
@@ -254,20 +262,20 @@ export default function MobileMenu({ user }: Props) {
                     ) : null}
                   </Link>
                   <Link href="/account" style={drawerItem}>
-                    บัญชีของฉัน
+                    {t("menu.myAccount", locale)}
                   </Link>
                   <Link href="/account/bookings" style={{ ...drawerItem, display: "flex", alignItems: "center", gap: 8 }}>
-                    การจองของฉัน
+                    {t("menu.myBookings", locale)}
                     {user.renterBadge > 0 ? <MPill n={user.renterBadge} /> : null}
                   </Link>
                   {user.isSeller ? (
                     <Link href="/sell/dashboard" style={drawerItem}>
-                      Dashboard ร้านของฉัน
+                      {t("menu.shopDashboard", locale)}
                     </Link>
                   ) : null}
                   {user.isSeller ? (
                     <Link href="/sell/bookings" style={{ ...drawerItem, display: "flex", alignItems: "center", gap: 8 }}>
-                      การจองของร้าน
+                      {t("menu.shopBookings", locale)}
                       {user.sellerBadge > 0 ? <MPill n={user.sellerBadge} /> : null}
                     </Link>
                   ) : null}
@@ -296,7 +304,7 @@ export default function MobileMenu({ user }: Props) {
                     type="submit"
                     className="btn btn-outline btn-block"
                   >
-                    ออกจากระบบ
+                    {t("menu.signOut", locale)}
                   </button>
                 </form>
               ) : (
@@ -306,14 +314,14 @@ export default function MobileMenu({ user }: Props) {
                     className="btn btn-outline btn-block"
                     onClick={() => setOpen(false)}
                   >
-                    เข้าสู่ระบบ
+                    {t("nav.login", locale)}
                   </Link>
                   <Link
                     href="/signup"
                     className="btn btn-dark btn-block"
                     onClick={() => setOpen(false)}
                   >
-                    สมัครสมาชิก
+                    {t("nav.signup", locale)}
                   </Link>
                 </>
               )}

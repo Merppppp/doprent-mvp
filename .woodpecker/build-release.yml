@@ -25,7 +25,10 @@ steps:
         from_secret: ghcr_token
     commands:
       - "echo \"$$GHCR_TOKEN\" | docker login ghcr.io -u \"$$GHCR_USERNAME\" --password-stdin"
-      - "BUILD_ARGS=$$(grep -vE '^(#|$$)' .config/doprent-mvp/prod.env | sed 's/^/--build-arg /' | tr '\\n' ' ')"
+      # Only pass args the Dockerfile declares (DATABASE_URL, NEXT_PUBLIC_*).
+      # Values with spaces (e.g. EMAIL_FROM="DopRent <...>") would word-split
+      # and break `docker build` — and they are runtime env, not build args.
+      - "BUILD_ARGS=$$(grep -E '^(DATABASE_URL|NEXT_PUBLIC_[A-Z_]*)=' .config/doprent-mvp/prod.env | sed 's/^/--build-arg /' | tr '\\n' ' ')"
       - "docker build $$BUILD_ARGS -t ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG} ."
       - "docker push ghcr.io/doprent/doprent-mvp:${CI_COMMIT_TAG}"
 

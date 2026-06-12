@@ -5,7 +5,7 @@ import { useState } from "react";
 import { submitKyc } from "@/app/actions/seller";
 
 type BusinessType = "individual" | "company";
-type Plan = "Free" | "Boost" | "Featured";
+type Plan = "free" | "boost" | "featured";
 
 type Step = 1 | 2 | 3;
 
@@ -38,7 +38,7 @@ export default function KycWizard({ boutiqueId }: Props) {
 
   // form state
   const [businessType, setBusinessType] = useState<BusinessType>("individual");
-  const [plan, setPlan] = useState<Plan>("Free");
+  const [plan, setPlan] = useState<Plan>("free");
   const [legalName, setLegalName] = useState("");
   const [taxId, setTaxId] = useState("");
   const [dbdRegNo, setDbdRegNo] = useState("");
@@ -56,17 +56,20 @@ export default function KycWizard({ boutiqueId }: Props) {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      // KYC docs are sensitive → PRIVATE bucket. The route returns an object
+      // KEY (e.g. `kyc/<uuid>.png`), not a public URL; admins resolve it via
+      // a guarded signed-URL route.
+      const res = await fetch("/api/upload/kyc", { method: "POST", body: fd });
       if (!res.ok) {
         setError("อัปโหลดไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง");
         setUploading(null);
         return;
       }
       const json = await res.json();
-      const url = json.urls?.large ?? json.url ?? "";
-      if (field === "id_card") setIdCardUrl(url);
-      if (field === "dbd_doc") setDbdDocUrl(url);
-      if (field === "book_bank") setBookBankUrl(url);
+      const key = json.key ?? "";
+      if (field === "id_card") setIdCardUrl(key);
+      if (field === "dbd_doc") setDbdDocUrl(key);
+      if (field === "book_bank") setBookBankUrl(key);
       setUploading(null);
     } catch (err) {
       setError((err as Error).message);
@@ -306,7 +309,7 @@ function Step1({
         เริ่มฟรีก่อนได้ อัปเกรดผ่าน LINE ของ DopRent ภายหลัง
       </p>
       <div style={{ display: "grid", gap: 10 }}>
-        {(["Free", "Boost", "Featured"] as Plan[]).map((p) => (
+        {(["free", "boost", "featured"] as Plan[]).map((p) => (
           <label
             key={p}
             style={{
@@ -328,9 +331,9 @@ function Step1({
               style={{ marginTop: 2 }}
             />
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600 }}>{p}</div>
+              <div style={{ fontWeight: 600, textTransform: "capitalize" }}>{p}</div>
               <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 2 }}>
-                {p === "Free" ? "ฟรี ตลอดชีพ" : p === "Boost" ? "฿990/เดือน" : "฿2,900/เดือน"}
+                {p === "free" ? "ฟรี ตลอดชีพ" : p === "boost" ? "฿990/เดือน" : "฿2,900/เดือน"}
               </div>
             </div>
           </label>

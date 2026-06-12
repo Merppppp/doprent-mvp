@@ -5,8 +5,12 @@ out
 .env.local
 .DS_Store
 *.log
+*.tsbuildinfo
 
 .claude
 
 .env.dev
 .env.main
+# AI-generated product image cache (served from MinIO/R2 bucket; only hero stays tracked)
+public/products/*.png
+!public/products/suit-rental-hero.png

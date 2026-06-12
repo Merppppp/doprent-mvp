@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
+import { withActor } from "@/lib/db-context";
 import { getCurrentUser } from "@/lib/auth";
 import { uploadPrivateToR2 } from "@/lib/r2";
 import type { BookingStatus } from "@/lib/types";
@@ -15,6 +16,13 @@ import {
   rentalDays,
 } from "@/lib/bookings";
 import { normalizeTiers, priceForNights } from "@/lib/pricing";
+import {
+  notifyBookingAccepted,
+  notifyBookingConfirmed,
+  notifyBookingRejected,
+  notifyNewBookingRequest,
+  notifySlipDisputed,
+} from "@/lib/notifications";
 import { FIRST_TOUCH_COOKIE, decodeAttribution } from "@/lib/attribution";
 
 type Result<T = unknown> =
@@ -40,35 +48,37 @@ export async function addAddress(formData: FormData): Promise<Result<{ id: strin
   if (!phone) return { ok: false, error: "กรุณาใส่เบอร์โทร" };
   if (!addressLine) return { ok: false, error: "กรุณาใส่ที่อยู่จัดส่ง" };
 
-  // First address becomes default automatically.
-  const count = await db.address.count({ where: { userId: user.id } });
-  const isDefault = makeDefault || count === 0;
+  return withActor(user.id, async () => {
+    // First address becomes default automatically.
+    const count = await db.address.count({ where: { userId: user.id } });
+    const isDefault = makeDefault || count === 0;
 
-  if (isDefault) {
-    await db.address.updateMany({
-      where: { userId: user.id },
-      data: { isDefault: false },
+    if (isDefault) {
+      await db.address.updateMany({
+        where: { userId: user.id },
+        data: { isDefault: false },
+      });
+    }
+
+    const created = await db.address.create({
+      data: {
+        userId: user.id,
+        label,
+        recipientName: recipient,
+        phone,
+        addressLine,
+        subdistrict,
+        district,
+        province,
+        postalCode,
+        isDefault,
+      },
+      select: { id: true },
     });
-  }
 
-  const created = await db.address.create({
-    data: {
-      userId: user.id,
-      label,
-      recipientName: recipient,
-      phone,
-      addressLine,
-      subdistrict,
-      district,
-      province,
-      postalCode,
-      isDefault,
-    },
-    select: { id: true },
+    revalidatePath("/checkout/address");
+    return { ok: true, id: created.id };
   });
-
-  revalidatePath("/checkout/address");
-  return { ok: true, id: created.id };
 }
 
 /* ------------------------------ booking ------------------------------ */
@@ -77,83 +87,113 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
 
-  const dressId = String(formData.get("dress_id") ?? "");
+  // `dress_id` accepted as a legacy alias during the rename deploy window.
+  const productId = String(formData.get("product_id") ?? formData.get("dress_id") ?? "");
   const addressId = String(formData.get("address_id") ?? "");
   const startDate = String(formData.get("start_date") ?? "");
   const endDate = String(formData.get("end_date") ?? "");
-  if (!dressId || !addressId || !startDate || !endDate)
+  if (!productId || !addressId || !startDate || !endDate)
     return { ok: false, error: "ข้อมูลการจองไม่ครบ" };
   if (endDate < startDate) return { ok: false, error: "วันคืนชุดต้องไม่ก่อนวันรับ" };
 
-  // anti-spam: cap pending requests per renter
-  const pendingCount = await db.booking.count({
-    where: { renterId: user.id, status: "booking_pending" },
+  return withActor(user.id, async () => {
+    // anti-spam: cap pending requests per renter
+    const pendingCount = await db.booking.count({
+      where: { renterId: user.id, status: "booking_pending" },
+    });
+    if (pendingCount >= 3)
+      return { ok: false, error: "มีคำขอจองที่รอร้านอยู่ 3 รายการแล้ว รอร้านตอบก่อนนะ" };
+
+    // price snapshot from the product (must be live + available)
+    const product = await db.product.findUnique({
+      where: { id: productId },
+      select: {
+        id: true,
+        name: true,
+        shopId: true,
+        pricePerDay: true,
+        priceTiers: {
+          orderBy: { minDays: "asc" },
+          select: { minDays: true, pricePerDay: true },
+        },
+        deposit: true,
+        status: true,
+        available: true,
+        shop: { select: { owner: { select: { email: true } } } },
+      },
+    });
+    if (!product) return { ok: false, error: "ไม่พบชุดนี้" };
+    if (product.status !== "live" || !product.available)
+      return { ok: false, error: "ชุดนี้ยังไม่เปิดให้จองในขณะนี้" };
+
+    // address snapshot (must belong to the user)
+    const addr = await db.address.findFirst({
+      where: { id: addressId, userId: user.id },
+      select: { id: true, recipientName: true, phone: true, addressLine: true },
+    });
+    if (!addr) return { ok: false, error: "ไม่พบที่อยู่จัดส่ง" };
+
+    const days = rentalDays(startDate, endDate);
+    const tiers = normalizeTiers(
+      product.priceTiers.map((t, i) => ({
+        min: t.minDays,
+        max: i < product.priceTiers.length - 1 ? product.priceTiers[i + 1].minDays - 1 : null,
+        per_day: t.pricePerDay,
+      })),
+    );
+    const rentalTotal = priceForNights(tiers, product.pricePerDay, days).total;
+
+    // First-touch channel of the renter — closes the acquisition→booking loop.
+    const channel =
+      decodeAttribution(cookies().get(FIRST_TOUCH_COOKIE)?.value)?.channel ?? null;
+
+    const created = await db.booking.create({
+      data: {
+        renterId: user.id,
+        shopId: product.shopId,
+        productId: product.id,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        rentalTotal,
+        deposit: product.deposit || 0,
+        commissionRate: PLATFORM_COMMISSION_RATE,
+        commissionAmount: commissionAmount(rentalTotal),
+        channel,
+        status: "booking_pending",
+        addressId: addr.id,
+        recipientName: addr.recipientName,
+        phone: addr.phone,
+        addressText: addr.addressLine,
+      },
+      select: { id: true },
+    });
+
+    // Fire-and-forget: notify the shop owner about the new request.
+    notifyNewBookingRequest({
+      sellerEmail: product.shop?.owner?.email,
+      dressName: product.name,
+      startDate,
+      endDate,
+      bookingId: created.id,
+    });
+
+    revalidatePath("/account/bookings");
+    return { ok: true, id: created.id };
   });
-  if (pendingCount >= 3)
-    return { ok: false, error: "มีคำขอจองที่รอร้านอยู่ 3 รายการแล้ว รอร้านตอบก่อนนะ" };
-
-  // price snapshot from the dress (must be live + available)
-  const dress = await db.dress.findUnique({
-    where: { id: dressId },
-    select: { id: true, boutiqueId: true, pricePerDay: true, priceTiers: true, deposit: true, status: true, available: true },
-  });
-  if (!dress) return { ok: false, error: "ไม่พบชุดนี้" };
-  if (dress.status !== "live" || !dress.available)
-    return { ok: false, error: "ชุดนี้ยังไม่เปิดให้จองในขณะนี้" };
-
-  // address snapshot (must belong to the user)
-  const addr = await db.address.findFirst({
-    where: { id: addressId, userId: user.id },
-    select: { id: true, recipientName: true, phone: true, addressLine: true },
-  });
-  if (!addr) return { ok: false, error: "ไม่พบที่อยู่จัดส่ง" };
-
-  const days = rentalDays(startDate, endDate);
-  const rentalTotal = priceForNights(
-    normalizeTiers(dress.priceTiers),
-    dress.pricePerDay,
-    days,
-  ).total;
-
-  // First-touch channel of the renter — closes the acquisition→booking loop.
-  const channel =
-    decodeAttribution(cookies().get(FIRST_TOUCH_COOKIE)?.value)?.channel ?? null;
-
-  const created = await db.booking.create({
-    data: {
-      renterId: user.id,
-      boutiqueId: dress.boutiqueId,
-      dressId: dress.id,
-      startDate: new Date(startDate),
-      endDate: new Date(endDate),
-      rentalTotal,
-      deposit: dress.deposit || 0,
-      commissionRate: PLATFORM_COMMISSION_RATE,
-      commissionAmount: commissionAmount(rentalTotal),
-      channel,
-      status: "booking_pending",
-      addressId: addr.id,
-      recipientName: addr.recipientName,
-      phone: addr.phone,
-      addressText: addr.addressLine,
-    },
-    select: { id: true },
-  });
-
-  revalidatePath("/account/bookings");
-  return { ok: true, id: created.id };
 }
 
-/** Load a booking + the boutique owner so we can check roles (no RLS in Postgres). */
+/** Load a booking + the shop owner so we can check roles (no RLS in Postgres). */
 async function loadBooking(bookingId: string) {
   return db.booking.findUnique({
     where: { id: bookingId },
     select: {
       id: true,
       renterId: true,
-      boutiqueId: true,
+      shopId: true,
       status: true,
-      boutique: { select: { ownerId: true } },
+      shop: { select: { ownerId: true } },
+      renter: { select: { email: true } },
+      product: { select: { name: true } },
     },
   });
 }
@@ -165,7 +205,7 @@ export async function acceptBooking(bookingId: string, shippingFee: number): Pro
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
   const booking = await loadBooking(bookingId);
   if (!booking) return { ok: false, error: "ไม่พบการจอง" };
-  if (booking.boutique?.ownerId !== user.id)
+  if (booking.shop?.ownerId !== user.id)
     return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
   if (!Number.isFinite(shippingFee) || shippingFee < 0)
     return { ok: false, error: "ค่าจัดส่งไม่ถูกต้อง" };
@@ -173,15 +213,24 @@ export async function acceptBooking(bookingId: string, shippingFee: number): Pro
     return { ok: false, error: "สถานะไม่ถูกต้องสำหรับการรับจอง" };
 
   // Atomic transition guard: only flips if still in the expected source status.
-  const res = await db.booking.updateMany({
-    where: { id: bookingId, status: "booking_pending" },
-    data: {
-      shippingFee: Math.round(shippingFee),
-      status: "waiting_for_payment",
-      currentDueAt: new Date(dueAt()),
-    },
-  });
+  const res = await withActor(user.id, () =>
+    db.booking.updateMany({
+      where: { id: bookingId, status: "booking_pending" },
+      data: {
+        shippingFee: Math.round(shippingFee),
+        status: "waiting_for_payment",
+        currentDueAt: new Date(dueAt()),
+      },
+    }),
+  );
   if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  notifyBookingAccepted({
+    renterEmail: booking.renter?.email,
+    dressName: booking.product?.name ?? "ชุดที่จอง",
+    bookingId,
+  });
+
   revalidatePath("/sell/bookings");
   revalidatePath("/account/bookings");
   return { ok: true };
@@ -208,20 +257,33 @@ async function sellerSimpleMove(
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
   const booking = await loadBooking(bookingId);
   if (!booking) return { ok: false, error: "ไม่พบการจอง" };
-  if (booking.boutique?.ownerId !== user.id)
+  if (booking.shop?.ownerId !== user.id)
     return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
   const from = booking.status as BookingStatus;
   if (!findTransition(from, to, "seller"))
     return { ok: false, error: "เปลี่ยนสถานะนี้ไม่ได้" };
 
-  const res = await db.booking.updateMany({
-    where: { id: bookingId, status: from },
-    data: {
-      status: to,
-      ...(reason !== undefined ? { cancelReason: reason, cancelFromStatus: from } : {}),
-    },
-  });
+  const res = await withActor(user.id, () =>
+    db.booking.updateMany({
+      where: { id: bookingId, status: from },
+      data: {
+        status: to,
+        ...(reason !== undefined ? { cancelReason: reason, cancelFromStatus: from } : {}),
+      },
+    }),
+  );
   if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  // Fire-and-forget renter notifications per transition.
+  const renterNotify = {
+    renterEmail: booking.renter?.email,
+    dressName: booking.product?.name ?? "ชุดที่จอง",
+    bookingId,
+  };
+  if (to === "rejected") notifyBookingRejected(renterNotify);
+  else if (to === "confirmed") notifyBookingConfirmed(renterNotify);
+  else if (to === "slip_disputed") notifySlipDisputed(renterNotify);
+
   revalidatePath("/sell/bookings");
   revalidatePath("/account/bookings");
   return { ok: true };
@@ -283,10 +345,12 @@ export async function uploadSlip(bookingId: string, formData: FormData): Promise
     return { ok: false, error: "อัปโหลดสลิปไม่สำเร็จ ลองใหม่อีกครั้ง" };
   }
 
-  const res = await db.booking.updateMany({
-    where: { id: bookingId, status: "waiting_for_payment", renterId: user.id },
-    data: { slipPath: key, status: "payment_review" },
-  });
+  const res = await withActor(user.id, () =>
+    db.booking.updateMany({
+      where: { id: bookingId, status: "waiting_for_payment", renterId: user.id },
+      data: { slipPath: key, status: "payment_review" },
+    }),
+  );
   if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
   revalidatePath("/account/bookings");
   revalidatePath("/sell/bookings");
@@ -303,10 +367,12 @@ export async function cancelBooking(bookingId: string): Promise<Result> {
   if (!findTransition(from, "cancelled", "renter"))
     return { ok: false, error: "ยกเลิกในขั้นตอนนี้ไม่ได้ ติดต่อร้านผ่านแอดมิน" };
 
-  const res = await db.booking.updateMany({
-    where: { id: bookingId, status: from, renterId: user.id },
-    data: { status: "cancelled" },
-  });
+  const res = await withActor(user.id, () =>
+    db.booking.updateMany({
+      where: { id: bookingId, status: from, renterId: user.id },
+      data: { status: "cancelled" },
+    }),
+  );
   if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
   revalidatePath("/account/bookings");
   revalidatePath("/sell/bookings");

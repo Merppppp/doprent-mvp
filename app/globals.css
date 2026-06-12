@@ -27,19 +27,19 @@
      just-in sections so they read as one editorial composition. */
   --warm: oklch(0.945 0.014 80);
 
-  /* Brand accent — deep teal / emerald. The DopRent signature.
+  /* Brand accent — vibrant emerald green (#2e9c65 from revamp palette).
      Carries CTAs, brand mark, verified/trust. Pair with --accent-ink
-     for text on top (now a warm near-white — teal is dark). */
-  --accent: oklch(0.45 0.085 168);
-  --accent-2: oklch(0.33 0.072 168); /* darker hover state / deep */
-  --accent-soft: oklch(0.93 0.03 168); /* tint for badge / wash fills */
-  --accent-ink: oklch(0.985 0.012 168);  /* warm near-white text on teal */
+     for text on top. */
+  --accent: oklch(0.58 0.12 158);
+  --accent-2: oklch(0.47 0.10 158); /* darker hover state / deep */
+  --accent-soft: oklch(0.94 0.04 158); /* tint for badge / wash fills */
+  --accent-ink: oklch(0.985 0.012 158);  /* warm near-white text on green */
 
-  /* Cobalt slot — now the same teal family so links / verified badge /
+  /* Cobalt slot — same green family so links / verified badge /
      info / focus / saved state read on-brand. (name kept for compat) */
-  --cobalt: oklch(0.40 0.082 168);
-  --cobalt-2: oklch(0.32 0.072 168);  /* darker hover */
-  --cobalt-soft: oklch(0.93 0.03 168); /* tint fill */
+  --cobalt: oklch(0.55 0.11 158);
+  --cobalt-2: oklch(0.45 0.09 158);  /* darker hover */
+  --cobalt-soft: oklch(0.94 0.04 158); /* tint fill */
 
   /* Saved-heart — stays a warm red (universal "saved/favourite" signal),
      intentionally NOT the teal brand hue so the wishlist reads instantly. */
@@ -101,6 +101,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: "kern", "liga", "calt";
+}
+
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-in-left {
+  animation: slide-in-left 0.25s var(--ease) both;
 }
 
 /* Editorial display family — IBM Plex Serif Thai pairs natively with the
@@ -193,11 +201,6 @@ img {
 /* ============================================================
    Utility component classes (reusable across pages)
    ============================================================ */
-.shell {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
 
 /* ============================================================
    Responsive grid helpers
@@ -406,10 +409,6 @@ img {
   gap: 36px;
 }
 
-/* Mobile menu toggle visibility — hidden on desktop */
-.mobile-menu-toggle {
-  display: none;
-}
 .mobile-only {
   display: none;
 }
@@ -421,9 +420,6 @@ img {
    Tablet breakpoint
    ============================================================ */
 @media (max-width: 900px) {
-  .shell {
-    padding: 0 16px;
-  }
   .grid-4 {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -500,11 +496,8 @@ img {
     grid-template-columns: 1fr;
     gap: 24px;
   }
-  .footer-bottom {
-    flex-direction: column;
-    gap: 6px;
-    text-align: center;
-  }
+  /* .footer-bottom is a single centered wrapping line at all breakpoints
+     (inline styles on the component) — no mobile override needed. */
   /* Section / shell paddings tighter */
   .section-pad {
     padding: 40px 0 !important;
@@ -944,4 +937,130 @@ img {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ── Dashboard shell (admin + seller sidebar layouts) ───────── */
+.dash-shell {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+}
+.dash-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 84px;
+}
+.dash-main {
+  flex: 1;
+  min-width: 0;
+}
+.dash-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: var(--shadow-1);
+}
+.dash-nav-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 10px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--line-2);
+}
+.dash-nav-badge {
+  background: var(--info);
+  color: var(--on-dark);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+.dash-nav-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dash-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition:
+    background var(--dur-1) var(--ease),
+    color var(--dur-1) var(--ease);
+}
+.dash-link:hover {
+  background: var(--warm);
+  color: var(--ink);
+}
+.dash-link.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-2);
+  font-weight: 600;
+}
+.dash-link svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+.dash-link.is-active svg {
+  opacity: 1;
+}
+@media (max-width: 767px) {
+  .dash-shell {
+    flex-direction: column;
+    gap: 18px;
+  }
+  .dash-sidebar {
+    width: 100%;
+    position: static;
+  }
+  .dash-nav {
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    padding: 8px;
+    border-radius: 12px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .dash-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .dash-nav-head {
+    border-bottom: none;
+    border-right: 1px solid var(--line-2);
+    padding: 4px 12px 4px 6px;
+    margin: 0 6px 0 0;
+  }
+  .dash-nav-title {
+    display: none;
+  }
+  .dash-link {
+    padding: 8px 12px;
+  }
+}
+
+/* Pages moved under the sidebar shells still render their own `.container`
+   (with inline padding). Neutralize it so spacing comes from the shell and
+   horizontal padding isn't doubled. Inline `maxWidth` on forms still wins. */
+.dash-main > .container {
+  max-width: none;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }

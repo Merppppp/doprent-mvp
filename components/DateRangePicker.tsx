@@ -30,8 +30,8 @@ type Props = {
   /** Unavailable dates as YYYY-MM-DD strings. Renter can't pick a range overlapping these. */
   blackouts?: string[];
   /** Optional dress ID to be tracked in /api/track when user clicks LINE. */
-  dressId?: string;
-  boutiqueId?: string;
+  productId?: string;
+  shopId?: string;
   /** Optional dress tag code (e.g. internal SKU) to include in LINE message */
   dressTagCode?: string;
   /**
@@ -109,8 +109,8 @@ export default function DateRangePicker({
   priceTiers,
   deposit,
   blackouts = [],
-  dressId,
-  boutiqueId,
+  productId,
+  shopId,
   dressTagCode,
   isLoggedIn,
 }: Props) {
@@ -156,10 +156,10 @@ export default function DateRangePicker({
   }, [isLoggedIn, lineUrl, start, end, nights, hasConflict, dressName, boutiqueName, pricePerDay, priceTiers, deposit, dressPageUrl, dressImageUrl, quote.perDay, quote.total]);
 
   function trackAndGo(e: React.MouseEvent<HTMLAnchorElement>) {
-    if (dressId || boutiqueId) {
+    if (productId || shopId) {
       try {
         const blob = new Blob(
-          [JSON.stringify({ dress_id: dressId, boutique_id: boutiqueId, source: "detail_datepicker" })],
+          [JSON.stringify({ product_id: productId, shop_id: shopId, source: "detail_datepicker" })],
           { type: "application/json" },
         );
         if (navigator.sendBeacon) navigator.sendBeacon("/api/track", blob);
@@ -241,12 +241,12 @@ export default function DateRangePicker({
 
       {nights > 0 && !hasConflict ? (
         <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-          {isLoggedIn && dressId ? (
-            <Link href={`/checkout/address?dress=${dressId}&start=${start}&end=${end}`} onClick={trackAndGo} className="btn btn-primary" style={{ display: "block", padding: "12px 16px", textAlign: "center", fontSize: 14, fontWeight: 600 }}>
+          {isLoggedIn && productId ? (
+            <Link href={`/checkout/address?product=${productId}&start=${start}&end=${end}`} onClick={trackAndGo} className="btn btn-primary" style={{ display: "block", padding: "12px 16px", textAlign: "center", fontSize: 14, fontWeight: 600 }}>
               จองเลย · {nights} วัน
             </Link>
           ) : (
-            <Link href={`/login?next=${encodeURIComponent(`/checkout/address?dress=${dressId ?? ""}&start=${start}&end=${end}`)}`} className="btn btn-dark" style={{ display: "block", padding: "12px 16px", textAlign: "center", fontSize: 14, fontWeight: 600 }}>
+            <Link href={`/login?next=${encodeURIComponent(`/checkout/address?product=${productId ?? ""}&start=${start}&end=${end}`)}`} className="btn btn-dark" style={{ display: "block", padding: "12px 16px", textAlign: "center", fontSize: 14, fontWeight: 600 }}>
               เข้าสู่ระบบเพื่อจอง · {nights} วัน
             </Link>
           )}

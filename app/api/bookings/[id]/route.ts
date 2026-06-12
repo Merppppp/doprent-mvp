@@ -4,8 +4,15 @@ import { db } from "@/lib/db";
 import { expireStaleBookings } from "@/lib/booking";
 
 const BOOKING_INCLUDE = {
-  dress: { select: { id: true, name: true, slug: true, images: true } },
-  boutique: { select: { id: true, name: true, slug: true, lineUrl: true, promptpayId: true } },
+  product: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      images: { orderBy: { sortOrder: "asc" as const }, select: { url: true, alt: true, sortOrder: true } },
+    },
+  },
+  shop: { select: { id: true, name: true, slug: true, lineUrl: true, promptpayId: true } },
   address: true,
   renter: { select: { id: true, name: true, email: true } },
 };
@@ -26,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   await expireStaleBookings([booking.id]);
 
   const isCustomer = booking.renterId === session.user.id;
-  const isSeller = booking.boutique.id === (await db.boutique.findFirst({ where: { ownerId: session.user.id } }))?.id;
+  const isSeller = booking.shop.id === (await db.shop.findFirst({ where: { ownerId: session.user.id } }))?.id;
   const isAdmin = session.user.role === "admin";
 
   if (!isCustomer && !isSeller && !isAdmin) {

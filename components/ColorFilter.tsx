@@ -33,7 +33,7 @@ export default function ColorFilter({ colors }: { colors: string[] }) {
     const sp = new URLSearchParams(params.toString());
     if (next === "all") sp.delete("color");
     else sp.set("color", next);
-    router.push(`/browse${sp.toString() ? `?${sp}` : ""}`);
+    router.push(`/${sp.toString() ? `?${sp}` : ""}`);
   };
 
   const opts = ["all", ...colors];
