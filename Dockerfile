@@ -73,6 +73,9 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/prisma ./prisma
 
+# Entrypoint maps Swarm secret files (/run/secrets/*) → env vars
+COPY --chmod=755 docker-entrypoint.sh /docker-entrypoint.sh
+
 USER nextjs
 
 EXPOSE 3000
@@ -80,4 +83,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/api/health 2>/dev/null || wget -qO- http://127.0.0.1:3000/ 2>/dev/null || exit 1
 
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "server.js"]
