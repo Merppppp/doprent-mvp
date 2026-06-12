@@ -1,17 +1,17 @@
 import Link from "next/link";
-import DressResults from "@/components/DressResults";
+import ProductResults from "@/components/ProductResults";
 import BrowseFilters from "@/components/BrowseFilters";
 import BannerCarousel from "@/components/BannerCarousel";
 import SortSelect from "@/components/SortSelect";
 import MobileFilterDrawer from "@/components/MobileFilterDrawer";
-import { OccasionTile } from "@/components/DressArt";
+import { OccasionTile } from "@/components/ProductArt";
 import {
   listDesigners,
-  listDresses,
+  listProducts,
   listOccasions,
-  listSponsorBoutiques,
-  listBoutiques,
-} from "@/lib/dresses";
+  listSponsorShops,
+  listShops,
+} from "@/lib/products";
 import { getCurrentUser } from "@/lib/auth";
 import {
   COLOR_LABELS_TH,
@@ -64,8 +64,8 @@ export default async function HomePage({
 
   const locale = getServerLocale();
 
-  const [{ items: dresses, total, hasMore }, occasions, designers, user, sponsors, boutiques] = await Promise.all([
-    listDresses({
+  const [{ items: products, total, hasMore }, occasions, designers, user, sponsors, shops] = await Promise.all([
+    listProducts({
       color: activeColor === "all" ? undefined : activeColor,
       occasions: activeOcc ? [activeOcc] : undefined,
       sizes: activeSize ? [activeSize] : undefined,
@@ -80,13 +80,13 @@ export default async function HomePage({
     listOccasions(),
     listDesigners(),
     getCurrentUser().catch(() => null),
-    listSponsorBoutiques(8),
-    listBoutiques({ featuredFirst: true, limit: 6 }),
+    listSponsorShops(8),
+    listShops({ featuredFirst: true, limit: 6 }),
   ]);
 
-  const savedSet = new Set<string>(user?.savedDressIds ?? []);
+  const savedSet = new Set<string>(user?.savedProductIds ?? []);
   const isLoggedIn = !!user;
-  const bannerBoutiques = sponsors.length > 0 ? sponsors : boutiques;
+  const bannerShops = sponsors.length > 0 ? sponsors : shops;
 
   // Locale-aware labels for filter chips
   const occasionOptions = occasions.map((o) => ({
@@ -116,7 +116,7 @@ export default async function HomePage({
       {/* ======== BANNER CAROUSEL ======== */}
       <section className="bg-bg pt-6">
         <div className="container">
-          <BannerCarousel boutiques={bannerBoutiques} locale={locale} />
+          <BannerCarousel shops={bannerShops} locale={locale} />
         </div>
       </section>
 
@@ -203,7 +203,7 @@ export default async function HomePage({
                 <SortSelect locale={locale} />
               </div>
 
-              {dresses.length === 0 ? (
+              {products.length === 0 ? (
                 <div className="hr-empty">
                   <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
                     {t("empty.title", locale)}
@@ -216,9 +216,9 @@ export default async function HomePage({
                   </Link>
                 </div>
               ) : (
-                <DressResults
+                <ProductResults
                   key={JSON.stringify(searchParams)}
-                  dresses={dresses}
+                  products={products}
                   savedIds={[...savedSet]}
                   isLoggedIn={isLoggedIn}
                   total={total}

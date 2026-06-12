@@ -108,10 +108,12 @@ export async function POST(req: Request) {
     } catch {
       /* anon */
     }
+    // New payload keys are product_id/shop_id; dress_id/boutique_id still
+    // accepted from cached clients during the rename deploy window.
     await db.lineClick.create({
       data: {
-        dressId: body?.dress_id ?? null,
-        boutiqueId: body?.boutique_id ?? null,
+        productId: body?.product_id ?? body?.dress_id ?? null,
+        shopId: body?.shop_id ?? body?.boutique_id ?? null,
         source: body?.source ?? "unknown",
         userId,
         channel,

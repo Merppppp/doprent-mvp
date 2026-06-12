@@ -12,12 +12,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function EditBoutiquePage() {
+export default async function EditShopPage() {
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?next=/sell/edit");
 
   const [raw, areasRaw] = await Promise.all([
-    db.boutique.findFirst({ where: { ownerId: user.id } }),
+    db.shop.findFirst({
+      where: { ownerId: user.id },
+      include: { area: { select: { key: true } } },
+    }),
     db.area.findMany({ orderBy: { th: "asc" }, select: { key: true, th: true } }),
   ]);
   if (!raw) redirect("/sell/signup");
@@ -35,7 +38,7 @@ export default async function EditBoutiquePage() {
         boutique={{
           id: raw.id,
           name: raw.name,
-          area_key: raw.areaKey,
+          area_key: raw.area?.key ?? null,
           area_label: raw.areaLabel,
           line_url: raw.lineUrl,
           instagram: raw.instagram,

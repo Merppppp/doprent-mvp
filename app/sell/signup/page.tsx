@@ -16,7 +16,7 @@ export default async function SellSignupPage() {
   if (!user) redirect("/login?next=/sell/signup");
 
   const [existing, areasRaw] = await Promise.all([
-    db.boutique.findFirst({ where: { ownerId: user.id }, select: { slug: true } }),
+    db.shop.findFirst({ where: { ownerId: user.id }, select: { slug: true } }),
     db.area.findMany({ orderBy: { th: "asc" }, select: { key: true, th: true } }),
   ]);
   if (existing) redirect("/sell/dashboard");

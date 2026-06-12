@@ -2,17 +2,23 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import type { Address, BookingDetail } from "@/lib/types";
 
-/** Prisma include that hydrates the dress + boutique fields a BookingDetail needs. */
+/** Prisma include that hydrates the product + shop fields a BookingDetail needs. */
 const BOOKING_INCLUDE = {
-  dress: { select: { name: true, slug: true, images: true } },
-  boutique: { select: { name: true, slug: true, lineUrl: true, promptpayId: true } },
+  product: {
+    select: {
+      name: true,
+      slug: true,
+      images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } },
+    },
+  },
+  shop: { select: { name: true, slug: true, lineUrl: true, promptpayId: true } },
 } as const;
 
 type PrismaBookingWithJoins = {
   id: string;
   renterId: string;
-  boutiqueId: string;
-  dressId: string;
+  shopId: string;
+  productId: string;
   startDate: Date;
   endDate: Date;
   rentalTotal: number;
@@ -32,8 +38,8 @@ type PrismaBookingWithJoins = {
   cancelFromStatus: string | null;
   createdAt: Date;
   updatedAt: Date;
-  dress?: { name: string | null; slug: string | null; images: unknown } | null;
-  boutique?: {
+  product?: { name: string | null; slug: string | null; images: Array<{ url: string }> } | null;
+  shop?: {
     name: string | null;
     slug: string | null;
     lineUrl: string | null;
@@ -45,12 +51,12 @@ const ymd = (d: Date) => d.toISOString().slice(0, 10);
 
 /** Map a Prisma booking (camelCase + joins) to the snake_case BookingDetail UI shape. */
 export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
-  const images = Array.isArray(b.dress?.images) ? (b.dress?.images as string[]) : [];
+  const images = (b.product?.images ?? []).map((img) => img.url);
   return {
     id: b.id,
     renter_id: b.renterId,
-    boutique_id: b.boutiqueId,
-    dress_id: b.dressId,
+    boutique_id: b.shopId,
+    dress_id: b.productId,
     start_date: ymd(b.startDate),
     end_date: ymd(b.endDate),
     rental_total: b.rentalTotal,
@@ -70,13 +76,13 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     cancel_from_status: b.cancelFromStatus,
     created_at: b.createdAt.toISOString(),
     updated_at: b.updatedAt.toISOString(),
-    dress_name: b.dress?.name ?? null,
-    dress_slug: b.dress?.slug ?? null,
+    dress_name: b.product?.name ?? null,
+    dress_slug: b.product?.slug ?? null,
     dress_image: images[0] ?? null,
-    boutique_name: b.boutique?.name ?? null,
-    boutique_slug: b.boutique?.slug ?? null,
-    boutique_line_url: b.boutique?.lineUrl ?? null,
-    boutique_promptpay_id: b.boutique?.promptpayId ?? null,
+    boutique_name: b.shop?.name ?? null,
+    boutique_slug: b.shop?.slug ?? null,
+    boutique_line_url: b.shop?.lineUrl ?? null,
+    boutique_promptpay_id: b.shop?.promptpayId ?? null,
   };
 }
 
@@ -112,14 +118,14 @@ export async function getRenterBookings(): Promise<BookingDetail[]> {
 export async function getSellerBookings(): Promise<BookingDetail[]> {
   const user = await getCurrentUser();
   if (!user) return [];
-  const boutiques = await db.boutique.findMany({
+  const shops = await db.shop.findMany({
     where: { ownerId: user.id },
     select: { id: true },
   });
-  const ids = boutiques.map((b) => b.id);
+  const ids = shops.map((s) => s.id);
   if (ids.length === 0) return [];
   const rows = await db.booking.findMany({
-    where: { boutiqueId: { in: ids } },
+    where: { shopId: { in: ids } },
     include: BOOKING_INCLUDE,
     orderBy: { createdAt: "desc" },
   });
@@ -136,15 +142,21 @@ export async function getBookingForView(id: string): Promise<BookingDetail | nul
   const b = await db.booking.findUnique({
     where: { id },
     include: {
-      dress: { select: { name: true, slug: true, images: true } },
-      boutique: {
+      product: {
+        select: {
+          name: true,
+          slug: true,
+          images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } },
+        },
+      },
+      shop: {
         select: { name: true, slug: true, lineUrl: true, promptpayId: true, ownerId: true },
       },
     },
   });
   if (!b) return null;
   const isRenter = b.renterId === user.id;
-  const isSeller = b.boutique?.ownerId === user.id;
+  const isSeller = b.shop?.ownerId === user.id;
   if (!isRenter && !isSeller && user.role !== "admin") return null;
   return toBookingDetail(b as unknown as PrismaBookingWithJoins);
 }
@@ -160,7 +172,7 @@ export async function getBookingBadges(): Promise<{ renter: number; seller: numb
     where: { renterId: user.id, status: "waiting_for_payment" },
   });
 
-  const shops = await db.boutique.findMany({
+  const shops = await db.shop.findMany({
     where: { ownerId: user.id },
     select: { id: true },
   });
@@ -170,7 +182,7 @@ export async function getBookingBadges(): Promise<{ renter: number; seller: numb
   if (ids.length > 0) {
     seller = await db.booking.count({
       where: {
-        boutiqueId: { in: ids },
+        shopId: { in: ids },
         status: { in: ["booking_pending", "payment_review"] },
       },
     });
@@ -178,12 +190,12 @@ export async function getBookingBadges(): Promise<{ renter: number; seller: numb
   return { renter: renterCount, seller };
 }
 
-/** Is the current user the owner of this booking's boutique? (for view role) */
-export async function currentUserIsSellerOf(boutiqueId: string): Promise<boolean> {
+/** Is the current user the owner of this booking's shop? (for view role) */
+export async function currentUserIsSellerOf(shopId: string): Promise<boolean> {
   const user = await getCurrentUser();
   if (!user) return false;
-  const b = await db.boutique.findFirst({
-    where: { id: boutiqueId, ownerId: user.id },
+  const b = await db.shop.findFirst({
+    where: { id: shopId, ownerId: user.id },
     select: { id: true },
   });
   return !!b;

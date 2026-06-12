@@ -13,7 +13,7 @@ export default async function Header() {
   const locale = getServerLocale();
   const user = await getCurrentUser().catch(() => null);
 
-  const fullName = user?.name || user?.email.split("@")[0] || "";
+  const fullName = user?.fullName || user?.email.split("@")[0] || "";
   const initials = fullName
     .trim()
     .split(/\s+/)
@@ -21,7 +21,7 @@ export default async function Header() {
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const savedCount = user?.savedDressIds?.length ?? 0;
+  const savedCount = user?.savedProductIds?.length ?? 0;
   const badges = user ? await getBookingBadges() : { renter: 0, seller: 0 };
   const isSeller = user?.role === "seller" || user?.role === "admin";
 

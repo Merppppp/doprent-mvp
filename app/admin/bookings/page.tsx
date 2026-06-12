@@ -69,9 +69,9 @@ export default async function AdminBookingsPage({
       status: true,
       currentDueAt: true,
       recipientName: true,
-      dress: { select: { name: true } },
-      boutique: { select: { name: true } },
-      renter: { select: { name: true, email: true } },
+      product: { select: { name: true } },
+      shop: { select: { name: true } },
+      renter: { select: { fullName: true, email: true } },
     },
   });
 
@@ -137,14 +137,14 @@ export default async function AdminBookingsPage({
                 <tr key={b.id} style={{ borderBottom: "1px solid var(--line)" }}>
                   <Td>
                     <Link href={`/admin/bookings/${b.id}`} style={{ fontWeight: 600 }}>
-                      {b.dress?.name ?? "ชุด"}
+                      {b.product?.name ?? "สินค้า"}
                     </Link>
                   </Td>
                   <Td>
-                    <div>{b.renter?.name ?? b.recipientName ?? "-"}</div>
+                    <div>{b.renter?.fullName ?? b.recipientName ?? "-"}</div>
                     <div style={{ color: "var(--ink-3)", fontSize: 12 }}>{b.renter?.email ?? ""}</div>
                   </Td>
-                  <Td>{b.boutique?.name ?? "-"}</Td>
+                  <Td>{b.shop?.name ?? "-"}</Td>
                   <Td style={{ whiteSpace: "nowrap" }}>
                     {fmtThai(b.startDate)} – {fmtThai(b.endDate)}
                   </Td>

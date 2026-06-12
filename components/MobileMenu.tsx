@@ -209,7 +209,7 @@ export default function MobileMenu({ user, locale = "th" }: Props) {
               <Link href="/" style={drawerItem}>
                 {t("mobile.browseDresses", locale)}
               </Link>
-              <Link href="/boutiques" style={drawerItem}>
+              <Link href="/shops" style={drawerItem}>
                 {t("mobile.boutiques", locale)}
               </Link>
               <Link

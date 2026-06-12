@@ -3,7 +3,7 @@
 import { Swiper, SwiperSlide } from "swiper/react";
 import { EffectCards, Autoplay } from "swiper/modules";
 import Link from "next/link";
-import { DressArt } from "@/components/DressArt";
+import { ProductArt } from "@/components/ProductArt";
 
 import "swiper/css";
 import "swiper/css/effect-cards";
@@ -50,7 +50,7 @@ export default function HeroSwiper({ slides }: { slides: SlideData[] }) {
         {items.map((d, i) => (
           <SwiperSlide key={d.id} className="hero-card-slide">
             {d.slug ? (
-              <Link href={`/dress/${d.slug}`} className="hero-card-inner">
+              <Link href={`/product/${d.slug}`} className="hero-card-inner">
                 <div className="hero-card-img">
                   {d.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -64,7 +64,7 @@ export default function HeroSwiper({ slides }: { slides: SlideData[] }) {
                       }}
                     />
                   ) : (
-                    <DressArt color={d.color as any} variant={i} />
+                    <ProductArt color={d.color as any} variant={i} />
                   )}
                 </div>
                 <div className="hero-card-label">
@@ -79,7 +79,7 @@ export default function HeroSwiper({ slides }: { slides: SlideData[] }) {
             ) : (
               <div className="hero-card-inner">
                 <div className="hero-card-img">
-                  <DressArt color={d.color as any} variant={i} />
+                  <ProductArt color={d.color as any} variant={i} />
                 </div>
                 <div className="hero-card-label">
                   <span

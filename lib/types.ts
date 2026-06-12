@@ -51,12 +51,49 @@ export type BookingStatus =
   | "cancelled"
   | "payment_expired";
 
+/**
+ * Public Occasion shape — mapper-output type (rev 3: assembled from the tag
+ * system [group "occasion"] + i18n + UI color constant; no longer a DB table).
+ */
 export type Occasion = {
   key: OccasionKey;
   th: string;
   en: string;
   color_token: Color;
   sort_order: number;
+};
+
+/** Product type reference (e.g. "dress", "suit") — mirrors product_types. */
+export type ProductType = {
+  key: string;
+  label: string;
+  is_active: boolean;
+};
+
+/** Hierarchical product category (per product type) — mirrors product_categories. */
+export type ProductCategory = {
+  key: string;
+  label: string;
+  parent_key: string | null;
+  product_type_key: string;
+  sort_order: number;
+  is_active: boolean;
+};
+
+/** Tag group (e.g. "occasion") — mirrors tag_groups. */
+export type TagGroup = {
+  key: string;
+  label: string;
+  sort_order: number;
+  is_active: boolean;
+};
+
+/** Tag inside a group (e.g. "wedding" in group "occasion") — mirrors tags. */
+export type Tag = {
+  key: string;
+  label: string;
+  group_key: string;
+  is_active: boolean;
 };
 
 export type Area = {
@@ -67,15 +104,15 @@ export type Area = {
   keywords: string[];
 };
 
-/** Lightweight dress preview used in banner card stacks. */
-export type DressCard = {
+/** Lightweight product preview used in banner card stacks. */
+export type ProductCard = {
   id: string;
   name: string;
   price_per_day: number;
   image: string | null;
 };
 
-export type Boutique = {
+export type Shop = {
   id: string;
   slug: string;
   name: string;
@@ -97,7 +134,7 @@ export type Boutique = {
   line_url: string;
   instagram: string | null;
   /** PromptPay id (mobile/national-id) for in-web QR payments.
-   *  Optional in the public Boutique shape — only the booking flow selects it. */
+   *  Optional in the public Shop shape — only the booking flow selects it. */
   promptpay_id?: string | null;
   since_year: number | null;
   cover_color: Color;
@@ -114,25 +151,30 @@ export type Boutique = {
   kyc_status: KycStatus;
   created_at: string;
   updated_at: string;
-  /** Optional dress card previews — populated by listSponsorBoutiques / listBoutiques for the hero banner card stack. */
-  dress_cards?: DressCard[];
+  /** Optional product card previews — populated by listSponsorShops / listShops for the hero banner card stack. */
+  product_cards?: ProductCard[];
 };
 
 /** One duration-based pricing bracket. per_day = THB/day; max=null means open-ended (X+ days). */
 export type PriceTier = { min: number; max: number | null; per_day: number };
 
-export type Dress = {
+export type Product = {
   id: string;
   slug: string;
   tag_code: string;
   name: string;
   designer: string | null;
-  boutique_id: string;
-  boutique_name: string;
-  /** Denormalized from boutiques.verified — populated by listDresses(). */
-  boutique_verified?: boolean;
-  /** Denormalized from the dress's boutique area_key — populated by listDresses(). Used for distance display. */
+  shop_id: string;
+  /** Joined from shops.name — populated by the product mapper. */
+  shop_name: string;
+  /** Denormalized from shops.verified — populated by listProducts(). */
+  shop_verified?: boolean;
+  /** Denormalized from the product's shop area key — populated by listProducts(). Used for distance display. */
   area_key?: string | null;
+  /** Business key of the product type (e.g. "dress") — joined from product_types. */
+  product_type_key: string;
+  /** Business key of the product's category (nullable — uncategorized allowed). */
+  category_key?: string | null;
   size: Size;
   color: Color;
   /** Starting/base per-day rate (THB). Fallback when no tiers; also the "from" price for cards & filters. */
@@ -159,12 +201,12 @@ export type Dress = {
   updated_at: string;
 };
 
-export type DressWithBoutique = Dress & {
-  boutique: Boutique;
+export type ProductWithShop = Product & {
+  shop: Shop;
 };
 
 export type Blackout = {
-  dress_id: string;
+  product_id: string;
   date: string;
   created_at: string;
 };
@@ -249,7 +291,8 @@ export type Channel =
 
 /** Visitor pageview event (general traffic analytics). */
 export type PageView = {
-  id: number;
+  /** uuid (was bigint serial pre-restructure). */
+  id: string;
   session_id: string | null;
   user_id: string | null;
   path: string | null;
@@ -268,10 +311,10 @@ export type PageView = {
 export type SubscriptionPlan = "free" | "boost" | "featured";
 export type SubscriptionStatus = "active" | "past_due" | "cancelled" | "expired";
 
-/** Seller paid-plan record (drives adoption-rate → revenue reporting). */
-export type SellerSubscription = {
+/** Shop paid-plan record (drives adoption-rate → revenue reporting). */
+export type ShopSubscription = {
   id: string;
-  boutique_id: string | null;
+  shop_id: string | null;
   owner_id: string | null;
   plan: SubscriptionPlan;
   status: SubscriptionStatus;

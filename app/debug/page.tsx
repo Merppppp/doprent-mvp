@@ -10,11 +10,15 @@ export default async function DebugPage() {
   const authCookies = allCookies.filter((c) => c.name.startsWith("authjs.") || c.name.startsWith("next-auth."));
 
   let dbUser = null;
+  let favoriteCount = 0;
   if (session?.user?.id) {
-    dbUser = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { id: true, email: true, name: true,role: true, emailVerified: true, savedDressIds: true },
-    });
+    [dbUser, favoriteCount] = await Promise.all([
+      db.user.findUnique({
+        where: { id: session.user.id },
+        select: { id: true, email: true, fullName: true, role: true, emailVerified: true },
+      }),
+      db.favorite.count({ where: { userId: session.user.id } }),
+    ]);
   }
 
   return (
@@ -39,7 +43,7 @@ export default async function DebugPage() {
 
       <Section title="User (from DB)">
         <pre style={{ fontSize: 12, overflow: "auto" }}>
-          {dbUser ? JSON.stringify(dbUser, null, 2) : "(no user in DB)"}
+          {dbUser ? JSON.stringify({ ...dbUser, favoriteCount }, null, 2) : "(no user in DB)"}
         </pre>
       </Section>
     </div>
