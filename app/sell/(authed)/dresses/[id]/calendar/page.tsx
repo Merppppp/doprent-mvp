@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { listBlackouts } from "@/lib/dresses";
+import { listBlackouts } from "@/lib/products";
 import AvailabilityCalendar from "@/components/AvailabilityCalendar";
 
 export const dynamic = "force-dynamic";

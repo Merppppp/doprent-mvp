@@ -1,11 +1,11 @@
 import { PALETTE, type Color } from "@/lib/types";
 
 /**
- * SVG gradient stand-in for a dress photo. Mirrors `dressSvg` in the demo —
- * a soft gradient based on the dress's color token. Used as a placeholder
- * until real photos are uploaded to Supabase Storage.
+ * SVG gradient stand-in for a product photo. Mirrors `dressSvg` in the demo —
+ * a soft gradient based on the product's color token. Used as a placeholder
+ * until real photos are uploaded.
  */
-export function DressArt({
+export function ProductArt({
   color,
   variant = 0,
   className,
@@ -35,7 +35,7 @@ export function DressArt({
   );
 }
 
-export function BoutiqueCover({
+export function ShopCover({
   color,
   className,
 }: {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listDresses } from "@/lib/dresses";
+import { listProducts } from "@/lib/products";
 import type { Color, OccasionKey } from "@/lib/types";
 
 export async function GET(req: NextRequest) {
@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
     const occasion = sp.get("occasion") as OccasionKey | null;
     const size = sp.get("size");
     const designer = sp.get("designer");
+    const category = sp.get("category");
     const q = sp.get("q");
     const sort = sp.get("sort") as "featured" | "price-asc" | "price-desc" | "name" | null;
     const page = Number(sp.get("page")) || 1;
@@ -17,11 +18,12 @@ export async function GET(req: NextRequest) {
     const dateFrom = sp.get("dateFrom") || undefined;
     const dateTo = sp.get("dateTo") || undefined;
 
-    const result = await listDresses({
+    const result = await listProducts({
       color: color ?? undefined,
       occasions: occasion ? [occasion] : undefined,
       sizes: size ? [size] : undefined,
       designers: designer ? [designer] : undefined,
+      category: category ?? undefined,
       search: q || undefined,
       sort: sort ?? "featured",
       page,
@@ -33,7 +35,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[api/dresses]", err);
+    console.error("[api/products]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

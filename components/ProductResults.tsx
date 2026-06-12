@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import DressCard from "./DressCard";
+import ProductCard from "./ProductCard";
 import { AREA_LIST, AREAS } from "@/lib/areas";
 import { haversineKm } from "@/lib/geo";
 import { useUserLocation } from "./LocationProvider";
-import type { Dress } from "@/lib/types";
+import type { Product } from "@/lib/types";
 import { t, type Locale } from "@/lib/i18n";
 
 const RADII = [3, 5, 10] as const;
@@ -23,8 +23,8 @@ type SearchParams = {
   priceMax?: string;
 };
 
-export default function DressResults({
-  dresses,
+export default function ProductResults({
+  products,
   savedIds,
   isLoggedIn,
   total,
@@ -32,7 +32,7 @@ export default function DressResults({
   searchParams = {},
   locale = "th",
 }: {
-  dresses: Dress[];
+  products: Product[];
   savedIds: string[];
   isLoggedIn: boolean;
   total?: number;
@@ -45,18 +45,18 @@ export default function DressResults({
   const savedSet = useMemo(() => new Set(savedIds), [savedIds]);
 
   // Infinite scroll state
-  const [allDresses, setAllDresses] = useState<Dress[]>(dresses);
+  const [allProducts, setAllProducts] = useState<Product[]>(products);
   const [page, setPage] = useState(2);
   const [hasMore, setHasMore] = useState(initialHasMore ?? false);
   const [loadingMore, setLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Reset when dresses prop changes (filter change)
+  // Reset when products prop changes (filter change)
   useEffect(() => {
-    setAllDresses(dresses);
+    setAllProducts(products);
     setPage(2);
     setHasMore(initialHasMore ?? false);
-  }, [dresses, initialHasMore]);
+  }, [products, initialHasMore]);
 
   const fetchMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
@@ -75,14 +75,14 @@ export default function DressResults({
       if (searchParams.priceMax) params.set("priceMax", searchParams.priceMax);
       params.set("page", String(page));
 
-      const res = await fetch(`/api/dresses?${params.toString()}`);
+      const res = await fetch(`/api/products?${params.toString()}`);
       if (!res.ok) throw new Error("fetch failed");
-      const data = await res.json() as { items: Dress[]; hasMore: boolean };
-      setAllDresses((prev) => [...prev, ...data.items]);
+      const data = await res.json() as { items: Product[]; hasMore: boolean };
+      setAllProducts((prev) => [...prev, ...data.items]);
       setHasMore(data.hasMore);
       setPage((p) => p + 1);
     } catch (err) {
-      console.error("[DressResults] fetchMore error:", err);
+      console.error("[ProductResults] fetchMore error:", err);
     } finally {
       setLoadingMore(false);
     }
@@ -128,7 +128,7 @@ export default function DressResults({
   }, [hasMore, loadingMore, fetchMore]);
 
   const list = useMemo(() => {
-    let rows = allDresses.map((d) => {
+    let rows = allProducts.map((d) => {
       const a = d.area_key ? AREAS[d.area_key] : undefined;
       const km = loc && a ? haversineKm(loc.lat, loc.lng, a.lat, a.lng) : null;
       return { d, km };
@@ -138,7 +138,7 @@ export default function DressResults({
       rows.sort((x, y) => (x.km == null ? 1 : y.km == null ? -1 : x.km - y.km));
     }
     return rows;
-  }, [allDresses, loc, radius]);
+  }, [allProducts, loc, radius]);
 
   return (
     <div>
@@ -209,7 +209,7 @@ export default function DressResults({
         <>
           <div className="grid-3" style={{ gap: "24px 20px" }}>
             {list.map(({ d }, i) => (
-              <DressCard key={d.id} dress={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
+              <ProductCard key={d.id} product={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
             ))}
           </div>
 
@@ -237,7 +237,7 @@ export default function DressResults({
           )}
 
           {/* End of results */}
-          {!hasMore && !loadingMore && allDresses.length > 0 && (
+          {!hasMore && !loadingMore && allProducts.length > 0 && (
             <div style={{ textAlign: "center", padding: "28px 0" }}>
               <span style={{
                 display: "inline-flex",
@@ -251,8 +251,8 @@ export default function DressResults({
                 background: "var(--surface)",
               }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><polyline points="20 6 9 17 4 12"/></svg>
-                {allDresses.length > 1
-                  ? t("results.allShown", locale).replace("{n}", String(allDresses.length))
+                {allProducts.length > 1
+                  ? t("results.allShown", locale).replace("{n}", String(allProducts.length))
                   : t("results.noMore", locale)}
               </span>
             </div>

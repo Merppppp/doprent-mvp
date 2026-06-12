@@ -7,17 +7,24 @@ export type CurrentUser = {
   email: string;
   name: string | null;
   role: Role;
-  savedDressIds: string[];
+  /** ids of products the user saved (favorites table — was users.saved_dress_ids uuid[]). */
+  savedProductIds: string[];
 };
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const dbUser = await db.user.findUnique({
-    where: { id: session.user.id },
-    select: { name: true, role: true, savedDressIds: true },
-  });
+  const [dbUser, favorites] = await Promise.all([
+    db.user.findUnique({
+      where: { id: session.user.id },
+      select: { name: true, role: true },
+    }),
+    db.favorite.findMany({
+      where: { userId: session.user.id },
+      select: { productId: true },
+    }),
+  ]);
   if (!dbUser) return null;
 
   return {
@@ -25,7 +32,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     email: session.user.email,
     name: dbUser.name ?? session.user.name ?? null,
     role: dbUser.role,
-    savedDressIds: dbUser.savedDressIds,
+    savedProductIds: favorites.map((f) => f.productId),
   };
 }
 

@@ -1,28 +1,28 @@
 import Link from "next/link";
-import DressCardImage from "./DressCardImage";
+import ProductCardImage from "./ProductCardImage";
 import SaveButton from "./SaveButton";
 import VerifiedBadge from "./VerifiedBadge";
 import DistanceBadge from "./DistanceBadge";
 import { hasMultipleRates, startingPerDay } from "@/lib/pricing";
-import type { Dress } from "@/lib/types";
+import type { Product } from "@/lib/types";
 
 type Props = {
-  dress: Dress;
+  product: Product;
   variant?: number;
-  /** Set of dress IDs the current user has saved. */
+  /** Set of product IDs the current user has saved. */
   savedSet?: Set<string>;
   /** Whether the viewer is logged in (affects save button behavior). */
   isLoggedIn?: boolean;
 };
 
-export default function DressCard({ dress, variant = 0, savedSet, isLoggedIn }: Props) {
-  const hasImg = Array.isArray(dress.images) && dress.images.length > 0;
-  const imgSrc = hasImg ? dress.images[0] : null;
-  const isSaved = savedSet ? savedSet.has(dress.id) : false;
+export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn }: Props) {
+  const hasImg = Array.isArray(product.images) && product.images.length > 0;
+  const imgSrc = hasImg ? product.images[0] : null;
+  const isSaved = savedSet ? savedSet.has(product.id) : false;
 
   return (
     <div className="card" style={{ position: "relative" }}>
-      <Link href={`/dress/${dress.slug}`} style={{ display: "block", cursor: "pointer" }}>
+      <Link href={`/dress/${product.slug}`} style={{ display: "block", cursor: "pointer" }}>
         <div
           style={{
             aspectRatio: "3/4",
@@ -33,8 +33,8 @@ export default function DressCard({ dress, variant = 0, savedSet, isLoggedIn }: 
             transition: "transform 0.2s",
           }}
         >
-          <DressCardImage src={imgSrc} alt={dress.name} color={dress.color} variant={variant} />
-          <SaveButton dressId={dress.id} initialSaved={isSaved} isLoggedIn={isLoggedIn} />
+          <ProductCardImage src={imgSrc} alt={product.name} color={product.color} variant={variant} />
+          <SaveButton dressId={product.id} initialSaved={isSaved} isLoggedIn={isLoggedIn} />
         </div>
         <div style={{ padding: "0 2px" }}>
           <div
@@ -46,10 +46,10 @@ export default function DressCard({ dress, variant = 0, savedSet, isLoggedIn }: 
               letterSpacing: "0.02em",
             }}
           >
-            {dress.designer || "—"}
+            {product.designer || "—"}
           </div>
           <div style={{ fontSize: 15, fontWeight: 500, lineHeight: 1.3, marginBottom: 4 }}>
-            {dress.name}
+            {product.name}
           </div>
           <div
             style={{
@@ -62,22 +62,22 @@ export default function DressCard({ dress, variant = 0, savedSet, isLoggedIn }: 
             }}
           >
             <span>
-              Size {dress.size} ·{" "}
-              <span style={{ color: "var(--ink-2)" }}>{dress.boutique_name}</span>
-              {dress.boutique_verified ? (
+              Size {product.size} ·{" "}
+              <span style={{ color: "var(--ink-2)" }}>{product.shop_name}</span>
+              {product.shop_verified ? (
                 <span style={{ marginLeft: 4, display: "inline-flex", verticalAlign: "middle" }}>
                   <VerifiedBadge size="sm" />
                 </span>
               ) : null}
-              {dress.area_key ? (
-                <DistanceBadge areaKey={dress.area_key} style={{ marginLeft: 6, verticalAlign: "middle" }} />
+              {product.area_key ? (
+                <DistanceBadge areaKey={product.area_key} style={{ marginLeft: 6, verticalAlign: "middle" }} />
               ) : null}
             </span>
             <span style={{ fontWeight: 600, color: "var(--ink)", whiteSpace: "nowrap", fontSize: 14 }}>
-              {hasMultipleRates(dress.price_tiers) ? (
+              {hasMultipleRates(product.price_tiers) ? (
                 <span style={{ fontSize: 11, fontWeight: 400, color: "var(--ink-3)" }}>เริ่ม </span>
               ) : null}
-              ฿{startingPerDay(dress.price_tiers, dress.price_per_day).toLocaleString()}{" "}
+              ฿{startingPerDay(product.price_tiers, product.price_per_day).toLocaleString()}{" "}
               <span style={{ color: "var(--ink-3)", fontSize: 12, fontWeight: 400 }}>/วัน</span>
             </span>
           </div>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { BoutiqueCover } from "@/components/DressArt";
+import { ShopCover } from "@/components/ProductArt";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { AREA_LIST, AREAS } from "@/lib/areas";
 import { formatKm, haversineKm } from "@/lib/geo";
@@ -25,7 +25,7 @@ export type FinderShop = {
 
 type SortMode = "near" | "default";
 
-export default function BoutiqueFinder({ shops }: { shops: FinderShop[] }) {
+export default function ShopFinder({ shops }: { shops: FinderShop[] }) {
   const { loc, label, source, status, requestGps, setArea, clear } = useUserLocation();
   const [sort, setSort] = useState<SortMode>("near");
 
@@ -127,7 +127,7 @@ export default function BoutiqueFinder({ shops }: { shops: FinderShop[] }) {
             }}
           >
             <div className="cover">
-              <BoutiqueCover color={b.coverColor} />
+              <ShopCover color={b.coverColor} />
             </div>
             <div style={{ padding: 22, flex: 1 }}>
               {b.featured ? (

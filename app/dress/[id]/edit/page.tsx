@@ -1,18 +1,18 @@
 import { notFound } from "next/navigation";
 import DressForm from "@/app/sell/(authed)/dresses/DressForm";
-import { getDressBySlug, listOccasions, getBoutiqueBySlug } from "@/lib/dresses";
+import { getProductBySlug, listOccasions, getShopBySlug } from "@/lib/products";
 
 type Params = { id: string };
 
 const DEFAULT_LINE = process.env.NEXT_PUBLIC_DEFAULT_LINE_URL ?? "https://line.me/R/ti/p/@doprent";
 
 export default async function EditDressPage({ params }: { params: Params }) {
-  const dress = await getDressBySlug(params.id);
+  const dress = await getProductBySlug(params.id);
   if (!dress) notFound();
 
   const occasions = await listOccasions();
-  // ensure boutique exists (used for boutique_id validity and line fallback)
-  const boutique = await getBoutiqueBySlug((dress.boutique_name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+  // ensure boutique exists (used for shop_id validity and line fallback)
+  const boutique = await getShopBySlug((dress.shop_name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-"));
 
   return (
     <div className="container" style={{ paddingTop: 20, paddingBottom: 60 }}>
@@ -21,7 +21,7 @@ export default async function EditDressPage({ params }: { params: Params }) {
         <DressForm
           mode="edit"
           dressId={dress.id}
-          boutiqueId={dress.boutique_id}
+          boutiqueId={dress.shop_id}
           defaultLineUrl={boutique?.line_url ?? DEFAULT_LINE}
           occasions={occasions}
           initial={{

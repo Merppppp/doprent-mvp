@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import VerifiedBadge from "@/components/VerifiedBadge";
-import { DressArt } from "@/components/DressArt";
+import { ProductArt } from "@/components/ProductArt";
 import SellerDashboardCalendarPanel from "@/components/SellerDashboardCalendarPanel";
 import { dressLimitFor, TIER_LABEL } from "@/lib/tiers";
 import type { AdsTier } from "@/lib/types";
@@ -340,7 +340,7 @@ export default async function SellerDashboard({
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     />
                   ) : (
-                    <DressArt color={d.color as never} variant={i} />
+                    <ProductArt color={d.color as never} variant={i} />
                   )}
                 </div>
                 <div style={{ minWidth: 0 }}>

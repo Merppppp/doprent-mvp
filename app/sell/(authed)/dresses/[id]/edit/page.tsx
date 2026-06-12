@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { listOccasions } from "@/lib/dresses";
+import { listOccasions } from "@/lib/products";
 import { normalizeTiers } from "@/lib/pricing";
 import DressForm from "../../DressForm";
 import type { Color, OccasionKey, PriceTier, Size } from "@/lib/types";
