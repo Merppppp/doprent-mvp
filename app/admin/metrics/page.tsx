@@ -55,7 +55,7 @@ async function getMetrics() {
     byOccasion,
     funnelGroups,
     activeSubs,
-    totalBoutiques,
+    totalShopCount,
   ] = await Promise.all([
     db.user.count(),
     db.user.count({ where: { createdAt: { gte: since } } }),
@@ -82,20 +82,21 @@ async function getMetrics() {
       from bookings where created_at >= ${since}
       group by 1 order by day`,
     db.$queryRaw<OccasionRow[]>`
-      select occ as occasion,
+      select t.key as occasion,
              count(*)::int as bookings,
              count(*) filter (where b.status = 'confirmed')::int as confirmed,
              coalesce(sum(b.commission_amount) filter (where b.status = 'confirmed'), 0)::int as commission
       from bookings b
-      join dresses d on d.id = b.dress_id
-      cross join lateral unnest(coalesce(d.occasions, array[]::text[])) as occ
+      join product_tags pt on pt.product_id = b.product_id
+      join tags t on t.id = pt.tag_id
+      join tag_groups tg on tg.id = t.tag_group_id and tg.key = 'occasion'
       group by 1 order by bookings desc`,
     db.booking.groupBy({ by: ["status"], _count: { _all: true } }),
-    db.sellerSubscription.findMany({
+    db.shopSubscription.findMany({
       where: { status: "active" },
-      select: { plan: true, amount: true, billingCycle: true, boutiqueId: true },
+      select: { plan: true, amount: true, billingCycle: true, shopId: true },
     }),
-    db.boutique.count(),
+    db.shop.count(),
   ]);
 
   // signups by channel
@@ -115,16 +116,17 @@ async function getMetrics() {
 
   // subscription revenue + adoption
   const subByPlan = new Map<string, { active: number; mrr: number }>();
-  const paidBoutiques = new Set<string>();
+  const paidShops = new Set<string>();
   for (const s of activeSubs) {
     const cur = subByPlan.get(s.plan) ?? { active: 0, mrr: 0 };
     cur.active += 1;
     cur.mrr += s.billingCycle === "yearly" ? Math.round(s.amount / 12) : s.amount;
     subByPlan.set(s.plan, cur);
-    if (s.plan !== "free" && s.boutiqueId) paidBoutiques.add(s.boutiqueId);
+    if (s.plan !== "free" && s.shopId) paidShops.add(s.shopId);
   }
-  const adoptionRate = totalBoutiques
-    ? Math.round((paidBoutiques.size / totalBoutiques) * 10000) / 100
+  const totalShops = totalShopCount;
+  const adoptionRate = totalShops
+    ? Math.round((paidShops.size / totalShops) * 10000) / 100
     : null;
 
   return {
@@ -139,7 +141,7 @@ async function getMetrics() {
     funnel: { total: totalBookings, confirmed, lost, confirmRate },
     subByPlan,
     subscriptionRevenue: [...subByPlan.values()].reduce((a, b) => a + b.mrr, 0),
-    adoption: { paid: paidBoutiques.size, total: totalBoutiques, rate: adoptionRate },
+    adoption: { paid: paidShops.size, total: totalShops, rate: adoptionRate },
   };
 }
 
@@ -160,7 +162,7 @@ export default async function AdminMetricsPage() {
         <H1>Business Metrics</H1>
         <Notice>
           ยังดึงข้อมูลไม่ได้ — ตรวจว่าได้รัน Prisma migration (ตาราง page_views / bookings /
-          seller_subscriptions) แล้ว
+          shop_subscriptions) แล้ว
           {err ? <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-3)" }}>{err}</div> : null}
         </Notice>
       </div>
@@ -258,7 +260,7 @@ export default async function AdminMetricsPage() {
             rows={[...m.subByPlan.entries()].map(([plan, v]) => [plan, num(v.active), baht(v.mrr)])}
           />
         ) : (
-          <Empty>ยังไม่มี subscription (ตาราง seller_subscriptions ว่าง)</Empty>
+          <Empty>ยังไม่มี subscription (ตาราง shop_subscriptions ว่าง)</Empty>
         )}
       </Section>
 

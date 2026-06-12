@@ -9,7 +9,7 @@ import ProductCard from "@/components/ProductCard";
 import SaveButton from "@/components/SaveButton";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import DateRangePicker from "@/components/DateRangePicker";
-import DressAvailabilityCalendar from "@/components/DressAvailabilityCalendar";
+import ProductAvailabilityCalendar from "@/components/ProductAvailabilityCalendar";
 import LineMessageCopyBox from "@/components/LineMessageCopyBox";
 import { getCurrentUser } from "@/lib/auth";
 import {
@@ -327,7 +327,7 @@ export default async function DressPage({ params }: { params: Params }) {
           ) : null}
 
           {/* Availability calendar */}
-          <DressAvailabilityCalendar blackouts={blackouts} />
+          <ProductAvailabilityCalendar blackouts={blackouts} />
 
           {/* Date picker (renter). LINE href and pre-filled message are
               omitted entirely for anonymous viewers — they see a login CTA

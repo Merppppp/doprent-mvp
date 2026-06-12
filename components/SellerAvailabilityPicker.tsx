@@ -175,7 +175,7 @@ export default function SellerAvailabilityPicker({ dresses }: { dresses: DressOp
           }}
         >
           <AvailabilityCalendar
-            dressId={selectedDressId}
+            productId={selectedDressId}
             initialBlackouts={blackouts}
           />
         </div>

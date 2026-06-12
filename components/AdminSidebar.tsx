@@ -43,13 +43,13 @@ const NAV: DashNavItem[] = [
     icon: <Icon d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" />,
   },
   {
-    href: "/admin/boutiques",
-    label: "Boutiques",
+    href: "/admin/shops",
+    label: "Shops",
     icon: <Icon d="M4 9l1-5h14l1 5M4 9a3 3 0 006 0 3 3 0 006 0 3 3 0 006 0M5 9v11h14V9M9 20v-6h6v6" />,
   },
   {
-    href: "/admin/dresses",
-    label: "Dresses",
+    href: "/admin/products",
+    label: "Products",
     icon: <Icon d="M9 3v3L5 14l4 7h6l4-7-4-8V3M9 6h6" />,
   },
   {

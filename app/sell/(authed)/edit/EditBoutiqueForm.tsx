@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { updateBoutique } from "@/app/actions/seller";
+import { updateShop } from "@/app/actions/seller";
 import type { Color } from "@/lib/types";
 
 const COLORS: Array<{ key: Color; label: string }> = [
@@ -54,7 +54,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
       const matched = areas.find((a) => a.key === areaKey);
       if (matched) fd.set("area_label", `${matched.key} · ${matched.th}`);
 
-      const res = await updateBoutique(boutique.id, fd);
+      const res = await updateShop(boutique.id, fd);
       if (!res.ok) {
         setError(res.error ?? "บันทึกไม่สำเร็จ");
         setSubmitting(false);

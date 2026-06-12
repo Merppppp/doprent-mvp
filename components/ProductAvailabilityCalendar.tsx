@@ -36,7 +36,7 @@ function toLocalDateString(d: Date): string {
 
 const TODAY = toLocalDateString(new Date());
 
-export default function DressAvailabilityCalendar({
+export default function ProductAvailabilityCalendar({
   blackouts = [],
   initialYear,
   initialMonth,

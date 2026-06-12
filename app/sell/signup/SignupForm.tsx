@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { createBoutique } from "@/app/actions/seller";
+import { createShop } from "@/app/actions/seller";
 import { BANGKOK_DISTRICTS, findDistrict, PROVINCE_TH } from "@/lib/bangkok-districts";
 
 const COLORS = [
@@ -79,7 +79,7 @@ export default function SignupForm(_props: Props) {
         formData.set("area_label", `เขต${d.th} · กรุงเทพ`);
       }
 
-      const res = await createBoutique(formData);
+      const res = await createShop(formData);
       if (!res.ok) {
         setError(res.error ?? "เกิดข้อผิดพลาด");
         setSubmitting(false);

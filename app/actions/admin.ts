@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { base, db } from "@/lib/db";
+import { withActor } from "@/lib/db-context";
 import { dueAt } from "@/lib/bookings";
 
 async function requireAdmin(): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
@@ -13,7 +14,11 @@ async function requireAdmin(): Promise<{ ok: true; userId: string } | { ok: fals
   return { ok: true, userId: user.id };
 }
 
-async function writeAudit(
+/**
+ * Write a business audit row to audit_logs (DESIGN §6.1).
+ * Uses `base` (un-extended) to avoid re-auditing the audit write itself.
+ */
+async function logAdminAction(
   adminId: string,
   action: string,
   targetType: string,
@@ -21,16 +26,24 @@ async function writeAudit(
   reason: string | null,
   payload?: Record<string, unknown>,
 ) {
-  await db.adminAudit.create({
-    data: {
-      adminId,
-      action,
-      targetType,
-      targetId,
-      reason,
-      payload: payload as Prisma.InputJsonValue | undefined,
-    },
-  });
+  try {
+    await base.auditLog.create({
+      data: {
+        action: "UPDATE",
+        entityType: targetType,
+        entityId: targetId,
+        actorId: adminId,
+        before: Prisma.JsonNull,
+        after: {
+          admin_action: action,
+          reason: reason ?? null,
+          ...payload,
+        },
+      },
+    });
+  } catch (e) {
+    console.error("[admin audit] write failed", action, e);
+  }
 }
 
 export async function approveKyc(kycId: string, notes?: string): Promise<{ ok: boolean; error?: string }> {
@@ -40,23 +53,25 @@ export async function approveKyc(kycId: string, notes?: string): Promise<{ ok: b
   const kyc = await db.kycSubmission.findUnique({ where: { id: kycId } });
   if (!kyc) return { ok: false, error: "ไม่พบ KYC" };
 
-  const isPaidPlan = kyc.plan === "Boost" || kyc.plan === "Featured";
+  const isPaidPlan = kyc.plan === "boost" || kyc.plan === "featured";
 
-  await db.kycSubmission.update({
-    where: { id: kycId },
-    data: { status: "approved", reviewerId: auth.userId, reviewNotes: notes ?? null, reviewedAt: new Date() },
-  });
-  await db.boutique.update({
-    where: { id: kyc.boutiqueId },
-    data: { kycStatus: "verified", verified: isPaidPlan, status: "live" },
-  });
-  await writeAudit(auth.userId, "approve_kyc", "kyc", kycId, notes ?? null, { plan: kyc.plan, verified: isPaidPlan });
+  return withActor(auth.userId, async () => {
+    await db.kycSubmission.update({
+      where: { id: kycId },
+      data: { status: "approved", reviewerId: auth.userId, reviewNotes: notes ?? null, reviewedAt: new Date() },
+    });
+    await db.shop.update({
+      where: { id: kyc.shopId },
+      data: { kycStatus: "verified", verified: isPaidPlan, status: "live" },
+    });
+    await logAdminAction(auth.userId, "approve_kyc", "kyc", kycId, notes ?? null, { plan: kyc.plan, verified: isPaidPlan });
 
-  revalidatePath("/admin");
-  revalidatePath("/admin/kyc");
-  revalidatePath("/admin/boutiques");
-  revalidatePath("/sell/dashboard");
-  return { ok: true };
+    revalidatePath("/admin");
+    revalidatePath("/admin/kyc");
+    revalidatePath("/admin/shops");
+    revalidatePath("/sell/dashboard");
+    return { ok: true };
+  });
 }
 
 export async function rejectKyc(kycId: string, reason: string): Promise<{ ok: boolean; error?: string }> {
@@ -67,96 +82,106 @@ export async function rejectKyc(kycId: string, reason: string): Promise<{ ok: bo
   const kyc = await db.kycSubmission.findUnique({ where: { id: kycId } });
   if (!kyc) return { ok: false, error: "ไม่พบ KYC" };
 
-  await db.kycSubmission.update({
-    where: { id: kycId },
-    data: { status: "rejected", reviewerId: auth.userId, reviewNotes: reason, reviewedAt: new Date() },
-  });
-  await db.boutique.update({ where: { id: kyc.boutiqueId }, data: { kycStatus: "rejected" } });
-  await writeAudit(auth.userId, "reject_kyc", "kyc", kycId, reason);
+  return withActor(auth.userId, async () => {
+    await db.kycSubmission.update({
+      where: { id: kycId },
+      data: { status: "rejected", reviewerId: auth.userId, reviewNotes: reason, reviewedAt: new Date() },
+    });
+    await db.shop.update({ where: { id: kyc.shopId }, data: { kycStatus: "rejected" } });
+    await logAdminAction(auth.userId, "reject_kyc", "kyc", kycId, reason);
 
-  revalidatePath("/admin/kyc");
-  revalidatePath("/sell/dashboard");
-  return { ok: true };
+    revalidatePath("/admin/kyc");
+    revalidatePath("/sell/dashboard");
+    return { ok: true };
+  });
 }
 
-export async function setBoutiqueStatus(
-  boutiqueId: string,
+export async function setShopStatus(
+  shopId: string,
   status: "live" | "pending" | "rejected",
   reason?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth;
 
-  await db.boutique.update({
-    where: { id: boutiqueId },
-    data: { status, rejectReason: status === "rejected" ? reason ?? null : null },
+  return withActor(auth.userId, async () => {
+    await db.shop.update({
+      where: { id: shopId },
+      data: { status, rejectReason: status === "rejected" ? reason ?? null : null },
+    });
+    await logAdminAction(auth.userId, `set_shop_${status}`, "shop", shopId, reason ?? null);
+
+    revalidatePath("/admin/shops");
+    revalidatePath("/");
+    return { ok: true };
   });
-  await writeAudit(auth.userId, `set_boutique_${status}`, "boutique", boutiqueId, reason ?? null);
-
-  revalidatePath("/admin/boutiques");
-  revalidatePath("/");
-  return { ok: true };
 }
 
-export async function toggleBoutiqueVerified(boutiqueId: string, verified: boolean): Promise<{ ok: boolean; error?: string }> {
+export async function toggleShopVerified(shopId: string, verified: boolean): Promise<{ ok: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth;
 
-  await db.boutique.update({ where: { id: boutiqueId }, data: { verified } });
-  await writeAudit(auth.userId, verified ? "verify_boutique" : "unverify_boutique", "boutique", boutiqueId, null);
+  return withActor(auth.userId, async () => {
+    await db.shop.update({ where: { id: shopId }, data: { verified } });
+    await logAdminAction(auth.userId, verified ? "verify_shop" : "unverify_shop", "shop", shopId, null);
 
-  revalidatePath("/admin/boutiques");
-  revalidatePath("/");
-  return { ok: true };
+    revalidatePath("/admin/shops");
+    revalidatePath("/");
+    return { ok: true };
+  });
 }
 
-export async function toggleBoutiqueFeatured(boutiqueId: string, featured: boolean): Promise<{ ok: boolean; error?: string }> {
+export async function toggleShopFeatured(shopId: string, featured: boolean): Promise<{ ok: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth;
 
-  await db.boutique.update({ where: { id: boutiqueId }, data: { featured } });
-  await writeAudit(auth.userId, featured ? "feature_boutique" : "unfeature_boutique", "boutique", boutiqueId, null);
+  return withActor(auth.userId, async () => {
+    await db.shop.update({ where: { id: shopId }, data: { featured } });
+    await logAdminAction(auth.userId, featured ? "feature_shop" : "unfeature_shop", "shop", shopId, null);
 
-  revalidatePath("/admin/boutiques");
-  revalidatePath("/");
-  return { ok: true };
+    revalidatePath("/admin/shops");
+    revalidatePath("/");
+    return { ok: true };
+  });
 }
 
-export async function setDressStatus(
-  dressId: string,
+export async function setProductStatus(
+  productId: string,
   status: "live" | "pending" | "rejected",
   reason?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth;
 
-  await db.dress.update({
-    where: { id: dressId },
-    data: { status, rejectReason: status === "rejected" ? reason ?? null : null },
-  });
-  await writeAudit(auth.userId, `set_dress_${status}`, "dress", dressId, reason ?? null);
+  return withActor(auth.userId, async () => {
+    await db.product.update({
+      where: { id: productId },
+      data: { status, rejectReason: status === "rejected" ? reason ?? null : null },
+    });
+    await logAdminAction(auth.userId, `set_product_${status}`, "product", productId, reason ?? null);
 
-  revalidatePath("/admin/dresses");
-  revalidatePath("/");
-  return { ok: true };
+    revalidatePath("/admin/products");
+    revalidatePath("/");
+    return { ok: true };
+  });
 }
 
-export async function toggleDressFeatured(dressId: string, featured: boolean): Promise<{ ok: boolean; error?: string }> {
+export async function toggleProductFeatured(productId: string, featured: boolean): Promise<{ ok: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth;
 
-  await db.dress.update({ where: { id: dressId }, data: { featured } });
-  await writeAudit(auth.userId, featured ? "feature_dress" : "unfeature_dress", "dress", dressId, null);
+  return withActor(auth.userId, async () => {
+    await db.product.update({ where: { id: productId }, data: { featured } });
+    await logAdminAction(auth.userId, featured ? "feature_product" : "unfeature_product", "product", productId, null);
 
-  revalidatePath("/admin/dresses");
-  revalidatePath("/");
-  return { ok: true };
+    revalidatePath("/admin/products");
+    revalidatePath("/");
+    return { ok: true };
+  });
 }
 
 /* --------------------------- booking resolution --------------------------- */
-/* Admin resolves the two dead-end statuses (cancel_requested, slip_disputed).
- * Same atomic updateMany status-guard pattern as app/actions/bookings.ts:
- * the WHERE clause pins the expected source status so concurrent moves lose. */
+/* Admin resolves the two dead-end statuses (cancel_requested, slip_disputed). */
 
 function revalidateBookingPaths(bookingId: string) {
   revalidatePath("/admin/bookings");
@@ -165,11 +190,6 @@ function revalidateBookingPaths(bookingId: string) {
   revalidatePath("/sell/bookings");
 }
 
-/** cancel_requested → cancelled (admin approves the seller's cancel request).
- *  NOTE on refunds: if the renter already paid (request raised from
- *  payment_review/confirmed), the refund is handled MANUALLY off-platform —
- *  admin coordinates a PromptPay transfer back to the renter. There is no
- *  automated refund in the MVP; the audit row is the paper trail. */
 export async function adminApproveCancel(bookingId: string, note?: string): Promise<{ ok: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth;
@@ -182,25 +202,23 @@ export async function adminApproveCancel(bookingId: string, note?: string): Prom
   if (booking.status !== "cancel_requested")
     return { ok: false, error: "การจองนี้ไม่ได้อยู่ในสถานะรอยกเลิก" };
 
-  const res = await db.booking.updateMany({
-    where: { id: bookingId, status: "cancel_requested" },
-    data: { status: "cancelled" },
-  });
-  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+  return withActor(auth.userId, async () => {
+    const res = await db.booking.updateMany({
+      where: { id: bookingId, status: "cancel_requested" },
+      data: { status: "cancelled" },
+    });
+    if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
 
-  await writeAudit(auth.userId, "approve_booking_cancel", "booking", bookingId, note ?? null, {
-    sellerReason: booking.cancelReason,
-    fromStatus: booking.cancelFromStatus,
-    refundRequired: booking.cancelFromStatus === "confirmed",
+    await logAdminAction(auth.userId, "approve_booking_cancel", "booking", bookingId, note ?? null, {
+      sellerReason: booking.cancelReason,
+      fromStatus: booking.cancelFromStatus,
+      refundRequired: booking.cancelFromStatus === "confirmed",
+    });
+    revalidateBookingPaths(bookingId);
+    return { ok: true };
   });
-  revalidateBookingPaths(bookingId);
-  return { ok: true };
 }
 
-/** cancel_requested → previous active status (admin denies the cancel request).
- *  Reverts to cancel_from_status when it is a known active state; falls back
- *  to confirmed when the origin is unknown (safest for the renter, who has
- *  already paid in every flow that can reach cancel_requested). */
 export async function adminDenyCancel(bookingId: string, note?: string): Promise<{ ok: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth;
@@ -218,38 +236,39 @@ export async function adminDenyCancel(bookingId: string, note?: string): Promise
       ? (booking.cancelFromStatus as "payment_review" | "confirmed")
       : "confirmed";
 
-  const res = await db.booking.updateMany({
-    where: { id: bookingId, status: "cancel_requested" },
-    data: { status: revertTo, cancelReason: null, cancelFromStatus: null },
-  });
-  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+  return withActor(auth.userId, async () => {
+    const res = await db.booking.updateMany({
+      where: { id: bookingId, status: "cancel_requested" },
+      data: { status: revertTo, cancelReason: null, cancelFromStatus: null },
+    });
+    if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
 
-  await writeAudit(auth.userId, "deny_booking_cancel", "booking", bookingId, note ?? null, {
-    sellerReason: booking.cancelReason,
-    revertedTo: revertTo,
+    await logAdminAction(auth.userId, "deny_booking_cancel", "booking", bookingId, note ?? null, {
+      sellerReason: booking.cancelReason,
+      revertedTo: revertTo,
+    });
+    revalidateBookingPaths(bookingId);
+    return { ok: true };
   });
-  revalidateBookingPaths(bookingId);
-  return { ok: true };
 }
 
-/** slip_disputed → confirmed (admin checked the slip and it is valid). */
 export async function adminAcceptSlip(bookingId: string, note?: string): Promise<{ ok: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth;
 
-  const res = await db.booking.updateMany({
-    where: { id: bookingId, status: "slip_disputed" },
-    data: { status: "confirmed", cancelReason: null, cancelFromStatus: null },
-  });
-  if (res.count === 0) return { ok: false, error: "การจองนี้ไม่ได้อยู่ในสถานะสลิปมีปัญหา" };
+  return withActor(auth.userId, async () => {
+    const res = await db.booking.updateMany({
+      where: { id: bookingId, status: "slip_disputed" },
+      data: { status: "confirmed", cancelReason: null, cancelFromStatus: null },
+    });
+    if (res.count === 0) return { ok: false, error: "การจองนี้ไม่ได้อยู่ในสถานะสลิปมีปัญหา" };
 
-  await writeAudit(auth.userId, "accept_disputed_slip", "booking", bookingId, note ?? null);
-  revalidateBookingPaths(bookingId);
-  return { ok: true };
+    await logAdminAction(auth.userId, "accept_disputed_slip", "booking", bookingId, note ?? null);
+    revalidateBookingPaths(bookingId);
+    return { ok: true };
+  });
 }
 
-/** slip_disputed → waiting_for_payment with a fresh payment window:
- *  the slip really was invalid, so the renter must pay/re-upload again. */
 export async function adminRejectSlip(bookingId: string, note?: string): Promise<{ ok: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth;
@@ -262,22 +281,36 @@ export async function adminRejectSlip(bookingId: string, note?: string): Promise
   if (booking.status !== "slip_disputed")
     return { ok: false, error: "การจองนี้ไม่ได้อยู่ในสถานะสลิปมีปัญหา" };
 
-  const res = await db.booking.updateMany({
-    where: { id: bookingId, status: "slip_disputed" },
-    data: {
-      status: "waiting_for_payment",
-      currentDueAt: new Date(dueAt()),
-      // Old slip key stays in R2 for the audit trail; uploading a new slip
-      // overwrites slipPath with a fresh key.
-      cancelReason: null,
-      cancelFromStatus: null,
-    },
-  });
-  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+  return withActor(auth.userId, async () => {
+    const res = await db.booking.updateMany({
+      where: { id: bookingId, status: "slip_disputed" },
+      data: {
+        status: "waiting_for_payment",
+        currentDueAt: new Date(dueAt()),
+        cancelReason: null,
+        cancelFromStatus: null,
+      },
+    });
+    if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
 
-  await writeAudit(auth.userId, "reject_disputed_slip", "booking", bookingId, note ?? null, {
-    rejectedSlipPath: booking.slipPath,
+    await logAdminAction(auth.userId, "reject_disputed_slip", "booking", bookingId, note ?? null, {
+      rejectedSlipPath: booking.slipPath,
+    });
+    revalidateBookingPaths(bookingId);
+    return { ok: true };
   });
-  revalidateBookingPaths(bookingId);
-  return { ok: true };
 }
+
+// ---------------------------------------------------------------------------
+// Legacy aliases — keep old names working during transition
+// ---------------------------------------------------------------------------
+/** @deprecated use setShopStatus */
+export const setBoutiqueStatus = setShopStatus;
+/** @deprecated use toggleShopVerified */
+export const toggleBoutiqueVerified = toggleShopVerified;
+/** @deprecated use toggleShopFeatured */
+export const toggleBoutiqueFeatured = toggleShopFeatured;
+/** @deprecated use setProductStatus */
+export const setDressStatus = setProductStatus;
+/** @deprecated use toggleProductFeatured */
+export const toggleDressFeatured = toggleProductFeatured;

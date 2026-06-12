@@ -69,10 +69,10 @@ const TIERS = [
 export default async function SellLanding() {
   const user = await getCurrentUser().catch(() => null);
 
-  // If already a seller with a boutique, send them to their dashboard
+  // If already a seller with a shop, send them to their dashboard
   let existingBoutique: { slug: string } | null = null;
   if (user) {
-    existingBoutique = await db.boutique.findFirst({
+    existingBoutique = await db.shop.findFirst({
       where: { ownerId: user.id },
       select: { slug: true },
     });

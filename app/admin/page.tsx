@@ -13,10 +13,10 @@ export default async function AdminHomePage() {
   const since7d = new Date(Date.now() - 7 * 86_400_000);
 
   const [bPending, bLive, dPending, dLive, kycPending, clicks7d, totalClicks, bookingAttention] = await Promise.all([
-    db.boutique.count({ where: { status: "pending" } }),
-    db.boutique.count({ where: { status: "live" } }),
-    db.dress.count({ where: { status: "pending" } }),
-    db.dress.count({ where: { status: "live", available: true } }),
+    db.shop.count({ where: { status: "pending" } }),
+    db.shop.count({ where: { status: "live" } }),
+    db.product.count({ where: { status: "pending" } }),
+    db.product.count({ where: { status: "live", available: true } }),
     db.kycSubmission.count({ where: { status: "pending" } }),
     db.lineClick.count({ where: { createdAt: { gte: since7d } } }),
     db.lineClick.count(),
@@ -37,15 +37,15 @@ export default async function AdminHomePage() {
 
       <div className="grid-4" style={{ gap: 14, marginBottom: 36 }}>
         <Stat label="KYC รออนุมัติ" value={kycPending} href="/admin/kyc" accent={!!kycPending} />
-        <Stat label="ร้านรออนุมัติ" value={bPending} href="/admin/boutiques?status=pending" accent={!!bPending} />
-        <Stat label="ชุดรออนุมัติ" value={dPending} href="/admin/dresses?status=pending" accent={!!dPending} />
+        <Stat label="ร้านรออนุมัติ" value={bPending} href="/admin/shops?status=pending" accent={!!bPending} />
+        <Stat label="สินค้ารออนุมัติ" value={dPending} href="/admin/products?status=pending" accent={!!dPending} />
         <Stat label="การจองรอแอดมิน" value={bookingAttention} href="/admin/bookings" accent={!!bookingAttention} />
       </div>
 
       <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>สถิติแพลตฟอร์ม</h2>
       <div className="grid-4" style={{ gap: 14 }}>
         <Stat label="ร้านออนไลน์" value={bLive} />
-        <Stat label="ชุดออนไลน์" value={dLive} />
+        <Stat label="สินค้าออนไลน์" value={dLive} />
         <Stat label="LINE clicks 7 วัน" value={clicks7d} href="/admin/clicks" />
         <Stat label="LINE clicks ทั้งหมด" value={totalClicks} href="/admin/clicks" />
       </div>
@@ -57,14 +57,14 @@ export default async function AdminHomePage() {
             ตรวจ KYC ({kycPending})
           </Link>
           <Link
-            href="/admin/dresses?status=pending"
+            href="/admin/products?status=pending"
             className="btn btn-outline"
             style={{ padding: "9px 14px", fontSize: 13 }}
           >
-            ตรวจชุดใหม่ ({dPending})
+            ตรวจสินค้าใหม่ ({dPending})
           </Link>
           <Link
-            href="/admin/boutiques?status=pending"
+            href="/admin/shops?status=pending"
             className="btn btn-outline"
             style={{ padding: "9px 14px", fontSize: 13 }}
           >

@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
-import BoutiqueRow from "./BoutiqueRow";
+import ShopRow from "./ShopRow";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Boutiques · Admin",
+  title: "Shops · Admin",
   robots: { index: false, follow: false },
 };
 
 const STATUS_OPTS = ["pending", "live", "rejected", "all"] as const;
 type StatusOpt = (typeof STATUS_OPTS)[number];
 
-export default async function BoutiquesAdmin({
+export default async function ShopsAdmin({
   searchParams,
 }: {
   searchParams: { status?: string };
@@ -21,10 +21,14 @@ export default async function BoutiquesAdmin({
     ? (searchParams!.status as StatusOpt)
     : "pending";
 
-  const rawRows = await db.boutique.findMany({
+  const rawRows = await db.shop.findMany({
     where: activeStatus !== "all" ? { status: activeStatus } : undefined,
     orderBy: { createdAt: "desc" },
-    select: { id: true, slug: true, name: true, ownerName: true, areaLabel: true, lineUrl: true, instagram: true, sinceYear: true, status: true, kycStatus: true, verified: true, featured: true, createdAt: true, ownerId: true },
+    select: {
+      id: true, slug: true, name: true, ownerName: true, areaLabel: true, lineUrl: true,
+      instagram: true, sinceYear: true, status: true, kycStatus: true,
+      verified: true, featured: true, createdAt: true, ownerId: true,
+    },
   });
 
   const rows = rawRows.map((b) => ({
@@ -39,7 +43,7 @@ export default async function BoutiquesAdmin({
   return (
     <div>
       <h1 className="page-title" style={{ fontSize: 26, fontWeight: 600, marginBottom: 4 }}>
-        Boutiques
+        Shops
       </h1>
       <p style={{ fontSize: 14, color: "var(--ink-3)", marginBottom: 18 }}>
         จัดการร้านค้า อนุมัติร้านใหม่ ติ๊ก verified / featured
@@ -49,7 +53,7 @@ export default async function BoutiquesAdmin({
         {STATUS_OPTS.map((s) => (
           <a
             key={s}
-            href={`/admin/boutiques?status=${s}`}
+            href={`/admin/shops?status=${s}`}
             style={{
               padding: "7px 14px",
               fontSize: 13,
@@ -83,7 +87,7 @@ export default async function BoutiquesAdmin({
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {rows.map((b) => (
-            <BoutiqueRow key={b.id} b={b} />
+            <ShopRow key={b.id} b={b} />
           ))}
         </div>
       )}

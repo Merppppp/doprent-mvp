@@ -27,9 +27,9 @@ const NAV: DashNavItem[] = [
     icon: <Icon d="M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10" />,
   },
   {
-    href: "/sell/dresses/new",
-    label: "เพิ่มชุด",
-    match: "/sell/dresses",
+    href: "/sell/products/new",
+    label: "เพิ่มสินค้า",
+    match: "/sell/products",
     icon: <Icon d="M12 5v14M5 12h14" />,
   },
   {

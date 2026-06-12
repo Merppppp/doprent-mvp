@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { createDress, updateDress } from "@/app/actions/seller";
+import { createProduct, updateProduct } from "@/app/actions/seller";
 import type { Color, Occasion, OccasionKey, PriceTier, Size } from "@/lib/types";
 import { priceForNights, validateTiers } from "@/lib/pricing";
 
@@ -46,14 +46,14 @@ const SIZES: Size[] = ["XXXS","XXS","XS","S","M","L","XL","XXL","3XL","4XL"];
 type Props =
   | {
       mode: "create";
-      boutiqueId: string;
+      shopId: string;
       defaultLineUrl: string;
       occasions: Occasion[];
     }
   | {
       mode: "edit";
-      dressId: string;
-      boutiqueId: string;
+      productId: string;
+      shopId: string;
       defaultLineUrl: string;
       occasions: Occasion[];
       initial: {
@@ -72,7 +72,7 @@ type Props =
       };
     };
 
-export default function DressForm(props: Props) {
+export default function ProductForm(props: Props) {
   const router = useRouter();
   const isEdit = props.mode === "edit";
   const initial = isEdit ? props.initial : null;
@@ -163,7 +163,7 @@ export default function DressForm(props: Props) {
     setSubmitting(true);
 
     const fd = new FormData();
-    fd.set("boutique_id", props.boutiqueId);
+    fd.set("shop_id", props.shopId);
     fd.set("name", name);
     fd.set("designer", designer);
     fd.set("size", size);
@@ -188,10 +188,10 @@ export default function DressForm(props: Props) {
 
     try {
       if (isEdit) {
-        const res = await updateDress(props.dressId, fd);
+        const res = await updateProduct(props.productId, fd);
         if (!res.ok) { setError(res.error ?? "บันทึกไม่สำเร็จ"); setSubmitting(false); return; }
       } else {
-        const res = await createDress(fd);
+        const res = await createProduct(fd);
         if (!res.ok) { setError(res.error ?? "บันทึกไม่สำเร็จ"); setSubmitting(false); return; }
       }
       router.push("/sell/dashboard");

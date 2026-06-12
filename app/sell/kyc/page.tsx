@@ -19,7 +19,7 @@ export default async function KycPage({ searchParams }: { searchParams: { slug?:
     ? { ownerId: user.id, slug: searchParams.slug }
     : { ownerId: user.id };
 
-  const raw = await db.boutique.findFirst({
+  const raw = await db.shop.findFirst({
     where,
     select: { id: true, slug: true, name: true, kycStatus: true, status: true },
   });
