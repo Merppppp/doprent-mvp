@@ -15,7 +15,7 @@ export default async function AccountPage() {
 
   const saved = await listProductsByIds(user.savedProductIds);
 
-  const initials = (user.name || user.email)
+  const initials = (user.fullName || user.email)
     .trim()
     .split(/\s+/)
     .map((s: string) => s[0])
@@ -54,7 +54,7 @@ export default async function AccountPage() {
               {initials || "?"}
             </div>
             <div style={{ fontWeight: 600, fontSize: 15 }}>
-              {user.name || user.email.split("@")[0]}
+              {user.fullName || user.email.split("@")[0]}
               {user.role === "admin" ? (
                 <span
                   style={{

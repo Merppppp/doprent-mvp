@@ -71,7 +71,7 @@ export default async function AdminBookingsPage({
       recipientName: true,
       product: { select: { name: true } },
       shop: { select: { name: true } },
-      renter: { select: { name: true, email: true } },
+      renter: { select: { fullName: true, email: true } },
     },
   });
 
@@ -141,7 +141,7 @@ export default async function AdminBookingsPage({
                     </Link>
                   </Td>
                   <Td>
-                    <div>{b.renter?.name ?? b.recipientName ?? "-"}</div>
+                    <div>{b.renter?.fullName ?? b.recipientName ?? "-"}</div>
                     <div style={{ color: "var(--ink-3)", fontSize: 12 }}>{b.renter?.email ?? ""}</div>
                   </Td>
                   <Td>{b.shop?.name ?? "-"}</Td>

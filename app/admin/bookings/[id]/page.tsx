@@ -30,7 +30,7 @@ export default async function AdminBookingDetail({ params }: { params: { id: str
     include: {
       product: { select: { name: true, slug: true } },
       shop: { select: { name: true, slug: true, promptpayId: true } },
-      renter: { select: { name: true, email: true } },
+      renter: { select: { fullName: true, email: true } },
     },
   });
 
@@ -71,7 +71,7 @@ export default async function AdminBookingDetail({ params }: { params: { id: str
 
       <div style={card}>
         <Row label="รหัสการจอง" value={b.id} mono />
-        <Row label="ผู้เช่า" value={`${b.renter?.name ?? "-"} · ${b.renter?.email ?? ""}`} />
+        <Row label="ผู้เช่า" value={`${b.renter?.fullName ?? "-"} · ${b.renter?.email ?? ""}`} />
         <Row label="ร้าน" value={b.shop?.name ?? "-"} />
         <Row label="วันเช่า" value={`${fmtThai(b.startDate)} – ${fmtThai(b.endDate)}`} />
         <Row label="ผู้รับ" value={`${b.recipientName ?? "-"} · ${b.phone ?? ""}`} />

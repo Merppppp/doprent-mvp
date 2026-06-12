@@ -15,7 +15,7 @@ export default async function DebugPage() {
     [dbUser, favoriteCount] = await Promise.all([
       db.user.findUnique({
         where: { id: session.user.id },
-        select: { id: true, email: true, name: true, role: true, emailVerified: true },
+        select: { id: true, email: true, fullName: true, role: true, emailVerified: true },
       }),
       db.favorite.count({ where: { userId: session.user.id } }),
     ]);

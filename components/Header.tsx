@@ -13,7 +13,7 @@ export default async function Header() {
   const locale = getServerLocale();
   const user = await getCurrentUser().catch(() => null);
 
-  const fullName = user?.name || user?.email.split("@")[0] || "";
+  const fullName = user?.fullName || user?.email.split("@")[0] || "";
   const initials = fullName
     .trim()
     .split(/\s+/)

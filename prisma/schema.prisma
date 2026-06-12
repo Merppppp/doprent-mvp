@@ -198,8 +198,8 @@ model User {
   emailVerified DateTime? @map("email_verified") @db.Timestamptz(6)
   /// bcrypt hash สำหรับ login แบบ credentials (NULL = OAuth-only)
   passwordHash  String?   @map("password_hash")
-  /// ชื่อ-นามสกุล (NextAuth adapter field ชื่อ `name`)
-  name          String?   @map("full_name")
+  /// ชื่อ-นามสกุล — vocabulary ทั้งระบบคือ `fullName` (NextAuth adapter ส่ง `name` มา → map ใน adapter wrapper ที่ auth.ts)
+  fullName      String?   @map("full_name")
   /// LINE id ของผู้ใช้ (ติดต่อกลับ)
   lineId        String?   @map("line_id")
   /// บทบาทในระบบ
