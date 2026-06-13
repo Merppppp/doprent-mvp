@@ -29,6 +29,14 @@ type Props = {
   deposit?: number;
   /** Unavailable dates as YYYY-MM-DD strings. Renter can't pick a range overlapping these. */
   blackouts?: string[];
+  /** Combined unavailable date set (blackouts + bookings + closed days). Renter can't pick a range overlapping these. */
+  unavailable?: string[];
+  /** Minimum days in advance the rental must start. */
+  leadTimeDays?: number;
+  /** Minimum rental length in days. */
+  minRentalDays?: number;
+  /** Maximum rental length in days; null = unlimited. */
+  maxRentalDays?: number | null;
   /** Optional dress ID to be tracked in /api/track when user clicks LINE. */
   productId?: string;
   shopId?: string;

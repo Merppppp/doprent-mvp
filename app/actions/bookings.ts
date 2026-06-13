@@ -15,6 +15,11 @@ import {
   findTransition,
   rentalDays,
 } from "@/lib/bookings";
+import {
+  resolveEffectivePolicy,
+  computeUnavailableDates,
+  validateBookingRange,
+} from "@/lib/booking-policy";
 import { normalizeTiers, priceForNights } from "@/lib/pricing";
 import {
   notifyBookingAccepted,
@@ -104,7 +109,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
     if (pendingCount >= 3)
       return { ok: false, error: "มีคำขอจองที่รอร้านอยู่ 3 รายการแล้ว รอร้านตอบก่อนนะ" };
 
-    // price snapshot from the product (must be live + available)
+    // price + policy snapshot from the product (must be live + available)
     const product = await db.product.findUnique({
       where: { id: productId },
       select: {
@@ -119,7 +124,28 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
         deposit: true,
         status: true,
         available: true,
-        shop: { select: { owner: { select: { email: true } } } },
+        // policy override columns
+        policyOverride: true,
+        leadTimeDays: true,
+        minRentalDays: true,
+        maxRentalDays: true,
+        returnWindowDays: true,
+        bufferDaysAfter: true,
+        shop: {
+          select: {
+            owner: { select: { email: true } },
+            // shop-level policy
+            leadTimeDays: true,
+            minRentalDays: true,
+            maxRentalDays: true,
+            returnWindowDays: true,
+            bufferDaysAfter: true,
+            closedWeekdays: true,
+            closedDates: {
+              select: { date: true },
+            },
+          },
+        },
       },
     });
     if (!product) return { ok: false, error: "ไม่พบชุดนี้" };
@@ -132,6 +158,66 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
       select: { id: true, recipientName: true, phone: true, addressLine: true },
     });
     if (!addr) return { ok: false, error: "ไม่พบที่อยู่จัดส่ง" };
+
+    // ── Booking policy enforcement ─────────────────────────────────────────
+    // Load active bookings + blackouts for this product to check availability.
+    const [activeBookings, blackouts] = await Promise.all([
+      db.booking.findMany({
+        where: {
+          productId: product.id,
+          status: { in: ["booking_pending", "waiting_for_payment", "payment_review", "confirmed"] },
+        },
+        select: { startDate: true, endDate: true, status: true },
+      }),
+      db.productBlackoutDate.findMany({
+        where: { productId: product.id },
+        select: { date: true },
+      }),
+    ]);
+
+    const effectivePolicy = resolveEffectivePolicy(
+      {
+        leadTimeDays: product.shop.leadTimeDays,
+        minRentalDays: product.shop.minRentalDays,
+        maxRentalDays: product.shop.maxRentalDays,
+        returnWindowDays: product.shop.returnWindowDays,
+        bufferDaysAfter: product.shop.bufferDaysAfter,
+        closedWeekdays: product.shop.closedWeekdays,
+      },
+      {
+        policyOverride: product.policyOverride,
+        leadTimeDays: product.leadTimeDays,
+        minRentalDays: product.minRentalDays,
+        maxRentalDays: product.maxRentalDays,
+        returnWindowDays: product.returnWindowDays,
+        bufferDaysAfter: product.bufferDaysAfter,
+      },
+    );
+
+    // Scan window: start..end (no need to scan further for server validation)
+    const unavailableDates = computeUnavailableDates({
+      blackouts: blackouts.map((b) => b.date.toISOString().slice(0, 10)),
+      shopClosedDates: product.shop.closedDates.map((d) => d.date.toISOString().slice(0, 10)),
+      bookings: activeBookings.map((b) => ({
+        startDate: b.startDate,
+        endDate: b.endDate,
+        status: b.status,
+      })),
+      effectivePolicy,
+      rangeStart: startDate,
+      rangeEnd: endDate,
+    });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const policyCheck = validateBookingRange({
+      startDate,
+      endDate,
+      effectivePolicy,
+      unavailableDates,
+      today,
+    });
+    if (!policyCheck.ok) return { ok: false, error: policyCheck.error };
+    // ── End policy enforcement ─────────────────────────────────────────────
 
     const days = rentalDays(startDate, endDate);
     const tiers = normalizeTiers(

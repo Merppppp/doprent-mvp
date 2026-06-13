@@ -404,6 +404,18 @@ model Shop {
   rejectReason String?   @map("reject_reason")
   /// สถานะ KYC ล่าสุด (rollup จาก kyc_submissions เพื่อ gate ฟีเจอร์เร็ว ๆ)
   kycStatus    KycStatus @default(none) @map("kyc_status")
+  /// จำนวนวันล่วงหน้าขั้นต่ำที่ผู้เช่าต้องจอง (วันรับ >= วันนี้ + leadTimeDays)
+  leadTimeDays     Int   @default(0)  @map("lead_time_days")
+  /// จำนวนวันเช่าขั้นต่ำต่อครั้ง
+  minRentalDays    Int   @default(1)  @map("min_rental_days")
+  /// จำนวนวันเช่าสูงสุดต่อครั้ง (null = ไม่จำกัด)
+  maxRentalDays    Int?               @map("max_rental_days")
+  /// จำนวนวันที่ผู้เช่าต้องคืนสินค้าหลังวันสิ้นสุดการเช่า (แสดงต่อผู้เช่า)
+  returnWindowDays Int   @default(2)  @map("return_window_days")
+  /// จำนวนวันบัฟเฟอร์หลังการเช่าแต่ละครั้ง (ช่วงเตรียม/ทำความสะอาด — บล็อกช่วง [start, end+bufferDaysAfter])
+  bufferDaysAfter  Int   @default(2)  @map("buffer_days_after")
+  /// วันปิดทำการประจำสัปดาห์ (0=อาทิตย์..6=เสาร์) — ซ้ำทุกสัปดาห์
+  closedWeekdays   Int[] @default([]) @map("closed_weekdays")
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -417,6 +429,7 @@ model Shop {
   lineClicks     LineClick[]
   bookings       Booking[]
   subscriptions  ShopSubscription[]
+  closedDates    ShopClosedDate[]
 
   @@index([status])
   @@index([featured])
@@ -477,6 +490,18 @@ model Product {
   available     Boolean                  @default(true)
   /// ตัวนับยอดเข้าชมหน้า detail
   views         Int                      @default(0)
+  /// เมื่อ true ใช้ policy ของสินค้านี้เองแทน policy ของร้าน
+  policyOverride   Boolean @default(false) @map("policy_override")
+  /// override: จำนวนวันล่วงหน้าขั้นต่ำ (ใช้เมื่อ policyOverride = true; null = ใช้ค่าของร้าน)
+  leadTimeDays     Int?    @map("lead_time_days")
+  /// override: จำนวนวันเช่าขั้นต่ำ (ใช้เมื่อ policyOverride = true; null = ใช้ค่าของร้าน)
+  minRentalDays    Int?    @map("min_rental_days")
+  /// override: จำนวนวันเช่าสูงสุด (null + override = ไม่จำกัด; null + ไม่ override = ใช้ค่าของร้าน)
+  maxRentalDays    Int?    @map("max_rental_days")
+  /// override: จำนวนวันคืนสินค้า (ใช้เมื่อ policyOverride = true; null = ใช้ค่าของร้าน)
+  returnWindowDays Int?    @map("return_window_days")
+  /// override: จำนวนวันบัฟเฟอร์หลังเช่า (ใช้เมื่อ policyOverride = true; null = ใช้ค่าของร้าน)
+  bufferDaysAfter  Int?    @map("buffer_days_after")
   /// full-text search vector (จัดการผ่าน raw SQL/trigger)
   searchVector  Unsupported("tsvector")? @map("search_vector")
 
@@ -920,6 +945,34 @@ model ProductBlackoutDate {
   @@index([productId])
   @@index([date])
   @@map("product_blackout_dates")
+}
+
+/// วันหยุดพิเศษ/วันปิดร้านแบบระบุวัน (one-off holidays) — mirror ของ product_blackout_dates แต่ระดับร้าน
+model ShopClosedDate {
+  /// Primary key (uuid)
+  id     String   @id @default(uuid()) @db.Uuid
+  /// FK → shops.id (Cascade)
+  shopId String   @map("shop_id") @db.Uuid
+  /// วันที่ปิดร้าน
+  date   DateTime @db.Date
+  /// หมายเหตุ (เช่น "วันสงกรานต์")
+  note   String?
+
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, date])
+  @@index([shopId])
+  @@index([date])
+  @@map("shop_closed_dates")
 }
 
 // ---------------------------------------------------------------------------
