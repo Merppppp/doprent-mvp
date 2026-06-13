@@ -1104,6 +1104,10 @@ enum BookingStatus {
   rejected
   cancelled
   payment_expired
+  /// ผู้เช่าคืนชุดแล้ว รอร้านตรวจรับ (terminal ของวงจรที่สำเร็จ ขั้นที่ 1)
+  returned
+  /// ร้านตรวจรับชุดเรียบร้อย ปิดรายการเช่าสมบูรณ์ (terminal สุดท้าย)
+  completed
 
   @@map("booking_status")
 }

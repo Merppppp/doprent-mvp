@@ -334,6 +334,16 @@ export async function disputeSlip(bookingId: string, reason: string): Promise<Re
   return sellerSimpleMove(bookingId, "slip_disputed", reason);
 }
 
+/** Seller marks the dress as received back — transitions confirmed → returned. */
+export async function markReturned(bookingId: string): Promise<Result> {
+  return sellerSimpleMove(bookingId, "returned");
+}
+
+/** Seller closes the rental after inspection — transitions returned → completed. */
+export async function markCompleted(bookingId: string): Promise<Result> {
+  return sellerSimpleMove(bookingId, "completed");
+}
+
 async function sellerSimpleMove(
   bookingId: string,
   to: BookingStatus,

@@ -49,7 +49,11 @@ export type BookingStatus =
   | "slip_disputed"
   | "rejected"
   | "cancelled"
-  | "payment_expired";
+  | "payment_expired"
+  /** ผู้เช่าคืนชุดแล้ว รอร้านตรวจรับ — ระยะกลางของการปิดรายการ */
+  | "returned"
+  /** ร้านตรวจรับชุดเรียบร้อย ปิดรายการเช่าสมบูรณ์ — terminal สุดท้าย */
+  | "completed";
 
 /**
  * Public Occasion shape — mapper-output type (rev 3: assembled from the tag

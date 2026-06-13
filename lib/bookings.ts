@@ -50,9 +50,9 @@ export const BOOKING_STATUS_META: Record<
   confirmed: {
     label: "ยืนยันแล้ว",
     tone: "success",
-    terminal: true,
+    terminal: false,
     renterHint: "ร้านยืนยันการชำระเงินแล้ว นัดรับ/ส่งชุดกับร้านได้เลย",
-    sellerHint: "ยืนยันแล้ว จัดส่งชุดตามที่อยู่ลูกค้า",
+    sellerHint: "ยืนยันแล้ว จัดส่งชุดตามที่อยู่ลูกค้า — กดรับคืนชุดเมื่อผู้เช่าส่งคืน",
   },
   cancel_requested: {
     label: "ร้านขอยกเลิก (รอแอดมิน)",
@@ -89,6 +89,20 @@ export const BOOKING_STATUS_META: Record<
     renterHint: "เลยกำหนดชำระเงิน การจองถูกตัด",
     sellerHint: "ลูกค้าไม่ชำระในเวลาที่กำหนด",
   },
+  returned: {
+    label: "รับคืนแล้ว",
+    tone: "info",
+    terminal: false,
+    renterHint: "ร้านได้รับชุดคืนแล้ว รอร้านตรวจสอบและปิดรายการ",
+    sellerHint: "รับชุดคืนแล้ว ตรวจสอบเสร็จแล้วกดปิดรายการ",
+  },
+  completed: {
+    label: "เสร็จสิ้น",
+    tone: "success",
+    terminal: true,
+    renterHint: "การเช่าชุดเสร็จสมบูรณ์ ขอบคุณที่ใช้บริการ",
+    sellerHint: "ปิดรายการเช่าเรียบร้อย",
+  },
 };
 
 export type Actor = "renter" | "seller";
@@ -115,6 +129,9 @@ export const TRANSITIONS: Transition[] = [
   { from: "payment_review", to: "slip_disputed", actor: "seller" },
   { from: "payment_review", to: "cancel_requested", actor: "seller" },
   { from: "confirmed", to: "cancel_requested", actor: "seller" },
+  // completion lifecycle: seller marks dress received, then closes the rental
+  { from: "confirmed", to: "returned", actor: "seller" },
+  { from: "returned", to: "completed", actor: "seller" },
 ];
 
 export function findTransition(
