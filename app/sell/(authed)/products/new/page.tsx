@@ -3,8 +3,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { listOccasions } from "@/lib/products";
 import { listTagGroups, listTagRequestsForShop } from "@/lib/tags";
+import { getTagGroupsForProductTypeKey } from "@/lib/tag-groups";
 import ProductForm from "../ProductForm";
 
 export const dynamic = "force-dynamic";
@@ -18,22 +18,21 @@ export default async function NewProductPage() {
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?next=/sell/products/new");
 
-  const [raw, occasions] = await Promise.all([
-    db.shop.findFirst({
-      where: { ownerId: user.id },
-      select: { id: true, slug: true, name: true, lineUrl: true, kycStatus: true },
-    }),
-    listOccasions(),
-  ]);
+  const raw = await db.shop.findFirst({
+    where: { ownerId: user.id },
+    select: { id: true, slug: true, name: true, lineUrl: true, kycStatus: true },
+  });
   if (!raw) redirect("/sell/signup");
   if (raw.kycStatus === "none" || raw.kycStatus === "rejected") {
     redirect(`/sell/kyc?slug=${raw.slug}`);
   }
 
-  const [tagGroups, tagRequestsRaw] = await Promise.all([
+  const [{ productTypeId, groups }, tagGroups, tagRequestsRaw] = await Promise.all([
+    getTagGroupsForProductTypeKey("dress"),
     listTagGroups(),
     listTagRequestsForShop(raw.id),
   ]);
+
   const shopTagRequests = tagRequestsRaw.map((r) => ({
     id: r.id,
     requestedLabel: r.requestedLabel,
@@ -54,7 +53,8 @@ export default async function NewProductPage() {
         mode="create"
         shopId={raw.id}
         defaultLineUrl={raw.lineUrl}
-        occasions={occasions}
+        productTypeId={productTypeId ?? ""}
+        tagGroupSections={groups}
         tagGroups={tagGroups}
         shopTagRequests={shopTagRequests}
       />

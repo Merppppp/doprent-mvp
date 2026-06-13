@@ -54,8 +54,9 @@ model ProductType {
   /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  products   Product[]
-  categories ProductCategory[]
+  products          Product[]
+  categories        ProductCategory[]
+  tagGroupBindings  ProductTypeTagGroup[]
 
   @@map("product_types")
 }
@@ -120,8 +121,9 @@ model TagGroup {
   /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  tags        Tag[]
-  tagRequests TagRequest[]
+  tags               Tag[]
+  tagRequests        TagRequest[]
+  productTypeBindings ProductTypeTagGroup[]
 
   @@map("tag_groups")
 }
@@ -153,6 +155,51 @@ model Tag {
 
   @@index([tagGroupId])
   @@map("tags")
+}
+
+/// โหมดการเลือกแท็กในกลุ่มเมื่อผูกกับประเภทสินค้า (เลือกได้อันเดียว/หลายอัน)
+enum TagSelectionMode {
+  single
+  multi
+
+  @@map("tag_selection_mode")
+}
+
+/// ผูกกลุ่มแท็ก ↔ ประเภทสินค้า (dynamic subcategory/attribute) — กำหนดว่าแบบฟอร์มสินค้า
+/// ของประเภทนั้น ๆ ต้องเรนเดอร์ช่องเลือกแท็กของกลุ่มใดบ้าง ลำดับ บังคับ และโหมดเลือก
+/// (occasion = instance แรกของกลไกนี้ แทนการ hardcode)
+model ProductTypeTagGroup {
+  /// Primary key (uuid)
+  id            String           @id @default(uuid()) @db.Uuid
+  /// FK → product_types.id ประเภทสินค้าที่ผูก (RESTRICT — ห้ามลบประเภทถ้ายังมี binding; ปิดผ่าน is_active)
+  productTypeId String           @map("product_type_id") @db.Uuid
+  /// FK → tag_groups.id กลุ่มแท็กที่ผูก (RESTRICT — ห้ามลบกลุ่มถ้ายังมี binding)
+  tagGroupId    String           @map("tag_group_id") @db.Uuid
+  /// ลำดับการแสดง section ของกลุ่มนี้ในแบบฟอร์มสินค้าของประเภทนี้ (น้อย = แสดงก่อน)
+  sortOrder     Int              @default(0) @map("sort_order")
+  /// บังคับให้ผู้ขายเลือกอย่างน้อย 1 แท็กของกลุ่มนี้หรือไม่
+  isRequired    Boolean          @default(false) @map("is_required")
+  /// โหมดการเลือก: single = เลือกได้อันเดียว, multi = เลือกได้หลายอัน
+  selectionMode TagSelectionMode @default(multi) @map("selection_mode")
+  /// ปิดการใช้งาน binding โดยไม่ต้องลบ (ซ่อนกลุ่มจากแบบฟอร์มชั่วคราว)
+  isActive      Boolean          @default(true) @map("is_active")
+
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  productType ProductType @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
+  tagGroup    TagGroup    @relation(fields: [tagGroupId], references: [id], onDelete: Restrict)
+
+  @@unique([productTypeId, tagGroupId])
+  @@index([productTypeId])
+  @@index([tagGroupId])
+  @@map("product_type_tag_groups")
 }
 
 /// ตารางอ้างอิงย่าน/พื้นที่ให้บริการ (เดิมกรุงเทพฯ) ใช้ค้นหาร้านใกล้เคียง
