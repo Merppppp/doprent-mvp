@@ -4,13 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { withActor } from "@/lib/db-context";
-
-/**
- * Minimum adsTier required to create shop promo banners.
- * 'free' tier cannot create banners; 'boost' and 'featured' can.
- */
-export const BANNER_ELIGIBLE_TIERS = ["boost", "featured"] as const;
-export type BannerEligibleTier = (typeof BANNER_ELIGIBLE_TIERS)[number];
+import { BANNER_ELIGIBLE_TIERS } from "@/lib/banner-tiers";
 
 /** Auth helper: returns logged-in user's shop. Does NOT check tier. */
 async function requireSellerShop(): Promise<

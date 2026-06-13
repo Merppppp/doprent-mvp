@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import ShopBannerForm from "./ShopBannerForm";
-import { BANNER_ELIGIBLE_TIERS } from "@/app/actions/seller-banners";
+import { BANNER_ELIGIBLE_TIERS } from "@/lib/banner-tiers";
 
 export const dynamic = "force-dynamic";
 
