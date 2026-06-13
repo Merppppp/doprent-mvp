@@ -30,6 +30,13 @@ export default async function EditProductPage({ params }: { params: { id: string
         id: true, name: true, designer: true, size: true, color: true,
         pricePerDay: true, deposit: true, description: true, lineUrl: true,
         available: true, shopId: true,
+        // Policy override columns
+        policyOverride: true,
+        leadTimeDays: true,
+        minRentalDays: true,
+        maxRentalDays: true,
+        returnWindowDays: true,
+        bufferDaysAfter: true,
         images: { orderBy: { sortOrder: "asc" }, select: { url: true } },
         priceTiers: { orderBy: { minDays: "asc" }, select: { minDays: true, pricePerDay: true } },
         productTags: { select: { tag: { select: { key: true } } } },
@@ -78,6 +85,12 @@ export default async function EditProductPage({ params }: { params: { id: string
           images: productRaw.images.map((img) => img.url),
           occasions: occasionKeys,
           available: productRaw.available,
+          policy_override: productRaw.policyOverride,
+          lead_time_days: productRaw.leadTimeDays,
+          min_rental_days: productRaw.minRentalDays,
+          max_rental_days: productRaw.maxRentalDays,
+          return_window_days: productRaw.returnWindowDays,
+          buffer_days_after: productRaw.bufferDaysAfter,
         }}
       />
     </div>

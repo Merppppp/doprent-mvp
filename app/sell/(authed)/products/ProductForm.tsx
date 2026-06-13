@@ -69,6 +69,13 @@ type Props =
         images: string[];
         occasions: OccasionKey[];
         available: boolean;
+        // Policy override (optional — absent = no override)
+        policy_override?: boolean;
+        lead_time_days?: number | null;
+        min_rental_days?: number | null;
+        max_rental_days?: number | null;
+        return_window_days?: number | null;
+        buffer_days_after?: number | null;
       };
     };
 
@@ -107,6 +114,23 @@ export default function ProductForm(props: Props) {
   const [occasions, setOccasions] = useState<OccasionKey[]>(initial?.occasions ?? []);
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
   const [available, setAvailable] = useState(initial?.available ?? true);
+  // Policy override state
+  const [policyOverride, setPolicyOverride] = useState<boolean>(initial?.policy_override ?? false);
+  const [overrideLeadTime, setOverrideLeadTime] = useState<string>(
+    initial?.lead_time_days != null ? String(initial.lead_time_days) : "",
+  );
+  const [overrideMinRental, setOverrideMinRental] = useState<string>(
+    initial?.min_rental_days != null ? String(initial.min_rental_days) : "",
+  );
+  const [overrideMaxRental, setOverrideMaxRental] = useState<string>(
+    initial?.max_rental_days != null ? String(initial.max_rental_days) : "",
+  );
+  const [overrideReturnWindow, setOverrideReturnWindow] = useState<string>(
+    initial?.return_window_days != null ? String(initial.return_window_days) : "",
+  );
+  const [overrideBuffer, setOverrideBuffer] = useState<string>(
+    initial?.buffer_days_after != null ? String(initial.buffer_days_after) : "",
+  );
   const [uploadingCount, setUploadingCount] = useState(0);
   const [urlInput, setUrlInput] = useState("");
   const [showUrlInput, setShowUrlInput] = useState(false);
@@ -185,6 +209,16 @@ export default function ProductForm(props: Props) {
     fd.set("images", images.join("\n"));
     occasions.forEach((o) => fd.append("occasions", o));
     fd.set("available", available ? "true" : "false");
+
+    // Policy override fields
+    fd.set("policy_override", policyOverride ? "true" : "false");
+    if (policyOverride) {
+      fd.set("lead_time_days", overrideLeadTime);
+      fd.set("min_rental_days", overrideMinRental);
+      fd.set("max_rental_days", overrideMaxRental);
+      fd.set("return_window_days", overrideReturnWindow);
+      fd.set("buffer_days_after", overrideBuffer);
+    }
 
     try {
       if (isEdit) {
@@ -494,6 +528,84 @@ export default function ProductForm(props: Props) {
           <span style={{ fontSize: 14 }}>เปิดให้เช่า (ติ๊กออกเพื่อหยุดให้บริการชุดนี้ชั่วคราว)</span>
         </label>
       ) : null}
+
+      {/* ─── เงื่อนไขการจอง (override ร้าน) ─── */}
+      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18 }}>
+        <label style={{ ...labelStyle, marginBottom: 8 }}>เงื่อนไขการจอง (override ร้าน)</label>
+        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 12 }}>
+          เปิดใช้งานเพื่อกำหนดเงื่อนไขเฉพาะสินค้าชิ้นนี้ ช่องว่าง = ใช้ค่าร้าน
+        </div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+          <input
+            type="checkbox"
+            checked={policyOverride}
+            onChange={(e) => setPolicyOverride(e.target.checked)}
+          />
+          <span style={{ fontSize: 14 }}>กำหนดเงื่อนไขเฉพาะสินค้านี้ (override ร้าน)</span>
+        </label>
+        {policyOverride ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12,
+              paddingLeft: 8,
+              borderLeft: "2px solid var(--line)",
+            }}
+          >
+            <Labeled label="จองล่วงหน้าขั้นต่ำ (วัน)" hint="ว่าง = ใช้ค่าร้าน">
+              <input
+                type="number"
+                min={0}
+                value={overrideLeadTime}
+                onChange={(e) => setOverrideLeadTime(e.target.value)}
+                placeholder="ใช้ค่าร้าน"
+                style={inputStyle}
+              />
+            </Labeled>
+            <Labeled label="เช่าขั้นต่ำ (วัน)" hint="ว่าง = ใช้ค่าร้าน">
+              <input
+                type="number"
+                min={1}
+                value={overrideMinRental}
+                onChange={(e) => setOverrideMinRental(e.target.value)}
+                placeholder="ใช้ค่าร้าน"
+                style={inputStyle}
+              />
+            </Labeled>
+            <Labeled label="เช่าสูงสุด (วัน)" hint="ว่าง = ไม่จำกัด (ใช้ค่าร้าน)">
+              <input
+                type="number"
+                min={1}
+                value={overrideMaxRental}
+                onChange={(e) => setOverrideMaxRental(e.target.value)}
+                placeholder="ไม่จำกัด"
+                style={inputStyle}
+              />
+            </Labeled>
+            <Labeled label="คืนสินค้าภายใน (วัน)" hint="ว่าง = ใช้ค่าร้าน">
+              <input
+                type="number"
+                min={0}
+                value={overrideReturnWindow}
+                onChange={(e) => setOverrideReturnWindow(e.target.value)}
+                placeholder="ใช้ค่าร้าน"
+                style={inputStyle}
+              />
+            </Labeled>
+            <Labeled label="บัฟเฟอร์หลังเช่า (วัน)" hint="ว่าง = ใช้ค่าร้าน">
+              <input
+                type="number"
+                min={0}
+                value={overrideBuffer}
+                onChange={(e) => setOverrideBuffer(e.target.value)}
+                placeholder="ใช้ค่าร้าน"
+                style={inputStyle}
+              />
+            </Labeled>
+          </div>
+        ) : null}
+      </div>
 
       {error ? (
         <div
