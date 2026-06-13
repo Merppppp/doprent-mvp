@@ -222,6 +222,16 @@ model User {
   /// จังหวัดล่าสุดที่ใช้งาน
   lastProvince   String?   @map("last_province")
 
+  // -- Billing / tax-invoice profile (optional, renter-side) --
+  /// ชื่อบริษัท/นิติบุคคล สำหรับออกใบกำกับภาษี (ไม่บังคับ)
+  billingCompanyName String? @map("billing_company_name")
+  /// เลขประจำตัวผู้เสียภาษี 13 หลัก (ไม่บังคับ)
+  billingTaxId       String? @map("billing_tax_id")
+  /// ที่อยู่สำหรับออกใบกำกับภาษี (ไม่บังคับ)
+  billingAddress     String? @map("billing_address")
+  /// สาขา เช่น สำนักงานใหญ่ / สาขา 00001 (ไม่บังคับ)
+  billingBranch      String? @map("billing_branch")
+
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedBy String?  @map("updated_by") @db.Uuid
