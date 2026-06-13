@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { submitKyc } from "@/app/actions/seller";
+import RequiredMark from "@/components/RequiredMark";
 
 type BusinessType = "individual" | "company";
 type Plan = "free" | "boost" | "featured";
@@ -358,22 +359,24 @@ function Step2(props: {
     <div>
       <h2 style={sectionTitle}>ข้อมูลผู้ดูแลร้าน</h2>
       <div style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 24 }}>
-        <Labeled label={isCompany ? "ชื่อบริษัท (ตามหนังสือรับรอง) *" : "ชื่อ-นามสกุล (ตามบัตรประชาชน) *"}>
+        <Labeled label={isCompany ? "ชื่อบริษัท (ตามหนังสือรับรอง)" : "ชื่อ-นามสกุล (ตามบัตรประชาชน)"} required>
           <input
             type="text"
             value={props.legalName}
             onChange={(e) => props.setLegalName(e.target.value)}
             required
+            aria-required={true}
             style={inputStyle}
           />
         </Labeled>
-        <Labeled label={isCompany ? "เลขประจำตัวผู้เสียภาษี (13 หลัก) *" : "เลขบัตรประชาชน (13 หลัก) *"}>
+        <Labeled label={isCompany ? "เลขประจำตัวผู้เสียภาษี (13 หลัก)" : "เลขบัตรประชาชน (13 หลัก)"} required>
           <input
             type="text"
             value={props.taxId}
             onChange={(e) => props.setTaxId(e.target.value.replace(/\D/g, "").slice(0, 13))}
             inputMode="numeric"
             maxLength={13}
+            aria-required={true}
             style={inputStyle}
           />
         </Labeled>
@@ -391,8 +394,9 @@ function Step2(props: {
 
       <h2 style={sectionTitle}>เอกสารยืนยันตัวตน</h2>
       <FileSlot
-        label={isCompany ? "หน้าบัตรประชาชนกรรมการ *" : "หน้าบัตรประชาชน *"}
+        label={isCompany ? "หน้าบัตรประชาชนกรรมการ" : "หน้าบัตรประชาชน"}
         hint="JPG / PNG / PDF · ใช้สำหรับยืนยันตัวตนเท่านั้น เก็บเป็นความลับ"
+        required
         url={props.idCardUrl}
         field="id_card"
         uploading={props.uploading}
@@ -400,8 +404,9 @@ function Step2(props: {
       />
       {isCompany ? (
         <FileSlot
-          label="หนังสือรับรองบริษัท (DBD) *"
+          label="หนังสือรับรองบริษัท (DBD)"
           hint="อายุไม่เกิน 3 เดือน"
+          required
           url={props.dbdDocUrl}
           field="dbd_doc"
           uploading={props.uploading}
@@ -525,6 +530,7 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 function FileSlot({
   label,
   hint,
+  required,
   url,
   field,
   uploading,
@@ -532,6 +538,7 @@ function FileSlot({
 }: {
   label: string;
   hint?: string;
+  required?: boolean;
   url: string;
   field: "id_card" | "dbd_doc" | "book_bank";
   uploading: { field: string; pct: number } | null;
@@ -540,7 +547,9 @@ function FileSlot({
   const isUploading = uploading?.field === field;
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
+        {label}{required ? <RequiredMark /> : null}
+      </div>
       {hint ? <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8 }}>{hint}</div> : null}
       <div
         style={{
@@ -593,10 +602,12 @@ function FileSlot({
   );
 }
 
-function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+function Labeled({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 6 }}>{label}</label>
+      <label style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
+        {label}{required ? <RequiredMark /> : null}
+      </label>
       {children}
     </div>
   );

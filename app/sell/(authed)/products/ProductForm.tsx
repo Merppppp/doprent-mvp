@@ -5,6 +5,7 @@ import { useState } from "react";
 import { createProduct, updateProduct } from "@/app/actions/seller";
 import type { Color, Occasion, OccasionKey, PriceTier, Size } from "@/lib/types";
 import { priceForNights, validateTiers } from "@/lib/pricing";
+import RequiredMark from "@/components/RequiredMark";
 
 type TierRow = { max: number | null; perDay: number };
 
@@ -344,12 +345,13 @@ export default function ProductForm(props: Props) {
         ) : null}
       </div>
 
-      <Labeled label="ชื่อชุด *">
+      <Labeled label="ชื่อชุด" required>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
+          aria-required={true}
           maxLength={80}
           style={inputStyle}
         />
@@ -366,8 +368,8 @@ export default function ProductForm(props: Props) {
       </Labeled>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <Labeled label="ขนาด *">
-          <select value={size} onChange={(e) => setSize(e.target.value as Size)} style={inputStyle}>
+        <Labeled label="ขนาด" required>
+          <select value={size} onChange={(e) => setSize(e.target.value as Size)} aria-required={true} style={inputStyle}>
             {SIZES.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -375,8 +377,8 @@ export default function ProductForm(props: Props) {
             ))}
           </select>
         </Labeled>
-        <Labeled label="สี *">
-          <select value={color} onChange={(e) => setColor(e.target.value as Color)} style={inputStyle}>
+        <Labeled label="สี" required>
+          <select value={color} onChange={(e) => setColor(e.target.value as Color)} aria-required={true} style={inputStyle}>
             {COLORS.map((c) => (
               <option key={c} value={c}>
                 {COLOR_TH[c]}
@@ -386,7 +388,7 @@ export default function ProductForm(props: Props) {
         </Labeled>
       </div>
 
-      <Labeled label="ราคาเช่า (ตามจำนวนวัน) *">
+      <Labeled label="ราคาเช่า (ตามจำนวนวัน)" required>
         <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8 }}>
           ตั้งราคาต่อวันให้ครบทุกช่วง ยิ่งเช่านานต่อวันยิ่งถูก ระบบคิดเงินตามช่วงที่ลูกค้าจองอัตโนมัติ
         </div>
@@ -647,15 +649,17 @@ export default function ProductForm(props: Props) {
 function Labeled({
   label,
   hint,
+  required,
   children,
 }: {
   label: string;
   hint?: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label style={labelStyle}>{label}</label>
+      <label style={labelStyle}>{label}{required ? <RequiredMark /> : null}</label>
       {hint ? <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6 }}>{hint}</div> : null}
       {children}
     </div>
