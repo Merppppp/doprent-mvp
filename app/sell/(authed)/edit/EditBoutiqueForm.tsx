@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { updateShop } from "@/app/actions/seller";
 import type { Color } from "@/lib/types";
+import RequiredMark from "@/components/RequiredMark";
 
 type ClosedDateRow = { date: string; note: string };
 
@@ -119,8 +120,8 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
 
   return (
     <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <Labeled label="ชื่อร้าน">
-        <input type="text" name="name" defaultValue={boutique.name} required style={inputStyle} />
+      <Labeled label="ชื่อร้าน" required>
+        <input type="text" name="name" defaultValue={boutique.name} required aria-required={true} style={inputStyle} />
       </Labeled>
       <Labeled label="ผู้ดูแล">
         <input type="text" name="owner_name" defaultValue={boutique.owner_name ?? ""} style={inputStyle} />
@@ -136,8 +137,8 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
         </select>
         <input type="hidden" name="area_label" defaultValue={boutique.area_label} />
       </Labeled>
-      <Labeled label="LINE">
-        <input type="text" name="line_url" defaultValue={boutique.line_url} required style={inputStyle} />
+      <Labeled label="LINE" required>
+        <input type="text" name="line_url" defaultValue={boutique.line_url} required aria-required={true} style={inputStyle} />
       </Labeled>
       <Labeled label="Instagram">
         <input type="text" name="instagram" defaultValue={boutique.instagram ?? ""} style={inputStyle} />
@@ -393,11 +394,11 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
   );
 }
 
-function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+function Labeled({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
       <label style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
-        {label}
+        {label}{required ? <RequiredMark /> : null}
       </label>
       {children}
     </div>

@@ -54,8 +54,9 @@ model ProductType {
   /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  products   Product[]
-  categories ProductCategory[]
+  products          Product[]
+  categories        ProductCategory[]
+  tagGroupBindings  ProductTypeTagGroup[]
 
   @@map("product_types")
 }
@@ -120,7 +121,9 @@ model TagGroup {
   /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  tags Tag[]
+  tags               Tag[]
+  tagRequests        TagRequest[]
+  productTypeBindings ProductTypeTagGroup[]
 
   @@map("tag_groups")
 }
@@ -152,6 +155,51 @@ model Tag {
 
   @@index([tagGroupId])
   @@map("tags")
+}
+
+/// โหมดการเลือกแท็กในกลุ่มเมื่อผูกกับประเภทสินค้า (เลือกได้อันเดียว/หลายอัน)
+enum TagSelectionMode {
+  single
+  multi
+
+  @@map("tag_selection_mode")
+}
+
+/// ผูกกลุ่มแท็ก ↔ ประเภทสินค้า (dynamic subcategory/attribute) — กำหนดว่าแบบฟอร์มสินค้า
+/// ของประเภทนั้น ๆ ต้องเรนเดอร์ช่องเลือกแท็กของกลุ่มใดบ้าง ลำดับ บังคับ และโหมดเลือก
+/// (occasion = instance แรกของกลไกนี้ แทนการ hardcode)
+model ProductTypeTagGroup {
+  /// Primary key (uuid)
+  id            String           @id @default(uuid()) @db.Uuid
+  /// FK → product_types.id ประเภทสินค้าที่ผูก (RESTRICT — ห้ามลบประเภทถ้ายังมี binding; ปิดผ่าน is_active)
+  productTypeId String           @map("product_type_id") @db.Uuid
+  /// FK → tag_groups.id กลุ่มแท็กที่ผูก (RESTRICT — ห้ามลบกลุ่มถ้ายังมี binding)
+  tagGroupId    String           @map("tag_group_id") @db.Uuid
+  /// ลำดับการแสดง section ของกลุ่มนี้ในแบบฟอร์มสินค้าของประเภทนี้ (น้อย = แสดงก่อน)
+  sortOrder     Int              @default(0) @map("sort_order")
+  /// บังคับให้ผู้ขายเลือกอย่างน้อย 1 แท็กของกลุ่มนี้หรือไม่
+  isRequired    Boolean          @default(false) @map("is_required")
+  /// โหมดการเลือก: single = เลือกได้อันเดียว, multi = เลือกได้หลายอัน
+  selectionMode TagSelectionMode @default(multi) @map("selection_mode")
+  /// ปิดการใช้งาน binding โดยไม่ต้องลบ (ซ่อนกลุ่มจากแบบฟอร์มชั่วคราว)
+  isActive      Boolean          @default(true) @map("is_active")
+
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  productType ProductType @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
+  tagGroup    TagGroup    @relation(fields: [tagGroupId], references: [id], onDelete: Restrict)
+
+  @@unique([productTypeId, tagGroupId])
+  @@index([productTypeId])
+  @@index([tagGroupId])
+  @@map("product_type_tag_groups")
 }
 
 /// ตารางอ้างอิงย่าน/พื้นที่ให้บริการ (เดิมกรุงเทพฯ) ใช้ค้นหาร้านใกล้เคียง
@@ -221,6 +269,16 @@ model User {
   lastActiveAt   DateTime? @map("last_active_at") @db.Timestamptz(6)
   /// จังหวัดล่าสุดที่ใช้งาน
   lastProvince   String?   @map("last_province")
+
+  // -- Billing / tax-invoice profile (optional, renter-side) --
+  /// ชื่อบริษัท/นิติบุคคล สำหรับออกใบกำกับภาษี (ไม่บังคับ)
+  billingCompanyName String? @map("billing_company_name")
+  /// เลขประจำตัวผู้เสียภาษี 13 หลัก (ไม่บังคับ)
+  billingTaxId       String? @map("billing_tax_id")
+  /// ที่อยู่สำหรับออกใบกำกับภาษี (ไม่บังคับ)
+  billingAddress     String? @map("billing_address")
+  /// สาขา เช่น สำนักงานใหญ่ / สาขา 00001 (ไม่บังคับ)
+  billingBranch      String? @map("billing_branch")
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -430,6 +488,8 @@ model Shop {
   bookings       Booking[]
   subscriptions  ShopSubscription[]
   closedDates    ShopClosedDate[]
+  banners        Banner[]
+  tagRequests    TagRequest[]
 
   @@index([status])
   @@index([featured])
@@ -1017,6 +1077,100 @@ enum AuditAction {
   @@map("audit_action")
 }
 
+/// แบนเนอร์โฆษณา/โปรโมชั่นสำหรับ carousel หน้าหลัก (จัดการโดย admin)
+model Banner {
+  /// Primary key (uuid)
+  id        String    @id @default(uuid()) @db.Uuid
+  /// ชื่อแบนเนอร์ที่แสดงใน carousel
+  title     String
+  /// URL รูปภาพแบนเนอร์ (วาง URL ตรง ๆ)
+  imageUrl  String    @map("image_url")
+  /// URL ปลายทางเมื่อผู้ใช้คลิกแบนเนอร์ (null = ไม่ link)
+  linkUrl   String?   @map("link_url")
+  /// ลำดับการแสดงผลใน carousel (น้อย = แสดงก่อน)
+  sortOrder Int       @default(0) @map("sort_order")
+  /// เปิดใช้งานแบนเนอร์ (false = ซ่อน)
+  isActive  Boolean   @default(true) @map("is_active")
+  /// เวลาเริ่มแสดงแบนเนอร์ (null = ไม่กำหนด — แสดงทันที)
+  startsAt  DateTime? @map("starts_at") @db.Timestamptz(6)
+  /// เวลาสิ้นสุดการแสดงแบนเนอร์ (null = ไม่กำหนด — แสดงไม่มีกำหนด)
+  endsAt    DateTime? @map("ends_at") @db.Timestamptz(6)
+  /// FK → shops.id ร้านเจ้าของแบนเนอร์ (NULL = แบนเนอร์ระดับ admin/global; non-NULL = แบนเนอร์โปรโมชั่นร้านของ seller — ลบร้านแล้วแบนเนอร์หายตาม)
+  shopId    String?   @map("shop_id") @db.Uuid
+  /// สถานะการอนุมัติ: 'pending' (รออนุมัติ — seller สร้างใหม่) | 'approved' (อนุมัติแล้ว แสดงใน carousel) | 'rejected' (ปฏิเสธ); แบนเนอร์ admin ค่าเริ่มต้น 'approved'
+  status    String    @default("approved")
+
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  shop      Shop?     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([isActive, sortOrder])
+  @@index([shopId])
+  @@map("banners")
+}
+
+// ---------------------------------------------------------------------------
+// Tag Request (seller tag-request → admin approval)
+// ---------------------------------------------------------------------------
+
+/// enum สถานะคำขอเพิ่มแท็กจากผู้ขาย
+enum TagRequestStatus {
+  pending
+  approved
+  rejected
+
+  @@map("tag_request_status")
+}
+
+/// คำขอเพิ่มแท็กใหม่จากผู้ขาย — รอแอดมินอนุมัติสร้าง Tag จริงในระบบ
+/// เมื่ออนุมัติ: สร้าง Tag ใน tag_groups เท่านั้น — ไม่แนบกับสินค้าอัตโนมัติ (seller แนบเองทีหลัง)
+model TagRequest {
+  /// Primary key (uuid)
+  id             String           @id @default(uuid()) @db.Uuid
+  /// FK → tag_groups.id กลุ่มแท็กที่ขอเพิ่ม (RESTRICT — ห้ามลบกลุ่มถ้ายังมีคำขอ)
+  tagGroupId     String           @map("tag_group_id") @db.Uuid
+  /// FK → shops.id ร้านที่ยื่นคำขอ (CASCADE — ลบร้านแล้วคำขอหาย)
+  shopId         String           @map("shop_id") @db.Uuid
+  /// ชื่อแท็กที่ขอ (ภาษาไทย, บังคับ)
+  requestedLabel String           @map("requested_label")
+  /// slug แท็กที่เสนอ (ตัวเลือก — admin ยืนยันหรือกำหนดใหม่ตอนอนุมัติ)
+  requestedKey   String?          @map("requested_key")
+  /// สถานะการตรวจ: pending / approved / rejected
+  status         TagRequestStatus @default(pending)
+  /// uuid แอดมินผู้ตรวจ (ไม่มี FK — ต้องอยู่รอดแม้ user ถูก hard delete)
+  reviewerId     String?          @map("reviewer_id") @db.Uuid
+  /// บันทึกผลการตรวจ (เหตุผลตีกลับ หรือหมายเหตุ)
+  reviewNotes    String?          @map("review_notes")
+  /// เวลาที่แอดมินตัดสินใจ
+  reviewedAt     DateTime?        @map("reviewed_at") @db.Timestamptz(6)
+  /// uuid ของ Tag ที่สร้างขึ้นเมื่ออนุมัติ (null = ยังไม่อนุมัติ; ไม่มี FK — ป้องกัน circular dependency)
+  createdTagId   String?          @map("created_tag_id") @db.Uuid
+
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tagGroup TagGroup @relation(fields: [tagGroupId], references: [id], onDelete: Restrict)
+  shop     Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([tagGroupId])
+  @@index([shopId])
+  @@map("tag_requests")
+}
+
 // ---------------------------------------------------------------------------
 // Enums (workflow states — kept; hard delete policy means no "deleted" states)
 // ---------------------------------------------------------------------------
@@ -1104,6 +1258,10 @@ enum BookingStatus {
   rejected
   cancelled
   payment_expired
+  /// ผู้เช่าคืนชุดแล้ว รอร้านตรวจรับ (terminal ของวงจรที่สำเร็จ ขั้นที่ 1)
+  returned
+  /// ร้านตรวจรับชุดเรียบร้อย ปิดรายการเช่าสมบูรณ์ (terminal สุดท้าย)
+  completed
 
   @@map("booking_status")
 }

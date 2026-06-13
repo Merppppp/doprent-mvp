@@ -9,6 +9,7 @@ import { isValidLineContact, normalizeLineUrl } from "@/lib/line";
 import { dressLimitFor } from "@/lib/tiers";
 import { normalizeTiers, validateTiers } from "@/lib/pricing";
 import type { AdsTier, Color, PriceTier } from "@/lib/types";
+import { resolveTagSelections } from "@/lib/tag-groups";
 
 function slugify(s: string): string {
   return s.toLowerCase().trim()
@@ -267,7 +268,8 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
 
-  const shopId = String(formData.get("boutique_id") ?? "").trim();
+  // Support both new (shop_id) and legacy (boutique_id) field names
+  const shopId = String(formData.get("shop_id") ?? formData.get("boutique_id") ?? "").trim();
   if (!shopId) return { ok: false, error: "ไม่พบร้าน" };
 
   const shop = await db.shop.findUnique({
@@ -313,20 +315,25 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
   const imagesRaw = String(formData.get("images") ?? "").trim();
   const images = imagesRaw ? imagesRaw.split("\n").map((s) => s.trim()).filter(Boolean) : [];
 
-  // Resolve occasion keys → tag IDs (reject unknown/inactive)
-  const occasionKeys = formData.getAll("occasions").map(String).filter(Boolean);
-  let tagIds: string[] = [];
-  if (occasionKeys.length > 0) {
-    const tags = await db.tag.findMany({
-      where: { key: { in: occasionKeys }, tagGroup: { key: "occasion" }, isActive: true },
-      select: { id: true },
-    });
-    tagIds = tags.map((t) => t.id);
+  // Resolve tag_selections JSON → tag IDs (generic, all bound groups)
+  const tagSelectionsRaw = formData.get("tag_selections");
+  let selectionsByGroup: Record<string, string[]> = {};
+  if (tagSelectionsRaw) {
+    try { selectionsByGroup = JSON.parse(String(tagSelectionsRaw)); } catch { /* ignore */ }
+  } else {
+    // Legacy fallback: if tag_selections absent but occasions present, wrap it
+    const occasionKeys = formData.getAll("occasions").map(String).filter(Boolean);
+    if (occasionKeys.length > 0) selectionsByGroup = { occasion: occasionKeys };
   }
 
   // Resolve productTypeId (seller UI is dress-only today)
   const productType = await db.productType.findUnique({ where: { key: "dress" }, select: { id: true } });
   if (!productType) return { ok: false, error: "product type ไม่พบ — กรุณาแจ้ง admin" };
+
+  // Resolve tags via binding-aware validator
+  const tagResolve = await resolveTagSelections(productType.id, selectionsByGroup);
+  if (!tagResolve.ok) return { ok: false, error: tagResolve.error };
+  const tagIds = tagResolve.tagIds;
 
   const tagCode = `DR${String(Date.now()).slice(-4).padStart(4, "0")}`;
 
@@ -455,18 +462,26 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     newImages = String(imagesRaw).split("\n").map((s) => s.trim()).filter(Boolean);
   }
 
-  // Parse occasions → resolve tag IDs (child table replace)
+  // Parse tag_selections → resolve tag IDs (child table replace)
   let newTagIds: string[] | null = null;
-  const occKeys = formData.getAll("occasions").map(String).filter(Boolean);
-  if (occKeys.length > 0) {
-    const tags = await db.tag.findMany({
-      where: { key: { in: occKeys }, tagGroup: { key: "occasion" }, isActive: true },
-      select: { id: true },
-    });
-    newTagIds = tags.map((t) => t.id);
-  } else if (formData.has("occasions")) {
-    // occasions sent but empty → clear
-    newTagIds = [];
+  const tagSelectionsRawUpdate = formData.get("tag_selections");
+  if (tagSelectionsRawUpdate !== null) {
+    let selByGroup: Record<string, string[]> = {};
+    try { selByGroup = JSON.parse(String(tagSelectionsRawUpdate)); } catch { /* ignore */ }
+    const resolved = await resolveTagSelections(product.productTypeId, selByGroup);
+    if (!resolved.ok) return { ok: false, error: resolved.error };
+    newTagIds = resolved.tagIds;
+  } else {
+    // Legacy fallback: occasions field
+    const occKeys = formData.getAll("occasions").map(String).filter(Boolean);
+    if (occKeys.length > 0) {
+      const selByGroup: Record<string, string[]> = { occasion: occKeys };
+      const resolved = await resolveTagSelections(product.productTypeId, selByGroup);
+      if (!resolved.ok) return { ok: false, error: resolved.error };
+      newTagIds = resolved.tagIds;
+    } else if (formData.has("occasions")) {
+      newTagIds = [];
+    }
   }
 
   return withActor(user.id, async () => {

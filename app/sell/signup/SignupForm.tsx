@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { createShop } from "@/app/actions/seller";
+import RequiredMark from "@/components/RequiredMark";
 import { BANGKOK_DISTRICTS, findDistrict, PROVINCE_TH } from "@/lib/bangkok-districts";
 
 const COLORS = [
@@ -94,8 +95,8 @@ export default function SignupForm(_props: Props) {
 
   return (
     <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-      <Field label="ชื่อร้าน *" hint="แสดงบนหน้าเว็บ ใช้ได้ทั้งไทย/อังกฤษ">
-        <input type="text" name="name" required maxLength={60} style={inputStyle} />
+      <Field label="ชื่อร้าน" hint="แสดงบนหน้าเว็บ ใช้ได้ทั้งไทย/อังกฤษ" required>
+        <input type="text" name="name" required aria-required={true} maxLength={60} style={inputStyle} />
       </Field>
 
       <Field label="ผู้ดูแล (ไม่บังคับ)" hint='เช่น "คุณนิด" — จะแสดงใต้ชื่อร้านในหน้าโปรไฟล์'>
@@ -117,11 +118,12 @@ export default function SignupForm(_props: Props) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <Field label="บ้านเลขที่ / อาคาร / ชั้น *">
+          <Field label="บ้านเลขที่ / อาคาร / ชั้น" required>
             <input
               type="text"
               name="house_no"
               required
+              aria-required={true}
               maxLength={80}
               placeholder="เช่น 88/8 ชั้น 2"
               style={inputStyle}
@@ -139,11 +141,12 @@ export default function SignupForm(_props: Props) {
           </Field>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="เขต *">
+            <Field label="เขต" required>
               <select
                 value={district}
                 onChange={(e) => onDistrictChange(e.target.value)}
                 required
+                aria-required={true}
                 style={inputStyle}
               >
                 <option value="">— เลือกเขต —</option>
@@ -155,11 +158,12 @@ export default function SignupForm(_props: Props) {
               </select>
             </Field>
 
-            <Field label="แขวง / ตำบล *">
+            <Field label="แขวง / ตำบล" required>
               <select
                 value={subdistrict}
                 onChange={(e) => onSubdistrictChange(e.target.value)}
                 required
+                aria-required={true}
                 disabled={!district}
                 style={{ ...inputStyle, opacity: !district ? 0.5 : 1 }}
               >
@@ -200,18 +204,20 @@ export default function SignupForm(_props: Props) {
       </div>
 
       <Field
-        label="LINE สำหรับลูกค้าทักร้าน *"
+        label="LINE สำหรับลูกค้าทักร้าน"
         hint={
           "ใส่ได้หลายแบบ:\n" +
           "• LINE Official: @yourshop หรือชื่อโดยไม่มี @\n" +
           "• LINE ส่วนตัว: ต้องใช้ลิงก์เต็ม (LINE → โปรไฟล์ → กดที่ ID → คัดลอกลิงก์)\n" +
           "• หรือลิงก์เชิญ https://lin.ee/..."
         }
+        required
       >
         <input
           type="text"
           name="line_url"
           required
+          aria-required={true}
           placeholder="@yourshop, https://line.me/..., หรือ https://lin.ee/..."
           style={inputStyle}
         />
@@ -296,16 +302,18 @@ export default function SignupForm(_props: Props) {
 function Field({
   label,
   hint,
+  required,
   children,
 }: {
   label: string;
   hint?: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div>
       <label style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
-        {label}
+        {label}{required ? <RequiredMark /> : null}
       </label>
       {hint ? (
         <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6, whiteSpace: "pre-line", lineHeight: 1.5 }}>{hint}</div>

@@ -96,6 +96,23 @@ export default async function AccountPage() {
             </Link>
           ) : null}
 
+          <Link
+            href="/account/billing"
+            style={{
+              display: "block",
+              padding: "10px 12px",
+              borderRadius: 6,
+              fontSize: 14,
+              color: "var(--ink-2)",
+              border: "1px solid var(--line)",
+              textAlign: "center",
+              marginBottom: 8,
+              textDecoration: "none",
+            }}
+          >
+            ข้อมูลใบกำกับภาษี
+          </Link>
+
           <form action="/auth/signout" method="POST">
             <button
               type="submit"

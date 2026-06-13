@@ -1,12 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listProducts } from "@/lib/products";
-import type { Color, OccasionKey } from "@/lib/types";
+import type { Color } from "@/lib/types";
 
 export async function GET(req: NextRequest) {
   try {
     const sp = req.nextUrl.searchParams;
     const color = sp.get("color") as Color | null;
-    const occasion = sp.get("occasion") as OccasionKey | null;
+    const KNOWN_PARAMS = new Set([
+      "color", "occasion", "size", "designer", "q", "sort",
+      "dateFrom", "dateTo", "priceMin", "priceMax", "page", "type",
+    ]);
+    const tagsByGroup: Record<string, string[]> = {};
+    for (const [key, value] of sp.entries()) {
+      if (!KNOWN_PARAMS.has(key) && value) {
+        tagsByGroup[key] = value.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+    }
+    // Backward compat: occasion URL param
+    const rawOccasion = sp.get("occasion");
+    if (rawOccasion) {
+      const occKeys = rawOccasion.split(",").map((s) => s.trim()).filter(Boolean);
+      const prev = tagsByGroup.occasion ?? [];
+      tagsByGroup.occasion = [...new Set([...prev, ...occKeys])];
+    }
     const size = sp.get("size");
     const designer = sp.get("designer");
     const category = sp.get("category");
@@ -20,7 +36,7 @@ export async function GET(req: NextRequest) {
 
     const result = await listProducts({
       color: color ?? undefined,
-      occasions: occasion ? [occasion] : undefined,
+      tagsByGroup: Object.keys(tagsByGroup).length > 0 ? tagsByGroup : undefined,
       sizes: size ? [size] : undefined,
       designers: designer ? [designer] : undefined,
       category: category ?? undefined,

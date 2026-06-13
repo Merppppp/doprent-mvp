@@ -38,6 +38,16 @@ const NAV: DashNavItem[] = [
     icon: <Icon d="M9 12l2 2 4-4M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z" />,
   },
   {
+    href: "/admin/tag-requests",
+    label: "คำขอแท็ก",
+    icon: <Icon d="M7 7h10M7 11h6M5 3h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zM12 17v-4m0 0l-2 2m2-2l2 2" />,
+  },
+  {
+    href: "/admin/tag-groups",
+    label: "ผูกกลุ่มแท็ก",
+    icon: <Icon d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />,
+  },
+  {
     href: "/admin/bookings",
     label: "การจอง",
     icon: <Icon d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" />,
@@ -51,6 +61,11 @@ const NAV: DashNavItem[] = [
     href: "/admin/products",
     label: "Products",
     icon: <Icon d="M9 3v3L5 14l4 7h6l4-7-4-8V3M9 6h6" />,
+  },
+  {
+    href: "/admin/banners",
+    label: "แบนเนอร์",
+    icon: <Icon d="M4 5h16a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zM4 14h16a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4a1 1 0 011-1z" />,
   },
   {
     href: "/admin/clicks",

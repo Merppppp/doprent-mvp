@@ -2,8 +2,10 @@ import Link from "next/link";
 import ProductResults from "@/components/ProductResults";
 import BrowseFilters from "@/components/BrowseFilters";
 import BannerCarousel from "@/components/BannerCarousel";
+import type { BannerSlide } from "@/components/BannerCarousel";
 import SortSelect from "@/components/SortSelect";
 import MobileFilterDrawer from "@/components/MobileFilterDrawer";
+import LocationControls from "@/components/LocationControls";
 import { OccasionTile } from "@/components/ProductArt";
 import {
   listDesigners,
@@ -13,6 +15,8 @@ import {
   listShops,
 } from "@/lib/products";
 import { getCurrentUser } from "@/lib/auth";
+import { getActiveBanners } from "@/lib/banners";
+import { getTagGroupsForProductTypeKey } from "@/lib/tag-groups";
 import {
   COLOR_LABELS_TH,
   COLOR_SWATCH,
@@ -40,6 +44,7 @@ type SearchParams = {
   dateTo?: string;
   priceMin?: string;
   priceMax?: string;
+  [key: string]: string | undefined;
 };
 
 export default async function HomePage({
@@ -62,12 +67,31 @@ export default async function HomePage({
     | "price-desc"
     | "name";
 
+  // Known non-tag-group params — excluded when building tagsByGroup from URL
+  const KNOWN_FILTER_PARAMS = new Set([
+    "color", "occasion", "size", "designer", "q", "sort",
+    "dateFrom", "dateTo", "priceMin", "priceMax", "page", "type",
+  ]);
+
+  // Build tagsByGroup from URL params (all params not in the known list)
+  const tagsByGroup: Record<string, string[]> = {};
+  for (const [key, val] of Object.entries(searchParams ?? {})) {
+    if (!KNOWN_FILTER_PARAMS.has(key) && val) {
+      tagsByGroup[key] = val.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  // Backward compat: occasion URL param → tagsByGroup.occasion
+  if (activeOcc) {
+    const prev = tagsByGroup.occasion ?? [];
+    tagsByGroup.occasion = [...new Set([...prev, activeOcc])];
+  }
+
   const locale = getServerLocale();
 
-  const [{ items: products, total, hasMore }, occasions, designers, user, sponsors, shops] = await Promise.all([
+  const [{ items: products, total, hasMore }, occasions, designers, user, sponsors, shops, dbBanners, { groups: tagGroups }] = await Promise.all([
     listProducts({
       color: activeColor === "all" ? undefined : activeColor,
-      occasions: activeOcc ? [activeOcc] : undefined,
+      tagsByGroup: Object.keys(tagsByGroup).length > 0 ? tagsByGroup : undefined,
       sizes: activeSize ? [activeSize] : undefined,
       designers: activeDesigner ? [activeDesigner] : undefined,
       priceMin: activePriceMin > PRICE_BOUNDS.min ? activePriceMin : undefined,
@@ -82,11 +106,39 @@ export default async function HomePage({
     getCurrentUser().catch(() => null),
     listSponsorShops(8),
     listShops({ featuredFirst: true, limit: 6 }),
+    getActiveBanners(),
+    getTagGroupsForProductTypeKey("dress"),
   ]);
+
+  // Build activeTags from bound tag groups (for filter UI)
+  const activeTags: Record<string, string[]> = {};
+  for (const group of tagGroups) {
+    const raw = (searchParams ?? {})[group.groupKey];
+    if (raw) {
+      const vals = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      if (vals.length > 0) activeTags[group.groupKey] = vals;
+    }
+  }
+  // Merge in occasion backward-compat
+  if (activeOcc) {
+    activeTags.occasion = [...new Set([...(activeTags.occasion ?? []), activeOcc])];
+  }
+
+  // Serialize active tag groups back to string params for ProductResults infinite scroll
+  const tagParamsForResults: Record<string, string | undefined> = {};
+  for (const [groupKey, tagKeys] of Object.entries(tagsByGroup)) {
+    if (tagKeys.length > 0) tagParamsForResults[groupKey] = tagKeys.join(",");
+  }
 
   const savedSet = new Set<string>(user?.savedProductIds ?? []);
   const isLoggedIn = !!user;
   const bannerShops = sponsors.length > 0 ? sponsors : shops;
+  const bannerSlides: BannerSlide[] = dbBanners.map((b) => ({
+    id: b.id,
+    title: b.title,
+    imageUrl: b.imageUrl,
+    linkUrl: b.linkUrl,
+  }));
 
   // Locale-aware labels for filter chips
   const occasionOptions = occasions.map((o) => ({
@@ -116,7 +168,7 @@ export default async function HomePage({
       {/* ======== BANNER CAROUSEL ======== */}
       <section className="bg-bg pt-6">
         <div className="container">
-          <BannerCarousel shops={bannerShops} locale={locale} />
+          <BannerCarousel shops={bannerShops} slides={bannerSlides} locale={locale} />
         </div>
       </section>
 
@@ -172,35 +224,46 @@ export default async function HomePage({
                 sizes={sizeOptions}
                 designers={designerOptions}
                 locale={locale}
+                tagGroups={tagGroups}
+                activeTags={activeTags}
               />
             </aside>
 
             {/* MAIN */}
             <main>
               <div className="hr-results-bar">
-                <div className="flex items-center gap-3">
-                  <MobileFilterDrawer
-                    q={search}
-                    color={activeColor === "all" ? null : activeColor}
-                    occasion={activeOcc ?? null}
-                    size={activeSize ?? null}
-                    designer={activeDesigner ?? null}
-                    priceMin={activePriceMin}
-                    priceMax={activePriceMax}
-                    priceBounds={PRICE_BOUNDS}
-                    occasions={occasionOptions}
-                    colors={colorOptions}
-                    sizes={sizeOptions}
-                    designers={designerOptions}
-                    locale={locale}
-                  />
-                  <div className="text-sm text-[var(--ink-2)]">
-                    {t("results.found", locale)}{" "}
-                    <b className="text-[var(--ink)]">{total}</b>{" "}
-                    {t("results.items", locale)}
+                {/* Location controls — GPS / district / radius chips */}
+                <LocationControls locale={locale} />
+
+                {/* Count + sort group, pinned to the right */}
+                <div className="hr-results-bar__right">
+                  {/* Mobile filter trigger + count */}
+                  <div className="flex items-center gap-2">
+                    <MobileFilterDrawer
+                      q={search}
+                      color={activeColor === "all" ? null : activeColor}
+                      occasion={activeOcc ?? null}
+                      size={activeSize ?? null}
+                      designer={activeDesigner ?? null}
+                      priceMin={activePriceMin}
+                      priceMax={activePriceMax}
+                      priceBounds={PRICE_BOUNDS}
+                      occasions={occasionOptions}
+                      colors={colorOptions}
+                      sizes={sizeOptions}
+                      designers={designerOptions}
+                      locale={locale}
+                      tagGroups={tagGroups}
+                      activeTags={activeTags}
+                    />
+                    <div className="text-sm text-[var(--ink-2)] whitespace-nowrap">
+                      {t("results.found", locale)}{" "}
+                      <b className="text-[var(--ink)]">{total}</b>{" "}
+                      {t("results.items", locale)}
+                    </div>
                   </div>
+                  <SortSelect locale={locale} />
                 </div>
-                <SortSelect locale={locale} />
               </div>
 
               {products.length === 0 ? (
@@ -227,7 +290,6 @@ export default async function HomePage({
                   searchParams={{
                     q: search || undefined,
                     color: activeColor === "all" ? undefined : activeColor,
-                    occasion: activeOcc,
                     size: activeSize,
                     designer: activeDesigner,
                     sort: sort === "featured" ? undefined : sort,
@@ -235,6 +297,7 @@ export default async function HomePage({
                     dateTo: activeDateTo,
                     priceMin: activePriceMin > PRICE_BOUNDS.min ? String(activePriceMin) : undefined,
                     priceMax: activePriceMax < PRICE_BOUNDS.max ? String(activePriceMax) : undefined,
+                    ...tagParamsForResults,
                   }}
                 />
               )}
@@ -303,12 +366,17 @@ const HR_CSS = `
 
 /* Results bar — sticky on mobile */
 .hr-results-bar{
-  display:flex;justify-content:space-between;align-items:center;
-  margin-bottom:16px;flex-wrap:wrap;gap:10px;
+  display:flex;align-items:center;
+  margin-bottom:16px;flex-wrap:wrap;gap:8px 12px;
   position:sticky;top:0;z-index:20;
   background:var(--bg);
   padding:10px 0;
   border-bottom:1px solid var(--line);
+}
+/* Right cluster: count + sort — shrinks but won't break */
+.hr-results-bar__right{
+  display:flex;align-items:center;gap:8px;
+  margin-left:auto;flex-shrink:0;flex-wrap:wrap;
 }
 
 /* Empty state */
