@@ -85,6 +85,10 @@ function DefaultFooter({ locale, year }: { locale: Locale; year: number }) {
       >
         <span>© {year} DopRent · Bangkok · v{version}</span>
         <span aria-hidden="true">·</span>
+        <Link href="/privacy" style={{ color: "var(--ink-3)" }}>นโยบายความเป็นส่วนตัว</Link>
+        <span aria-hidden="true">·</span>
+        <Link href="/terms" style={{ color: "var(--ink-3)" }}>เงื่อนไขการใช้บริการ</Link>
+        <span aria-hidden="true">·</span>
         <LocaleToggle defaultLocale={locale} variant="footer-inline" />
       </div>
     </footer>
@@ -126,6 +130,12 @@ function SellerFooter({ locale, year }: { locale: Locale; year: number }) {
         <a href="mailto:hello@doprent.com" style={{ color: "var(--ink-2)" }}>
           hello@doprent.com
         </a>
+        <Link href="/privacy" style={{ color: "var(--ink-2)" }}>
+          {t("footer.privacy", locale)}
+        </Link>
+        <Link href="/terms" style={{ color: "var(--ink-2)" }}>
+          {t("footer.terms", locale)}
+        </Link>
       </div>
       <div
         className="container"

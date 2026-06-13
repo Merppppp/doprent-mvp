@@ -36,6 +36,7 @@ export default function KycWizard({ boutiqueId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState<{ field: string; pct: number } | null>(null);
+  const [kycConsent, setKycConsent] = useState(false);
 
   // form state
   const [businessType, setBusinessType] = useState<BusinessType>("individual");
@@ -85,6 +86,7 @@ export default function KycWizard({ boutiqueId }: Props) {
       return null;
     }
     if (s === 3) {
+      if (!kycConsent) return "กรุณายืนยันความยินยอมการเก็บข้อมูลส่วนบุคคล (PDPA) ก่อนส่ง";
       return null;
     }
     return null;
@@ -107,6 +109,10 @@ export default function KycWizard({ boutiqueId }: Props) {
 
   async function onSubmit() {
     setError(null);
+    if (!kycConsent) {
+      setError("กรุณายืนยันความยินยอมการเก็บข้อมูลส่วนบุคคล (PDPA) ก่อนส่ง");
+      return;
+    }
     setSubmitting(true);
     const fd = new FormData();
     fd.set("boutique_id", boutiqueId);
@@ -215,6 +221,8 @@ export default function KycWizard({ boutiqueId }: Props) {
           idCardUrl={idCardUrl}
           dbdDocUrl={dbdDocUrl}
           bookBankUrl={bookBankUrl}
+          kycConsent={kycConsent}
+          setKycConsent={setKycConsent}
         />
       ) : null}
 
@@ -250,7 +258,8 @@ export default function KycWizard({ boutiqueId }: Props) {
             ถัดไป →
           </button>
         ) : (
-          <button type="button" className="btn btn-dark" onClick={onSubmit} disabled={submitting}>
+          <button type="button" className="btn btn-dark" onClick={onSubmit} disabled={submitting || !kycConsent}
+            style={{ opacity: (submitting || !kycConsent) ? 0.6 : 1 }}>
             {submitting ? "กำลังส่ง…" : "ส่งข้อมูล KYC"}
           </button>
         )}
@@ -393,6 +402,31 @@ function Step2(props: {
       </div>
 
       <h2 style={sectionTitle}>เอกสารยืนยันตัวตน</h2>
+      {/* Privacy reassurance note */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 8,
+          padding: "10px 14px",
+          background: "var(--surface)",
+          border: "1px solid var(--line)",
+          borderRadius: 8,
+          marginBottom: 16,
+          fontSize: 13,
+          color: "var(--ink-2)",
+          lineHeight: 1.55,
+        }}
+      >
+        <span style={{ fontSize: 16, flexShrink: 0 }}>🔒</span>
+        <span>
+          <strong>เอกสารถูกเก็บเป็นความลับ</strong> เข้าถึงได้เฉพาะเจ้าหน้าที่ตรวจสอบของ DopRent เท่านั้น
+          ไม่เปิดเผยต่อผู้ใช้รายอื่น ตาม{" "}
+          <a href="/privacy" target="_blank" rel="noreferrer noopener" style={{ color: "var(--accent)" }}>
+            นโยบายความเป็นส่วนตัว
+          </a>
+        </span>
+      </div>
       <FileSlot
         label={isCompany ? "หน้าบัตรประชาชนกรรมการ" : "หน้าบัตรประชาชน"}
         hint="JPG / PNG / PDF · ใช้สำหรับยืนยันตัวตนเท่านั้น เก็บเป็นความลับ"
@@ -488,6 +522,8 @@ function Step4(props: {
   idCardUrl: string;
   dbdDocUrl: string;
   bookBankUrl: string;
+  kycConsent: boolean;
+  setKycConsent: (v: boolean) => void;
 }) {
   return (
     <div>
@@ -506,6 +542,50 @@ function Step4(props: {
       ) : null}
       {/* Bank account section hidden as requested */}
       {/* <ReviewRow label="สมุดบัญชี" value={props.bookBankUrl ? "✓ อัปโหลดแล้ว" : "✗"} /> */}
+
+      {/* PDPA KYC Consent */}
+      <div
+        style={{
+          marginTop: 24,
+          padding: "16px",
+          background: "var(--surface)",
+          border: "1px solid var(--line)",
+          borderRadius: 8,
+        }}
+      >
+        <label
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 10,
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={props.kycConsent}
+            onChange={(e) => props.setKycConsent(e.target.checked)}
+            required
+            style={{ marginTop: 3, flexShrink: 0, width: 16, height: 16, accentColor: "var(--ink)" }}
+          />
+          <span style={{ fontSize: 13, lineHeight: 1.7, color: "var(--ink)" }}>
+            ฉันยินยอมให้ DopRent เก็บ ใช้ และประมวลผลข้อมูลส่วนบุคคลและเอกสารยืนยันตัวตน
+            (บัตรประชาชน / หนังสือรับรองนิติบุคคล) เพื่อยืนยันตัวตนผู้ขายและป้องกันการทุจริต
+            ตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562{" "}
+            (
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noreferrer noopener"
+              style={{ color: "var(--accent)", textDecoration: "underline" }}
+            >
+              อ่านนโยบายความเป็นส่วนตัว
+            </a>
+            ){" "}
+            <span style={{ color: "var(--danger)" }}>*</span>
+          </span>
+        </label>
+      </div>
     </div>
   );
 }

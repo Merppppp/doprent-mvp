@@ -125,6 +125,8 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   "footer.myDashboard": { th: "Dashboard ร้านของฉัน", en: "My Shop Dashboard" },
   "footer.allBoutiques":{ th: "ร้านเช่าทั้งหมด",      en: "All Boutiques" },
   "footer.sellLink":    { th: "เปิดร้านขาย →",        en: "Open a Shop →" },
+  "footer.privacy":     { th: "นโยบายความเป็นส่วนตัว", en: "Privacy Policy" },
+  "footer.terms":       { th: "เงื่อนไขการใช้บริการ",  en: "Terms of Service" },
 
   // ── Banner ────────────────────────────────────────────────────────────────
   "banner.kicker":   { th: "ร้านค้าแนะนำ",  en: "Featured Shop" },

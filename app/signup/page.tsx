@@ -14,6 +14,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
@@ -22,6 +23,7 @@ export default function SignupPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!consentChecked) { setError("กรุณายอมรับเงื่อนไขการใช้บริการและนโยบายความเป็นส่วนตัวก่อนสมัครสมาชิก"); return; }
     if (password.length < 6) { setError("รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร"); return; }
     if (password !== confirmPassword) { setError("รหัสผ่านทั้งสองช่องไม่ตรงกัน"); return; }
 
@@ -93,10 +95,17 @@ export default function SignupPage() {
 
       <button type="button" onClick={() => signIn("google", { callbackUrl: next })}
         className="btn btn-outline btn-block btn-lg"
-        style={{ marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
         <GoogleIcon />
         สมัครด้วย Google
       </button>
+      <p style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 18, lineHeight: 1.55 }}>
+        การสมัครด้วย Google ถือว่าท่านยอมรับ{" "}
+        <a href="/terms" target="_blank" rel="noreferrer noopener" style={{ color: "var(--accent)", textDecoration: "underline" }}>เงื่อนไขการใช้บริการ</a>
+        {" "}และ{" "}
+        <a href="/privacy" target="_blank" rel="noreferrer noopener" style={{ color: "var(--accent)", textDecoration: "underline" }}>นโยบายความเป็นส่วนตัว</a>
+        {" "}ของ DopRent
+      </p>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 18px", color: "var(--ink-3)", fontSize: 12 }}>
         <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
@@ -111,8 +120,40 @@ export default function SignupPage() {
           required showToggle showPassword={showPassword} onToggleShowPassword={() => setShowPassword(p => !p)} />
         <Field label="ยืนยันรหัสผ่าน" type="password" value={confirmPassword} onChange={setConfirmPassword}
           required showToggle showPassword={showPassword} onToggleShowPassword={() => setShowPassword(p => !p)} />
-        <button type="submit" disabled={loading} className="btn btn-dark btn-block btn-lg"
-          style={{ marginTop: 12, opacity: loading ? 0.6 : 1 }}>
+
+        {/* PDPA consent checkbox */}
+        <label
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 10,
+            marginTop: 4,
+            marginBottom: 4,
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={consentChecked}
+            onChange={(e) => setConsentChecked(e.target.checked)}
+            required
+            style={{ marginTop: 3, flexShrink: 0, width: 16, height: 16, accentColor: "var(--ink)" }}
+          />
+          <span style={{ fontSize: 13, lineHeight: 1.6, color: "var(--ink-2)" }}>
+            ฉันได้อ่านและยอมรับ{" "}
+            <a href="/terms" target="_blank" rel="noreferrer noopener" style={{ color: "var(--accent)", textDecoration: "underline" }}>
+              เงื่อนไขการใช้บริการ
+            </a>
+            {" "}และ{" "}
+            <a href="/privacy" target="_blank" rel="noreferrer noopener" style={{ color: "var(--accent)", textDecoration: "underline" }}>
+              นโยบายความเป็นส่วนตัว
+            </a>
+            {" "}ของ DopRent <span style={{ color: "var(--danger)" }}>*</span>
+          </span>
+        </label>
+
+        <button type="submit" disabled={loading || !consentChecked} className="btn btn-dark btn-block btn-lg"
+          style={{ marginTop: 12, opacity: (loading || !consentChecked) ? 0.6 : 1 }}>
           {loading ? "กำลังสร้างบัญชี..." : "สร้างบัญชี"}
         </button>
       </form>
