@@ -26,26 +26,31 @@ function SortSelectInner({ locale = "th" }: { locale?: Locale }) {
   };
 
   return (
-    <select
-      value={current}
-      onChange={handleChange}
-      aria-label={t("sort.label", locale)}
-      style={{
-        padding: "7px 12px",
-        border: "1px solid var(--line)",
-        borderRadius: 8,
-        background: "var(--bg)",
-        fontSize: 13,
-        color: "var(--ink)",
-        cursor: "pointer",
-        outline: "none",
-        fontFamily: "inherit",
-      }}
-    >
-      {SORT_OPTIONS.map((o) => (
-        <option key={o.value} value={o.value}>{t(o.labelKey, locale)}</option>
-      ))}
-    </select>
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <span style={{ fontSize: 13, color: "var(--ink-3)", whiteSpace: "nowrap" }}>
+        {t("sort.label", locale)}:
+      </span>
+      <select
+        value={current}
+        onChange={handleChange}
+        aria-label={t("sort.label", locale)}
+        style={{
+          padding: "7px 12px",
+          border: "1px solid var(--line)",
+          borderRadius: 8,
+          background: "var(--bg)",
+          fontSize: 13,
+          color: "var(--ink)",
+          cursor: "pointer",
+          outline: "none",
+          fontFamily: "inherit",
+        }}
+      >
+        {SORT_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>{t(o.labelKey, locale)}</option>
+        ))}
+      </select>
+    </div>
   );
 }
 
