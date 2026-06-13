@@ -9,7 +9,6 @@ import ProductCard from "@/components/ProductCard";
 import SaveButton from "@/components/SaveButton";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import DateRangePicker from "@/components/DateRangePicker";
-import ProductAvailabilityCalendar from "@/components/ProductAvailabilityCalendar";
 import LineMessageCopyBox from "@/components/LineMessageCopyBox";
 import { getCurrentUser } from "@/lib/auth";
 import {
@@ -21,6 +20,11 @@ import {
 } from "@/lib/products";
 import { hasMultipleRates, startingPerDay } from "@/lib/pricing";
 import { COLOR_LABELS_TH } from "@/lib/types";
+import { db } from "@/lib/db";
+import {
+  resolveEffectivePolicy,
+  computeUnavailableDates,
+} from "@/lib/booking-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +64,97 @@ export default async function DressPage({ params }: { params: Params }) {
   const savedSet = new Set<string>(user?.savedProductIds ?? []);
   const isLoggedIn = !!user;
   const isSaved = savedSet.has(dress.id);
+
+  // Load shop policy + active bookings + shop closed dates for unavailability computation.
+  // This requires the product's DB record — we fetch by id which is already resolved.
+  const shopWithPolicy = await db.shop.findUnique({
+    where: { id: dress.shop_id },
+    select: {
+      leadTimeDays: true,
+      minRentalDays: true,
+      maxRentalDays: true,
+      returnWindowDays: true,
+      bufferDaysAfter: true,
+      closedWeekdays: true,
+      closedDates: { select: { date: true } },
+    },
+  });
+
+  // product policy override columns
+  const productPolicyRow = shopWithPolicy
+    ? await db.product.findUnique({
+        where: { id: dress.id },
+        select: {
+          policyOverride: true,
+          leadTimeDays: true,
+          minRentalDays: true,
+          maxRentalDays: true,
+          returnWindowDays: true,
+          bufferDaysAfter: true,
+        },
+      })
+    : null;
+
+  const activeBookings = await db.booking.findMany({
+    where: {
+      productId: dress.id,
+      status: { in: ["booking_pending", "waiting_for_payment", "payment_review", "confirmed"] },
+    },
+    select: { startDate: true, endDate: true, status: true },
+  });
+
+  const rangeStart = new Date().toISOString().slice(0, 10);
+  // Scan 180 days ahead for the calendar
+  const rangeEnd = (() => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + 180);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const effectivePolicy = shopWithPolicy
+    ? resolveEffectivePolicy(
+        {
+          leadTimeDays: shopWithPolicy.leadTimeDays,
+          minRentalDays: shopWithPolicy.minRentalDays,
+          maxRentalDays: shopWithPolicy.maxRentalDays,
+          returnWindowDays: shopWithPolicy.returnWindowDays,
+          bufferDaysAfter: shopWithPolicy.bufferDaysAfter,
+          closedWeekdays: shopWithPolicy.closedWeekdays,
+        },
+        productPolicyRow ?? {
+          policyOverride: false,
+          leadTimeDays: null,
+          minRentalDays: null,
+          maxRentalDays: null,
+          returnWindowDays: null,
+          bufferDaysAfter: null,
+        },
+      )
+    : {
+        leadTimeDays: 0,
+        minRentalDays: 1,
+        maxRentalDays: null,
+        returnWindowDays: 2,
+        bufferDaysAfter: 2,
+        closedWeekdays: [] as number[],
+      };
+
+  const unavailableSet = shopWithPolicy
+    ? computeUnavailableDates({
+        blackouts,
+        shopClosedDates: shopWithPolicy.closedDates.map((d) => d.date.toISOString().slice(0, 10)),
+        bookings: activeBookings.map((b) => ({
+          startDate: b.startDate,
+          endDate: b.endDate,
+          status: b.status,
+        })),
+        effectivePolicy,
+        rangeStart,
+        rangeEnd,
+      })
+    : new Set<string>();
+
+  const unavailable = Array.from(unavailableSet).sort();
 
   const lineUrl = dress.line_url || boutique?.line_url || DEFAULT_LINE;
   const url = `${SITE}/product/${dress.slug}`;
@@ -326,9 +421,6 @@ export default async function DressPage({ params }: { params: Params }) {
             </div>
           ) : null}
 
-          {/* Availability calendar */}
-          <ProductAvailabilityCalendar blackouts={blackouts} />
-
           {/* Date picker (renter). LINE href and pre-filled message are
               omitted entirely for anonymous viewers — they see a login CTA
               instead of the booking button. */}
@@ -342,6 +434,10 @@ export default async function DressPage({ params }: { params: Params }) {
             priceTiers={dress.price_tiers}
             deposit={dress.deposit}
             blackouts={blackouts}
+            unavailable={unavailable}
+            leadTimeDays={effectivePolicy.leadTimeDays}
+            minRentalDays={effectivePolicy.minRentalDays}
+            maxRentalDays={effectivePolicy.maxRentalDays}
             productId={dress.id}
             shopId={dress.shop_id}
             dressTagCode={dress.tag_code}

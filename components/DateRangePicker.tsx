@@ -29,6 +29,14 @@ type Props = {
   deposit?: number;
   /** Unavailable dates as YYYY-MM-DD strings. Renter can't pick a range overlapping these. */
   blackouts?: string[];
+  /** Combined unavailable date set (blackouts + bookings + closed days). Renter can't pick a range overlapping these. */
+  unavailable?: string[];
+  /** Minimum days in advance the rental must start. */
+  leadTimeDays?: number;
+  /** Minimum rental length in days. */
+  minRentalDays?: number;
+  /** Maximum rental length in days; null = unlimited. */
+  maxRentalDays?: number | null;
   /** Optional dress ID to be tracked in /api/track when user clicks LINE. */
   productId?: string;
   shopId?: string;
@@ -109,6 +117,10 @@ export default function DateRangePicker({
   priceTiers,
   deposit,
   blackouts = [],
+  unavailable = [],
+  leadTimeDays = 0,
+  minRentalDays = 1,
+  maxRentalDays = null,
   productId,
   shopId,
   dressTagCode,
@@ -118,16 +130,43 @@ export default function DateRangePicker({
   const [end, setEnd] = useState("");
 
   const blackoutSet = useMemo(() => new Set(blackouts), [blackouts]);
+  // Merged unavailable set: original blackouts + policy-computed unavailable dates
+  const allUnavailableSet = useMemo(
+    () => (unavailable.length === 0 ? blackoutSet : new Set([...blackoutSet, ...unavailable])),
+    [blackoutSet, unavailable],
+  );
+  // Minimum selectable ISO date: today + leadTimeDays
+  const minISO = useMemo(() => {
+    if (!leadTimeDays) return TODAY;
+    const d = new Date(TODAY + "T00:00:00");
+    d.setDate(d.getDate() + leadTimeDays);
+    return isoOf(d);
+  }, [leadTimeDays]);
+
   const nights = nightsBetween(start, end);
   const quote = priceForNights(priceTiers ?? null, pricePerDay ?? 0, nights);
 
-  // Conflict check: does the selected range hit any blackout?
+  // Conflict check: does the selected range hit any unavailable date?
   const conflictDates = useMemo(() => {
     if (!start || !end) return [];
-    return rangeDates(start, end).filter((d) => blackoutSet.has(d));
-  }, [start, end, blackoutSet]);
+    return rangeDates(start, end).filter((d) => allUnavailableSet.has(d));
+  }, [start, end, allUnavailableSet]);
 
   const hasConflict = conflictDates.length > 0;
+
+  // Policy validation: min/max rental days (checked only when no date conflict)
+  const policyError = useMemo<string | null>(() => {
+    if (!start || !end || hasConflict) return null;
+    if (minRentalDays > 1 && nights < minRentalDays) {
+      return `ร้านนี้เช่าขั้นต่ำ ${minRentalDays} วัน`;
+    }
+    if (maxRentalDays !== null && maxRentalDays !== undefined && nights > maxRentalDays) {
+      return `เช่าได้สูงสุด ${maxRentalDays} วัน`;
+    }
+    return null;
+  }, [start, end, nights, minRentalDays, maxRentalDays, hasConflict]);
+
+  const isInvalid = hasConflict || !!policyError;
 
   // Up to 6 nearest future blackouts to show as warning
   const nextBlackouts = useMemo(() => {
@@ -136,7 +175,7 @@ export default function DateRangePicker({
 
   const lineHref = useMemo(() => {
     if (!isLoggedIn || !lineUrl) return "";
-    if (!start || !end || nights === 0 || hasConflict) return lineUrl;
+    if (!start || !end || nights === 0 || isInvalid) return lineUrl;
     const lines = [
       `สวัสดีค่ะ สนใจเช่าชุด "${dressName}"`,
       `ร้าน: ${boutiqueName}`,
@@ -153,7 +192,7 @@ export default function DateRangePicker({
     const text = lines.join("\n");
     const sep = lineUrl.includes("?") ? "&" : "?";
     return `${lineUrl}${sep}text=${encodeURIComponent(text)}`;
-  }, [isLoggedIn, lineUrl, start, end, nights, hasConflict, dressName, boutiqueName, pricePerDay, priceTiers, deposit, dressPageUrl, dressImageUrl, quote.perDay, quote.total]);
+  }, [isLoggedIn, lineUrl, start, end, nights, isInvalid, dressName, boutiqueName, pricePerDay, priceTiers, deposit, dressPageUrl, dressImageUrl, quote.perDay, quote.total]);
 
   function trackAndGo(e: React.MouseEvent<HTMLAnchorElement>) {
     if (productId || shopId) {
@@ -188,8 +227,8 @@ export default function DateRangePicker({
       <Calendar
         start={start}
         end={end}
-        minISO={TODAY}
-        blackoutSet={blackoutSet}
+        minISO={minISO}
+        blackoutSet={allUnavailableSet}
         onChange={(s, e) => { setStart(s); setEnd(e); }}
       />
 
@@ -223,7 +262,14 @@ export default function DateRangePicker({
         </div>
       ) : null}
 
-      {nights > 0 && !hasConflict ? (
+      {/* Policy warning: min/max rental days */}
+      {policyError ? (
+        <div style={{ padding: "10px 12px", background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.4)", borderRadius: 6, fontSize: 13, color: "#92400E", marginBottom: 10, lineHeight: 1.5, fontWeight: 500 }}>
+          ⚠️ {policyError}
+        </div>
+      ) : null}
+
+      {nights > 0 && !isInvalid ? (
         <div style={{ padding: "8px 10px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 6, fontSize: 12, color: "var(--ink-2)", lineHeight: 1.5 }}>
           <div style={{ fontWeight: 500, color: "var(--ink)" }}>
             ระยะเวลา: {nights} วัน ({fmtThai(start)} ถึง {fmtThai(end)})
@@ -239,7 +285,7 @@ export default function DateRangePicker({
         </div>
       ) : null}
 
-      {nights > 0 && !hasConflict ? (
+      {nights > 0 && !isInvalid ? (
         <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
           {isLoggedIn && productId ? (
             <Link href={`/checkout/address?product=${productId}&start=${start}&end=${end}`} onClick={trackAndGo} className="btn btn-primary" style={{ display: "block", padding: "12px 16px", textAlign: "center", fontSize: 14, fontWeight: 600 }}>
@@ -259,7 +305,7 @@ export default function DateRangePicker({
       ) : null}
 
       {/* Show copy box only when a valid range is selected */}
-      {start && end && !hasConflict ? (
+      {start && end && !isInvalid ? (
         <div style={{ marginTop: 12 }}>
           <LineMessageCopyBox
             dressName={dressName}

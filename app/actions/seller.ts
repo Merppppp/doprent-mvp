@@ -135,8 +135,81 @@ export async function updateShop(shopId: string, formData: FormData): Promise<{ 
     if (!isNaN(y) && y >= 1980 && y <= new Date().getFullYear()) updates.sinceYear = y;
   }
 
+  // Booking policy: integer fields (>= 0; empty / missing = skip)
+  for (const f of ["lead_time_days","min_rental_days","return_window_days","buffer_days_after"] as const) {
+    const v = formData.get(f);
+    if (v !== null) {
+      const s = String(v).trim();
+      if (s !== "") {
+        const n = parseInt(s, 10);
+        if (!isNaN(n) && n >= 0) {
+          const camel = f.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+          updates[camel] = n;
+        }
+      }
+    }
+  }
+  // max_rental_days: empty string means null (no limit)
+  const maxRentalRaw = formData.get("max_rental_days");
+  if (maxRentalRaw !== null) {
+    const s = String(maxRentalRaw).trim();
+    if (s === "") {
+      updates.maxRentalDays = null;
+    } else {
+      const n = parseInt(s, 10);
+      if (!isNaN(n) && n >= 1) updates.maxRentalDays = n;
+    }
+  }
+  // Validate min <= max when both are set
+  const minRental = updates.minRentalDays as number | undefined;
+  const maxRental = updates.maxRentalDays as number | null | undefined;
+  if (typeof minRental === "number" && typeof maxRental === "number" && maxRental < minRental) {
+    return { ok: false, error: "จำนวนวันเช่าสูงสุดต้องไม่น้อยกว่าขั้นต่ำ" };
+  }
+
+  // closedWeekdays (JSON array of ints 0–6)
+  const cwRaw = formData.get("closed_weekdays");
+  if (cwRaw !== null) {
+    try {
+      const parsed: unknown = JSON.parse(String(cwRaw));
+      if (
+        Array.isArray(parsed) &&
+        parsed.every((x) => Number.isInteger(x) && x >= 0 && x <= 6)
+      ) {
+        updates.closedWeekdays = parsed as number[];
+      }
+    } catch { /* ignore malformed */ }
+  }
+
+  // closedDates (JSON array of {date: YYYY-MM-DD, note?: string})
+  let newClosedDates: Array<{ date: string; note?: string }> | null = null;
+  const cdRaw = formData.get("closed_dates");
+  if (cdRaw !== null) {
+    try {
+      const parsed: unknown = JSON.parse(String(cdRaw));
+      if (Array.isArray(parsed)) {
+        newClosedDates = (parsed as Array<Record<string, unknown>>)
+          .filter((x) => typeof x?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x.date as string))
+          .map((x) => ({ date: x.date as string, note: typeof x.note === "string" ? x.note : undefined }));
+      }
+    } catch { /* ignore malformed */ }
+  }
+
   return withActor(user.id, async () => {
     await db.shop.update({ where: { id: shopId }, data: updates });
+    // Replace closedDates if provided (delete-all + recreate)
+    if (newClosedDates !== null) {
+      await db.shopClosedDate.deleteMany({ where: { shopId } });
+      if (newClosedDates.length > 0) {
+        await db.shopClosedDate.createMany({
+          data: newClosedDates.map((cd) => ({
+            shopId,
+            date: new Date(cd.date + "T00:00:00Z"),
+            note: cd.note ?? null,
+          })),
+        });
+      }
+    }
     revalidatePath("/sell/dashboard");
     return { ok: true };
   });
@@ -257,6 +330,15 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
 
   const tagCode = `DR${String(Date.now()).slice(-4).padStart(4, "0")}`;
 
+  // Policy override
+  const policyOverride = String(formData.get("policy_override") ?? "false") === "true";
+  const parsePolicyInt = (key: string): number | null => {
+    const v = String(formData.get(key) ?? "").trim();
+    if (!v) return null;
+    const n = parseInt(v, 10);
+    return isNaN(n) || n < 0 ? null : n;
+  };
+
   return withActor(user.id, async () => {
     const created = await db.product.create({
       data: {
@@ -274,6 +356,12 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
         lineUrl,
         status: "pending",
         available: true,
+        policyOverride,
+        leadTimeDays: policyOverride ? parsePolicyInt("lead_time_days") : null,
+        minRentalDays: policyOverride ? parsePolicyInt("min_rental_days") : null,
+        maxRentalDays: policyOverride ? parsePolicyInt("max_rental_days") : null,
+        returnWindowDays: policyOverride ? parsePolicyInt("return_window_days") : null,
+        bufferDaysAfter: policyOverride ? parsePolicyInt("buffer_days_after") : null,
         images: { create: images.map((url, i) => ({ url, sortOrder: i })) },
         priceTiers: tiers.length
           ? { create: tiers.map((t) => ({ minDays: t.min, pricePerDay: t.per_day })) }
@@ -318,6 +406,33 @@ export async function updateProduct(productId: string, formData: FormData): Prom
   if (dep !== null) { const p = parseInt(String(dep), 10); if (!isNaN(p)) scalarUpdates.deposit = p; }
   const avail = formData.get("available");
   if (avail !== null) scalarUpdates.available = avail === "true" || avail === "on";
+
+  // Policy override fields
+  const policyOverrideRaw = formData.get("policy_override");
+  if (policyOverrideRaw !== null) {
+    const override = policyOverrideRaw === "true";
+    scalarUpdates.policyOverride = override;
+    const parsePInt = (key: string): number | null => {
+      const v = String(formData.get(key) ?? "").trim();
+      if (!v) return null;
+      const n = parseInt(v, 10);
+      return isNaN(n) || n < 0 ? null : n;
+    };
+    if (override) {
+      scalarUpdates.leadTimeDays = parsePInt("lead_time_days");
+      scalarUpdates.minRentalDays = parsePInt("min_rental_days");
+      scalarUpdates.maxRentalDays = parsePInt("max_rental_days");
+      scalarUpdates.returnWindowDays = parsePInt("return_window_days");
+      scalarUpdates.bufferDaysAfter = parsePInt("buffer_days_after");
+    } else {
+      // Override turned off — clear all override columns
+      scalarUpdates.leadTimeDays = null;
+      scalarUpdates.minRentalDays = null;
+      scalarUpdates.maxRentalDays = null;
+      scalarUpdates.returnWindowDays = null;
+      scalarUpdates.bufferDaysAfter = null;
+    }
+  }
 
   // Parse price tiers (child table replace)
   let newTiers: PriceTier[] | null = null;
