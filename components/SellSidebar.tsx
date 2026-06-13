@@ -38,6 +38,11 @@ const NAV: DashNavItem[] = [
     icon: <Icon d="M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" />,
   },
   {
+    href: "/sell/calendar",
+    label: "ปฏิทินร้าน",
+    icon: <Icon d="M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2zM8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />,
+  },
+  {
     href: "/sell/edit",
     label: "แก้ไขร้าน",
     icon: <Icon d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />,
