@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import PriceRange from "./PriceRange";
 import type { SelectOption } from "./SearchSelect";
-import { t, DRESS_ITEM_EN, type Locale } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
 import type { BoundTagGroup } from "@/lib/tag-groups";
 
 export type BrowseFiltersProps = {
@@ -27,31 +27,12 @@ export type BrowseFiltersProps = {
   activeTags?: Record<string, string[]>;
 };
 
-// ── Dress type sub-groups (client-side URL only — no server filtering yet) ──
-
-const DRESS_TYPE_GROUPS: {
-  label: string;
-  key: "top" | "bottom" | "dress";
-  items: string[];
-}[] = [
-  {
-    label: "เสื้อ",
-    key: "top",
-    items: ["แขนยาว", "แขนสั้น", "แขนกุด", "สายเดี่ยว", "ปาดไหล่", "เกาะอก", "เสื้อคลุม", "คอเต่า/เสื้อโค้ท", "แจ็คเก็ต", "ชีทรู"],
-  },
-  {
-    label: "กางเกง / กระโปรง",
-    key: "bottom",
-    items: ["กระโปรงยาว", "กระโปรงสั้น", "กางเกงขายาว", "กางเกงขาสั้น"],
-  },
-  {
-    label: "เดรส",
-    key: "dress",
-    items: ["เดรสยาว", "เดรสสั้น"],
-  },
-];
-
 // ── Chip + Section helpers ────────────────────────────────────────────────────
+// NOTE: The "ประเภทชุด" (dress-type) filter section previously had a hardcoded
+// DRESS_TYPE_GROUPS client-side list here. It has been removed — dress-type is
+// now a DB-backed TagGroup (key='dress-type') bound to the dress product type via
+// product_type_tag_groups. It will appear automatically in the dynamic
+// tagGroups sections rendered by the bound-tag-group facet above.
 
 function SectionHeader({
   label,
@@ -344,12 +325,9 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     [push],
   );
 
-  // Active filter values
-  const activeType = params.get("type");
-
   // Section open/close state
   const [sections, setSections] = useState<Record<string, boolean>>(() => {
-    const init: Record<string, boolean> = { occasion: true, type: false, color: false, size: false, price: true };
+    const init: Record<string, boolean> = { occasion: true, color: false, size: false, price: true };
     (props.tagGroups ?? []).forEach((g, i) => { init[`tg_${g.groupKey}`] = i === 0; });
     return init;
   });
@@ -363,7 +341,6 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     !!props.size ||
     !!props.designer ||
     !!props.q ||
-    !!activeType ||
     Object.values(props.activeTags ?? {}).some((arr) => arr.length > 0) ||
     props.priceMin > props.priceBounds.min ||
     props.priceMax < props.priceBounds.max;
@@ -384,18 +361,6 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
         searchText: [o.value, o.label, t(`occasion.${o.value}`, "th"), t(`occasion.${o.value}`, "en")].join(" "),
       })),
     [props.occasions],
-  );
-
-  const typeItems: SearchableItem[] = useMemo(
-    () =>
-      DRESS_TYPE_GROUPS.flatMap((group) =>
-        group.items.map((item) => ({
-          value: item,
-          label: locale === "en" ? (DRESS_ITEM_EN[item] ?? item) : item,
-          searchText: [item, DRESS_ITEM_EN[item] ?? ""].join(" "),
-        })),
-      ),
-    [locale],
   );
 
   // ── Selected filter badges (top of sidebar) ───────────────────────────────
@@ -428,13 +393,6 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
       key: "occasion",
       label: occ?.label ?? props.occasion,
       onRemove: () => setParam("occasion", null),
-    });
-  }
-  if (activeType) {
-    selectedBadges.push({
-      key: "type",
-      label: locale === "en" ? (DRESS_ITEM_EN[activeType] ?? activeType) : activeType,
-      onRemove: () => setParam("type", null),
     });
   }
   if (props.color) {
@@ -542,24 +500,6 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
           )}
         </div>
       )}
-
-      {/* ════ Section: Dress Type (searchable) ════ */}
-      <div className="py-3 border-b border-[var(--line)]/50">
-        <SectionHeader
-          label={t("filter.type", locale)}
-          open={sections.type}
-          onToggle={() => toggleSection("type")}
-        />
-        {sections.type && (
-          <SearchableChipSection
-            items={typeItems}
-            active={activeType}
-            onSelect={(value) => setParam("type", value)}
-            searchPlaceholder={t("filter.searchType", locale)}
-            locale={locale}
-          />
-        )}
-      </div>
 
       {/* ════ Section: Color ════ */}
       <div className="py-3 border-b border-[var(--line)]/50">
