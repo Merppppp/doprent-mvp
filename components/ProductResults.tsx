@@ -8,18 +8,7 @@ import { useUserLocation } from "./LocationProvider";
 import type { Product } from "@/lib/types";
 import { t, type Locale } from "@/lib/i18n";
 
-type SearchParams = {
-  q?: string;
-  color?: string;
-  occasion?: string;
-  size?: string;
-  designer?: string;
-  sort?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  priceMin?: string;
-  priceMax?: string;
-};
+type SearchParams = Record<string, string | undefined>;
 
 export default function ProductResults({
   products,
@@ -60,16 +49,9 @@ export default function ProductResults({
     setLoadingMore(true);
     try {
       const params = new URLSearchParams();
-      if (searchParams.q) params.set("q", searchParams.q);
-      if (searchParams.color) params.set("color", searchParams.color);
-      if (searchParams.occasion) params.set("occasion", searchParams.occasion);
-      if (searchParams.size) params.set("size", searchParams.size);
-      if (searchParams.designer) params.set("designer", searchParams.designer);
-      if (searchParams.sort) params.set("sort", searchParams.sort);
-      if (searchParams.dateFrom) params.set("dateFrom", searchParams.dateFrom);
-      if (searchParams.dateTo) params.set("dateTo", searchParams.dateTo);
-      if (searchParams.priceMin) params.set("priceMin", searchParams.priceMin);
-      if (searchParams.priceMax) params.set("priceMax", searchParams.priceMax);
+      for (const [key, value] of Object.entries(searchParams)) {
+        if (value) params.set(key, value);
+      }
       params.set("page", String(page));
 
       const res = await fetch(`/api/products?${params.toString()}`);

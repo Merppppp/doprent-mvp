@@ -30,6 +30,8 @@ export type ProductFilters = {
   color?: Color | "all";
   sizes?: string[];
   occasions?: OccasionKey[];
+  /** Generic tag filter: keys = tag-group keys, values = tag keys (OR within group, AND across groups). */
+  tagsByGroup?: Record<string, string[]>;
   shopSlugs?: string[];
   designers?: string[];
   /** Category business key — additive optional filter (rev 3 taxonomy). */
@@ -275,11 +277,22 @@ export async function listProducts(
     };
   }
 
-  // Occasions filter — rev 3: via product_tags (tag group "occasion")
+  // Generalized tag-group filter — one AND clause per group, OR within a group.
+  // occasions is a backward-compat alias that maps to tagsByGroup.occasion.
+  const effectiveTagsByGroup: Record<string, string[]> = { ...(opts.tagsByGroup ?? {}) };
   if (opts.occasions?.length) {
-    where.productTags = {
-      some: { tag: { key: { in: opts.occasions }, tagGroup: { key: "occasion" } } },
-    };
+    const prev = effectiveTagsByGroup.occasion ?? [];
+    effectiveTagsByGroup.occasion = [...new Set([...prev, ...opts.occasions])];
+  }
+  const tagGroupClauses = Object.entries(effectiveTagsByGroup)
+    .filter(([, tagKeys]) => tagKeys.length > 0)
+    .map(([groupKey, tagKeys]): Prisma.ProductWhereInput => ({
+      productTags: {
+        some: { tag: { key: { in: tagKeys }, tagGroup: { key: groupKey } } },
+      },
+    }));
+  if (tagGroupClauses.length > 0) {
+    where.AND = tagGroupClauses;
   }
 
   // Category filter (additive, key-based)
@@ -339,14 +352,18 @@ export async function listProducts(
       // denormalized boutique_name column — so the shop-name match is ORed in here).
       const terms = q.split(/\s+/).filter(Boolean);
       if (terms.length > 0) {
-        where.AND = terms.map((term) => ({
-          OR: [
-            { name: { contains: term, mode: "insensitive" as const } },
-            { designer: { contains: term, mode: "insensitive" as const } },
-            { shop: { name: { contains: term, mode: "insensitive" as const } } },
-            { description: { contains: term, mode: "insensitive" as const } },
-          ],
-        }));
+        const existingAnd: Prisma.ProductWhereInput[] = Array.isArray(where.AND) ? where.AND : [];
+        where.AND = [
+          ...existingAnd,
+          ...terms.map((term): Prisma.ProductWhereInput => ({
+            OR: [
+              { name: { contains: term, mode: "insensitive" as const } },
+              { designer: { contains: term, mode: "insensitive" as const } },
+              { shop: { name: { contains: term, mode: "insensitive" as const } } },
+              { description: { contains: term, mode: "insensitive" as const } },
+            ],
+          })),
+        ];
       }
       if (blockedIds.length > 0) where.id = { notIn: blockedIds };
     }

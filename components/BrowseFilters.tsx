@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import PriceRange from "./PriceRange";
 import type { SelectOption } from "./SearchSelect";
 import { t, DRESS_ITEM_EN, type Locale } from "@/lib/i18n";
+import type { BoundTagGroup } from "@/lib/tag-groups";
 
 export type BrowseFiltersProps = {
   q: string;
@@ -20,6 +21,10 @@ export type BrowseFiltersProps = {
   sizes: SelectOption[];
   designers: SelectOption[];
   locale?: Locale;
+  /** Bound tag groups for the current product type (from DB, server-fetched). */
+  tagGroups?: BoundTagGroup[];
+  /** Active tag selections keyed by group key, values are tag keys. */
+  activeTags?: Record<string, string[]>;
 };
 
 // ── Dress type sub-groups (client-side URL only — no server filtering yet) ──
@@ -265,6 +270,32 @@ function ColorSwatch({
   );
 }
 
+/** Simple chip list for a bound tag group — supports single and multi select. */
+function TagGroupSection({
+  tags,
+  active,
+  selectionMode,
+  onToggle,
+}: {
+  tags: Array<{ id: string; key: string; label: string }>;
+  active: string[];
+  selectionMode: "single" | "multi";
+  onToggle: (tagKey: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-1.5 mt-2">
+      {tags.map((tag) => (
+        <Chip
+          key={tag.key}
+          label={tag.label}
+          active={active.includes(tag.key)}
+          onClick={() => onToggle(tag.key)}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function BrowseFilters(props: BrowseFiltersProps) {
@@ -293,19 +324,37 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     [push],
   );
 
+  /** Toggle a tag within a group in the URL (comma-separated), respecting selectionMode. */
+  const setTagParam = useCallback(
+    (groupKey: string, tagKey: string, selectionMode: "single" | "multi") => {
+      push((sp) => {
+        const current = sp.get(groupKey)?.split(",").filter(Boolean) ?? [];
+        let next: string[];
+        if (selectionMode === "single") {
+          next = current.includes(tagKey) ? [] : [tagKey];
+        } else {
+          next = current.includes(tagKey)
+            ? current.filter((k) => k !== tagKey)
+            : [...current, tagKey];
+        }
+        if (next.length === 0) sp.delete(groupKey);
+        else sp.set(groupKey, next.join(","));
+      });
+    },
+    [push],
+  );
+
   // Active filter values
   const activeType = params.get("type");
 
   // Section open/close state
-  const [sections, setSections] = useState({
-    occasion: true,
-    type: false,
-    color: false,
-    size: false,
-    price: true,
+  const [sections, setSections] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = { occasion: true, type: false, color: false, size: false, price: true };
+    (props.tagGroups ?? []).forEach((g, i) => { init[`tg_${g.groupKey}`] = i === 0; });
+    return init;
   });
 
-  const toggleSection = (key: keyof typeof sections) =>
+  const toggleSection = (key: string) =>
     setSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const hasAny =
@@ -315,6 +364,7 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     !!props.designer ||
     !!props.q ||
     !!activeType ||
+    Object.values(props.activeTags ?? {}).some((arr) => arr.length > 0) ||
     props.priceMin > props.priceBounds.min ||
     props.priceMax < props.priceBounds.max;
 
@@ -353,7 +403,26 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
   if (props.q) {
     selectedBadges.push({ key: "q", label: `"${props.q}"`, onRemove: () => setParam("q", null) });
   }
-  if (props.occasion) {
+  // Dynamic tag group badges (when tagGroups provided, replace hardcoded occasion badge)
+  if (props.tagGroups?.length) {
+    for (const group of props.tagGroups) {
+      const activeTgs = props.activeTags?.[group.groupKey] ?? [];
+      for (const tagKey of activeTgs) {
+        const tag = group.tags.find((t) => t.key === tagKey);
+        selectedBadges.push({
+          key: `tg_${group.groupKey}_${tagKey}`,
+          label: tag?.label ?? tagKey,
+          onRemove: () =>
+            push((sp) => {
+              const current = sp.get(group.groupKey)?.split(",").filter(Boolean) ?? [];
+              const next = current.filter((k) => k !== tagKey);
+              if (next.length === 0) sp.delete(group.groupKey);
+              else sp.set(group.groupKey, next.join(","));
+            }),
+        });
+      }
+    }
+  } else if (props.occasion) {
     const occ = props.occasions.find((o) => o.value === props.occasion);
     selectedBadges.push({
       key: "occasion",
@@ -435,23 +504,44 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
         </div>
       )}
 
-      {/* ════ Section: Occasion (searchable) ════ */}
-      <div className="py-3 border-b border-[var(--line)]/50">
-        <SectionHeader
-          label={t("filter.occasion", locale)}
-          open={sections.occasion}
-          onToggle={() => toggleSection("occasion")}
-        />
-        {sections.occasion && (
-          <SearchableChipSection
-            items={occasionItems}
-            active={props.occasion}
-            onSelect={(value) => setParam("occasion", value)}
-            searchPlaceholder={t("filter.searchOccasion", locale)}
-            locale={locale}
+      {/* ════ Dynamic tag group sections (data-driven from bound tag groups) ════ */}
+      {props.tagGroups?.length ? (
+        props.tagGroups.map((group) => (
+          <div key={group.groupKey} className="py-3 border-b border-[var(--line)]/50">
+            <SectionHeader
+              label={group.groupLabel}
+              open={!!sections[`tg_${group.groupKey}`]}
+              onToggle={() => toggleSection(`tg_${group.groupKey}`)}
+            />
+            {!!sections[`tg_${group.groupKey}`] && (
+              <TagGroupSection
+                tags={group.tags}
+                active={props.activeTags?.[group.groupKey] ?? []}
+                selectionMode={group.selectionMode}
+                onToggle={(tagKey) => setTagParam(group.groupKey, tagKey, group.selectionMode)}
+              />
+            )}
+          </div>
+        ))
+      ) : (
+        /* ════ Fallback: hardcoded Occasion section ════ */
+        <div className="py-3 border-b border-[var(--line)]/50">
+          <SectionHeader
+            label={t("filter.occasion", locale)}
+            open={!!sections.occasion}
+            onToggle={() => toggleSection("occasion")}
           />
-        )}
-      </div>
+          {!!sections.occasion && (
+            <SearchableChipSection
+              items={occasionItems}
+              active={props.occasion}
+              onSelect={(value) => setParam("occasion", value)}
+              searchPlaceholder={t("filter.searchOccasion", locale)}
+              locale={locale}
+            />
+          )}
+        </div>
+      )}
 
       {/* ════ Section: Dress Type (searchable) ════ */}
       <div className="py-3 border-b border-[var(--line)]/50">
