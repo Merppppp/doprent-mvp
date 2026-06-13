@@ -1017,6 +1017,38 @@ enum AuditAction {
   @@map("audit_action")
 }
 
+/// แบนเนอร์โฆษณา/โปรโมชั่นสำหรับ carousel หน้าหลัก (จัดการโดย admin)
+model Banner {
+  /// Primary key (uuid)
+  id        String    @id @default(uuid()) @db.Uuid
+  /// ชื่อแบนเนอร์ที่แสดงใน carousel
+  title     String
+  /// URL รูปภาพแบนเนอร์ (วาง URL ตรง ๆ)
+  imageUrl  String    @map("image_url")
+  /// URL ปลายทางเมื่อผู้ใช้คลิกแบนเนอร์ (null = ไม่ link)
+  linkUrl   String?   @map("link_url")
+  /// ลำดับการแสดงผลใน carousel (น้อย = แสดงก่อน)
+  sortOrder Int       @default(0) @map("sort_order")
+  /// เปิดใช้งานแบนเนอร์ (false = ซ่อน)
+  isActive  Boolean   @default(true) @map("is_active")
+  /// เวลาเริ่มแสดงแบนเนอร์ (null = ไม่กำหนด — แสดงทันที)
+  startsAt  DateTime? @map("starts_at") @db.Timestamptz(6)
+  /// เวลาสิ้นสุดการแสดงแบนเนอร์ (null = ไม่กำหนด — แสดงไม่มีกำหนด)
+  endsAt    DateTime? @map("ends_at") @db.Timestamptz(6)
+
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([isActive, sortOrder])
+  @@map("banners")
+}
+
 // ---------------------------------------------------------------------------
 // Enums (workflow states — kept; hard delete policy means no "deleted" states)
 // ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@ import Link from "next/link";
 import ProductResults from "@/components/ProductResults";
 import BrowseFilters from "@/components/BrowseFilters";
 import BannerCarousel from "@/components/BannerCarousel";
+import type { BannerSlide } from "@/components/BannerCarousel";
 import SortSelect from "@/components/SortSelect";
 import MobileFilterDrawer from "@/components/MobileFilterDrawer";
 import LocationControls from "@/components/LocationControls";
@@ -14,6 +15,7 @@ import {
   listShops,
 } from "@/lib/products";
 import { getCurrentUser } from "@/lib/auth";
+import { getActiveBanners } from "@/lib/banners";
 import {
   COLOR_LABELS_TH,
   COLOR_SWATCH,
@@ -65,7 +67,7 @@ export default async function HomePage({
 
   const locale = getServerLocale();
 
-  const [{ items: products, total, hasMore }, occasions, designers, user, sponsors, shops] = await Promise.all([
+  const [{ items: products, total, hasMore }, occasions, designers, user, sponsors, shops, dbBanners] = await Promise.all([
     listProducts({
       color: activeColor === "all" ? undefined : activeColor,
       occasions: activeOcc ? [activeOcc] : undefined,
@@ -83,11 +85,18 @@ export default async function HomePage({
     getCurrentUser().catch(() => null),
     listSponsorShops(8),
     listShops({ featuredFirst: true, limit: 6 }),
+    getActiveBanners(),
   ]);
 
   const savedSet = new Set<string>(user?.savedProductIds ?? []);
   const isLoggedIn = !!user;
   const bannerShops = sponsors.length > 0 ? sponsors : shops;
+  const bannerSlides: BannerSlide[] = dbBanners.map((b) => ({
+    id: b.id,
+    title: b.title,
+    imageUrl: b.imageUrl,
+    linkUrl: b.linkUrl,
+  }));
 
   // Locale-aware labels for filter chips
   const occasionOptions = occasions.map((o) => ({
@@ -117,7 +126,7 @@ export default async function HomePage({
       {/* ======== BANNER CAROUSEL ======== */}
       <section className="bg-bg pt-6">
         <div className="container">
-          <BannerCarousel shops={bannerShops} locale={locale} />
+          <BannerCarousel shops={bannerShops} slides={bannerSlides} locale={locale} />
         </div>
       </section>
 

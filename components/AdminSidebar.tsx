@@ -53,6 +53,11 @@ const NAV: DashNavItem[] = [
     icon: <Icon d="M9 3v3L5 14l4 7h6l4-7-4-8V3M9 6h6" />,
   },
   {
+    href: "/admin/banners",
+    label: "แบนเนอร์",
+    icon: <Icon d="M4 5h16a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zM4 14h16a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4a1 1 0 011-1z" />,
+  },
+  {
     href: "/admin/clicks",
     label: "LINE Clicks",
     icon: <Icon d="M4 12a8 8 0 1116 0 8 8 0 01-16 0zM12 8v4l3 2" />,
