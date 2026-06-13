@@ -5,7 +5,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { getSellerBookings } from "@/lib/booking-queries";
 import { expireOverdueBookings } from "@/lib/booking-expiry";
 import { amountDue } from "@/lib/bookings";
+import { getTrustScores } from "@/lib/trust-score";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
+import TrustBadge from "@/components/TrustBadge";
 import { ProductArt } from "@/components/ProductArt";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +29,10 @@ export default async function SellerBookingsPage() {
   // Lazy payment-expiry sweep so stale waiting_for_payment rows never show.
   await expireOverdueBookings();
   const bookings = await getSellerBookings();
+
+  // Batch trust scores: one query for all renters in this list (no N+1).
+  const renterIds = [...new Set(bookings.map((b) => b.renter_id))];
+  const trustScores = await getTrustScores(renterIds);
   const pending = bookings.filter(
     (b) => b.status === "booking_pending" || b.status === "payment_review"
   ).length;
@@ -93,7 +99,13 @@ export default async function SellerBookingsPage() {
               </div>
               <div style={{ flex: 1, fontSize: 14, minWidth: 0 }}>
                 <div style={{ fontWeight: 600 }}>{b.dress_name ?? "ชุด"}</div>
-                <div style={{ color: "var(--ink-2)" }}>{b.recipient_name ?? ""}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", color: "var(--ink-2)" }}>
+                  <span>{b.recipient_name ?? ""}</span>
+                  {(() => {
+                    const score = trustScores.get(b.renter_id);
+                    return score ? <TrustBadge score={score} /> : null;
+                  })()}
+                </div>
                 <div style={{ color: "var(--ink-3)", fontSize: 12.5, marginTop: 2 }}>
                   {fmtThai(b.start_date)} – {fmtThai(b.end_date)} · ฿{amountDue(b).toLocaleString()}
                 </div>

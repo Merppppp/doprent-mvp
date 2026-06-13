@@ -5,7 +5,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { getBookingForView, currentUserIsSellerOf } from "@/lib/booking-queries";
 import { getSignedPrivateUrl } from "@/lib/r2";
 import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
+import { getTrustScore } from "@/lib/trust-score";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
+import TrustBadge from "@/components/TrustBadge";
 import SellerBookingActions from "@/components/SellerBookingActions";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +37,9 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
   // Slip is private — sign a short-lived URL for the seller (authorized above).
   const slipUrl = b.slip_path ? await getSignedPrivateUrl(b.slip_path) : null;
 
+  // Trust score for this renter (single query — only one renter on a detail page).
+  const renterTrust = await getTrustScore(b.renter_id);
+
   return (
     <div className="container" style={{ paddingTop: 36, paddingBottom: 80, maxWidth: 560 }}>
       <Link href="/sell/bookings" style={{ fontSize: 14, color: "var(--ink-3)" }}>
@@ -51,7 +56,15 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
 
       <div style={card}>
         <Row label="วันเช่า" value={`${fmtThai(b.start_date)} – ${fmtThai(b.end_date)}`} />
-        <Row label="ผู้รับ" value={`${b.recipient_name ?? ""} · ${b.phone ?? ""}`} />
+        {/* Renter row: recipient name + reliability badge */}
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "4px 0", fontSize: 14 }}>
+          <span style={{ color: "var(--ink-3)", flexShrink: 0 }}>ผู้เช่า / ผู้รับ</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 500, color: "var(--ink)", textAlign: "right", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {b.recipient_name ?? ""}
+            {b.phone ? ` · ${b.phone}` : ""}
+            <TrustBadge score={renterTrust} style={{ marginLeft: 2 }} />
+          </span>
+        </div>
         <Row label="ที่อยู่จัดส่ง" value={b.address_text ?? "-"} />
       </div>
 
