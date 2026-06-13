@@ -123,3 +123,26 @@ export async function toggleBannerActive(id: string, isActive: boolean): Promise
     return { ok: false, error: "เปลี่ยนสถานะไม่สำเร็จ" };
   }
 }
+
+export async function setBannerStatus(
+  id: string,
+  status: "approved" | "rejected"
+): Promise<{ ok: boolean; error?: string }> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth;
+
+  if (!["approved", "rejected"].includes(status)) {
+    return { ok: false, error: "สถานะไม่ถูกต้อง" };
+  }
+
+  try {
+    await withActor(auth.userId, () =>
+      db.banner.update({ where: { id }, data: { status } })
+    );
+    revalidateBannerPaths();
+    return { ok: true };
+  } catch (e) {
+    console.error("[admin-banners] setBannerStatus", e);
+    return { ok: false, error: "เปลี่ยนสถานะไม่สำเร็จ" };
+  }
+}

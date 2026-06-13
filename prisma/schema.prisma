@@ -430,6 +430,7 @@ model Shop {
   bookings       Booking[]
   subscriptions  ShopSubscription[]
   closedDates    ShopClosedDate[]
+  banners        Banner[]
 
   @@index([status])
   @@index([featured])
@@ -1035,6 +1036,10 @@ model Banner {
   startsAt  DateTime? @map("starts_at") @db.Timestamptz(6)
   /// เวลาสิ้นสุดการแสดงแบนเนอร์ (null = ไม่กำหนด — แสดงไม่มีกำหนด)
   endsAt    DateTime? @map("ends_at") @db.Timestamptz(6)
+  /// FK → shops.id ร้านเจ้าของแบนเนอร์ (NULL = แบนเนอร์ระดับ admin/global; non-NULL = แบนเนอร์โปรโมชั่นร้านของ seller — ลบร้านแล้วแบนเนอร์หายตาม)
+  shopId    String?   @map("shop_id") @db.Uuid
+  /// สถานะการอนุมัติ: 'pending' (รออนุมัติ — seller สร้างใหม่) | 'approved' (อนุมัติแล้ว แสดงใน carousel) | 'rejected' (ปฏิเสธ); แบนเนอร์ admin ค่าเริ่มต้น 'approved'
+  status    String    @default("approved")
 
   /// uuid ผู้สร้าง record (NULL = system/seed)
   createdBy String?  @map("created_by") @db.Uuid
@@ -1045,7 +1050,10 @@ model Banner {
   /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  shop      Shop?     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
   @@index([isActive, sortOrder])
+  @@index([shopId])
   @@map("banners")
 }
 

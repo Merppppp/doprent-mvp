@@ -52,6 +52,11 @@ const NAV: DashNavItem[] = [
     label: "อัปเกรด",
     icon: <Icon d="M12 2l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1 3-6z" />,
   },
+  {
+    href: "/sell/banners",
+    label: "แบนเนอร์ร้าน",
+    icon: <Icon d="M4 5h16a1 1 0 011 1v8a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zM8 17h8M10 17v2M14 17v2" />,
+  },
 ];
 
 export default function SellSidebar() {

@@ -10,9 +10,12 @@ export type ActiveBanner = {
 };
 
 /**
- * Returns banners that are active and within their schedule window,
+ * Returns banners that are active, approved, and within their schedule window,
  * ordered by sort_order ascending.
- * Used by app/page.tsx to prefer DB banners over shop-derived fallback.
+ *
+ * - Admin/global banners (shopId null): default status='approved' — visible as before.
+ * - Shop promo banners (shopId not null): ONLY shown when status='approved'
+ *   (seller creates with status='pending'; admin approves to make visible).
  */
 export async function getActiveBanners(): Promise<ActiveBanner[]> {
   const now = new Date();
@@ -20,6 +23,7 @@ export async function getActiveBanners(): Promise<ActiveBanner[]> {
     return await db.banner.findMany({
       where: {
         isActive: true,
+        status: "approved",
         OR: [{ startsAt: null }, { startsAt: { lte: now } }],
         AND: [
           {
