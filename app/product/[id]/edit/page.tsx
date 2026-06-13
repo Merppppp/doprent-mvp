@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import ProductForm from "@/app/sell/(authed)/products/ProductForm";
 import { getProductBySlug, listOccasions, getShopBySlug } from "@/lib/products";
+import { listTagGroups, listTagRequestsForShop } from "@/lib/tags";
 
 type Params = { id: string };
 
@@ -10,9 +11,18 @@ export default async function EditDressPage({ params }: { params: Params }) {
   const dress = await getProductBySlug(params.id);
   if (!dress) notFound();
 
-  const occasions = await listOccasions();
+  const [occasions, tagGroups] = await Promise.all([listOccasions(), listTagGroups()]);
   // ensure boutique exists (used for shop_id validity and line fallback)
   const boutique = await getShopBySlug((dress.shop_name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+  const tagRequestsRaw = await listTagRequestsForShop(dress.shop_id);
+  const shopTagRequests = tagRequestsRaw.map((r) => ({
+    id: r.id,
+    requestedLabel: r.requestedLabel,
+    requestedKey: r.requestedKey,
+    status: r.status,
+    reviewNotes: r.reviewNotes,
+    tagGroup: r.tagGroup,
+  }));
 
   return (
     <div className="container" style={{ paddingTop: 20, paddingBottom: 60 }}>
@@ -24,6 +34,8 @@ export default async function EditDressPage({ params }: { params: Params }) {
           shopId={dress.shop_id}
           defaultLineUrl={boutique?.line_url ?? DEFAULT_LINE}
           occasions={occasions}
+          tagGroups={tagGroups}
+          shopTagRequests={shopTagRequests}
           initial={{
             name: dress.name,
             designer: dress.designer,

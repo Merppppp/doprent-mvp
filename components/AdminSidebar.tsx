@@ -38,6 +38,11 @@ const NAV: DashNavItem[] = [
     icon: <Icon d="M9 12l2 2 4-4M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z" />,
   },
   {
+    href: "/admin/tag-requests",
+    label: "คำขอแท็ก",
+    icon: <Icon d="M7 7h10M7 11h6M5 3h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zM12 17v-4m0 0l-2 2m2-2l2 2" />,
+  },
+  {
     href: "/admin/bookings",
     label: "การจอง",
     icon: <Icon d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" />,

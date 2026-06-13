@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { listOccasions } from "@/lib/products";
 import { normalizeTiers } from "@/lib/pricing";
+import { listTagGroups, listTagRequestsForShop } from "@/lib/tags";
 import ProductForm from "../../ProductForm";
 import type { Color, OccasionKey, PriceTier, Size } from "@/lib/types";
 
@@ -60,6 +61,19 @@ export default async function EditProductPage({ params }: { params: { id: string
   const priceTiersNormalized: PriceTier[] = normalizeTiers(priceTiersRaw);
   const occasionKeys = productRaw.productTags.map((pt) => pt.tag.key as OccasionKey);
 
+  const [tagGroups, tagRequestsRaw] = await Promise.all([
+    listTagGroups(),
+    listTagRequestsForShop(shopRaw.id),
+  ]);
+  const shopTagRequests = tagRequestsRaw.map((r) => ({
+    id: r.id,
+    requestedLabel: r.requestedLabel,
+    requestedKey: r.requestedKey,
+    status: r.status,
+    reviewNotes: r.reviewNotes,
+    tagGroup: r.tagGroup,
+  }));
+
   return (
     <div className="container" style={{ paddingTop: 32, paddingBottom: 80, maxWidth: 720 }}>
       <Link href="/sell/dashboard" style={{ fontSize: 13, color: "var(--ink-3)" }}>← กลับ Dashboard</Link>
@@ -72,6 +86,8 @@ export default async function EditProductPage({ params }: { params: { id: string
         shopId={shopRaw.id}
         defaultLineUrl={shopRaw.lineUrl}
         occasions={occasions}
+        tagGroups={tagGroups}
+        shopTagRequests={shopTagRequests}
         initial={{
           name: productRaw.name,
           designer: productRaw.designer,

@@ -120,7 +120,8 @@ model TagGroup {
   /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  tags Tag[]
+  tags        Tag[]
+  tagRequests TagRequest[]
 
   @@map("tag_groups")
 }
@@ -441,6 +442,7 @@ model Shop {
   subscriptions  ShopSubscription[]
   closedDates    ShopClosedDate[]
   banners        Banner[]
+  tagRequests    TagRequest[]
 
   @@index([status])
   @@index([featured])
@@ -1065,6 +1067,61 @@ model Banner {
   @@index([isActive, sortOrder])
   @@index([shopId])
   @@map("banners")
+}
+
+// ---------------------------------------------------------------------------
+// Tag Request (seller tag-request → admin approval)
+// ---------------------------------------------------------------------------
+
+/// enum สถานะคำขอเพิ่มแท็กจากผู้ขาย
+enum TagRequestStatus {
+  pending
+  approved
+  rejected
+
+  @@map("tag_request_status")
+}
+
+/// คำขอเพิ่มแท็กใหม่จากผู้ขาย — รอแอดมินอนุมัติสร้าง Tag จริงในระบบ
+/// เมื่ออนุมัติ: สร้าง Tag ใน tag_groups เท่านั้น — ไม่แนบกับสินค้าอัตโนมัติ (seller แนบเองทีหลัง)
+model TagRequest {
+  /// Primary key (uuid)
+  id             String           @id @default(uuid()) @db.Uuid
+  /// FK → tag_groups.id กลุ่มแท็กที่ขอเพิ่ม (RESTRICT — ห้ามลบกลุ่มถ้ายังมีคำขอ)
+  tagGroupId     String           @map("tag_group_id") @db.Uuid
+  /// FK → shops.id ร้านที่ยื่นคำขอ (CASCADE — ลบร้านแล้วคำขอหาย)
+  shopId         String           @map("shop_id") @db.Uuid
+  /// ชื่อแท็กที่ขอ (ภาษาไทย, บังคับ)
+  requestedLabel String           @map("requested_label")
+  /// slug แท็กที่เสนอ (ตัวเลือก — admin ยืนยันหรือกำหนดใหม่ตอนอนุมัติ)
+  requestedKey   String?          @map("requested_key")
+  /// สถานะการตรวจ: pending / approved / rejected
+  status         TagRequestStatus @default(pending)
+  /// uuid แอดมินผู้ตรวจ (ไม่มี FK — ต้องอยู่รอดแม้ user ถูก hard delete)
+  reviewerId     String?          @map("reviewer_id") @db.Uuid
+  /// บันทึกผลการตรวจ (เหตุผลตีกลับ หรือหมายเหตุ)
+  reviewNotes    String?          @map("review_notes")
+  /// เวลาที่แอดมินตัดสินใจ
+  reviewedAt     DateTime?        @map("reviewed_at") @db.Timestamptz(6)
+  /// uuid ของ Tag ที่สร้างขึ้นเมื่ออนุมัติ (null = ยังไม่อนุมัติ; ไม่มี FK — ป้องกัน circular dependency)
+  createdTagId   String?          @map("created_tag_id") @db.Uuid
+
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tagGroup TagGroup @relation(fields: [tagGroupId], references: [id], onDelete: Restrict)
+  shop     Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([tagGroupId])
+  @@index([shopId])
+  @@map("tag_requests")
 }
 
 // ---------------------------------------------------------------------------

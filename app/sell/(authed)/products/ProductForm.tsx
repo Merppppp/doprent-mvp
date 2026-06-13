@@ -3,9 +3,22 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createProduct, updateProduct } from "@/app/actions/seller";
+import { requestTag } from "@/app/actions/seller-tags";
 import type { Color, Occasion, OccasionKey, PriceTier, Size } from "@/lib/types";
 import { priceForNights, validateTiers } from "@/lib/pricing";
 import RequiredMark from "@/components/RequiredMark";
+
+/** กลุ่มแท็กสำหรับ dropdown ขอเพิ่มแท็ก */
+type TagGroupOption = { id: string; key: string; label: string };
+/** คำขอเพิ่มแท็กของร้านนี้ */
+type ShopTagRequest = {
+  id: string;
+  requestedLabel: string;
+  requestedKey: string | null;
+  status: string;
+  reviewNotes: string | null;
+  tagGroup: { label: string; key: string };
+};
 
 type TierRow = { max: number | null; perDay: number };
 
@@ -50,6 +63,8 @@ type Props =
       shopId: string;
       defaultLineUrl: string;
       occasions: Occasion[];
+      tagGroups: TagGroupOption[];
+      shopTagRequests: ShopTagRequest[];
     }
   | {
       mode: "edit";
@@ -57,6 +72,8 @@ type Props =
       shopId: string;
       defaultLineUrl: string;
       occasions: Occasion[];
+      tagGroups: TagGroupOption[];
+      shopTagRequests: ShopTagRequest[];
       initial: {
         name: string;
         designer: string | null;
@@ -137,6 +154,14 @@ export default function ProductForm(props: Props) {
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Tag-request panel state
+  const [showTagRequest, setShowTagRequest] = useState(false);
+  const [tagReqGroupId, setTagReqGroupId] = useState(props.tagGroups[0]?.id ?? "");
+  const [tagReqLabel, setTagReqLabel] = useState("");
+  const [tagReqKey, setTagReqKey] = useState("");
+  const [tagReqSubmitting, setTagReqSubmitting] = useState(false);
+  const [tagReqError, setTagReqError] = useState<string | null>(null);
+  const [tagReqSuccess, setTagReqSuccess] = useState<string | null>(null);
 
   function toggleOccasion(k: OccasionKey) {
     setOccasions((curr) =>
@@ -233,6 +258,34 @@ export default function ProductForm(props: Props) {
     } catch (err) {
       setError((err as Error).message);
       setSubmitting(false);
+    }
+  }
+
+  async function onTagRequest() {
+    setTagReqError(null);
+    setTagReqSuccess(null);
+    if (!tagReqLabel.trim()) { setTagReqError("กรุณาระบุชื่อแท็ก"); return; }
+    if (!tagReqGroupId) { setTagReqError("กรุณาเลือกกลุ่มแท็ก"); return; }
+    setTagReqSubmitting(true);
+    try {
+      const res = await requestTag({
+        shopId: props.shopId,
+        tagGroupId: tagReqGroupId,
+        requestedLabel: tagReqLabel.trim(),
+        requestedKey: tagReqKey.trim() || undefined,
+      });
+      if (!res.ok) {
+        setTagReqError(res.error ?? "ส่งคำขอไม่สำเร็จ");
+      } else {
+        setTagReqSuccess("ส่งคำขอแล้ว รอแอดมินอนุมัติ");
+        setTagReqLabel("");
+        setTagReqKey("");
+        setShowTagRequest(false);
+      }
+    } catch (e) {
+      setTagReqError((e as Error).message);
+    } finally {
+      setTagReqSubmitting(false);
     }
   }
 
@@ -608,6 +661,130 @@ export default function ProductForm(props: Props) {
           </div>
         ) : null}
       </div>
+
+      {/* ─── ขอเพิ่มแท็ก ─── */}
+      {props.tagGroups.length > 0 ? (
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <label style={labelStyle}>ขอเพิ่มแท็กใหม่</label>
+            <button
+              type="button"
+              onClick={() => { setShowTagRequest((s) => !s); setTagReqError(null); setTagReqSuccess(null); }}
+              style={{ background: "none", border: "none", color: "var(--ink-3)", fontSize: 12, textDecoration: "underline", cursor: "pointer", padding: 0 }}
+            >
+              {showTagRequest ? "ซ่อน" : "+ ขอเพิ่มแท็ก"}
+            </button>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: showTagRequest ? 12 : 0 }}>
+            หากไม่พบแท็กที่ต้องการ สามารถขอให้ admin เพิ่มแท็กใหม่ในกลุ่มที่มีอยู่
+          </div>
+          {showTagRequest ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingLeft: 8, borderLeft: "2px solid var(--line)" }}>
+              <div>
+                <label style={{ ...labelStyle, fontSize: 13 }}>กลุ่มแท็ก</label>
+                <select
+                  value={tagReqGroupId}
+                  onChange={(e) => setTagReqGroupId(e.target.value)}
+                  style={inputStyle}
+                >
+                  {props.tagGroups.map((g) => (
+                    <option key={g.id} value={g.id}>{g.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ ...labelStyle, fontSize: 13 }}>ชื่อแท็กที่ต้องการ (ภาษาไทย) <RequiredMark /></label>
+                <input
+                  type="text"
+                  value={tagReqLabel}
+                  onChange={(e) => setTagReqLabel(e.target.value)}
+                  maxLength={80}
+                  placeholder="เช่น งานกีฬาสี"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={{ ...labelStyle, fontSize: 13 }}>slug key (ไม่บังคับ — admin กำหนดได้เอง)</label>
+                <input
+                  type="text"
+                  value={tagReqKey}
+                  onChange={(e) => setTagReqKey(e.target.value)}
+                  maxLength={48}
+                  placeholder="เช่น sport-event"
+                  style={inputStyle}
+                />
+              </div>
+              {tagReqError ? (
+                <div style={{ fontSize: 12, color: "var(--danger)" }}>{tagReqError}</div>
+              ) : null}
+              <button
+                type="button"
+                onClick={onTagRequest}
+                disabled={tagReqSubmitting}
+                className="btn btn-outline"
+                style={{ alignSelf: "flex-start", padding: "9px 16px", fontSize: 13 }}
+              >
+                {tagReqSubmitting ? "กำลังส่ง…" : "ส่งคำขอ"}
+              </button>
+            </div>
+          ) : null}
+          {tagReqSuccess ? (
+            <div style={{ marginTop: 8, fontSize: 13, color: "var(--success, #16a34a)" }}>{tagReqSuccess}</div>
+          ) : null}
+
+          {/* คำขอที่ส่งไปแล้วของร้านนี้ */}
+          {props.shopTagRequests.length > 0 ? (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, color: "var(--ink-2)", marginBottom: 6 }}>
+                คำขอที่ส่งไปแล้ว
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {props.shopTagRequests.slice(0, 5).map((r) => (
+                  <div
+                    key={r.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      fontSize: 12,
+                      padding: "6px 10px",
+                      background: "var(--bg)",
+                      borderRadius: 6,
+                      border: "1px solid var(--line)",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span>
+                      <span style={{ color: "var(--ink-3)" }}>{r.tagGroup.label} /</span>{" "}
+                      <strong>{r.requestedLabel}</strong>
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: "2px 8px",
+                        borderRadius: 999,
+                        background:
+                          r.status === "approved" ? "color-mix(in oklch, #16a34a 15%, transparent)" :
+                          r.status === "rejected" ? "color-mix(in oklch, var(--danger) 12%, transparent)" :
+                          "color-mix(in oklch, #d97706 12%, transparent)",
+                        color:
+                          r.status === "approved" ? "#16a34a" :
+                          r.status === "rejected" ? "var(--danger)" :
+                          "#d97706",
+                      }}
+                    >
+                      {r.status === "approved" ? "อนุมัติแล้ว" :
+                       r.status === "rejected" ? "ตีกลับ" : "รออนุมัติ"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {error ? (
         <div
