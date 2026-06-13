@@ -676,7 +676,14 @@ export default function ProductForm(props: Props) {
             </button>
           </div>
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: showTagRequest ? 12 : 0 }}>
-            หากไม่พบแท็กที่ต้องการ สามารถขอให้ admin เพิ่มแท็กใหม่ในกลุ่มที่มีอยู่
+            คำขอจะถูกส่งให้แอดมินอนุมัติ • เมื่ออนุมัติแล้วผู้ขายทุกคนและผู้ใช้จะเห็นแท็กนี้
+            {" "}
+            <a
+              href="/sell/tags"
+              style={{ color: "var(--ink-3)", textDecoration: "underline", whiteSpace: "nowrap" }}
+            >
+              จัดการคำขอแท็กทั้งหมด →
+            </a>
           </div>
           {showTagRequest ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingLeft: 8, borderLeft: "2px solid var(--line)" }}>
