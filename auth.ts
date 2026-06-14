@@ -6,6 +6,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { base, db } from "@/lib/db";
 import type { Role } from "@prisma/client";
+import { TERMS_VERSION } from "@/lib/consent";
 
 const ADMIN_EMAILS = ["admin@doprent.com", "prem@doprent.com", "hgcovuf@gmail.com"];
 
@@ -98,6 +99,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (t.id) session.user.id = t.id;
       if (t.role) session.user.role = t.role;
       return session;
+    },
+  },
+  events: {
+    async createUser({ user }) {
+      // Persist PDPA consent for new Google OAuth users (email signup sets it in the API route).
+      if (user.id) {
+        try {
+          await db.user.update({
+            where: { id: user.id },
+            data: { termsAcceptedAt: new Date(), termsVersion: TERMS_VERSION },
+          });
+        } catch {
+          // Non-fatal — do not block sign-in if this update fails.
+        }
+      }
     },
   },
   pages: {

@@ -11,7 +11,7 @@ const BOOKING_INCLUDE = {
       images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } },
     },
   },
-  shop: { select: { name: true, slug: true, lineUrl: true, promptpayId: true } },
+  shop: { select: { name: true, slug: true, lineUrl: true, promptpayId: true, bankName: true, bankAccountNumber: true, bankAccountName: true } },
 } as const;
 
 type PrismaBookingWithJoins = {
@@ -44,6 +44,9 @@ type PrismaBookingWithJoins = {
     slug: string | null;
     lineUrl: string | null;
     promptpayId: string | null;
+    bankName: string | null;
+    bankAccountNumber: string | null;
+    bankAccountName: string | null;
   } | null;
 };
 
@@ -83,6 +86,9 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     boutique_slug: b.shop?.slug ?? null,
     boutique_line_url: b.shop?.lineUrl ?? null,
     boutique_promptpay_id: b.shop?.promptpayId ?? null,
+    boutique_bank_name: b.shop?.bankName ?? null,
+    boutique_bank_account_number: b.shop?.bankAccountNumber ?? null,
+    boutique_bank_account_name: b.shop?.bankAccountName ?? null,
   };
 }
 
@@ -150,7 +156,7 @@ export async function getBookingForView(id: string): Promise<BookingDetail | nul
         },
       },
       shop: {
-        select: { name: true, slug: true, lineUrl: true, promptpayId: true, ownerId: true },
+        select: { name: true, slug: true, lineUrl: true, promptpayId: true, ownerId: true, bankName: true, bankAccountNumber: true, bankAccountName: true },
       },
     },
   });
