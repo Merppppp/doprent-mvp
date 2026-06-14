@@ -38,6 +38,7 @@ export default function UserMenu({
   email,
   isAdmin,
   isSeller,
+  hasShop,
   initials,
   savedCount,
   renterBadge,
@@ -48,6 +49,8 @@ export default function UserMenu({
   email: string;
   isAdmin: boolean;
   isSeller: boolean;
+  /** true when the user actually owns a shop — independent of admin role */
+  hasShop?: boolean;
   initials: string;
   savedCount: number;
   renterBadge: number;
@@ -197,8 +200,8 @@ export default function UserMenu({
           </Link>
         </div>
 
-        {/* ── Group 2: Manage shop (seller only) ── */}
-        {isSeller && !isAdmin && (
+        {/* ── Group 2: Manage shop (any shop owner — incl. admin-with-shop) ── */}
+        {(hasShop ?? isSeller) && (
           <>
             <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
             <div
