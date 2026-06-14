@@ -268,6 +268,55 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   });
 }
 
+/** Statuses where the renter may still edit the delivery address (pre-shipment). */
+const ADDRESS_EDITABLE_STATUSES: BookingStatus[] = ["booking_pending", "waiting_for_payment"];
+
+/**
+ * Renter edits the delivery address on an in-progress booking.
+ * Only allowed while the booking is still in a pre-shipment state
+ * (booking_pending or waiting_for_payment).
+ */
+export async function editBookingAddress(
+  bookingId: string,
+  formData: FormData,
+): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const recipientName = String(formData.get("recipient_name") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const addressText = String(formData.get("address_text") ?? "").trim();
+
+  if (!recipientName) return { ok: false, error: "กรุณาใส่ชื่อผู้รับ" };
+  if (!phone) return { ok: false, error: "กรุณาใส่เบอร์โทร" };
+  if (!addressText) return { ok: false, error: "กรุณาใส่ที่อยู่จัดส่ง" };
+
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: { id: true, renterId: true, status: true },
+  });
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.renterId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์แก้ไขการจองนี้" };
+  if (!ADDRESS_EDITABLE_STATUSES.includes(booking.status as BookingStatus))
+    return { ok: false, error: "ไม่สามารถแก้ไขที่อยู่ได้ในขั้นตอนนี้" };
+
+  const res = await withActor(user.id, () =>
+    db.booking.updateMany({
+      where: {
+        id: bookingId,
+        renterId: user.id,
+        status: { in: ADDRESS_EDITABLE_STATUSES },
+      },
+      data: { recipientName, phone, addressText },
+    }),
+  );
+  if (res.count === 0) return { ok: false, error: "ไม่สามารถแก้ไขได้ (สถานะเปลี่ยนไปแล้ว)" };
+
+  revalidatePath(`/account/bookings/${bookingId}`);
+  revalidatePath("/account/bookings");
+  return { ok: true };
+}
+
 /** Load a booking + the shop owner so we can check roles (no RLS in Postgres). */
 async function loadBooking(bookingId: string) {
   return db.booking.findUnique({
