@@ -189,6 +189,36 @@ export async function seedBase() {
   });
 
   // ---------------------------------------------------------------------------
+  // 3d. Bind occasion + color to the suit product type (mirrors
+  //     20260614120000 migration). dress-type is intentionally NOT bound to suit
+  //     (its values are dress-specific). All bindings: multi, not required.
+  // ---------------------------------------------------------------------------
+  await db.productTypeTagGroup.upsert({
+    where: { productTypeId_tagGroupId: { productTypeId: suitType.id, tagGroupId: occasionGroup.id } },
+    update: {},
+    create: {
+      productTypeId: suitType.id,
+      tagGroupId: occasionGroup.id,
+      sortOrder: 0,
+      isRequired: false,
+      selectionMode: "multi",
+      isActive: true,
+    },
+  });
+  await db.productTypeTagGroup.upsert({
+    where: { productTypeId_tagGroupId: { productTypeId: suitType.id, tagGroupId: colorGroup.id } },
+    update: {},
+    create: {
+      productTypeId: suitType.id,
+      tagGroupId: colorGroup.id,
+      sortOrder: 1,
+      isRequired: false,
+      selectionMode: "multi",
+      isActive: true,
+    },
+  });
+
+  // ---------------------------------------------------------------------------
   // 4. Areas (uuid PK + key UNIQUE — data unchanged from the old seed)
   // ---------------------------------------------------------------------------
   await db.area.createMany({
