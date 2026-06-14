@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import RenterBookingActions from "@/components/RenterBookingActions";
 import ReviewForm from "@/components/ReviewForm";
+import EditAddressForm from "@/components/EditAddressForm";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,7 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
   });
 
   const isReviewable = b.status === "returned" || b.status === "completed";
+  const canEditAddress = b.status === "booking_pending" || b.status === "waiting_for_payment";
 
   // QR only while waiting for payment + shop has PromptPay + fee set
   const qr =
@@ -70,6 +72,14 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
         <Row label="วันเช่า" value={`${fmtThai(b.start_date)} – ${fmtThai(b.end_date)}`} />
         <Row label="ส่งถึง" value={`${b.recipient_name ?? ""} · ${b.phone ?? ""}`} />
         <Row label="ที่อยู่" value={b.address_text ?? "-"} />
+        {canEditAddress ? (
+          <EditAddressForm
+            bookingId={b.id}
+            recipientName={b.recipient_name}
+            phone={b.phone}
+            addressText={b.address_text}
+          />
+        ) : null}
       </div>
 
       <div style={card}>
