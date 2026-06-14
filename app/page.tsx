@@ -353,7 +353,7 @@ const HR_CSS = `
 .hr-results-bar{
   display:flex;align-items:center;
   margin-bottom:16px;flex-wrap:wrap;gap:8px 12px;
-  position:sticky;top:0;z-index:20;
+  position:sticky;top:var(--header-h,120px);z-index:20;
   background:var(--bg);
   padding:10px 0;
   border-bottom:1px solid var(--line);
