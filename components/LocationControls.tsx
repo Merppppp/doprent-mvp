@@ -124,14 +124,20 @@ export default function LocationControls({ locale = "th" }: { locale?: Locale })
         defaultValue=""
         onChange={(e) => e.target.value && setArea(e.target.value)}
         aria-label={t("results.selectDistrict", locale)}
+        className="loc-district-select"
         style={{
-          padding: "6px 10px",
+          padding: "5px 8px",
           border: "1px solid var(--line)",
           borderRadius: 8,
           background: "var(--bg)",
           fontSize: 13,
           color: "var(--ink)",
           fontFamily: "inherit",
+          maxWidth: 160,
+          minWidth: 0,
+          height: 34,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
         }}
       >
         <option value="" disabled>

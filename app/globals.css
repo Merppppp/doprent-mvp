@@ -14,6 +14,12 @@
    _backups/globals.css.bak. All OKLCH, never pure #000 / #fff.
    ============================================================ */
 :root {
+  /* Header height custom property — used by sticky results bar so it sits
+     below the navbar at every breakpoint.
+     Desktop (≥768px): top-row 28 + middle 52 + cats 40 = 120px
+     Mobile  (<768px): top-row hidden + middle 52 + search 52 + cats 40 = 144px */
+  --header-h: 120px;
+
   /* Neutrals — warm charcoal → cream, never pure black/white */
   --ink: oklch(0.235 0.018 70);   /* warm charcoal, near-black */
   --ink-2: oklch(0.47 0.014 72);  /* secondary text */
@@ -375,6 +381,22 @@ img {
   gap: 32px;
 }
 
+/* Browse results grid — more columns on large screens.
+   Scoped to .browse-grid .grid-3 so other .grid-3 usages are unaffected.
+   Existing tablet/phone media queries use plain .grid-3 (lower specificity)
+   and only fire at ≤900px / ≤600px — well below these min-width thresholds,
+   so there is no conflict. */
+@media (min-width: 1280px) {
+  .browse-grid .grid-3 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (min-width: 1536px) {
+  .browse-grid .grid-3 {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
 /* Detail page: gallery + info */
 .detail-grid {
   display: grid;
@@ -470,6 +492,20 @@ img {
   }
   .page-title {
     font-size: 30px !important;
+  }
+}
+
+/* Mobile header height override — top-row is hidden, mobile search row appears */
+/* Also tightens the district select so GPS chip + district + radius stay balanced */
+@media (max-width: 767px) {
+  :root {
+    --header-h: 144px;
+  }
+  .loc-district-select {
+    max-width: 130px !important;
+    font-size: 12px !important;
+    height: 30px !important;
+    padding: 3px 6px !important;
   }
 }
 
