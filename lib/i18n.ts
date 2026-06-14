@@ -43,6 +43,7 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   "filter.showLess":       { th: "แสดงน้อยลง",          en: "Show less" },
   "filter.noResults":      { th: "ไม่พบรายการ",         en: "No matches" },
   "filter.removeFilter":   { th: "ลบตัวกรอง",           en: "Remove filter" },
+  "filter.searchTags":     { th: "ค้นหาแท็ก...",         en: "Search tags..." },
 
   // Dress-type sub-group headers
   "type.group.top":    { th: "เสื้อ",                  en: "Tops" },
