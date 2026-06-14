@@ -27,9 +27,13 @@ const NAV: DashNavItem[] = [
     icon: <Icon d="M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10" />,
   },
   {
+    href: "/sell/products",
+    label: "สินค้า",
+    icon: <Icon d="M4 6h16M4 10h16M4 14h16M4 18h10" />,
+  },
+  {
     href: "/sell/products/new",
     label: "เพิ่มสินค้า",
-    match: "/sell/products",
     icon: <Icon d="M12 5v14M5 12h14" />,
   },
   {
@@ -46,11 +50,6 @@ const NAV: DashNavItem[] = [
     href: "/sell/edit",
     label: "แก้ไขร้าน",
     icon: <Icon d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />,
-  },
-  {
-    href: "/sell/upgrade",
-    label: "อัปเกรด",
-    icon: <Icon d="M12 2l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1 3-6z" />,
   },
   {
     href: "/sell/banners",

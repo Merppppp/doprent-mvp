@@ -8,6 +8,7 @@ import { ProductArt } from "@/components/ProductArt";
 import SellerDashboardCalendarPanel from "@/components/SellerDashboardCalendarPanel";
 import { dressLimitFor, TIER_LABEL } from "@/lib/tiers";
 import type { AdsTier } from "@/lib/types";
+import { toggleShopOpen } from "@/app/actions/seller";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,9 @@ export default async function SellerDashboard({
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?next=/sell/dashboard");
 
-  const shopRaw = await db.shop.findFirst({ where: { ownerId: user.id } });
+  const shopRaw = await db.shop.findFirst({
+    where: { ownerId: user.id },
+  });
   if (!shopRaw) redirect("/sell/signup");
   if (shopRaw.kycStatus === "none" || shopRaw.kycStatus === "rejected") {
     redirect(`/sell/kyc?slug=${shopRaw.slug}`);
@@ -55,6 +58,7 @@ export default async function SellerDashboard({
     id: shopRaw.id, slug: shopRaw.slug, name: shopRaw.name,
     area_label: shopRaw.areaLabel, status: shopRaw.status,
     kyc_status: shopRaw.kycStatus, verified: shopRaw.verified,
+    is_open: shopRaw.isOpen,
   };
 
   const [productRows, totalClicks] = await Promise.all([
@@ -192,6 +196,44 @@ export default async function SellerDashboard({
             ส่งเอกสาร KYC →
           </Link>
         ) : null}
+      </div>
+
+      {/* Shop open/close toggle */}
+      <div
+        style={{
+          padding: 14,
+          background: shop.is_open ? "var(--success-soft)" : "var(--warn-soft)",
+          border: `1px solid ${shop.is_open ? "color-mix(in oklch, var(--success) 30%, transparent)" : "color-mix(in oklch, var(--warn) 30%, transparent)"}`,
+          borderRadius: 8,
+          marginBottom: 18,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 4 }}>สถานะร้าน</div>
+          <div
+            style={{
+              fontWeight: 600,
+              fontSize: 15,
+              color: shop.is_open ? "var(--success)" : "var(--warn)",
+            }}
+          >
+            {shop.is_open ? "✓ ร้านเปิดอยู่ · ลูกค้าสามารถจองได้" : "⏸ ปิดร้านชั่วคราว · ลูกค้าจองไม่ได้"}
+          </div>
+        </div>
+        <form action={toggleShopOpen.bind(null, shop.id)}>
+          <button
+            type="submit"
+            className="btn btn-outline"
+            style={{ padding: "8px 14px", fontSize: 13 }}
+          >
+            {shop.is_open ? "ปิดร้านชั่วคราว" : "เปิดร้าน"}
+          </button>
+        </form>
       </div>
 
       {/* Stats */}

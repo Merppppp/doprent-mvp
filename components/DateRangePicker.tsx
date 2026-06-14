@@ -4,16 +4,8 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { priceForNights } from "@/lib/pricing";
 import type { PriceTier } from "@/lib/types";
-import LineMessageCopyBox from "@/components/LineMessageCopyBox";
-
 type Props = {
-  /**
-   * Base LINE URL (without our query params). Pass empty string "" for
-   * anonymous viewers — when isLoggedIn is false, the LINE href is
-   * never built or rendered.
-   */
-  lineUrl: string;
-  /** Dress display name (used in pre-filled LINE message). */
+  /** Dress display name. */
   dressName: string;
   /** Boutique name for the LINE message. */
   boutiqueName: string;
@@ -108,7 +100,6 @@ const TH_DOW = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"]; // Monda
  * and pre-fills a LINE message with image, link, dates and price.
  */
 export default function DateRangePicker({
-  lineUrl,
   dressName,
   boutiqueName,
   dressPageUrl,
@@ -172,27 +163,6 @@ export default function DateRangePicker({
   const nextBlackouts = useMemo(() => {
     return blackouts.filter((d) => d >= TODAY).sort().slice(0, 6);
   }, [blackouts]);
-
-  const lineHref = useMemo(() => {
-    if (!isLoggedIn || !lineUrl) return "";
-    if (!start || !end || nights === 0 || isInvalid) return lineUrl;
-    const lines = [
-      `สวัสดีค่ะ สนใจเช่าชุด "${dressName}"`,
-      `ร้าน: ${boutiqueName}`,
-      `วันที่: ${fmtThai(start)} ถึง ${fmtThai(end)} (${nights} วัน)`,
-    ];
-    if (typeof pricePerDay === "number") {
-      lines.push(`ราคา: ฿${quote.perDay.toLocaleString()}/วัน × ${nights} = ฿${quote.total.toLocaleString()}`);
-    }
-    if (typeof deposit === "number" && deposit > 0) {
-      lines.push(`ค่ามัดจำ: ฿${deposit.toLocaleString()}`);
-    }
-    if (dressPageUrl) lines.push(`ลิงก์ชุด: ${dressPageUrl}`);
-    if (dressImageUrl) lines.push(`รูป: ${dressImageUrl}`);
-    const text = lines.join("\n");
-    const sep = lineUrl.includes("?") ? "&" : "?";
-    return `${lineUrl}${sep}text=${encodeURIComponent(text)}`;
-  }, [isLoggedIn, lineUrl, start, end, nights, isInvalid, dressName, boutiqueName, pricePerDay, priceTiers, deposit, dressPageUrl, dressImageUrl, quote.perDay, quote.total]);
 
   function trackAndGo(e: React.MouseEvent<HTMLAnchorElement>) {
     if (productId || shopId) {
@@ -296,26 +266,6 @@ export default function DateRangePicker({
               เข้าสู่ระบบเพื่อจอง · {nights} วัน
             </Link>
           )}
-          {isLoggedIn && lineHref ? (
-            <a href={lineHref} target="_blank" rel="noopener noreferrer" onClick={trackAndGo} style={{ display: "block", padding: "10px 16px", textAlign: "center", fontSize: 13, fontWeight: 500, color: "var(--ink-2)", border: "1px solid var(--line)", borderRadius: 8, textDecoration: "none" }}>
-              สอบถามร้านก่อน (LINE)
-            </a>
-          ) : null}
-        </div>
-      ) : null}
-
-      {/* Show copy box only when a valid range is selected */}
-      {start && end && !isInvalid ? (
-        <div style={{ marginTop: 12 }}>
-          <LineMessageCopyBox
-            dressName={dressName}
-            boutiqueName={boutiqueName}
-            pricePerDay={pricePerDay}
-            dressPageUrl={dressPageUrl ?? ""}
-            dateFrom={start}
-            dateTo={end}
-            tagCode={dressTagCode}
-          />
         </div>
       ) : null}
     </div>
