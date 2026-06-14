@@ -87,7 +87,7 @@ function mapProduct(d: ProductRow): Product {
     product_type_key: d.productType.key,
     category_key: d.category?.key ?? null,
     size: d.size as Size,
-    color: d.color as Color,
+    color: (d.productTags.find(pt => pt.tag.tagGroup.key === 'color')?.tag.key ?? d.color ?? null) as Color | null,
     price_per_day: d.pricePerDay,
     deposit: d.deposit,
     price_tiers: mapPriceTiers(d.priceTiers),
@@ -266,7 +266,6 @@ export async function listProducts(
     productType: { key: DEFAULT_PRODUCT_TYPE_KEY },
   };
 
-  if (opts.color && opts.color !== "all") where.color = opts.color;
   if (opts.sizes?.length) where.size = { in: opts.sizes as unknown as Prisma.EnumSizeFilter<"Product">["in"] };
 
   // priceMin + priceMax
@@ -283,6 +282,10 @@ export async function listProducts(
   if (opts.occasions?.length) {
     const prev = effectiveTagsByGroup.occasion ?? [];
     effectiveTagsByGroup.occasion = [...new Set([...prev, ...opts.occasions])];
+  }
+  if (opts.color && opts.color !== "all") {
+    const prev = effectiveTagsByGroup.color ?? [];
+    effectiveTagsByGroup.color = [...new Set([...prev, opts.color])];
   }
   const tagGroupClauses = Object.entries(effectiveTagsByGroup)
     .filter(([, tagKeys]) => tagKeys.length > 0)

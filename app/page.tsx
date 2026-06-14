@@ -18,9 +18,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { getActiveBanners } from "@/lib/banners";
 import { getTagGroupsForProductTypeKey } from "@/lib/tag-groups";
 import {
-  COLOR_LABELS_TH,
-  COLOR_SWATCH,
-  type Color,
   type OccasionKey,
   SIZES,
 } from "@/lib/types";
@@ -30,7 +27,6 @@ import { getServerLocale } from "@/lib/i18n-server";
 export const dynamic = "force-dynamic";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
-const COLORS: Color[] = ["rose", "ivory", "green", "black", "navy", "red", "blue", "purple"];
 const PRICE_BOUNDS = { min: 0, max: 10000 };
 
 type SearchParams = {
@@ -52,7 +48,6 @@ export default async function HomePage({
 }: {
   searchParams: SearchParams;
 }) {
-  const activeColor = (searchParams?.color ?? "all") as Color | "all";
   const activeOcc = searchParams?.occasion as OccasionKey | undefined;
   const activeSize = searchParams?.size;
   const activeDesigner = searchParams?.designer?.trim() || undefined;
@@ -69,7 +64,7 @@ export default async function HomePage({
 
   // Known non-tag-group params — excluded when building tagsByGroup from URL
   const KNOWN_FILTER_PARAMS = new Set([
-    "color", "occasion", "size", "designer", "q", "sort",
+    "occasion", "size", "designer", "q", "sort",
     "dateFrom", "dateTo", "priceMin", "priceMax", "page", "type",
   ]);
 
@@ -90,7 +85,6 @@ export default async function HomePage({
 
   const [{ items: products, total, hasMore }, occasions, designers, user, sponsors, shops, dbBanners, { groups: tagGroups }] = await Promise.all([
     listProducts({
-      color: activeColor === "all" ? undefined : activeColor,
       tagsByGroup: Object.keys(tagsByGroup).length > 0 ? tagsByGroup : undefined,
       sizes: activeSize ? [activeSize] : undefined,
       designers: activeDesigner ? [activeDesigner] : undefined,
@@ -144,11 +138,6 @@ export default async function HomePage({
   const occasionOptions = occasions.map((o) => ({
     value: o.key,
     label: locale === "en" ? t(`occasion.${o.key}`, "en") : o.th,
-  }));
-  const colorOptions = COLORS.map((c) => ({
-    value: c,
-    label: locale === "en" ? t(`color.${c}`, "en") : COLOR_LABELS_TH[c],
-    swatch: COLOR_SWATCH[c],
   }));
   const sizeOptions = SIZES.map((sz) => ({ value: sz, label: sz }));
   const designerOptions = designers.map((d) => ({ value: d, label: d }));
@@ -212,7 +201,6 @@ export default async function HomePage({
             <aside className="hidden md:block sticky top-[15px] self-start max-h-[calc(100vh-135px)] overflow-y-auto overscroll-contain text-sm filter-sidebar pr-[15px]">
               <BrowseFilters
                 q={search}
-                color={activeColor === "all" ? null : activeColor}
                 occasion={activeOcc ?? null}
                 size={activeSize ?? null}
                 designer={activeDesigner ?? null}
@@ -220,7 +208,6 @@ export default async function HomePage({
                 priceMax={activePriceMax}
                 priceBounds={PRICE_BOUNDS}
                 occasions={occasionOptions}
-                colors={colorOptions}
                 sizes={sizeOptions}
                 designers={designerOptions}
                 locale={locale}
@@ -241,7 +228,6 @@ export default async function HomePage({
                   <div className="flex items-center gap-2">
                     <MobileFilterDrawer
                       q={search}
-                      color={activeColor === "all" ? null : activeColor}
                       occasion={activeOcc ?? null}
                       size={activeSize ?? null}
                       designer={activeDesigner ?? null}
@@ -249,7 +235,6 @@ export default async function HomePage({
                       priceMax={activePriceMax}
                       priceBounds={PRICE_BOUNDS}
                       occasions={occasionOptions}
-                      colors={colorOptions}
                       sizes={sizeOptions}
                       designers={designerOptions}
                       locale={locale}
@@ -289,7 +274,6 @@ export default async function HomePage({
                   locale={locale}
                   searchParams={{
                     q: search || undefined,
-                    color: activeColor === "all" ? undefined : activeColor,
                     size: activeSize,
                     designer: activeDesigner,
                     sort: sort === "featured" ? undefined : sort,
