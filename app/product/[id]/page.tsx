@@ -439,9 +439,9 @@ export default async function DressPage({ params }: { params: Params }) {
             }}
           >
             <strong style={{ color: "var(--ink)", display: "block", marginBottom: 4 }}>
-              ขั้นตอนต่อจากนี้
+              วิธีเช่า
             </strong>
-            ตกลงวันใส่ ราคา การส่ง คุยกับร้านโดยตรงทาง LINE จ่ายผ่าน PromptPay หรือโอนตรงให้ร้าน DopRent ไม่เก็บเงิน
+            คุยกับร้านทาง LINE เพื่อตกลงวัน ราคา และการส่งเลยค่ะ จากนั้นจ่ายผ่าน PromptPay หรือโอนตรงให้ร้าน DopRent ไม่เก็บเงินคุณ
           </div>
         </div>
       </div>
