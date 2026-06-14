@@ -6,8 +6,8 @@
 --
 -- No new GRANTs needed: the shops table is already granted to the app role.
 
--- 1. Extend the enum with the new 'full' tier (idempotent via IF NOT EXISTS)
+-- Extend the enum with the new 'full' tier (idempotent via IF NOT EXISTS).
+-- NOTE: a newly added enum value cannot be USED in the same transaction it is
+-- added (Postgres 55P04). The shops.ads_tier default that uses 'full' therefore
+-- lives in the SEPARATE follow-up migration 20260615090300_single_plan_default.
 ALTER TYPE "plan_tier" ADD VALUE IF NOT EXISTS 'full';
-
--- 2. Change the default on shops.ads_tier so new shops default to 'full'
-ALTER TABLE "shops" ALTER COLUMN "ads_tier" SET DEFAULT 'full';
