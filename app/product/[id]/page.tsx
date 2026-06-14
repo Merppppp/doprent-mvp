@@ -376,7 +376,7 @@ export default async function DressPage({ params }: { params: Params }) {
             <Spec lbl="ขนาด" val={dress.size} />
             <Spec lbl="สี" val={dress.color ? COLOR_LABELS_TH[dress.color] : "—"} />
             <Spec lbl="ร้านเช่า" val={dress.shop_name} />
-            <Spec lbl="ดีไซเนอร์" val={dress.designer ?? "—"} />
+            <Spec lbl="แบรนด์" val={dress.designer ?? "—"} />
           </div>
 
           {/* Price tiers / promotion table (read-only) */}

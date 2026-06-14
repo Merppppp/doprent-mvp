@@ -576,21 +576,26 @@ export async function updateProductPriceTiers(productId: string, tiers: PriceTie
   });
 }
 
-export async function toggleProductAvailable(productId: string, available: boolean): Promise<{ ok: boolean }> {
+/** Flip a product's available flag (owner-only). Mirrors toggleShopOpen pattern. */
+export async function toggleProductAvailable(productId: string): Promise<void> {
   const user = await getCurrentUser();
-  if (!user) return { ok: false };
+  if (!user) return;
 
   const product = await db.product.findUnique({
     where: { id: productId },
-    include: { shop: { select: { ownerId: true } } },
+    select: { available: true, shop: { select: { ownerId: true } } },
   });
-  if (!product || product.shop.ownerId !== user.id) return { ok: false };
+  if (!product || product.shop.ownerId !== user.id) return;
 
-  return withActor(user.id, async () => {
-    await db.product.update({ where: { id: productId }, data: { available } });
-    revalidatePath("/sell/dashboard");
-    return { ok: true };
+  const next = !product.available;
+
+  await withActor(user.id, async () => {
+    await db.product.update({ where: { id: productId }, data: { available: next } });
   });
+
+  revalidatePath("/sell/products");
+  revalidatePath("/sell/dashboard");
+  revalidatePath(`/product/${productId}`);
 }
 
 export async function replyToReview(reviewId: string, text: string): Promise<{ ok: true } | { ok: false; error: string }> {

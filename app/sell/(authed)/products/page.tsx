@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ProductArt } from "@/components/ProductArt";
+import { toggleProductAvailable } from "@/app/actions/seller";
 
 export const dynamic = "force-dynamic";
 
@@ -200,6 +201,21 @@ export default async function SellerProductsPage() {
                   >
                     📅 ปฏิทิน
                   </Link>
+                  <form action={toggleProductAvailable.bind(null, d.id)}>
+                    <button
+                      type="submit"
+                      className="btn btn-outline"
+                      style={{
+                        padding: "6px 10px",
+                        fontSize: 12,
+                        width: "100%",
+                        color: d.available ? "var(--danger)" : "var(--success)",
+                        borderColor: d.available ? "var(--danger)" : "var(--success)",
+                      }}
+                    >
+                      {d.available ? "ปิดการเช่า" : "เปิดให้เช่า"}
+                    </button>
+                  </form>
                 </div>
               </div>
             );
