@@ -22,10 +22,11 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   "search.button":      { th: "ค้นหา",                  en: "Search" },
 
   // ── Sort ─────────────────────────────────────────────────────────────────
-  "sort.label":     { th: "เรียงลำดับ",      en: "Sort" },
-  "sort.featured":  { th: "เกี่ยวข้อง",      en: "Relevant" },
-  "sort.priceAsc":  { th: "ราคา ต่ำ→สูง",   en: "Price: Low → High" },
-  "sort.priceDesc": { th: "ราคา สูง→ต่ำ",   en: "Price: High → Low" },
+  "sort.label":       { th: "เรียงลำดับ",      en: "Sort" },
+  "sort.featured":    { th: "เกี่ยวข้อง",      en: "Relevant" },
+  "sort.priceAsc":    { th: "ราคา ต่ำ→สูง",   en: "Price: Low → High" },
+  "sort.priceDesc":   { th: "ราคา สูง→ต่ำ",   en: "Price: High → Low" },
+  "sort.ratingDesc":  { th: "คะแนนรีวิว",      en: "Top Rated" },
 
   // ── Filter ───────────────────────────────────────────────────────────────
   "filter.title":    { th: "Filter",         en: "Filter" },

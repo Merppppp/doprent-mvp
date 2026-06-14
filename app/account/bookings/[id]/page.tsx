@@ -5,8 +5,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { getBookingForView } from "@/lib/booking-queries";
 import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
 import { promptPayQrDataUrl } from "@/lib/payments";
+import { db } from "@/lib/db";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import RenterBookingActions from "@/components/RenterBookingActions";
+import ReviewForm from "@/components/ReviewForm";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,14 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
 
   const total = amountDue(b);
   const meta = BOOKING_STATUS_META[b.status];
+
+  // Fetch existing review for this booking
+  const existingReview = await db.review.findUnique({
+    where: { bookingId: b.id },
+    select: { id: true, rating: true, comment: true, createdAt: true, sellerRepliedAt: true },
+  });
+
+  const isReviewable = b.status === "returned" || b.status === "completed";
 
   // QR only while waiting for payment + shop has PromptPay + fee set
   const qr =
@@ -118,6 +128,33 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
       ) : null}
 
       <RenterBookingActions bookingId={b.id} status={b.status} canPay={!!qr} />
+
+      {/* Review section — shown for completed/returned bookings */}
+      {isReviewable ? (
+        <div style={{ ...card, marginTop: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>รีวิวร้าน</div>
+          {existingReview ? (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span>
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <span key={s} style={{ color: s <= existingReview.rating ? "#F5A623" : "var(--line)", fontSize: 16 }}>★</span>
+                  ))}
+                </span>
+                <span style={{ fontSize: 13, color: "var(--ink-3)" }}>
+                  {existingReview.createdAt.toLocaleDateString("th-TH")}
+                </span>
+              </div>
+              {existingReview.comment ? (
+                <p style={{ fontSize: 14, color: "var(--ink-2)", margin: "4px 0 0" }}>{existingReview.comment}</p>
+              ) : null}
+              <p style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 8 }}>รีวิวถูกส่งแล้ว</p>
+            </div>
+          ) : (
+            <ReviewForm bookingId={b.id} />
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
