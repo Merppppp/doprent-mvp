@@ -566,6 +566,32 @@ export async function toggleProductAvailable(productId: string, available: boole
   });
 }
 
+export async function replyToReview(reviewId: string, text: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const trimmed = String(text ?? "").trim().slice(0, 500);
+  if (!trimmed) return { ok: false, error: "กรุณาใส่ข้อความตอบกลับ" };
+
+  const review = await db.review.findUnique({
+    where: { id: reviewId },
+    select: { shopId: true },
+  });
+  if (!review) return { ok: false, error: "ไม่พบรีวิว" };
+
+  const shop = await db.shop.findUnique({ where: { id: review.shopId }, select: { ownerId: true, slug: true } });
+  if (!shop || shop.ownerId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์ตอบรีวิวของร้านนี้" };
+
+  return withActor(user.id, async () => {
+    await db.review.update({
+      where: { id: reviewId },
+      data: { sellerReply: trimmed, sellerRepliedAt: new Date() },
+    });
+    revalidatePath(`/shop/${shop.slug}`);
+    return { ok: true };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Legacy aliases (called by SignupForm / KycWizard which still use old names
 // during the 4B→4C migration window)

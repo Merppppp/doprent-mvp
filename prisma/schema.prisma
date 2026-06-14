@@ -299,6 +299,7 @@ model User {
   pageViews         PageView[]
   shopSubscriptions ShopSubscription[]
   favorites         Favorite[]
+  reviews           Review[]          @relation("UserReviews")
 
   @@index([lastActiveAt(sort: Desc)])
   @@index([signupChannel])
@@ -478,6 +479,10 @@ model Shop {
   bufferDaysAfter  Int       @default(2) @map("buffer_days_after")
   /// วันปิดทำการประจำสัปดาห์ (0=อาทิตย์..6=เสาร์) — ซ้ำทุกสัปดาห์
   closedWeekdays   Int[]     @default([]) @map("closed_weekdays")
+  /// คะแนนเฉลี่ยรีวิวทั้งหมดของร้าน (NULL = ยังไม่มีรีวิว) — อัปเดตโดย recomputeShopRating()
+  ratingAvg        Decimal?  @map("rating_avg") @db.Decimal(3, 2)
+  /// จำนวนรีวิวที่มองเห็น (status=visible) ของร้าน — อัปเดตโดย recomputeShopRating()
+  ratingCount      Int       @default(0) @map("rating_count")
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -494,6 +499,7 @@ model Shop {
   closedDates    ShopClosedDate[]
   banners        Banner[]
   tagRequests    TagRequest[]
+  reviews        Review[]
 
   @@index([status])
   @@index([featured])
@@ -976,6 +982,7 @@ model Booking {
   shop    Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
   product Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   address Address? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  review  Review?
 
   @@index([renterId])
   @@index([shopId])
@@ -1118,6 +1125,60 @@ model Banner {
   @@index([isActive, sortOrder])
   @@index([shopId])
   @@map("banners")
+}
+
+// ---------------------------------------------------------------------------
+// Reviews (renter → shop rating after completed rental)
+// ---------------------------------------------------------------------------
+
+/// enum สถานะการมองเห็นรีวิว (visible = แสดงผล, hidden = admin ซ่อน)
+enum ReviewStatus {
+  visible
+  hidden
+
+  @@map("review_status")
+}
+
+/// รีวิวร้านจากผู้เช่า — ผู้เช่ารีวิวได้หลังการเช่าสำเร็จ (returned/completed)
+/// 1 การจองรีวิวได้ 1 ครั้ง; admin ซ่อนได้; ร้านตอบกลับได้ 1 ครั้ง
+model Review {
+  /// Primary key (uuid)
+  id              String        @id @default(uuid()) @db.Uuid
+  /// FK → users.id ผู้เขียนรีวิว (SetNull — ลบผู้ใช้แล้วรีวิวยังอยู่แต่ไม่มีชื่อ)
+  reviewerId      String?       @map("reviewer_id") @db.Uuid
+  /// FK → shops.id ร้านที่รีวิว (Cascade — ลบร้านแล้วรีวิวหายตาม)
+  shopId          String        @map("shop_id") @db.Uuid
+  /// FK → bookings.id การจองที่รีวิว (SetNull — ลบ booking แล้วรีวิวยังอยู่)
+  bookingId       String?       @map("booking_id") @db.Uuid
+  /// คะแนน 1-5 ดาว
+  rating          Int
+  /// ความเห็น (ไม่บังคับ, ≤ 1000 ตัวอักษร)
+  comment         String?
+  /// สถานะการแสดงผล (visible = แสดง, hidden = admin ซ่อน)
+  status          ReviewStatus  @default(visible)
+  /// ข้อความตอบกลับของร้าน (ไม่บังคับ)
+  sellerReply     String?       @map("seller_reply")
+  /// เวลาที่ร้านตอบกลับ
+  sellerRepliedAt DateTime?     @map("seller_replied_at") @db.Timestamptz(6)
+
+  /// uuid ผู้สร้าง record (NULL = system/seed)
+  createdBy String?  @map("created_by") @db.Uuid
+  /// เวลาสร้าง record
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// uuid ผู้แก้ไขล่าสุด
+  updatedBy String?  @map("updated_by") @db.Uuid
+  /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  reviewer User?    @relation("UserReviews", fields: [reviewerId], references: [id], onDelete: SetNull)
+  shop     Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  booking  Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@unique([bookingId])
+  @@index([shopId])
+  @@index([reviewerId])
+  @@index([shopId, status, createdAt(sort: Desc)])
+  @@map("reviews")
 }
 
 // ---------------------------------------------------------------------------

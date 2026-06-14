@@ -10,9 +10,10 @@ function SortSelectInner({ locale = "th" }: { locale?: Locale }) {
   const current = searchParams.get("sort") ?? "featured";
 
   const SORT_OPTIONS = [
-    { value: "featured",   labelKey: "sort.featured" },
-    { value: "price-asc",  labelKey: "sort.priceAsc" },
-    { value: "price-desc", labelKey: "sort.priceDesc" },
+    { value: "featured",    labelKey: "sort.featured" },
+    { value: "price-asc",   labelKey: "sort.priceAsc" },
+    { value: "price-desc",  labelKey: "sort.priceDesc" },
+    { value: "rating-desc", labelKey: "sort.ratingDesc" },
   ] as const;
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
