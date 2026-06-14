@@ -66,6 +66,8 @@ function revalidateTagRequestPaths() {
 export async function approveTagRequest(
   requestId: string,
   overrideKey?: string,
+  swatchHex?: string,
+  swatchImageUrl?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth;
@@ -98,6 +100,8 @@ export async function approveTagRequest(
         key: candidateKey,
         label: req.requestedLabel,
         isActive: true,
+        swatchHex: swatchHex?.trim() || null,
+        swatchImageUrl: swatchImageUrl?.trim() || null,
       },
       select: { id: true },
     });

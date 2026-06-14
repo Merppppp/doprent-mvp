@@ -356,7 +356,6 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
         shopId,
         productTypeId: productType.id,
         size: String(formData.get("size") ?? "M") as "XS"|"S"|"M"|"L"|"XL",
-        color: String(formData.get("color") ?? "rose") as Color,
         pricePerDay: basePerDay,
         deposit: parseInt(String(formData.get("deposit") ?? "0"), 10) || 0,
         description: String(formData.get("description") ?? "").trim() || null,
@@ -395,7 +394,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
   if (!product || product.shop.ownerId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์แก้ไขสินค้านี้" };
 
   const scalarUpdates: Record<string, unknown> = {};
-  for (const f of ["name","designer","size","color","description"] as const) {
+  for (const f of ["name","designer","size","description"] as const) {
     const v = formData.get(f);
     if (v !== null) scalarUpdates[f] = String(v).trim() || null;
   }

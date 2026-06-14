@@ -7,7 +7,7 @@ export type BoundTagGroup = {
   sortOrder: number;
   isRequired: boolean;
   selectionMode: "single" | "multi";
-  tags: Array<{ id: string; key: string; label: string }>;
+  tags: Array<{ id: string; key: string; label: string; swatchHex: string | null; swatchImageUrl: string | null }>;
 };
 
 /** Bound tag groups for a product type, ordered, each hydrated with active tags.
@@ -29,7 +29,7 @@ export async function getTagGroupsForProductType(productTypeId: string): Promise
           tags: {
             where: { isActive: true },
             orderBy: { label: "asc" },
-            select: { id: true, key: true, label: true },
+            select: { id: true, key: true, label: true, swatchHex: true, swatchImageUrl: true },
           },
         },
       },

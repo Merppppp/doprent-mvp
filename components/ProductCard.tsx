@@ -33,7 +33,7 @@ export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn
             transition: "transform 0.2s",
           }}
         >
-          <ProductCardImage src={imgSrc} alt={product.name} color={product.color} variant={variant} />
+          <ProductCardImage src={imgSrc} alt={product.name} color={product.color ?? "rose"} variant={variant} />
           <SaveButton productId={product.id} initialSaved={isSaved} isLoggedIn={isLoggedIn} />
         </div>
         <div style={{ padding: "0 2px" }}>

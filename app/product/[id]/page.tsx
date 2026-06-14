@@ -212,7 +212,7 @@ export default async function DressPage({ params }: { params: Params }) {
                 overflow: "hidden",
               }}
             >
-              <ProductArt color={dress.color} variant={0} />
+              <ProductArt color={dress.color ?? "rose"} variant={0} />
             </div>
           )}
         </div>
@@ -335,7 +335,7 @@ export default async function DressPage({ params }: { params: Params }) {
               }}
             >
               <div style={{ width: 44, height: 44, borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
-                <ProductArt color={boutique?.cover_color ?? dress.color} variant={0} />
+                <ProductArt color={boutique?.cover_color ?? dress.color ?? "rose"} variant={0} />
               </div>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 14, display: "inline-flex", alignItems: "center", gap: 5 }}>
@@ -397,7 +397,7 @@ export default async function DressPage({ params }: { params: Params }) {
             }}
           >
             <Spec lbl="ขนาด" val={dress.size} />
-            <Spec lbl="สี" val={COLOR_LABELS_TH[dress.color]} />
+            <Spec lbl="สี" val={dress.color ? COLOR_LABELS_TH[dress.color] : "—"} />
             <Spec lbl="ร้านเช่า" val={dress.shop_name} />
             <Spec lbl="ดีไซเนอร์" val={dress.designer ?? "—"} />
           </div>

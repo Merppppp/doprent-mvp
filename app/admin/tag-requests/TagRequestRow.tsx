@@ -23,6 +23,8 @@ export default function TagRequestRow({ req }: { req: TagRequestRowData }) {
   const [showReject, setShowReject] = useState(false);
   const [showApproveKeyInput, setShowApproveKeyInput] = useState(false);
   const [approveKey, setApproveKey] = useState(req.requestedKey ?? "");
+  const [swatchHex, setSwatchHex] = useState("");
+  const [swatchImageUrl, setSwatchImageUrl] = useState("");
   const [rejectReason, setRejectReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +33,7 @@ export default function TagRequestRow({ req }: { req: TagRequestRowData }) {
   async function onApprove() {
     setWorking(true);
     setError(null);
-    const res = await approveTagRequest(req.id, approveKey.trim() || undefined);
+    const res = await approveTagRequest(req.id, approveKey.trim() || undefined, swatchHex.trim() || undefined, swatchImageUrl.trim() || undefined);
     if (!res.ok) {
       setError(res.error ?? "ผิดพลาด");
       setWorking(false);
@@ -181,38 +183,66 @@ export default function TagRequestRow({ req }: { req: TagRequestRowData }) {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {showApproveKeyInput ? (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <input
-                  type="text"
-                  value={approveKey}
-                  onChange={(e) => setApproveKey(e.target.value)}
-                  placeholder="slug key (ว่าง = ระบบสร้างอัตโนมัติ)"
-                  style={{
-                    flex: 1,
-                    padding: "9px 12px",
-                    border: "1px solid var(--line)",
-                    borderRadius: 6,
-                    fontSize: 13,
-                    minWidth: 220,
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={onApprove}
-                  disabled={working}
-                  className="btn btn-dark"
-                  style={{ padding: "9px 16px", fontSize: 13 }}
-                >
-                  {working ? "กำลังอนุมัติ…" : "✓ ยืนยันอนุมัติ"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowApproveKeyInput(false); setError(null); }}
-                  className="btn btn-outline"
-                  style={{ padding: "9px 14px", fontSize: 13 }}
-                >
-                  ยกเลิก
-                </button>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input
+                    type="text"
+                    value={approveKey}
+                    onChange={(e) => setApproveKey(e.target.value)}
+                    placeholder="slug key (ว่าง = ระบบสร้างอัตโนมัติ)"
+                    style={{
+                      flex: 1,
+                      padding: "9px 12px",
+                      border: "1px solid var(--line)",
+                      borderRadius: 6,
+                      fontSize: 13,
+                      minWidth: 220,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={onApprove}
+                    disabled={working}
+                    className="btn btn-dark"
+                    style={{ padding: "9px 16px", fontSize: 13 }}
+                  >
+                    {working ? "กำลังอนุมัติ…" : "✓ ยืนยันอนุมัติ"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowApproveKeyInput(false); setError(null); }}
+                    className="btn btn-outline"
+                    style={{ padding: "9px 14px", fontSize: 13 }}
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+                {req.tagGroup.key === "color" && (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", paddingLeft: 2 }}>
+                    <label style={{ fontSize: 12, color: "var(--ink-2)", whiteSpace: "nowrap" }}>สี (hex):</label>
+                    <input
+                      type="color"
+                      value={swatchHex || "#cccccc"}
+                      onChange={(e) => setSwatchHex(e.target.value)}
+                      style={{ width: 36, height: 28, padding: 2, border: "1px solid var(--line)", borderRadius: 4, cursor: "pointer" }}
+                    />
+                    <input
+                      type="text"
+                      value={swatchHex}
+                      onChange={(e) => setSwatchHex(e.target.value)}
+                      placeholder="#RRGGBB (ไม่บังคับ)"
+                      style={{ width: 130, padding: "6px 10px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 12 }}
+                    />
+                    <label style={{ fontSize: 12, color: "var(--ink-2)", whiteSpace: "nowrap" }}>URL รูป:</label>
+                    <input
+                      type="text"
+                      value={swatchImageUrl}
+                      onChange={(e) => setSwatchImageUrl(e.target.value)}
+                      placeholder="https://... (ไม่บังคับ)"
+                      style={{ flex: 1, minWidth: 160, padding: "6px 10px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 12 }}
+                    />
+                  </div>
+                )}
               </div>
             ) : (
               <div style={{ display: "flex", gap: 8 }}>
