@@ -46,6 +46,10 @@ export default async function EditProductPage({ params }: { params: { id: string
             },
           },
         },
+        variants: {
+          orderBy: { size: "asc" },
+          select: { size: true, quantity: true, pricePerDay: true, deposit: true, available: true },
+        },
       },
     }),
   ]);
@@ -119,6 +123,13 @@ export default async function EditProductPage({ params }: { params: { id: string
           return_window_days: productRaw.returnWindowDays,
           buffer_days_after: productRaw.bufferDaysAfter,
           selectedByGroup: initialSelectedByGroup,
+          variants: productRaw.variants.map((v) => ({
+            size: v.size as Size,
+            quantity: v.quantity,
+            pricePerDay: v.pricePerDay,
+            deposit: v.deposit,
+            available: v.available,
+          })),
         }}
       />
     </div>

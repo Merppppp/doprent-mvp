@@ -7,7 +7,7 @@ import DistanceBadge from "@/components/DistanceBadge";
 import ProductCard from "@/components/ProductCard";
 import SaveButton from "@/components/SaveButton";
 import VerifiedBadge from "@/components/VerifiedBadge";
-import DateRangePicker from "@/components/DateRangePicker";
+import DateRangePicker, { type VariantOption } from "@/components/DateRangePicker";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getShopBySlug,
@@ -91,13 +91,20 @@ export default async function DressPage({ params }: { params: Params }) {
       })
     : null;
 
-  const activeBookings = await db.booking.findMany({
-    where: {
-      productId: dress.id,
-      status: { in: ["booking_pending", "waiting_for_payment", "payment_review", "confirmed"] },
-    },
-    select: { startDate: true, endDate: true, status: true },
-  });
+  const [activeBookings, productVariants] = await Promise.all([
+    db.booking.findMany({
+      where: {
+        productId: dress.id,
+        status: { in: ["booking_pending", "waiting_for_payment", "payment_review", "confirmed"] },
+      },
+      select: { startDate: true, endDate: true, status: true, variantId: true },
+    }),
+    db.productVariant.findMany({
+      where: { productId: dress.id },
+      orderBy: [{ size: "asc" }],
+      select: { id: true, size: true, quantity: true, pricePerDay: true, deposit: true, available: true },
+    }),
+  ]);
 
   const rangeStart = new Date().toISOString().slice(0, 10);
   // Scan 180 days ahead for the calendar
@@ -151,6 +158,42 @@ export default async function DressPage({ params }: { params: Params }) {
     : new Set<string>();
 
   const unavailable = Array.from(unavailableSet).sort();
+
+  // Build per-variant unavailable date sets (variant-aware stock check).
+  // The product-level unavailableSet (blackouts + closed days) is common to all variants.
+  // Per-variant: additionally block dates where that variant's booking count >= quantity.
+  const ACTIVE_STATUSES_DETAIL = new Set(["booking_pending", "waiting_for_payment", "payment_review", "confirmed"]);
+
+  const variantOptions: VariantOption[] = productVariants.map((v) => {
+    // Bookings for this specific variant (+ legacy null-variant bookings as conservative estimate)
+    const variantBookings = activeBookings.filter(
+      (b) => ACTIVE_STATUSES_DETAIL.has(b.status) && (b.variantId === v.id || b.variantId === null),
+    );
+
+    const variantUnavailableSet = computeUnavailableDates({
+      blackouts,
+      shopClosedDates: shopWithPolicy?.closedDates.map((d) => d.date.toISOString().slice(0, 10)) ?? [],
+      bookings: variantBookings.map((b) => ({ startDate: b.startDate, endDate: b.endDate, status: b.status })),
+      effectivePolicy,
+      rangeStart,
+      rangeEnd,
+      quantity: v.quantity,
+    });
+
+    return {
+      id: v.id,
+      size: v.size,
+      quantity: v.quantity,
+      pricePerDay: v.pricePerDay,
+      deposit: v.deposit,
+      available: v.available,
+      // Only include dates that are NOT already in the product-level unavailableSet
+      // (product-level dates are shown at the calendar level; variant-specific ones overlay)
+      unavailable: Array.from(variantUnavailableSet)
+        .filter((d) => !unavailableSet.has(d))
+        .sort(),
+    };
+  });
 
   const url = `${SITE}/product/${dress.slug}`;
 
@@ -419,6 +462,7 @@ export default async function DressPage({ params }: { params: Params }) {
             dressTagCode={dress.tag_code}
             isLoggedIn={isLoggedIn}
             loginNext={`/product/${dress.slug}`}
+            variants={variantOptions.length > 0 ? variantOptions : undefined}
           />
 
 
