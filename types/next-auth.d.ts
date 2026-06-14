@@ -9,18 +9,31 @@ declare module "next-auth" {
       email: string;
       name?: string | null;
       image?: string | null;
-      role: Role;
+      role: Role | "staff";
+      // Staff-only fields (present when role === "staff")
+      shopId?: string;
+      staffId?: string;
+      canManageBookings?: boolean;
+      canManageProducts?: boolean;
     };
   }
 
   interface User {
-    role?: Role;
+    role?: Role | "staff";
+    shopId?: string;
+    staffId?: string;
+    canManageBookings?: boolean;
+    canManageProducts?: boolean;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
-    role?: Role;
+    role?: Role | "staff";
+    shopId?: string;
+    staffId?: string;
+    canManageBookings?: boolean;
+    canManageProducts?: boolean;
   }
 }

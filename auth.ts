@@ -18,6 +18,10 @@ class EmailNotVerifiedError extends CredentialsSignin {
   code = "email_not_verified";
 }
 
+class StaffAuthError extends CredentialsSignin {
+  code = "staff_auth_error";
+}
+
 // IMPORTANT: the adapter gets the UN-extended client. Passing the extended
 // `db` would actor-stamp/audit adapter ops and serialize Account/Session/
 // VerificationToken rows (OAuth + verification tokens) into audit_logs jsonb
@@ -73,6 +77,68 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return user;
       },
     }),
+    Credentials({
+      id: "staff",
+      credentials: {
+        username: { label: "Username", type: "text" },
+        pin: { label: "PIN", type: "password" },
+      },
+      async authorize(credentials) {
+        const username = (credentials?.username as string | undefined)?.toLowerCase().trim();
+        const pin = credentials?.pin as string | undefined;
+        if (!username || !pin) throw new StaffAuthError();
+
+        const staff = await db.shopStaff.findUnique({ where: { username } });
+        // Generic error — don't leak which field is wrong
+        if (!staff || !staff.isActive) throw new StaffAuthError();
+
+        // Brute-force lockout check
+        if (staff.lockedUntil && staff.lockedUntil > new Date()) {
+          throw new StaffAuthError();
+        }
+
+        const valid = await bcrypt.compare(pin, staff.pinHash);
+        if (!valid) {
+          const newAttempts = staff.failedAttempts + 1;
+          if (newAttempts >= 5) {
+            // Lock for 15 minutes
+            await db.shopStaff.update({
+              where: { id: staff.id },
+              data: {
+                failedAttempts: 0,
+                lockedUntil: new Date(Date.now() + 15 * 60 * 1000),
+              },
+            });
+          } else {
+            await db.shopStaff.update({
+              where: { id: staff.id },
+              data: { failedAttempts: newAttempts },
+            });
+          }
+          throw new StaffAuthError();
+        }
+
+        // Success — reset lockout state + update lastLoginAt
+        await db.shopStaff.update({
+          where: { id: staff.id },
+          data: {
+            failedAttempts: 0,
+            lockedUntil: null,
+            lastLoginAt: new Date(),
+          },
+        });
+
+        return {
+          id: `staff:${staff.id}`,
+          role: "staff" as const,
+          shopId: staff.shopId,
+          staffId: staff.id,
+          name: staff.displayName,
+          canManageBookings: staff.canManageBookings,
+          canManageProducts: staff.canManageProducts,
+        };
+      },
+    }),
   ],
   callbacks: {
     async signIn({ user, account }) {
@@ -90,14 +156,40 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as { role?: Role }).role ?? "customer";
+        const u = user as {
+          role?: Role | "staff";
+          shopId?: string;
+          staffId?: string;
+          canManageBookings?: boolean;
+          canManageProducts?: boolean;
+        };
+        token.role = u.role ?? "customer";
+        if (u.role === "staff") {
+          token.shopId = u.shopId;
+          token.staffId = u.staffId;
+          token.canManageBookings = u.canManageBookings;
+          token.canManageProducts = u.canManageProducts;
+        }
       }
       return token;
     },
     async session({ session, token }) {
-      const t = token as JWT & { id?: string; role?: Role };
+      const t = token as JWT & {
+        id?: string;
+        role?: Role | "staff";
+        shopId?: string;
+        staffId?: string;
+        canManageBookings?: boolean;
+        canManageProducts?: boolean;
+      };
       if (t.id) session.user.id = t.id;
       if (t.role) session.user.role = t.role;
+      if (t.role === "staff") {
+        session.user.shopId = t.shopId;
+        session.user.staffId = t.staffId;
+        session.user.canManageBookings = t.canManageBookings;
+        session.user.canManageProducts = t.canManageProducts;
+      }
       return session;
     },
   },
