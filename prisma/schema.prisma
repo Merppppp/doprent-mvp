@@ -284,6 +284,12 @@ model User {
   /// สาขา เช่น สำนักงานใหญ่ / สาขา 00001 (ไม่บังคับ)
   billingBranch      String? @map("billing_branch")
 
+  // -- PDPA consent evidence --
+  /// เวลาที่ผู้ใช้ยอมรับ T&C + Privacy Policy ล่าสุด (NULL = ก่อนมีฟีเจอร์นี้)
+  termsAcceptedAt DateTime? @map("terms_accepted_at") @db.Timestamptz(6)
+  /// version string ของ T&C ที่ยอมรับ (e.g. "2026-06-15")
+  termsVersion    String?   @map("terms_version")
+
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedBy String?  @map("updated_by") @db.Uuid
@@ -444,7 +450,13 @@ model Shop {
   /// Instagram handle/URL
   instagram        String?
   /// PromptPay id รับเงิน (เบอร์/เลขบัตร ปชช.)
-  promptpayId      String?   @map("promptpay_id")
+  promptpayId         String?   @map("promptpay_id")
+  /// ชื่อธนาคาร สำหรับรับโอนเงิน (ไม่บังคับ)
+  bankName            String?   @map("bank_name")
+  /// เลขบัญชีธนาคาร
+  bankAccountNumber   String?   @map("bank_account_number")
+  /// ชื่อบัญชีธนาคาร
+  bankAccountName     String?   @map("bank_account_name")
   /// ปีที่เปิดร้าน
   sinceYear        Int?      @map("since_year")
   /// โทนสี cover การ์ดร้าน

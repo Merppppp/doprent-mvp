@@ -140,6 +140,12 @@ export type Shop = {
   /** PromptPay id (mobile/national-id) for in-web QR payments.
    *  Optional in the public Shop shape — only the booking flow selects it. */
   promptpay_id?: string | null;
+  /** ธนาคารที่ใช้รับโอน (ไม่บังคับ) */
+  bank_name?: string | null;
+  /** เลขบัญชีธนาคาร */
+  bank_account_number?: string | null;
+  /** ชื่อบัญชีธนาคาร */
+  bank_account_name?: string | null;
   since_year: number | null;
   cover_color: Color;
   cover_image: string | null;
@@ -274,6 +280,9 @@ export type BookingDetail = Booking & {
   boutique_slug: string | null;
   boutique_line_url: string | null;
   boutique_promptpay_id: string | null;
+  boutique_bank_name: string | null;
+  boutique_bank_account_number: string | null;
+  boutique_bank_account_name: string | null;
 };
 
 export type Profile = {

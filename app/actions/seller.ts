@@ -46,6 +46,10 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
   const sinceYear = sinceYearRaw ? parseInt(sinceYearRaw, 10) : null;
   const coverColor = (String(formData.get("cover_color") ?? "rose") as Color);
   const ownerName = String(formData.get("owner_name") ?? "").trim() || null;
+  const promptpayId = String(formData.get("promptpay_id") ?? "").trim() || null;
+  const bankName = String(formData.get("bank_name") ?? "").trim() || null;
+  const bankAccountNumber = String(formData.get("bank_account_number") ?? "").trim() || null;
+  const bankAccountName = String(formData.get("bank_account_name") ?? "").trim() || null;
 
   const address = [houseNo, street, subdistrict ? `แขวง${subdistrict}` : null, district ? `เขต${district}` : null, province, postalCode]
     .filter(Boolean).join(" ") || null;
@@ -81,6 +85,7 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
         slug, name, ownerId: user.id, ownerName, areaId, areaLabel,
         address, houseNo, street, subdistrict, district, province, postalCode,
         lineUrl, instagram, tag, story, sinceYear, coverColor, deliveryInfo,
+        promptpayId, bankName, bankAccountNumber, bankAccountName,
         status: "pending", kycStatus: "none",
       },
       select: { slug: true },
@@ -105,7 +110,7 @@ export async function updateShop(shopId: string, formData: FormData): Promise<{ 
 
   const updates: Record<string, unknown> = {};
   // area_key handled separately (UUID FK resolution); exclude from generic camelCase loop
-  const scalarFields = ["name","area_label","instagram","tag","story","delivery_info","owner_name","address","hours","cover_color","promptpay_id"] as const;
+  const scalarFields = ["name","area_label","instagram","tag","story","delivery_info","owner_name","address","hours","cover_color","promptpay_id","bank_name","bank_account_number","bank_account_name"] as const;
   for (const f of scalarFields) {
     const v = formData.get(f);
     if (v !== null) {

@@ -86,23 +86,45 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
 
       {/* payment */}
       {b.status === "waiting_for_payment" ? (
-        qr ? (
-          <div style={{ ...card, textAlign: "center" }}>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>สแกนจ่ายผ่าน PromptPay</div>
-            <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 12 }}>
-              ยอด ฿{total.toLocaleString()} → {b.boutique_name}
+        <>
+          {qr ? (
+            <div style={{ ...card, textAlign: "center" }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>สแกนจ่ายผ่าน PromptPay</div>
+              <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 12 }}>
+                ยอด ฿{total.toLocaleString()} → {b.boutique_name}
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qr} alt="PromptPay QR" width={240} height={240} style={{ borderRadius: 8 }} />
+              <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 10, lineHeight: 1.5 }}>
+                โอนแล้วกดปุ่มด้านล่างเพื่ออัปโหลดสลิป ร้านจะตรวจและยืนยันให้
+              </p>
             </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qr} alt="PromptPay QR" width={240} height={240} style={{ borderRadius: 8 }} />
-            <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 10, lineHeight: 1.5 }}>
-              โอนแล้วกดปุ่มด้านล่างเพื่ออัปโหลดสลิป ร้านจะตรวจและยืนยันให้
-            </p>
-          </div>
-        ) : (
-          <div style={{ ...card, color: "var(--warn)", fontSize: 14 }}>
-            ร้านยังไม่ได้ตั้งค่า PromptPay กรุณาติดต่อร้าน{b.boutique_line_url ? " ผ่าน LINE" : ""}เพื่อชำระเงิน
-          </div>
-        )
+          ) : null}
+
+          {b.boutique_bank_name || b.boutique_bank_account_number ? (
+            <div style={card}>
+              <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>ช่องทางโอนเงินให้ร้าน</div>
+              {b.boutique_bank_name ? (
+                <Row label="ธนาคาร" value={b.boutique_bank_name} />
+              ) : null}
+              {b.boutique_bank_account_number ? (
+                <Row label="เลขบัญชี" value={b.boutique_bank_account_number} />
+              ) : null}
+              {b.boutique_bank_account_name ? (
+                <Row label="ชื่อบัญชี" value={b.boutique_bank_account_name} />
+              ) : null}
+              <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 8, lineHeight: 1.5 }}>
+                โอนแล้วกดปุ่มด้านล่างเพื่ออัปโหลดสลิป ร้านจะตรวจและยืนยันให้
+              </p>
+            </div>
+          ) : null}
+
+          {!qr && !b.boutique_bank_name && !b.boutique_bank_account_number ? (
+            <div style={{ ...card, color: "var(--warn)", fontSize: 14 }}>
+              ร้านยังไม่ได้ตั้งค่าช่องทางรับชำระเงิน กรุณาติดต่อร้าน{b.boutique_line_url ? " ผ่าน LINE" : ""}เพื่อชำระเงิน
+            </div>
+          ) : null}
+        </>
       ) : null}
 
       {b.status === "confirmed" ? (

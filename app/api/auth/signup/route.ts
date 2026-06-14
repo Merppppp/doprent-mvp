@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { db } from "@/lib/db";
 import { sendVerificationEmail } from "@/lib/email";
+import { TERMS_VERSION } from "@/lib/consent";
 
 const ADMIN_EMAILS = ["admin@doprent.com", "prem@doprent.com", "hgcovuf@gmail.com"];
 const TOKEN_EXPIRY_HOURS = 24;
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
   const passwordHash = await bcrypt.hash(password, 12);
 
   await db.user.create({
-    data: { email, passwordHash, fullName, role },
+    data: { email, passwordHash, fullName, role, termsAcceptedAt: new Date(), termsVersion: TERMS_VERSION },
   });
 
   // Create verification token (expires in 24h)
