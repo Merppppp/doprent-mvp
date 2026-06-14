@@ -302,6 +302,41 @@ export async function adminRejectSlip(bookingId: string, note?: string): Promise
 }
 
 // ---------------------------------------------------------------------------
+// Admin user management
+// ---------------------------------------------------------------------------
+
+/**
+ * Promote a user to the admin role by email.
+ * Idempotent — if the user is already admin, returns a friendly notice.
+ * Promotion only — no demotion to prevent accidental lock-out.
+ */
+export async function addAdminByEmail(formData: FormData): Promise<{ ok: boolean; error?: string; notice?: string }> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth;
+
+  const email = (formData.get("email") as string | null)?.trim().toLowerCase();
+  if (!email) return { ok: false, error: "ระบุอีเมลด้วย" };
+
+  const target = await db.user.findUnique({ where: { email }, select: { id: true, email: true, role: true, fullName: true } });
+  if (!target) return { ok: false, error: `ไม่พบผู้ใช้ที่มีอีเมล ${email}` };
+
+  if (target.role === "admin") {
+    return { ok: true, notice: `${email} เป็น admin อยู่แล้ว` };
+  }
+
+  await db.user.update({ where: { id: target.id }, data: { role: "admin" } });
+
+  await logAdminAction(auth.userId, "promote_to_admin", "user", target.id, null, {
+    targetEmail: target.email,
+    targetName: target.fullName ?? null,
+    previousRole: target.role,
+  });
+
+  revalidatePath("/admin/admins");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
 // Legacy aliases — keep old names working during transition
 // ---------------------------------------------------------------------------
 /** @deprecated use setShopStatus */
