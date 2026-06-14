@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { getCurrentUser } from "@/lib/auth";
 import { getSellerBookings } from "@/lib/booking-queries";
+import { requireShopAccess } from "@/lib/shop-access";
 import { expireOverdueBookings } from "@/lib/booking-expiry";
 import { amountDue } from "@/lib/bookings";
 import { getTrustScores } from "@/lib/trust-score";
@@ -23,12 +23,12 @@ const fmtThai = (s: string) => {
 };
 
 export default async function SellerBookingsPage() {
-  const user = await getCurrentUser().catch(() => null);
-  if (!user) redirect("/login?next=/sell/bookings");
+  const access = await requireShopAccess({ need: "bookings" }).catch(() => null);
+  if (!access) redirect("/login?next=/sell/bookings");
 
   // Lazy payment-expiry sweep so stale waiting_for_payment rows never show.
   await expireOverdueBookings();
-  const bookings = await getSellerBookings();
+  const bookings = await getSellerBookings(access.shopId);
 
   // Batch trust scores: one query for all renters in this list (no N+1).
   const renterIds = [...new Set(bookings.map((b) => b.renter_id))];

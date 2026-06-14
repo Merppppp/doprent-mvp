@@ -121,7 +121,18 @@ export async function getRenterBookings(): Promise<BookingDetail[]> {
   return rows.map(toBookingDetail);
 }
 
-export async function getSellerBookings(): Promise<BookingDetail[]> {
+export async function getSellerBookings(shopId?: string): Promise<BookingDetail[]> {
+  // If shopId is provided (staff or pre-resolved owner), use it directly.
+  if (shopId) {
+    const rows = await db.booking.findMany({
+      where: { shopId },
+      include: BOOKING_INCLUDE,
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map(toBookingDetail);
+  }
+
+  // Fall back to owner-based lookup.
   const user = await getCurrentUser();
   if (!user) return [];
   const shops = await db.shop.findMany({

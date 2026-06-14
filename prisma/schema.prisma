@@ -514,6 +514,7 @@ model Shop {
   banners        Banner[]
   tagRequests    TagRequest[]
   reviews        Review[]
+  staff          ShopStaff[]
 
   @@index([status])
   @@index([featured])
@@ -521,6 +522,35 @@ model Shop {
   @@index([verified])
   @@index([district])
   @@map("shops")
+}
+
+/// พนักงานร้าน — login ด้วย username + PIN, scoped ต่อ 1 ร้าน
+model ShopStaff {
+  id            String   @id @default(uuid()) @db.Uuid
+  shopId        String   @map("shop_id") @db.Uuid
+  /// login handle — GLOBAL unique (ไม่ต้องเลือกร้านตอน login)
+  username      String   @unique
+  displayName   String   @map("display_name")
+  /// bcrypt hash ของ PIN — ห้ามเก็บ plaintext
+  pinHash       String   @map("pin_hash")
+  /// permission flags
+  canManageBookings  Boolean @default(true)  @map("can_manage_bookings")
+  canManageProducts  Boolean @default(false) @map("can_manage_products")
+  isActive      Boolean  @default(true) @map("is_active")
+  /// brute-force guard
+  failedAttempts Int     @default(0) @map("failed_attempts")
+  lockedUntil   DateTime? @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt   DateTime? @map("last_login_at") @db.Timestamptz(6)
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId])
+  @@map("shop_staff")
 }
 
 // ---------------------------------------------------------------------------
