@@ -5,8 +5,11 @@ import { ShopCover } from "@/components/ProductArt";
 import ProductCard from "@/components/ProductCard";
 import LineButton from "@/components/LineButton";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import StarRating from "@/components/StarRating";
+import ReviewList from "@/components/ReviewList";
 import { getCurrentUser } from "@/lib/auth";
 import { getShopBySlug, listProductsByShop } from "@/lib/products";
+import { getShopReviews } from "@/lib/reviews";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +30,10 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function BoutiquePage({ params }: { params: Params }) {
   const b = await getShopBySlug(params.slug);
   if (!b) notFound();
-  const [dresses, user] = await Promise.all([
+  const [dresses, user, reviews] = await Promise.all([
     listProductsByShop(b.id),
     getCurrentUser().catch(() => null),
+    getShopReviews(b.id),
   ]);
   const savedSet = new Set<string>(user?.savedProductIds ?? []);
   const isLoggedIn = !!user;
@@ -65,6 +69,11 @@ export default async function BoutiquePage({ params }: { params: Params }) {
           <div style={{ fontSize: 14, color: "var(--ink-2)", maxWidth: 600, lineHeight: 1.55 }}>
             {b.tag}
           </div>
+          {b.rating_count > 0 ? (
+            <div style={{ marginTop: 8 }}>
+              <StarRating avg={b.rating_avg} count={b.rating_count} size="md" />
+            </div>
+          ) : null}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <LineButton
@@ -156,6 +165,12 @@ export default async function BoutiquePage({ params }: { params: Params }) {
           ))}
         </div>
       )}
+
+      {/* Reviews section */}
+      <div style={{ marginTop: 48, paddingTop: 32, borderTop: "1px solid var(--line)" }}>
+        <h2 style={{ fontSize: 22, fontWeight: 600, marginBottom: 20 }}>รีวิวจากผู้เช่า</h2>
+        <ReviewList reviews={reviews} />
+      </div>
     </div>
   );
 }

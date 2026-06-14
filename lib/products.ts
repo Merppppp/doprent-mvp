@@ -39,7 +39,7 @@ export type ProductFilters = {
   priceMin?: number;
   priceMax?: number;
   search?: string;
-  sort?: "featured" | "price-asc" | "price-desc" | "name";
+  sort?: "featured" | "price-asc" | "price-desc" | "name" | "rating-desc";
   dateFrom?: string; // YYYY-MM-DD
   dateTo?: string;   // YYYY-MM-DD
   page?: number;
@@ -56,7 +56,7 @@ const PRODUCT_INCLUDE = {
   productTags: { select: { tag: { select: { key: true, tagGroup: { select: { key: true } } } } } },
   productType: { select: { key: true } },
   category: { select: { key: true } },
-  shop: { select: { name: true, verified: true, area: { select: { key: true } } } },
+  shop: { select: { name: true, verified: true, ratingAvg: true, ratingCount: true, area: { select: { key: true } } } },
 } satisfies Prisma.ProductInclude;
 
 type ProductRow = Prisma.ProductGetPayload<{ include: typeof PRODUCT_INCLUDE }>;
@@ -83,6 +83,8 @@ function mapProduct(d: ProductRow): Product {
     shop_id: d.shopId,
     shop_name: d.shop.name,
     shop_verified: d.shop.verified,
+    shop_rating_avg: d.shop.ratingAvg !== null && d.shop.ratingAvg !== undefined ? Number(d.shop.ratingAvg) : null,
+    shop_rating_count: d.shop.ratingCount,
     area_key: d.shop.area?.key ?? null,
     product_type_key: d.productType.key,
     category_key: d.category?.key ?? null,
@@ -142,6 +144,8 @@ function mapShop(b: PrismaShop, coverImage?: string | null): Shop {
     status: b.status as Status,
     reject_reason: b.rejectReason,
     kyc_status: b.kycStatus as KycStatus,
+    rating_avg: b.ratingAvg !== null && b.ratingAvg !== undefined ? Number(b.ratingAvg) : null,
+    rating_count: b.ratingCount ?? 0,
     created_at: b.createdAt.toISOString(),
     updated_at: b.updatedAt.toISOString(),
   };
@@ -378,10 +382,11 @@ export async function listProducts(
   // DB-level sort
   let orderBy: Prisma.ProductOrderByWithRelationInput[];
   switch (opts.sort) {
-    case "price-asc":  orderBy = [{ pricePerDay: "asc" }]; break;
-    case "price-desc": orderBy = [{ pricePerDay: "desc" }]; break;
-    case "name":       orderBy = [{ name: "asc" }]; break;
-    default:           orderBy = [{ featured: "desc" }, { sponsored: "desc" }, { createdAt: "desc" }];
+    case "price-asc":    orderBy = [{ pricePerDay: "asc" }]; break;
+    case "price-desc":   orderBy = [{ pricePerDay: "desc" }]; break;
+    case "name":         orderBy = [{ name: "asc" }]; break;
+    case "rating-desc":  orderBy = [{ shop: { ratingAvg: { sort: "desc", nulls: "last" } } }]; break;
+    default:             orderBy = [{ featured: "desc" }, { sponsored: "desc" }, { createdAt: "desc" }];
   }
 
   // Pagination
@@ -476,17 +481,23 @@ export async function listSponsorShops(limit = 8): Promise<Shop[]> {
   }
 }
 
-export async function listShops(opts: { limit?: number; featuredFirst?: boolean } = {}): Promise<Shop[]> {
+export async function listShops(opts: { limit?: number; featuredFirst?: boolean; sort?: "rating-desc" | "name" } = {}): Promise<Shop[]> {
+  let orderBy: Prisma.ShopOrderByWithRelationInput[];
+  if (opts.sort === "rating-desc") {
+    orderBy = [{ ratingAvg: { sort: "desc", nulls: "last" } }];
+  } else {
+    orderBy = [
+      ...(opts.featuredFirst ? [{ featured: "desc" as const }] : []),
+      { name: "asc" },
+    ];
+  }
   const rows = await db.shop.findMany({
     where: { status: "live" },
     include: {
       area: { select: { key: true } },
       products: SHOP_PRODUCT_PREVIEW,
     },
-    orderBy: [
-      ...(opts.featuredFirst ? [{ featured: "desc" as const }] : []),
-      { name: "asc" },
-    ],
+    orderBy,
     take: opts.limit,
   });
   return rows.map((r, index) => mapShopWithCards(r, index));

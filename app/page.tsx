@@ -60,7 +60,8 @@ export default async function HomePage({
     | "featured"
     | "price-asc"
     | "price-desc"
-    | "name";
+    | "name"
+    | "rating-desc";
 
   // Known non-tag-group params — excluded when building tagsByGroup from URL
   const KNOWN_FILTER_PARAMS = new Set([

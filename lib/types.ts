@@ -153,6 +153,10 @@ export type Shop = {
   status: Status;
   reject_reason: string | null;
   kyc_status: KycStatus;
+  /** Average rating (1–5) from visible reviews. NULL = no reviews yet. */
+  rating_avg: number | null;
+  /** Number of visible reviews. */
+  rating_count: number;
   created_at: string;
   updated_at: string;
   /** Optional product card previews — populated by listSponsorShops / listShops for the hero banner card stack. */
@@ -173,6 +177,10 @@ export type Product = {
   shop_name: string;
   /** Denormalized from shops.verified — populated by listProducts(). */
   shop_verified?: boolean;
+  /** Denormalized from shops.rating_avg — populated by listProducts(). */
+  shop_rating_avg?: number | null;
+  /** Denormalized from shops.rating_count — populated by listProducts(). */
+  shop_rating_count?: number;
   /** Denormalized from the product's shop area key — populated by listProducts(). Used for distance display. */
   area_key?: string | null;
   /** Business key of the product type (e.g. "dress") — joined from product_types. */
