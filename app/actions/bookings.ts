@@ -88,6 +88,27 @@ export async function addAddress(formData: FormData): Promise<Result<{ id: strin
 
 /* ------------------------------ booking ------------------------------ */
 
+/** Active booking statuses for overlap counting — must stay in sync with ACTIVE_STATUSES in lib/booking-policy.ts */
+const ACTIVE_BOOKING_STATUSES = ["booking_pending", "waiting_for_payment", "payment_review", "confirmed"] as const;
+
+/** Add `days` calendar days to a YYYY-MM-DD string (UTC). Mirrors the helper in booking-policy.ts. */
+function addDaysLocal(dateStr: string, days: number): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Enumerate all YYYY-MM-DD strings in [start, end] inclusive (UTC). */
+function dateRangeLocal(start: string, end: string): string[] {
+  const result: string[] = [];
+  let cur = start;
+  while (cur <= end) {
+    result.push(cur);
+    cur = addDaysLocal(cur, 1);
+  }
+  return result;
+}
+
 export async function createBooking(formData: FormData): Promise<Result<{ id: string }>> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
@@ -97,6 +118,8 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   const addressId = String(formData.get("address_id") ?? "");
   const startDate = String(formData.get("start_date") ?? "");
   const endDate = String(formData.get("end_date") ?? "");
+  // variantId is optional — new bookings send it; legacy back-compat: null
+  const variantIdRaw = String(formData.get("variant_id") ?? "").trim() || null;
   if (!productId || !addressId || !startDate || !endDate)
     return { ok: false, error: "ข้อมูลการจองไม่ครบ" };
   if (endDate < startDate) return { ok: false, error: "วันคืนชุดต้องไม่ก่อนวันรับ" };
@@ -152,6 +175,27 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
     if (product.status !== "live" || !product.available)
       return { ok: false, error: "ชุดนี้ยังไม่เปิดให้จองในขณะนี้" };
 
+    // ── Variant validation ────────────────────────────────────────────────────
+    // If a variantId was submitted, verify it belongs to this product and is open.
+    let resolvedVariantId: string | null = variantIdRaw;
+    let variantPricePerDay: number = product.pricePerDay;
+    let variantDeposit: number = product.deposit;
+    let variantQuantity: number = 1;
+
+    if (resolvedVariantId) {
+      const variant = await db.productVariant.findUnique({
+        where: { id: resolvedVariantId },
+        select: { id: true, productId: true, pricePerDay: true, deposit: true, quantity: true, available: true },
+      });
+      if (!variant || variant.productId !== product.id)
+        return { ok: false, error: "ไม่พบไซซ์ที่เลือก" };
+      if (!variant.available)
+        return { ok: false, error: "ไซซ์นี้ยังไม่เปิดให้จองในขณะนี้" };
+      variantPricePerDay = variant.pricePerDay;
+      variantDeposit = variant.deposit;
+      variantQuantity = variant.quantity;
+    }
+
     // address snapshot (must belong to the user)
     const addr = await db.address.findFirst({
       where: { id: addressId, userId: user.id },
@@ -160,15 +204,31 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
     if (!addr) return { ok: false, error: "ไม่พบที่อยู่จัดส่ง" };
 
     // ── Booking policy enforcement ─────────────────────────────────────────
-    // Load active bookings + blackouts for this product to check availability.
+    // Load active bookings + blackouts for availability check.
+    // When a variantId is given: filter active bookings to that variant (plus
+    // legacy null-variant bookings for this product — they hold "some size").
+    // When no variantId (legacy): load all product-level bookings.
     const [activeBookings, blackouts] = await Promise.all([
-      db.booking.findMany({
-        where: {
-          productId: product.id,
-          status: { in: ["booking_pending", "waiting_for_payment", "payment_review", "confirmed"] },
-        },
-        select: { startDate: true, endDate: true, status: true },
-      }),
+      resolvedVariantId
+        ? db.booking.findMany({
+            where: {
+              productId: product.id,
+              status: { in: [...ACTIVE_BOOKING_STATUSES] },
+              // Include bookings for THIS variant OR legacy bookings (null variantId)
+              OR: [
+                { variantId: resolvedVariantId },
+                { variantId: null },
+              ],
+            },
+            select: { startDate: true, endDate: true, status: true },
+          })
+        : db.booking.findMany({
+            where: {
+              productId: product.id,
+              status: { in: [...ACTIVE_BOOKING_STATUSES] },
+            },
+            select: { startDate: true, endDate: true, status: true },
+          }),
       db.productBlackoutDate.findMany({
         where: { productId: product.id },
         select: { date: true },
@@ -206,6 +266,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
       effectivePolicy,
       rangeStart: startDate,
       rangeEnd: endDate,
+      quantity: variantQuantity,
     });
 
     const today = new Date().toISOString().slice(0, 10);
@@ -227,32 +288,115 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
         per_day: t.pricePerDay,
       })),
     );
-    const rentalTotal = priceForNights(tiers, product.pricePerDay, days).total;
+    // Pricing: use variant price if a variant was chosen, otherwise product base price.
+    // priceTiers apply on top of variantPricePerDay (variant overrides the base rate).
+    const rentalTotal = priceForNights(tiers, variantPricePerDay, days).total;
 
     // First-touch channel of the renter — closes the acquisition→booking loop.
     const channel =
       decodeAttribution(cookies().get(FIRST_TOUCH_COOKIE)?.value)?.channel ?? null;
 
-    const created = await db.booking.create({
-      data: {
-        renterId: user.id,
-        shopId: product.shopId,
-        productId: product.id,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        rentalTotal,
-        deposit: product.deposit || 0,
-        commissionRate: PLATFORM_COMMISSION_RATE,
-        commissionAmount: commissionAmount(rentalTotal),
-        channel,
-        status: "booking_pending",
-        addressId: addr.id,
-        recipientName: addr.recipientName,
-        phone: addr.phone,
-        addressText: addr.addressLine,
-      },
-      select: { id: true },
-    });
+    // ── TX-guarded oversell prevention ───────────────────────────────────────
+    // If a variant was chosen: use a transaction with SELECT FOR UPDATE on the
+    // variant row (serialises concurrent attempts), then re-count overlaps, then
+    // insert — the only race-safe way to prevent stock oversell.
+    let createdId: string;
+
+    if (resolvedVariantId) {
+      const bufferDays = effectivePolicy.bufferDaysAfter;
+
+      let txResult: { ok: true; id: string } | { ok: false; error: string };
+      try {
+        txResult = await db.$transaction(async (tx) => {
+          // Lock the variant row to serialize concurrent booking attempts for the same variant.
+          await tx.$queryRaw`SELECT id FROM product_variants WHERE id = ${resolvedVariantId}::uuid FOR UPDATE`;
+
+          // Re-count overlapping active bookings (variant + legacy null-variant).
+          const overlapBookings = await tx.booking.findMany({
+            where: {
+              status: { in: [...ACTIVE_BOOKING_STATUSES] },
+              OR: [
+                { variantId: resolvedVariantId },
+                { variantId: null, productId: product.id },
+              ],
+              startDate: { lte: new Date(endDate) },
+              endDate: { gte: new Date(startDate) },
+            },
+            select: { startDate: true, endDate: true },
+          });
+
+          // Count concurrent bookings per calendar day (including buffer after each).
+          const dayCount = new Map<string, number>();
+          for (const b of overlapBookings) {
+            const bStart = b.startDate.toISOString().slice(0, 10);
+            const bEnd = addDaysLocal(b.endDate.toISOString().slice(0, 10), bufferDays);
+            for (const d of dateRangeLocal(bStart, bEnd)) {
+              dayCount.set(d, (dayCount.get(d) ?? 0) + 1);
+            }
+          }
+
+          // Reject if any day in the requested range is at or above stock capacity.
+          for (const d of dateRangeLocal(startDate, endDate)) {
+            if ((dayCount.get(d) ?? 0) >= variantQuantity) {
+              const [, m, day] = d.split("-");
+              return { ok: false as const, error: `ไซซ์นี้เต็มในวันที่ ${parseInt(day ?? "0")}/${parseInt(m ?? "0")} กรุณาเลือกวันอื่น` };
+            }
+          }
+
+          const row = await tx.booking.create({
+            data: {
+              renterId: user.id,
+              shopId: product.shopId,
+              productId: product.id,
+              variantId: resolvedVariantId,
+              startDate: new Date(startDate),
+              endDate: new Date(endDate),
+              rentalTotal,
+              deposit: variantDeposit,
+              commissionRate: PLATFORM_COMMISSION_RATE,
+              commissionAmount: commissionAmount(rentalTotal),
+              channel,
+              status: "booking_pending",
+              addressId: addr.id,
+              recipientName: addr.recipientName,
+              phone: addr.phone,
+              addressText: addr.addressLine,
+            },
+            select: { id: true },
+          });
+          return { ok: true as const, id: row.id };
+        });
+      } catch (e) {
+        console.error("[doprent] createBooking tx error", e);
+        return { ok: false, error: "เกิดข้อผิดพลาด กรุณาลองใหม่" };
+      }
+
+      if (!txResult.ok) return txResult;
+      createdId = txResult.id;
+    } else {
+      // Legacy path (no variant): simple insert.
+      const row = await db.booking.create({
+        data: {
+          renterId: user.id,
+          shopId: product.shopId,
+          productId: product.id,
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+          rentalTotal,
+          deposit: variantDeposit,
+          commissionRate: PLATFORM_COMMISSION_RATE,
+          commissionAmount: commissionAmount(rentalTotal),
+          channel,
+          status: "booking_pending",
+          addressId: addr.id,
+          recipientName: addr.recipientName,
+          phone: addr.phone,
+          addressText: addr.addressLine,
+        },
+        select: { id: true },
+      });
+      createdId = row.id;
+    }
 
     // Fire-and-forget: notify the shop owner about the new request.
     notifyNewBookingRequest({
@@ -260,11 +404,11 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
       dressName: product.name,
       startDate,
       endDate,
-      bookingId: created.id,
+      bookingId: createdId,
     });
 
     revalidatePath("/account/bookings");
-    return { ok: true, id: created.id };
+    return { ok: true, id: createdId };
   });
 }
 

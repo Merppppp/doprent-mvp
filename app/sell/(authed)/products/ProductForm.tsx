@@ -44,7 +44,17 @@ function toPriceTiers(rows: TierRow[]): PriceTier[] {
   }));
 }
 
-const SIZES: Size[] = ["XXXS","XXS","XS","S","M","L","XL","XXL","3XL","4XL"];
+/** Sizes available in the DB enum (XS–XL only — no enum additions allowed) */
+const SIZES: Size[] = ["XS", "S", "M", "L", "XL"];
+
+/** One row in the variant matrix form */
+type VariantRow = {
+  size: Size;
+  quantity: number;
+  pricePerDay: number;
+  deposit: number;
+  available: boolean;
+};
 
 type InitialData = {
   name: string;
@@ -65,6 +75,8 @@ type InitialData = {
   max_rental_days?: number | null;
   return_window_days?: number | null;
   buffer_days_after?: number | null;
+  /** Existing variants loaded from DB (edit mode) */
+  variants?: VariantRow[];
 };
 
 type Props =
@@ -96,7 +108,38 @@ export default function ProductForm(props: Props) {
 
   const [name, setName] = useState(initial?.name ?? "");
   const [designer, setDesigner] = useState(initial?.designer ?? "");
+  // Legacy single-size field (kept for back-compat in the data submitted to createProduct)
   const [size, setSize] = useState<Size>(initial?.size ?? "M");
+
+  // ── Variant matrix state ──────────────────────────────────────────────────
+  // Default: one variant inheriting the product's current size/price/deposit
+  const defaultVariantRows: VariantRow[] = initial?.variants?.length
+    ? initial.variants
+    : [{ size: initial?.size ?? "M", quantity: 1, pricePerDay: initial?.price_per_day ?? 500, deposit: initial?.deposit ?? 3000, available: true }];
+  const [variantRows, setVariantRows] = useState<VariantRow[]>(defaultVariantRows);
+
+  const addVariantRow = () => {
+    const usedSizes = new Set(variantRows.map((r) => r.size));
+    const nextSize = SIZES.find((s) => !usedSizes.has(s));
+    if (!nextSize) return; // all sizes already added
+    const lastRow = variantRows[variantRows.length - 1];
+    setVariantRows((prev) => [
+      ...prev,
+      { size: nextSize, quantity: 1, pricePerDay: lastRow?.pricePerDay ?? 500, deposit: lastRow?.deposit ?? 0, available: true },
+    ]);
+  };
+
+  const removeVariantRow = (i: number) => {
+    if (variantRows.length <= 1) return;
+    setVariantRows((prev) => prev.filter((_, idx) => idx !== i));
+  };
+
+  const updateVariantRow = (i: number, patch: Partial<VariantRow>) =>
+    setVariantRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+
+  // Keep the legacy single-size in sync with the first variant row's size
+  // so the product.size column stays coherent (back-compat).
+  const primarySize = variantRows[0]?.size ?? "M";
   const [tiers, setTiers] = useState<TierRow[]>(
     initial?.price_tiers && initial.price_tiers.length
       ? initial.price_tiers.map((t) => ({ max: t.max, perDay: t.per_day }))
@@ -231,7 +274,10 @@ export default function ProductForm(props: Props) {
     fd.set("shop_id", props.shopId);
     fd.set("name", name);
     fd.set("designer", designer);
-    fd.set("size", size);
+    // size field: use primary variant's size for back-compat (Product.size column)
+    fd.set("size", primarySize);
+    // Variants JSON — used by create/update actions to upsert ProductVariant rows
+    fd.set("variants", JSON.stringify(variantRows));
     const pt = toPriceTiers(tiers);
     const v = validateTiers(pt);
     if (!v.ok) {
@@ -240,10 +286,24 @@ export default function ProductForm(props: Props) {
       return;
     }
     setTierError(null);
-    const basePerDay = Math.min(...pt.map((t) => t.per_day));
+    // Validate variant rows
+    if (variantRows.length === 0) {
+      setError("กรุณาเพิ่มไซซ์อย่างน้อย 1 ไซซ์");
+      setSubmitting(false);
+      return;
+    }
+    for (const vr of variantRows) {
+      if (vr.pricePerDay < 100) {
+        setError(`ราคาเช่าต่อวันของไซซ์ ${vr.size} ต้องอย่างน้อย ฿100`);
+        setSubmitting(false);
+        return;
+      }
+    }
+    // Base price = min variant price (used for product-level "from" display on cards)
+    const basePerDay = Math.min(...variantRows.map((vr) => vr.pricePerDay));
     fd.set("price_tiers", JSON.stringify(pt));
     fd.set("price_per_day", String(basePerDay));
-    fd.set("deposit", String(deposit));
+    fd.set("deposit", String(variantRows[0]?.deposit ?? 0));
     fd.set("description", description);
     fd.set("line_url", lineUrl);
     fd.set("images", images.join("\n"));
@@ -395,12 +455,79 @@ export default function ProductForm(props: Props) {
         />
       </Labeled>
 
-      {/* 3) ขนาด* */}
-      <Labeled label="ขนาด" required>
-        <select value={size} onChange={(e) => setSize(e.target.value as Size)} aria-required={true} style={inputStyle}>
-          {SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </Labeled>
+      {/* 3) ไซซ์ + สต็อก matrix */}
+      <div>
+        <label style={{ ...labelStyle, marginBottom: 8 }}>
+          ไซซ์ / จำนวน / ราคา <span style={{ color: "var(--danger)" }}>*</span>
+        </label>
+        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 10 }}>
+          เพิ่มทุกไซซ์ที่มี ระบุจำนวนหน่วย (stock) และราคาต่อวันของแต่ละไซซ์
+        </div>
+        {/* Header row */}
+        <div style={{ display: "grid", gridTemplateColumns: "90px 80px 1fr 1fr 60px 30px", gap: 6, marginBottom: 4 }}>
+          <div style={{ fontSize: 11, color: "var(--ink-3)", fontWeight: 500 }}>ไซซ์</div>
+          <div style={{ fontSize: 11, color: "var(--ink-3)", fontWeight: 500 }}>จำนวน</div>
+          <div style={{ fontSize: 11, color: "var(--ink-3)", fontWeight: 500 }}>ราคา/วัน (฿)</div>
+          <div style={{ fontSize: 11, color: "var(--ink-3)", fontWeight: 500 }}>มัดจำ (฿)</div>
+          <div style={{ fontSize: 11, color: "var(--ink-3)", fontWeight: 500 }}>เปิดจอง</div>
+          <div />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {variantRows.map((row, i) => {
+            const usedSizes = new Set(variantRows.map((r, ri) => ri !== i ? r.size : null).filter(Boolean));
+            return (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "90px 80px 1fr 1fr 60px 30px", gap: 6, alignItems: "center" }}>
+                <select
+                  value={row.size}
+                  onChange={(e) => updateVariantRow(i, { size: e.target.value as Size })}
+                  style={{ ...inputStyle, padding: "8px 6px", fontSize: 13 }}
+                >
+                  {SIZES.map((s) => (
+                    <option key={s} value={s} disabled={usedSizes.has(s) && s !== row.size}>{s}</option>
+                  ))}
+                </select>
+                <input
+                  type="number" min={1} step={1} value={row.quantity}
+                  onChange={(e) => updateVariantRow(i, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
+                  style={{ ...inputStyle, padding: "8px 6px", fontSize: 13 }}
+                />
+                <input
+                  type="number" min={100} step={1} value={row.pricePerDay}
+                  onChange={(e) => updateVariantRow(i, { pricePerDay: parseInt(e.target.value) || 0 })}
+                  style={{ ...inputStyle, padding: "8px 6px", fontSize: 13 }}
+                />
+                <input
+                  type="number" min={0} step={1} value={row.deposit}
+                  onChange={(e) => updateVariantRow(i, { deposit: parseInt(e.target.value) || 0 })}
+                  style={{ ...inputStyle, padding: "8px 6px", fontSize: 13 }}
+                />
+                <div style={{ display: "flex", justifyContent: "center" }}>
+                  <input
+                    type="checkbox" checked={row.available}
+                    onChange={(e) => updateVariantRow(i, { available: e.target.checked })}
+                    style={{ width: 16, height: 16 }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeVariantRow(i)}
+                  disabled={variantRows.length <= 1}
+                  aria-label="ลบไซซ์"
+                  style={{ border: 0, background: "none", color: variantRows.length <= 1 ? "var(--ink-3)" : "var(--danger)", cursor: variantRows.length <= 1 ? "default" : "pointer", fontSize: 18, lineHeight: 1, opacity: variantRows.length <= 1 ? 0.35 : 1 }}
+                >×</button>
+              </div>
+            );
+          })}
+        </div>
+        {variantRows.length < SIZES.length ? (
+          <button
+            type="button" onClick={addVariantRow}
+            style={{ marginTop: 10, fontSize: 13, color: "var(--ink-2)", background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 6, padding: "7px 12px", cursor: "pointer" }}
+          >
+            + เพิ่มไซซ์
+          </button>
+        ) : null}
+      </div>
 
       {/* 4) § คุณสมบัติชุด — dynamic tag group sections */}
       {props.tagGroupSections.length > 0 ? (

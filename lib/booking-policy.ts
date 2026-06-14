@@ -131,13 +131,19 @@ export type ComputeUnavailableParams = {
   blackouts: string[];
   /** ShopClosedDate.date strings (YYYY-MM-DD) for the shop. */
   shopClosedDates: string[];
-  /** Active bookings for this product (startDate/endDate as Date objects). */
+  /** Active bookings for this product (or a specific variant). */
   bookings: BookingDateRange[];
   effectivePolicy: EffectivePolicy;
   /** Window start (YYYY-MM-DD) — closed-weekday scan begins here. */
   rangeStart: string;
   /** Window end (YYYY-MM-DD) — closed-weekday scan ends here. */
   rangeEnd: string;
+  /**
+   * Stock quantity for the variant (or product when no variants).
+   * A date is "full" when overlap_count >= quantity.
+   * Defaults to 1 (single-unit = old behaviour, date blocked by any overlap).
+   */
+  quantity?: number;
 };
 
 /**
@@ -160,6 +166,7 @@ export function computeUnavailableDates({
   effectivePolicy,
   rangeStart,
   rangeEnd,
+  quantity = 1,
 }: ComputeUnavailableParams): Set<string> {
   const unavailable = new Set<string>();
 
@@ -173,13 +180,35 @@ export function computeUnavailableDates({
     unavailable.add(d);
   }
 
-  // 3. Active bookings block [startDate .. endDate + bufferDaysAfter]
-  for (const booking of bookings) {
-    if (!ACTIVE_STATUSES.has(booking.status as BookingStatus)) continue;
-    const start = booking.startDate.toISOString().slice(0, 10);
-    const end = addDays(booking.endDate.toISOString().slice(0, 10), effectivePolicy.bufferDaysAfter);
-    for (const d of dateRange(start, end)) {
-      unavailable.add(d);
+  // 3. Active bookings block dates based on stock quantity.
+  //    When quantity === 1 (single-unit, legacy default): any overlap blocks the date.
+  //    When quantity > 1: a date is blocked only when overlap_count >= quantity.
+  //    Buffer days after each booking are included (cleaning/preparation window).
+  if (quantity <= 1) {
+    // Fast path (legacy single-unit behaviour — unchanged)
+    for (const booking of bookings) {
+      if (!ACTIVE_STATUSES.has(booking.status as BookingStatus)) continue;
+      const start = booking.startDate.toISOString().slice(0, 10);
+      const end = addDays(booking.endDate.toISOString().slice(0, 10), effectivePolicy.bufferDaysAfter);
+      for (const d of dateRange(start, end)) {
+        unavailable.add(d);
+      }
+    }
+  } else {
+    // Multi-unit path: count concurrent overlaps per date.
+    const overlapCount = new Map<string, number>();
+    for (const booking of bookings) {
+      if (!ACTIVE_STATUSES.has(booking.status as BookingStatus)) continue;
+      const start = booking.startDate.toISOString().slice(0, 10);
+      const end = addDays(booking.endDate.toISOString().slice(0, 10), effectivePolicy.bufferDaysAfter);
+      for (const d of dateRange(start, end)) {
+        overlapCount.set(d, (overlapCount.get(d) ?? 0) + 1);
+      }
+    }
+    for (const [d, count] of overlapCount) {
+      if (count >= quantity) {
+        unavailable.add(d);
+      }
     }
   }
 

@@ -9,7 +9,45 @@ import { isValidLineContact, normalizeLineUrl } from "@/lib/line";
 import { dressLimitFor } from "@/lib/tiers";
 import { normalizeTiers, validateTiers } from "@/lib/pricing";
 import type { AdsTier, Color, PriceTier } from "@/lib/types";
+// DB-valid size enum values only (Prisma schema has XS..XL; no new enum values allowed)
+type DbSize = "XS" | "S" | "M" | "L" | "XL";
 import { resolveTagSelections } from "@/lib/tag-groups";
+
+/** Valid Size enum values in the DB (no enum additions — Postgres 55P04 guard). */
+const VALID_SIZES = new Set<string>(["XS", "S", "M", "L", "XL"]);
+
+type VariantInput = {
+  size: DbSize;
+  quantity: number;
+  pricePerDay: number;
+  deposit: number;
+  available: boolean;
+};
+
+/**
+ * Parse a `variants` JSON field from a FormData submission.
+ * Returns an empty array if the field is absent or malformed.
+ * Only rows with a valid Size enum value are included.
+ */
+function parseVariants(formData: FormData): VariantInput[] {
+  const raw = formData.get("variants");
+  if (!raw || typeof raw !== "string") return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return (parsed as Array<Record<string, unknown>>)
+      .filter((r) => typeof r === "object" && r !== null && VALID_SIZES.has(String(r.size ?? "")))
+      .map((r) => ({
+        size: String(r.size) as DbSize,
+        quantity: Math.max(1, parseInt(String(r.quantity ?? "1"), 10) || 1),
+        pricePerDay: Math.max(0, parseInt(String(r.pricePerDay ?? r.price_per_day ?? "0"), 10) || 0),
+        deposit: Math.max(0, parseInt(String(r.deposit ?? "0"), 10) || 0),
+        available: r.available !== false,
+      }));
+  } catch {
+    return [];
+  }
+}
 
 function slugify(s: string): string {
   return s.toLowerCase().trim()
@@ -373,6 +411,12 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
     return isNaN(n) || n < 0 ? null : n;
   };
 
+  // Parse variants from formData
+  const variantInputs = parseVariants(formData);
+  // If no variants submitted (legacy path), create one default variant from product fields
+  const sizeRaw = (String(formData.get("size") ?? "M") as DbSize);
+  const depositRaw = parseInt(String(formData.get("deposit") ?? "0"), 10) || 0;
+
   return withActor(user.id, async () => {
     const created = await db.product.create({
       data: {
@@ -382,9 +426,9 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
         designer: String(formData.get("designer") ?? "").trim() || null,
         shopId,
         productTypeId: productType.id,
-        size: String(formData.get("size") ?? "M") as "XS"|"S"|"M"|"L"|"XL",
+        size: sizeRaw,
         pricePerDay: basePerDay,
-        deposit: parseInt(String(formData.get("deposit") ?? "0"), 10) || 0,
+        deposit: depositRaw,
         description: String(formData.get("description") ?? "").trim() || null,
         lineUrl,
         status: "pending",
@@ -403,6 +447,31 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
       },
       select: { id: true, slug: true },
     });
+
+    // Upsert ProductVariant rows (one per submitted size; fallback: one default variant)
+    const variantsToUpsert: VariantInput[] = variantInputs.length > 0
+      ? variantInputs
+      : [{ size: sizeRaw, quantity: 1, pricePerDay: basePerDay, deposit: depositRaw, available: true }];
+
+    for (const vi of variantsToUpsert) {
+      await db.productVariant.upsert({
+        where: { productId_size: { productId: created.id, size: vi.size } },
+        create: {
+          productId: created.id,
+          size: vi.size,
+          quantity: vi.quantity,
+          pricePerDay: vi.pricePerDay,
+          deposit: vi.deposit,
+          available: vi.available,
+        },
+        update: {
+          quantity: vi.quantity,
+          pricePerDay: vi.pricePerDay,
+          deposit: vi.deposit,
+          available: vi.available,
+        },
+      });
+    }
 
     revalidatePath("/sell/dashboard");
     revalidatePath("/admin/products");
@@ -510,6 +579,9 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     }
   }
 
+  // Parse variants from formData (optional — only update if provided)
+  const newVariants = parseVariants(formData);
+
   return withActor(user.id, async () => {
     if (Object.keys(scalarUpdates).length > 0) {
       await db.product.update({ where: { id: productId }, data: scalarUpdates });
@@ -537,6 +609,28 @@ export async function updateProduct(productId: string, formData: FormData): Prom
         await db.productTag.createMany({
           data: newTagIds.map((tagId) => ({ productId, tagId })),
           skipDuplicates: true,
+        });
+      }
+    }
+    // Upsert ProductVariant rows if variants were submitted
+    if (newVariants.length > 0) {
+      for (const vi of newVariants) {
+        await db.productVariant.upsert({
+          where: { productId_size: { productId, size: vi.size } },
+          create: {
+            productId,
+            size: vi.size,
+            quantity: vi.quantity,
+            pricePerDay: vi.pricePerDay,
+            deposit: vi.deposit,
+            available: vi.available,
+          },
+          update: {
+            quantity: vi.quantity,
+            pricePerDay: vi.pricePerDay,
+            deposit: vi.deposit,
+            available: vi.available,
+          },
         });
       }
     }
