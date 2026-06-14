@@ -146,6 +146,7 @@ function mapShop(b: PrismaShop, coverImage?: string | null): Shop {
     kyc_status: b.kycStatus as KycStatus,
     rating_avg: b.ratingAvg !== null && b.ratingAvg !== undefined ? Number(b.ratingAvg) : null,
     rating_count: b.ratingCount ?? 0,
+    is_open: b.isOpen,
     created_at: b.createdAt.toISOString(),
     updated_at: b.updatedAt.toISOString(),
   };

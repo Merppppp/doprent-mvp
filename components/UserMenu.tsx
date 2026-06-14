@@ -240,34 +240,6 @@ export default function UserMenu({
                 padding: "8px 16px 4px",
                 fontSize: 11,
                 fontWeight: 600,
-                color: "var(--ink-3)",
-                letterSpacing: "0.04em",
-                textTransform: "uppercase",
-              }}
-            >
-              {t("menu.manageShop", locale)}
-            </div>
-            <Link href="/sell/dashboard" style={menuItemStyle}>
-              {t("menu.shopDashboard", locale)}
-            </Link>
-            <Link
-              href="/sell/bookings"
-              style={{
-                ...menuItemStyle,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              {t("menu.shopBookings", locale)}
-              <Pill n={sellerBadge} />
-            </Link>
-            <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
-            <div
-              style={{
-                padding: "8px 16px 4px",
-                fontSize: 11,
-                fontWeight: 600,
                 color: "var(--info)",
                 letterSpacing: "0.04em",
                 textTransform: "uppercase",

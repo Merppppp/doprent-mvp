@@ -34,7 +34,7 @@ export type OccasionKey =
   | "work"
   | "casual";
 
-export type AdsTier = "free" | "boost" | "featured";
+export type AdsTier = "free" | "boost" | "featured" | "full";
 export type Status = "pending" | "live" | "rejected" | "draft";
 export type KycStatus = "none" | "submitted" | "verified" | "rejected";
 
@@ -157,6 +157,8 @@ export type Shop = {
   rating_avg: number | null;
   /** Number of visible reviews. */
   rating_count: number;
+  /** Seller-controlled open/close toggle. false = shop shows 'ปิดชั่วคราว' on public page. */
+  is_open: boolean;
   created_at: string;
   updated_at: string;
   /** Optional product card previews — populated by listSponsorShops / listShops for the hero banner card stack. */

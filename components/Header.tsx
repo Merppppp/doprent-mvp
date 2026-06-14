@@ -23,7 +23,12 @@ export default async function Header() {
     .toUpperCase();
   const savedCount = user?.savedProductIds?.length ?? 0;
   const badges = user ? await getBookingBadges() : { renter: 0, seller: 0 };
-  const isSeller = user?.role === "seller" || user?.role === "admin";
+  // isSeller and isAdmin are mutually exclusive (Role enum has no overlap).
+  // A user with role "admin" is NOT treated as a seller — admins manage the
+  // platform and do not own shops. This gate is purely for display; real
+  // authorization lives in route guards and server actions.
+  const isSeller = user?.role === "seller";
+  const isAdmin = user?.role === "admin";
 
   return (
     <header
@@ -43,7 +48,7 @@ export default async function Header() {
       >
         {/* Left */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {!isSeller && (
+          {!isSeller && !isAdmin && (
             <Link href="/sell/signup" style={topLinkStyle}>
               {t("nav.openShop", locale)}
             </Link>
@@ -51,6 +56,11 @@ export default async function Header() {
           {isSeller && (
             <Link href="/sell/dashboard" style={topLinkStyle}>
               {t("menu.shopDashboard", locale)}
+            </Link>
+          )}
+          {isAdmin && (
+            <Link href="/admin" style={topLinkStyle}>
+              Admin
             </Link>
           )}
           <span style={topDividerStyle}>|</span>

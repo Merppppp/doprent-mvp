@@ -75,16 +75,33 @@ export default async function BoutiquePage({ params }: { params: Params }) {
             </div>
           ) : null}
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <LineButton
-            href={isLoggedIn ? b.line_url : null}
-            label="ทักร้านทาง LINE"
-            variant="primary"
-            source="boutique_primary"
-            shopId={b.id}
-            isLoggedIn={isLoggedIn}
-            loginNext={`/shop/${b.slug}`}
-          />
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+          {!b.is_open ? (
+            <div
+              style={{
+                padding: "8px 14px",
+                background: "var(--warn-soft)",
+                border: "1px solid color-mix(in oklch, var(--warn) 30%, transparent)",
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                color: "var(--warn)",
+              }}
+            >
+              ⏸ ปิดชั่วคราว · ไม่รับจองขณะนี้
+            </div>
+          ) : null}
+          {b.is_open ? (
+            <LineButton
+              href={isLoggedIn ? b.line_url : null}
+              label="ทักร้านทาง LINE"
+              variant="primary"
+              source="boutique_primary"
+              shopId={b.id}
+              isLoggedIn={isLoggedIn}
+              loginNext={`/shop/${b.slug}`}
+            />
+          ) : null}
         </div>
       </div>
 

@@ -235,9 +235,9 @@ export async function submitKyc(formData: FormData): Promise<{ ok: boolean; erro
   if (!taxId) return { ok: false, error: "กรุณาใส่เลขประจำตัวผู้เสียภาษี/บัตรประชาชน" };
   if (!/^[0-9]{13}$/.test(taxId)) return { ok: false, error: "เลขประจำตัวผู้เสียภาษี/บัตรประชาชนต้องเป็นตัวเลข 13 หลัก" };
 
-  // Plan: lowercase (new PlanTier enum: free | boost | featured)
-  const planRaw = String(formData.get("plan") ?? "free").trim().toLowerCase();
-  const plan = (["free", "boost", "featured"].includes(planRaw) ? planRaw : "free") as "free" | "boost" | "featured";
+  // Plan: lowercase (PlanTier enum: free | boost | featured | full). MVP default is 'full'.
+  const planRaw = String(formData.get("plan") ?? "full").trim().toLowerCase();
+  const plan = (["free", "boost", "featured", "full"].includes(planRaw) ? planRaw : "full") as AdsTier;
 
   return withActor(user.id, async () => {
     await db.kycSubmission.create({
@@ -262,6 +262,28 @@ export async function submitKyc(formData: FormData): Promise<{ ok: boolean; erro
 
 export async function redirectAfterSignup(slug: string): Promise<never> {
   redirect(`/sell/kyc?slug=${encodeURIComponent(slug)}`);
+}
+
+/** Flip the shop's is_open flag (owner-only). Revalidates dashboard + public shop page. */
+export async function toggleShopOpen(shopId: string): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user) return;
+
+  const shop = await db.shop.findFirst({
+    where: { id: shopId, ownerId: user.id },
+    select: { id: true, slug: true, isOpen: true },
+  });
+  if (!shop) return;
+
+  await withActor(user.id, async () => {
+    await db.shop.update({
+      where: { id: shop.id },
+      data: { isOpen: !shop.isOpen },
+    });
+  });
+
+  revalidatePath("/sell/dashboard");
+  revalidatePath(`/shop/${shop.slug}`);
 }
 
 export async function createProduct(formData: FormData): Promise<{ ok: boolean; error?: string; slug?: string; id?: string }> {
