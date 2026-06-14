@@ -256,10 +256,12 @@ export default function UserMenu({
           </>
         )}
 
-        {/* ── Language ── */}
-        <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
-        <div style={{ padding: "8px 16px" }}>
-          <LocaleToggle defaultLocale={locale} variant="dropdown" />
+        {/* ── Language (mobile only — desktop has the navbar-top switcher) ── */}
+        <div className="md:hidden">
+          <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
+          <div style={{ padding: "8px 16px" }}>
+            <LocaleToggle defaultLocale={locale} variant="dropdown" />
+          </div>
         </div>
 
         {/* ── Sign out ── */}
