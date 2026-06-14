@@ -9,7 +9,7 @@ import type { BoundTagGroup } from "@/lib/tag-groups";
 
 export type BrowseFiltersProps = {
   q: string;
-  color: string | null;
+  color?: string | null;
   occasion: string | null;
   size: string | null;
   designer: string | null;
@@ -17,7 +17,7 @@ export type BrowseFiltersProps = {
   priceMax: number;
   priceBounds: { min: number; max: number };
   occasions: SelectOption[];
-  colors: SelectOption[];
+  colors?: SelectOption[];
   sizes: SelectOption[];
   designers: SelectOption[];
   locale?: Locale;
@@ -251,28 +251,62 @@ function ColorSwatch({
   );
 }
 
-/** Simple chip list for a bound tag group — supports single and multi select. */
+/** Simple chip list for a bound tag group — supports single and multi select.
+ *  Renders swatches (image > hex > plain chip) when swatch data is present. */
 function TagGroupSection({
   tags,
   active,
   selectionMode,
   onToggle,
 }: {
-  tags: Array<{ id: string; key: string; label: string }>;
+  tags: Array<{ id: string; key: string; label: string; swatchHex?: string | null; swatchImageUrl?: string | null }>;
   active: string[];
   selectionMode: "single" | "multi";
   onToggle: (tagKey: string) => void;
 }) {
   return (
     <div className="grid grid-cols-2 gap-1.5 mt-2">
-      {tags.map((tag) => (
-        <Chip
-          key={tag.key}
-          label={tag.label}
-          active={active.includes(tag.key)}
-          onClick={() => onToggle(tag.key)}
-        />
-      ))}
+      {tags.map((tag) => {
+        const isActive = active.includes(tag.key);
+        if (tag.swatchImageUrl) {
+          return (
+            <button
+              key={tag.key}
+              type="button"
+              onClick={() => onToggle(tag.key)}
+              className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md cursor-pointer font-[inherit] transition-all duration-150 ${
+                isActive
+                  ? "border border-[var(--accent)] bg-[var(--accent-soft)]"
+                  : "border border-[var(--line)] bg-[var(--surface)]"
+              }`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={tag.swatchImageUrl} alt="" className="w-3.5 h-3.5 rounded-full shrink-0 object-cover" />
+              <span className={`text-[11px] ${isActive ? "text-[var(--accent)] font-semibold" : "text-[var(--ink-2)] font-normal"}`}>{tag.label}</span>
+            </button>
+          );
+        }
+        if (tag.swatchHex) {
+          return (
+            <ColorSwatch
+              key={tag.key}
+              value={tag.key}
+              label={tag.label}
+              hex={tag.swatchHex}
+              active={isActive}
+              onClick={() => onToggle(tag.key)}
+            />
+          );
+        }
+        return (
+          <Chip
+            key={tag.key}
+            label={tag.label}
+            active={isActive}
+            onClick={() => onToggle(tag.key)}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -336,7 +370,6 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     setSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const hasAny =
-    !!props.color ||
     !!props.occasion ||
     !!props.size ||
     !!props.designer ||
@@ -344,13 +377,6 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     Object.values(props.activeTags ?? {}).some((arr) => arr.length > 0) ||
     props.priceMin > props.priceBounds.min ||
     props.priceMax < props.priceBounds.max;
-
-  // Use existing colors from props (backed by DB color keys + swatch hex)
-  const colorItems = props.colors.map((c) => ({
-    value: c.value,
-    label: c.label,
-    hex: (c as SelectOption & { swatch?: string }).swatch ?? "#ccc",
-  }));
 
   // ── Searchable items (match both th + en labels) ──────────────────────────
   const occasionItems: SearchableItem[] = useMemo(
@@ -393,14 +419,6 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
       key: "occasion",
       label: occ?.label ?? props.occasion,
       onRemove: () => setParam("occasion", null),
-    });
-  }
-  if (props.color) {
-    const col = colorItems.find((c) => c.value === props.color);
-    selectedBadges.push({
-      key: "color",
-      label: col?.label ?? props.color,
-      onRemove: () => setParam("color", null),
     });
   }
   if (props.size) {
@@ -500,29 +518,6 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
           )}
         </div>
       )}
-
-      {/* ════ Section: Color ════ */}
-      <div className="py-3 border-b border-[var(--line)]/50">
-        <SectionHeader
-          label={t("filter.color", locale)}
-          open={sections.color}
-          onToggle={() => toggleSection("color")}
-        />
-        {sections.color && (
-          <div className="grid grid-cols-2 gap-1.5 mt-2">
-            {colorItems.map((c) => (
-              <ColorSwatch
-                key={c.value}
-                value={c.value}
-                label={c.label}
-                hex={c.hex}
-                active={props.color === c.value}
-                onClick={() => setParam("color", props.color === c.value ? null : c.value)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* ════ Section: Size ════ */}
       <div className="py-3 border-b border-[var(--line)]/50">

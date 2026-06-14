@@ -54,9 +54,9 @@ model ProductType {
   /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  products          Product[]
-  categories        ProductCategory[]
-  tagGroupBindings  ProductTypeTagGroup[]
+  products         Product[]
+  categories       ProductCategory[]
+  tagGroupBindings ProductTypeTagGroup[]
 
   @@map("product_types")
 }
@@ -121,8 +121,8 @@ model TagGroup {
   /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  tags               Tag[]
-  tagRequests        TagRequest[]
+  tags                Tag[]
+  tagRequests         TagRequest[]
   productTypeBindings ProductTypeTagGroup[]
 
   @@map("tag_groups")
@@ -131,15 +131,19 @@ model TagGroup {
 /// แท็กในกลุ่ม (เช่น "wedding" ในกลุ่ม occasion) — แทน occasions เดิม + รองรับมิติใหม่ในอนาคต
 model Tag {
   /// Primary key (uuid)
-  id         String  @id @default(uuid()) @db.Uuid
+  id             String  @id @default(uuid()) @db.Uuid
   /// FK → tag_groups.id กลุ่มของแท็กนี้ (RESTRICT — ลบกลุ่มไม่ได้ถ้ายังมีแท็ก, ปิดผ่าน is_active)
-  tagGroupId String  @map("tag_group_id") @db.Uuid
+  tagGroupId     String  @map("tag_group_id") @db.Uuid
   /// Business key (เช่น "wedding") — UNIQUE ทั้งระบบ, ใช้ใน URL/filter
-  key        String  @unique
+  key            String  @unique
   /// ชื่อแสดงผล (ไทย)
-  label      String
+  label          String
   /// ปิดการใช้งานแท็กโดยไม่ต้องลบ
-  isActive   Boolean @default(true) @map("is_active")
+  isActive       Boolean @default(true) @map("is_active")
+  /// สีตัวอย่าง hex ใช้เฉพาะแท็กกลุ่ม color (เช่น "#D9A4A0") — NULL ถ้ากลุ่มอื่น
+  swatchHex      String? @map("swatch_hex")
+  /// รูป swatch สำหรับสีลาย/พื้นผิว — NULL ถ้าใช้ swatchHex แทน
+  swatchImageUrl String? @map("swatch_image_url")
 
   /// uuid ผู้สร้าง record (NULL = system/seed)
   createdBy String?  @map("created_by") @db.Uuid
@@ -239,21 +243,21 @@ model Area {
 /// ผู้ใช้ทุกบทบาท (customer / seller / admin) — สร้างผ่าน NextAuth (Google) หรือ email+password
 model User {
   /// Primary key (uuid) — อ้างโดย NextAuth JWT
-  id            String    @id @default(uuid()) @db.Uuid
+  id             String    @id @default(uuid()) @db.Uuid
   /// อีเมล (UNIQUE) — NULL ได้กรณี provider ไม่ส่งอีเมล
-  email         String?   @unique
+  email          String?   @unique
   /// เวลายืนยันอีเมลสำเร็จ (NULL = ยังไม่ยืนยัน)
-  emailVerified DateTime? @map("email_verified") @db.Timestamptz(6)
+  emailVerified  DateTime? @map("email_verified") @db.Timestamptz(6)
   /// bcrypt hash สำหรับ login แบบ credentials (NULL = OAuth-only)
-  passwordHash  String?   @map("password_hash")
+  passwordHash   String?   @map("password_hash")
   /// ชื่อ-นามสกุล — vocabulary ทั้งระบบคือ `fullName` (NextAuth adapter ส่ง `name` มา → map ใน adapter wrapper ที่ auth.ts)
-  fullName      String?   @map("full_name")
+  fullName       String?   @map("full_name")
   /// LINE id ของผู้ใช้ (ติดต่อกลับ)
-  lineId        String?   @map("line_id")
+  lineId         String?   @map("line_id")
   /// บทบาทในระบบ
-  role          Role      @default(customer)
+  role           Role      @default(customer)
   /// URL รูปโปรไฟล์ (จาก OAuth)
-  image         String?
+  image          String?
   // -- Acquisition attribution (first-touch) + activity recency for MAU --
   /// utm_source แรกที่พามาสมัคร
   signupSource   String?   @map("signup_source")
@@ -401,79 +405,79 @@ model VerificationToken {
 /// ร้านให้เช่าสินค้า (เดิม boutiques) — 1 ร้านมีเจ้าของ 1 คน (owner), มีสินค้าหลายรายการ
 model Shop {
   /// Primary key (uuid)
-  id           String    @id @default(uuid()) @db.Uuid
+  id               String    @id @default(uuid()) @db.Uuid
   /// slug สำหรับ URL (UNIQUE)
-  slug         String    @unique
+  slug             String    @unique
   /// ชื่อร้าน
-  name         String
+  name             String
   /// FK → users.id เจ้าของร้าน (SetNull เมื่อ user ถูกลบ)
-  ownerId      String?   @map("owner_id") @db.Uuid
+  ownerId          String?   @map("owner_id") @db.Uuid
   /// ชื่อเจ้าของร้านที่แสดงผล (กรอกเอง — ไม่ใช่ snapshot ของ users.full_name)
-  ownerName    String?   @map("owner_name")
+  ownerName        String?   @map("owner_name")
   /// FK → areas.id ย่านที่ตั้งร้าน (เดิมอ้างด้วย area key string)
-  areaId       String?   @map("area_id") @db.Uuid
+  areaId           String?   @map("area_id") @db.Uuid
   /// ป้ายชื่อย่านที่แสดงผล (รองรับย่านอิสระที่ไม่อยู่ใน areas)
-  areaLabel    String    @map("area_label")
+  areaLabel        String    @map("area_label")
   /// ที่อยู่แบบข้อความเต็ม (legacy/รวม)
-  address      String?
+  address          String?
   /// บ้านเลขที่
-  houseNo      String?   @map("house_no")
+  houseNo          String?   @map("house_no")
   /// ถนน/ซอย
-  street       String?
+  street           String?
   /// แขวง/ตำบล
-  subdistrict  String?
+  subdistrict      String?
   /// เขต/อำเภอ
-  district     String?
+  district         String?
   /// จังหวัด
-  province     String    @default("กรุงเทพมหานคร")
+  province         String    @default("กรุงเทพมหานคร")
   /// รหัสไปรษณีย์
-  postalCode   String?   @map("postal_code")
+  postalCode       String?   @map("postal_code")
   /// ละติจูดที่ตั้งร้าน
-  lat          Decimal?  @db.Decimal(9, 6)
+  lat              Decimal?  @db.Decimal(9, 6)
   /// ลองจิจูดที่ตั้งร้าน
-  lng          Decimal?  @db.Decimal(9, 6)
+  lng              Decimal?  @db.Decimal(9, 6)
   /// เวลาทำการ (ข้อความอิสระ)
-  hours        String?
+  hours            String?
   /// LINE OA deep-link ของร้าน (CTA หลัก)
-  lineUrl      String    @map("line_url")
+  lineUrl          String    @map("line_url")
   /// Instagram handle/URL
-  instagram    String?
+  instagram        String?
   /// PromptPay id รับเงิน (เบอร์/เลขบัตร ปชช.)
-  promptpayId  String?   @map("promptpay_id")
+  promptpayId      String?   @map("promptpay_id")
   /// ปีที่เปิดร้าน
-  sinceYear    Int?      @map("since_year")
+  sinceYear        Int?      @map("since_year")
   /// โทนสี cover การ์ดร้าน
-  coverColor   Color     @default(rose) @map("cover_color")
+  coverColor       Color     @default(rose) @map("cover_color")
   /// ป้าย tag การตลาดสั้น ๆ
-  tag          String?
+  tag              String?
   /// เรื่องราว/คำแนะนำร้าน
-  story        String?
+  story            String?
   /// ข้อมูลการจัดส่ง
-  deliveryInfo String?   @map("delivery_info")
+  deliveryInfo     String?   @map("delivery_info")
   /// ร้านแนะนำ (คัดโดย admin)
-  featured     Boolean   @default(false)
+  featured         Boolean   @default(false)
   /// ระดับแผนโฆษณาปัจจุบันของร้าน
-  adsTier      PlanTier  @default(free) @map("ads_tier")
+  adsTier          PlanTier  @default(free) @map("ads_tier")
   /// ผ่านการยืนยันตัวตนแล้ว (badge)
-  verified     Boolean   @default(false)
+  verified         Boolean   @default(false)
   /// สถานะ workflow การเผยแพร่ร้าน
-  status       Status    @default(live)
+  status           Status    @default(live)
   /// เหตุผลเมื่อถูก reject
-  rejectReason String?   @map("reject_reason")
+  rejectReason     String?   @map("reject_reason")
   /// สถานะ KYC ล่าสุด (rollup จาก kyc_submissions เพื่อ gate ฟีเจอร์เร็ว ๆ)
-  kycStatus    KycStatus @default(none) @map("kyc_status")
+  kycStatus        KycStatus @default(none) @map("kyc_status")
   /// จำนวนวันล่วงหน้าขั้นต่ำที่ผู้เช่าต้องจอง (วันรับ >= วันนี้ + leadTimeDays)
-  leadTimeDays     Int   @default(0)  @map("lead_time_days")
+  leadTimeDays     Int       @default(0) @map("lead_time_days")
   /// จำนวนวันเช่าขั้นต่ำต่อครั้ง
-  minRentalDays    Int   @default(1)  @map("min_rental_days")
+  minRentalDays    Int       @default(1) @map("min_rental_days")
   /// จำนวนวันเช่าสูงสุดต่อครั้ง (null = ไม่จำกัด)
-  maxRentalDays    Int?               @map("max_rental_days")
+  maxRentalDays    Int?      @map("max_rental_days")
   /// จำนวนวันที่ผู้เช่าต้องคืนสินค้าหลังวันสิ้นสุดการเช่า (แสดงต่อผู้เช่า)
-  returnWindowDays Int   @default(2)  @map("return_window_days")
+  returnWindowDays Int       @default(2) @map("return_window_days")
   /// จำนวนวันบัฟเฟอร์หลังการเช่าแต่ละครั้ง (ช่วงเตรียม/ทำความสะอาด — บล็อกช่วง [start, end+bufferDaysAfter])
-  bufferDaysAfter  Int   @default(2)  @map("buffer_days_after")
+  bufferDaysAfter  Int       @default(2) @map("buffer_days_after")
   /// วันปิดทำการประจำสัปดาห์ (0=อาทิตย์..6=เสาร์) — ซ้ำทุกสัปดาห์
-  closedWeekdays   Int[] @default([]) @map("closed_weekdays")
+  closedWeekdays   Int[]     @default([]) @map("closed_weekdays")
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -508,62 +512,62 @@ model Shop {
 /// ย้าย images/price_tiers/occasions ออกเป็นตารางลูก, เพิ่ม product_type_id
 model Product {
   /// Primary key (uuid)
-  id            String                   @id @default(uuid()) @db.Uuid
+  id               String                   @id @default(uuid()) @db.Uuid
   /// slug สำหรับ URL (UNIQUE)
-  slug          String                   @unique
+  slug             String                   @unique
   /// รหัส tag ติดสินค้า (UNIQUE, สร้างอัตโนมัติ)
-  tagCode       String                   @unique @map("tag_code")
+  tagCode          String                   @unique @map("tag_code")
   /// ชื่อสินค้า
-  name          String
+  name             String
   /// ชื่อดีไซเนอร์/แบรนด์
-  designer      String?
+  designer         String?
   /// FK → shops.id ร้านเจ้าของสินค้า
-  shopId        String                   @map("shop_id") @db.Uuid
+  shopId           String                   @map("shop_id") @db.Uuid
   /// FK → product_types.id ประเภทสินค้า (RESTRICT — ลบประเภทไม่ได้ถ้ามีสินค้าอ้างอยู่; ใช้ is_active แทน)
-  productTypeId String                   @map("product_type_id") @db.Uuid
+  productTypeId    String                   @map("product_type_id") @db.Uuid
   /// FK → product_categories.id หมวดหมู่ของสินค้า (host decision: สินค้า 1 ชิ้นมีได้ 1 หมวดเท่านั้น;
   /// NULL ได้ — สินค้าสร้างก่อนจัดหมวดได้; SET NULL — ลบหมวดแล้วสินค้ากลายเป็น "ยังไม่จัดหมวด", ดู DESIGN §3.2)
-  categoryId    String?                  @map("category_id") @db.Uuid
+  categoryId       String?                  @map("category_id") @db.Uuid
   /// ไซซ์
-  size          Size
-  /// สีหลักของสินค้า (ใช้ filter)
-  color         Color
+  size             Size
+  /// สีหลักของสินค้า (ใช้ filter) — nullable: สินค้าใหม่ใช้ ProductTag แทน; คอลัมน์ยังคงอยู่เพื่อ backward-compat
+  color            Color?
   /// ราคาเช่าต่อวัน (บาท จำนวนเต็ม)
-  pricePerDay   Int                      @map("price_per_day")
+  pricePerDay      Int                      @map("price_per_day")
   /// ค่ามัดจำ (บาท)
-  deposit       Int                      @default(0)
+  deposit          Int                      @default(0)
   /// คำอธิบายสินค้า
-  description   String?
+  description      String?
   /// LINE deep-link ของสินค้า (CTA หลัก)
-  lineUrl       String                   @map("line_url")
+  lineUrl          String                   @map("line_url")
   /// ระดับแผนโฆษณาของสินค้า
-  adsTier       PlanTier                 @default(free) @map("ads_tier")
+  adsTier          PlanTier                 @default(free) @map("ads_tier")
   /// สินค้าแนะนำ (คัดโดย admin)
-  featured      Boolean                  @default(false)
+  featured         Boolean                  @default(false)
   /// ติดป้าย sponsored
-  sponsored     Boolean                  @default(false)
+  sponsored        Boolean                  @default(false)
   /// สถานะ workflow การเผยแพร่สินค้า
-  status        Status                   @default(live)
+  status           Status                   @default(live)
   /// เหตุผลเมื่อถูก reject
-  rejectReason  String?                  @map("reject_reason")
+  rejectReason     String?                  @map("reject_reason")
   /// เปิดให้เช่าอยู่ (toggle โดยร้าน)
-  available     Boolean                  @default(true)
+  available        Boolean                  @default(true)
   /// ตัวนับยอดเข้าชมหน้า detail
-  views         Int                      @default(0)
+  views            Int                      @default(0)
   /// เมื่อ true ใช้ policy ของสินค้านี้เองแทน policy ของร้าน
-  policyOverride   Boolean @default(false) @map("policy_override")
+  policyOverride   Boolean                  @default(false) @map("policy_override")
   /// override: จำนวนวันล่วงหน้าขั้นต่ำ (ใช้เมื่อ policyOverride = true; null = ใช้ค่าของร้าน)
-  leadTimeDays     Int?    @map("lead_time_days")
+  leadTimeDays     Int?                     @map("lead_time_days")
   /// override: จำนวนวันเช่าขั้นต่ำ (ใช้เมื่อ policyOverride = true; null = ใช้ค่าของร้าน)
-  minRentalDays    Int?    @map("min_rental_days")
+  minRentalDays    Int?                     @map("min_rental_days")
   /// override: จำนวนวันเช่าสูงสุด (null + override = ไม่จำกัด; null + ไม่ override = ใช้ค่าของร้าน)
-  maxRentalDays    Int?    @map("max_rental_days")
+  maxRentalDays    Int?                     @map("max_rental_days")
   /// override: จำนวนวันคืนสินค้า (ใช้เมื่อ policyOverride = true; null = ใช้ค่าของร้าน)
-  returnWindowDays Int?    @map("return_window_days")
+  returnWindowDays Int?                     @map("return_window_days")
   /// override: จำนวนวันบัฟเฟอร์หลังเช่า (ใช้เมื่อ policyOverride = true; null = ใช้ค่าของร้าน)
-  bufferDaysAfter  Int?    @map("buffer_days_after")
+  bufferDaysAfter  Int?                     @map("buffer_days_after")
   /// full-text search vector (จัดการผ่าน raw SQL/trigger)
-  searchVector  Unsupported("tsvector")? @map("search_vector")
+  searchVector     Unsupported("tsvector")? @map("search_vector")
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1109,7 +1113,7 @@ model Banner {
   /// เวลาแก้ไขล่าสุด (DB trigger set_updated_at + Prisma @updatedAt)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  shop      Shop?     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shop Shop? @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
   @@index([isActive, sortOrder])
   @@index([shopId])

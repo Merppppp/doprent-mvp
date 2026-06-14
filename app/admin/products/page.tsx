@@ -32,7 +32,7 @@ export default async function ProductsAdmin({
 
   const rows = rawRows.map((d) => ({
     id: d.id, slug: d.slug, tag_code: d.tagCode, name: d.name, designer: d.designer,
-    shop_name: d.shop.name, size: d.size, color: d.color, price_per_day: d.pricePerDay,
+    shop_name: d.shop.name, size: d.size, color: d.color ?? "", price_per_day: d.pricePerDay,
     status: d.status, available: d.available, featured: d.featured, sponsored: d.sponsored,
     images: d.images.map((img) => img.url), created_at: d.createdAt.toISOString(), views: d.views,
   }));

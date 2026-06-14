@@ -7,7 +7,7 @@ import { normalizeTiers } from "@/lib/pricing";
 import { listTagGroups, listTagRequestsForShop } from "@/lib/tags";
 import { getTagGroupsForProductType } from "@/lib/tag-groups";
 import ProductForm from "../../ProductForm";
-import type { Color, PriceTier, Size } from "@/lib/types";
+import type { PriceTier, Size } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -105,7 +105,6 @@ export default async function EditProductPage({ params }: { params: { id: string
           name: productRaw.name,
           designer: productRaw.designer,
           size: productRaw.size as Size,
-          color: productRaw.color as Color,
           price_per_day: productRaw.pricePerDay,
           price_tiers: priceTiersNormalized,
           deposit: productRaw.deposit,

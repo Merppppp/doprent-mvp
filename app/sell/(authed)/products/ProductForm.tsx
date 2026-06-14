@@ -5,7 +5,7 @@ import { useState } from "react";
 import { createProduct, updateProduct } from "@/app/actions/seller";
 import { requestTag } from "@/app/actions/seller-tags";
 import type { BoundTagGroup } from "@/lib/tag-groups";
-import type { Color, PriceTier, Size } from "@/lib/types";
+import type { PriceTier, Size } from "@/lib/types";
 import { priceForNights, validateTiers } from "@/lib/pricing";
 import RequiredMark from "@/components/RequiredMark";
 
@@ -44,24 +44,13 @@ function toPriceTiers(rows: TierRow[]): PriceTier[] {
   }));
 }
 
-const COLORS: Color[] = ["rose", "ivory", "green", "black", "navy", "red", "blue", "purple"];
-const COLOR_TH: Record<Color, string> = {
-  rose: "กุหลาบ",
-  ivory: "งาช้าง",
-  green: "เขียว",
-  black: "ดำ",
-  navy: "กรมท่า",
-  red: "แดง",
-  blue: "ฟ้า",
-  purple: "ม่วง",
-};
 const SIZES: Size[] = ["XXXS","XXS","XS","S","M","L","XL","XXL","3XL","4XL"];
 
 type InitialData = {
   name: string;
   designer: string | null;
   size: Size;
-  color: Color;
+  color?: string | null;
   price_per_day: number;
   price_tiers: PriceTier[] | null;
   deposit: number;
@@ -108,7 +97,6 @@ export default function ProductForm(props: Props) {
   const [name, setName] = useState(initial?.name ?? "");
   const [designer, setDesigner] = useState(initial?.designer ?? "");
   const [size, setSize] = useState<Size>(initial?.size ?? "M");
-  const [color, setColor] = useState<Color>(initial?.color ?? "rose");
   const [tiers, setTiers] = useState<TierRow[]>(
     initial?.price_tiers && initial.price_tiers.length
       ? initial.price_tiers.map((t) => ({ max: t.max, perDay: t.per_day }))
@@ -244,7 +232,6 @@ export default function ProductForm(props: Props) {
     fd.set("name", name);
     fd.set("designer", designer);
     fd.set("size", size);
-    fd.set("color", color);
     const pt = toPriceTiers(tiers);
     const v = validateTiers(pt);
     if (!v.ok) {
@@ -408,19 +395,12 @@ export default function ProductForm(props: Props) {
         />
       </Labeled>
 
-      {/* 3) ขนาด* | สี* (side by side) */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <Labeled label="ขนาด" required>
-          <select value={size} onChange={(e) => setSize(e.target.value as Size)} aria-required={true} style={inputStyle}>
-            {SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </Labeled>
-        <Labeled label="สี" required>
-          <select value={color} onChange={(e) => setColor(e.target.value as Color)} aria-required={true} style={inputStyle}>
-            {COLORS.map((c) => <option key={c} value={c}>{COLOR_TH[c]}</option>)}
-          </select>
-        </Labeled>
-      </div>
+      {/* 3) ขนาด* */}
+      <Labeled label="ขนาด" required>
+        <select value={size} onChange={(e) => setSize(e.target.value as Size)} aria-required={true} style={inputStyle}>
+          {SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </Labeled>
 
       {/* 4) § คุณสมบัติชุด — dynamic tag group sections */}
       {props.tagGroupSections.length > 0 ? (
@@ -450,8 +430,15 @@ export default function ProductForm(props: Props) {
                           background: active ? "var(--ink)" : "var(--surface)",
                           color: active ? "var(--on-dark)" : "var(--ink)",
                           borderRadius: 6, cursor: "pointer",
+                          display: "inline-flex", alignItems: "center",
                         }}
                       >
+                        {t.swatchImageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={t.swatchImageUrl} alt="" style={{ width: 14, height: 14, borderRadius: "50%", objectFit: "cover", display: "inline-block", marginRight: 4, verticalAlign: "middle" }} />
+                        ) : t.swatchHex ? (
+                          <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: t.swatchHex, marginRight: 4, verticalAlign: "middle", border: "1px solid rgba(0,0,0,0.1)", flexShrink: 0 }} />
+                        ) : null}
                         {t.label}
                       </button>
                     );

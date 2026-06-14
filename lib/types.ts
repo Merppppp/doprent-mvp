@@ -180,7 +180,7 @@ export type Product = {
   /** Business key of the product's category (nullable — uncategorized allowed). */
   category_key?: string | null;
   size: Size;
-  color: Color;
+  color: Color | null;
   /** Starting/base per-day rate (THB). Fallback when no tiers; also the "from" price for cards & filters. */
   price_per_day: number;
   /**
@@ -354,6 +354,7 @@ export const COLOR_LABELS_TH: Record<Color, string> = {
   purple: "ม่วง",
 };
 
+// NOTE: COLOR_SWATCH is shop-theme-only (Shop.coverColor). Product/browse swatches come from Tag.swatchHex.
 export const COLOR_SWATCH: Record<Color, string> = {
   rose: "#D9A4A0",
   ivory: "#EFE3CC",

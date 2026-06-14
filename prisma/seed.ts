@@ -147,6 +147,48 @@ export async function seedBase() {
   });
 
   // ---------------------------------------------------------------------------
+  // 3c. Tag group: color (สี) — 8-tag multi-select group with swatch_hex
+  //     mirrors 20260614100000 migration INSERT; sort_order=2 (after dress-type)
+  // ---------------------------------------------------------------------------
+  const colorGroup = await db.tagGroup.upsert({
+    where: { key: "color" },
+    update: {},
+    create: { key: "color", label: "สี", sortOrder: 2 },
+  });
+
+  const colorTags = [
+    { key: "rose",   label: "กุหลาบ",  swatchHex: "#D9A4A0" },
+    { key: "ivory",  label: "งาช้าง",  swatchHex: "#EFE3CC" },
+    { key: "green",  label: "เขียว",   swatchHex: "#2F6F4E" },
+    { key: "black",  label: "ดำ",      swatchHex: "#1A1815" },
+    { key: "navy",   label: "กรมท่า",  swatchHex: "#1F2A4A" },
+    { key: "red",    label: "แดง",     swatchHex: "#B5302C" },
+    { key: "blue",   label: "ฟ้า",     swatchHex: "#7BA8C9" },
+    { key: "purple", label: "ม่วง",    swatchHex: "#A48BC4" },
+  ];
+  for (const t of colorTags) {
+    await db.tag.upsert({
+      where: { key: t.key },
+      update: {},
+      create: { key: t.key, label: t.label, swatchHex: t.swatchHex, tagGroupId: colorGroup.id },
+    });
+  }
+
+  // Bind color to dress product type (mirrors 20260614100000 migration INSERT)
+  await db.productTypeTagGroup.upsert({
+    where: { productTypeId_tagGroupId: { productTypeId: dressType.id, tagGroupId: colorGroup.id } },
+    update: {},
+    create: {
+      productTypeId: dressType.id,
+      tagGroupId: colorGroup.id,
+      sortOrder: 2,
+      isRequired: false,
+      selectionMode: "multi",
+      isActive: true,
+    },
+  });
+
+  // ---------------------------------------------------------------------------
   // 4. Areas (uuid PK + key UNIQUE — data unchanged from the old seed)
   // ---------------------------------------------------------------------------
   await db.area.createMany({
@@ -180,7 +222,7 @@ export async function seedBase() {
     skipDuplicates: true,
   });
 
-  console.log("✅ Base seed complete (product_types + product_categories + tag_groups/tags [occasion + dress-type] + bindings + areas)");
+  console.log("✅ Base seed complete (product_types + product_categories + tag_groups/tags [occasion + dress-type + color] + bindings + areas)");
 }
 
 async function main() {
