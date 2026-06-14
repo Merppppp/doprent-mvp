@@ -264,6 +264,71 @@ export default function SignupForm(_props: Props) {
         </select>
       </Field>
 
+      {/* ==== PAYMENT SECTION ==== */}
+      <div
+        style={{
+          padding: 16,
+          background: "var(--bg)",
+          border: "1px solid var(--line)",
+          borderRadius: 8,
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>วิธีรับเงิน (ไม่บังคับ)</div>
+        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 14, lineHeight: 1.5 }}>
+          ลูกค้าจะโอนเงินให้ร้านโดยตรง DopRent ไม่เก็บเงินแทน
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Field
+            label="PromptPay (ไม่บังคับ)"
+            hint="เบอร์มือถือ / เลขบัตรประชาชน สำหรับรับเงินผ่าน PromptPay QR"
+          >
+            <input
+              type="text"
+              name="promptpay_id"
+              maxLength={20}
+              placeholder="เช่น 0812345678"
+              style={inputStyle}
+            />
+          </Field>
+
+          <Field label="ธนาคาร (ไม่บังคับ)">
+            <select name="bank_name" style={inputStyle} defaultValue="">
+              <option value="">— ไม่ระบุ —</option>
+              <option value="ธ.กสิกรไทย">ธ.กสิกรไทย</option>
+              <option value="ธ.ไทยพาณิชย์">ธ.ไทยพาณิชย์</option>
+              <option value="ธ.กรุงเทพ">ธ.กรุงเทพ</option>
+              <option value="ธ.กรุงไทย">ธ.กรุงไทย</option>
+              <option value="ธ.กรุงศรีอยุธยา">ธ.กรุงศรีอยุธยา</option>
+              <option value="ธ.ทหารไทยธนชาต">ธ.ทหารไทยธนชาต</option>
+              <option value="ธ.ออมสิน">ธ.ออมสิน</option>
+              <option value="อื่นๆ">อื่นๆ</option>
+            </select>
+          </Field>
+
+          <Field label="เลขบัญชี (ไม่บังคับ)" hint="เลขบัญชี">
+            <input
+              type="text"
+              name="bank_account_number"
+              inputMode="numeric"
+              maxLength={20}
+              placeholder="เช่น 123-4-56789-0"
+              style={inputStyle}
+            />
+          </Field>
+
+          <Field label="ชื่อบัญชี (ไม่บังคับ)" hint="ชื่อบัญชี">
+            <input
+              type="text"
+              name="bank_account_name"
+              maxLength={100}
+              placeholder="เช่น นางสาว วรรณิษา ใจดี"
+              style={inputStyle}
+            />
+          </Field>
+        </div>
+      </div>
+
       {/* Hidden inputs that createBoutique reads */}
       <input type="hidden" name="area_key" />
       <input type="hidden" name="area_label" />

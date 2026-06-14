@@ -46,6 +46,10 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
   const sinceYear = sinceYearRaw ? parseInt(sinceYearRaw, 10) : null;
   const coverColor = (String(formData.get("cover_color") ?? "rose") as Color);
   const ownerName = String(formData.get("owner_name") ?? "").trim() || null;
+  const promptpayId = String(formData.get("promptpay_id") ?? "").trim() || null;
+  const bankName = String(formData.get("bank_name") ?? "").trim() || null;
+  const bankAccountNumber = String(formData.get("bank_account_number") ?? "").trim() || null;
+  const bankAccountName = String(formData.get("bank_account_name") ?? "").trim() || null;
 
   const address = [houseNo, street, subdistrict ? `แขวง${subdistrict}` : null, district ? `เขต${district}` : null, province, postalCode]
     .filter(Boolean).join(" ") || null;
@@ -81,6 +85,7 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
         slug, name, ownerId: user.id, ownerName, areaId, areaLabel,
         address, houseNo, street, subdistrict, district, province, postalCode,
         lineUrl, instagram, tag, story, sinceYear, coverColor, deliveryInfo,
+        promptpayId, bankName, bankAccountNumber, bankAccountName,
         status: "pending", kycStatus: "none",
       },
       select: { slug: true },
@@ -105,7 +110,7 @@ export async function updateShop(shopId: string, formData: FormData): Promise<{ 
 
   const updates: Record<string, unknown> = {};
   // area_key handled separately (UUID FK resolution); exclude from generic camelCase loop
-  const scalarFields = ["name","area_label","instagram","tag","story","delivery_info","owner_name","address","hours","cover_color","promptpay_id"] as const;
+  const scalarFields = ["name","area_label","instagram","tag","story","delivery_info","owner_name","address","hours","cover_color","promptpay_id","bank_name","bank_account_number","bank_account_name"] as const;
   for (const f of scalarFields) {
     const v = formData.get(f);
     if (v !== null) {
@@ -235,9 +240,9 @@ export async function submitKyc(formData: FormData): Promise<{ ok: boolean; erro
   if (!taxId) return { ok: false, error: "กรุณาใส่เลขประจำตัวผู้เสียภาษี/บัตรประชาชน" };
   if (!/^[0-9]{13}$/.test(taxId)) return { ok: false, error: "เลขประจำตัวผู้เสียภาษี/บัตรประชาชนต้องเป็นตัวเลข 13 หลัก" };
 
-  // Plan: lowercase (new PlanTier enum: free | boost | featured)
-  const planRaw = String(formData.get("plan") ?? "free").trim().toLowerCase();
-  const plan = (["free", "boost", "featured"].includes(planRaw) ? planRaw : "free") as "free" | "boost" | "featured";
+  // Plan: lowercase (PlanTier enum: free | boost | featured | full). MVP default is 'full'.
+  const planRaw = String(formData.get("plan") ?? "full").trim().toLowerCase();
+  const plan = (["free", "boost", "featured", "full"].includes(planRaw) ? planRaw : "full") as AdsTier;
 
   return withActor(user.id, async () => {
     await db.kycSubmission.create({
@@ -262,6 +267,28 @@ export async function submitKyc(formData: FormData): Promise<{ ok: boolean; erro
 
 export async function redirectAfterSignup(slug: string): Promise<never> {
   redirect(`/sell/kyc?slug=${encodeURIComponent(slug)}`);
+}
+
+/** Flip the shop's is_open flag (owner-only). Revalidates dashboard + public shop page. */
+export async function toggleShopOpen(shopId: string): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user) return;
+
+  const shop = await db.shop.findFirst({
+    where: { id: shopId, ownerId: user.id },
+    select: { id: true, slug: true, isOpen: true },
+  });
+  if (!shop) return;
+
+  await withActor(user.id, async () => {
+    await db.shop.update({
+      where: { id: shop.id },
+      data: { isOpen: !shop.isOpen },
+    });
+  });
+
+  revalidatePath("/sell/dashboard");
+  revalidatePath(`/shop/${shop.slug}`);
 }
 
 export async function createProduct(formData: FormData): Promise<{ ok: boolean; error?: string; slug?: string; id?: string }> {
@@ -549,21 +576,26 @@ export async function updateProductPriceTiers(productId: string, tiers: PriceTie
   });
 }
 
-export async function toggleProductAvailable(productId: string, available: boolean): Promise<{ ok: boolean }> {
+/** Flip a product's available flag (owner-only). Mirrors toggleShopOpen pattern. */
+export async function toggleProductAvailable(productId: string): Promise<void> {
   const user = await getCurrentUser();
-  if (!user) return { ok: false };
+  if (!user) return;
 
   const product = await db.product.findUnique({
     where: { id: productId },
-    include: { shop: { select: { ownerId: true } } },
+    select: { available: true, shop: { select: { ownerId: true } } },
   });
-  if (!product || product.shop.ownerId !== user.id) return { ok: false };
+  if (!product || product.shop.ownerId !== user.id) return;
 
-  return withActor(user.id, async () => {
-    await db.product.update({ where: { id: productId }, data: { available } });
-    revalidatePath("/sell/dashboard");
-    return { ok: true };
+  const next = !product.available;
+
+  await withActor(user.id, async () => {
+    await db.product.update({ where: { id: productId }, data: { available: next } });
   });
+
+  revalidatePath("/sell/products");
+  revalidatePath("/sell/dashboard");
+  revalidatePath(`/product/${productId}`);
 }
 
 export async function replyToReview(reviewId: string, text: string): Promise<{ ok: true } | { ok: false; error: string }> {

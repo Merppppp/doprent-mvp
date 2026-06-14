@@ -462,8 +462,8 @@ export default function ProductForm(props: Props) {
         </div>
       ) : null}
 
-      {/* 5) แบรนด์/ดีไซเนอร์ */}
-      <Labeled label="แบรนด์/ดีไซเนอร์ (ไม่บังคับ)">
+      {/* 5) แบรนด์ */}
+      <Labeled label="แบรนด์ (ไม่บังคับ)">
         <input
           type="text" value={designer} onChange={(e) => setDesigner(e.target.value)}
           maxLength={60} style={inputStyle}

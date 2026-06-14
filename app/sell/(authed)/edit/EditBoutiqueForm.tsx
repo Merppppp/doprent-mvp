@@ -39,6 +39,9 @@ type Props = {
     line_url: string;
     instagram: string | null;
     promptpay_id?: string | null;
+    bank_name?: string | null;
+    bank_account_number?: string | null;
+    bank_account_name?: string | null;
     delivery_info?: string | null;
     since_year: number | null;
     tag: string | null;
@@ -149,6 +152,40 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
           name="promptpay_id"
           defaultValue={boutique.promptpay_id ?? ""}
           placeholder="เช่น 0812345678"
+          style={inputStyle}
+        />
+      </Labeled>
+      <Labeled label="ธนาคาร (ไม่บังคับ)">
+        <select name="bank_name" defaultValue={boutique.bank_name ?? ""} style={inputStyle}>
+          <option value="">— ไม่ระบุ —</option>
+          <option value="ธ.กสิกรไทย">ธ.กสิกรไทย</option>
+          <option value="ธ.ไทยพาณิชย์">ธ.ไทยพาณิชย์</option>
+          <option value="ธ.กรุงเทพ">ธ.กรุงเทพ</option>
+          <option value="ธ.กรุงไทย">ธ.กรุงไทย</option>
+          <option value="ธ.กรุงศรีอยุธยา">ธ.กรุงศรีอยุธยา</option>
+          <option value="ธ.ทหารไทยธนชาต">ธ.ทหารไทยธนชาต</option>
+          <option value="ธ.ออมสิน">ธ.ออมสิน</option>
+          <option value="อื่นๆ">อื่นๆ</option>
+        </select>
+      </Labeled>
+      <Labeled label="เลขบัญชี (ไม่บังคับ)">
+        <input
+          type="text"
+          name="bank_account_number"
+          defaultValue={boutique.bank_account_number ?? ""}
+          inputMode="numeric"
+          maxLength={20}
+          placeholder="เช่น 123-4-56789-0"
+          style={inputStyle}
+        />
+      </Labeled>
+      <Labeled label="ชื่อบัญชี (ไม่บังคับ)">
+        <input
+          type="text"
+          name="bank_account_name"
+          defaultValue={boutique.bank_account_name ?? ""}
+          maxLength={100}
+          placeholder="เช่น นางสาว วรรณิษา ใจดี"
           style={inputStyle}
         />
       </Labeled>

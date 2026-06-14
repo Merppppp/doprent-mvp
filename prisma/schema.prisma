@@ -284,6 +284,12 @@ model User {
   /// สาขา เช่น สำนักงานใหญ่ / สาขา 00001 (ไม่บังคับ)
   billingBranch      String? @map("billing_branch")
 
+  // -- PDPA consent evidence --
+  /// เวลาที่ผู้ใช้ยอมรับ T&C + Privacy Policy ล่าสุด (NULL = ก่อนมีฟีเจอร์นี้)
+  termsAcceptedAt DateTime? @map("terms_accepted_at") @db.Timestamptz(6)
+  /// version string ของ T&C ที่ยอมรับ (e.g. "2026-06-15")
+  termsVersion    String?   @map("terms_version")
+
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedBy String?  @map("updated_by") @db.Uuid
@@ -444,7 +450,13 @@ model Shop {
   /// Instagram handle/URL
   instagram        String?
   /// PromptPay id รับเงิน (เบอร์/เลขบัตร ปชช.)
-  promptpayId      String?   @map("promptpay_id")
+  promptpayId         String?   @map("promptpay_id")
+  /// ชื่อธนาคาร สำหรับรับโอนเงิน (ไม่บังคับ)
+  bankName            String?   @map("bank_name")
+  /// เลขบัญชีธนาคาร
+  bankAccountNumber   String?   @map("bank_account_number")
+  /// ชื่อบัญชีธนาคาร
+  bankAccountName     String?   @map("bank_account_name")
   /// ปีที่เปิดร้าน
   sinceYear        Int?      @map("since_year")
   /// โทนสี cover การ์ดร้าน
@@ -457,8 +469,8 @@ model Shop {
   deliveryInfo     String?   @map("delivery_info")
   /// ร้านแนะนำ (คัดโดย admin)
   featured         Boolean   @default(false)
-  /// ระดับแผนโฆษณาปัจจุบันของร้าน
-  adsTier          PlanTier  @default(free) @map("ads_tier")
+  /// ระดับแผนโฆษณาปัจจุบันของร้าน (MVP default: full = ไม่จำกัด ไม่มีแพ็กเกจ UI)
+  adsTier          PlanTier  @default(full) @map("ads_tier")
   /// ผ่านการยืนยันตัวตนแล้ว (badge)
   verified         Boolean   @default(false)
   /// สถานะ workflow การเผยแพร่ร้าน
@@ -483,6 +495,8 @@ model Shop {
   ratingAvg        Decimal?  @map("rating_avg") @db.Decimal(3, 2)
   /// จำนวนรีวิวที่มองเห็น (status=visible) ของร้าน — อัปเดตโดย recomputeShopRating()
   ratingCount      Int       @default(0) @map("rating_count")
+  /// เปิด/ปิดร้านชั่วคราว (seller-controlled toggle) — false = แสดง 'ปิดชั่วคราว' บนหน้าร้านสาธารณะ
+  isOpen           Boolean   @default(true) @map("is_open")
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1267,10 +1281,12 @@ enum Size {
 
 /// ระดับแผน/โฆษณา — รวม AdsTier + KycPlan + SubPlan เดิมให้เหลือ enum เดียว
 /// (KycPlan เดิมใช้ตัวพิมพ์ใหญ่ Free/Boost/Featured → migrate เป็นตัวเล็ก)
+/// MVP: ค่าเริ่มต้นสำหรับร้านใหม่คือ 'full' (ไม่จำกัด, ไม่มีการเลือกแพ็กเกจใน UI)
 enum PlanTier {
   free
   boost
   featured
+  full
 
   @@map("plan_tier")
 }

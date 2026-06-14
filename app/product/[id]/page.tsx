@@ -4,12 +4,10 @@ import { notFound } from "next/navigation";
 import { ProductArt } from "@/components/ProductArt";
 import Gallery from "@/components/Gallery";
 import DistanceBadge from "@/components/DistanceBadge";
-import LineButton from "@/components/LineButton";
 import ProductCard from "@/components/ProductCard";
 import SaveButton from "@/components/SaveButton";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import DateRangePicker from "@/components/DateRangePicker";
-import LineMessageCopyBox from "@/components/LineMessageCopyBox";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getShopBySlug,
@@ -31,8 +29,6 @@ export const dynamic = "force-dynamic";
 type Params = { id: string }; // route param is actually slug (folder name kept for compat)
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
-const DEFAULT_LINE =
-  process.env.NEXT_PUBLIC_DEFAULT_LINE_URL ?? "https://line.me/R/ti/p/@doprent";
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const dress = await getProductBySlug(params.id);
@@ -156,11 +152,9 @@ export default async function DressPage({ params }: { params: Params }) {
 
   const unavailable = Array.from(unavailableSet).sort();
 
-  const lineUrl = dress.line_url || boutique?.line_url || DEFAULT_LINE;
   const url = `${SITE}/product/${dress.slug}`;
 
   // Get boutique-specific data from DB-fetched record (preferred), or denormalized name
-  const boutiqueLine = boutique?.line_url || dress.line_url || DEFAULT_LINE;
   const boutiqueSlug = boutique?.slug ?? null;
 
   const jsonLd = {
@@ -367,23 +361,6 @@ export default async function DressPage({ params }: { params: Params }) {
             </div>
           )}
 
-          {/* Small inline contact link — for renters who want to ask general
-              questions ("ชุดยังว่างมั้ย? ส่ง Grab ได้มั้ย?") without committing
-              to dates yet. Low visual weight so it doesn't compete with the
-              date-picker booking flow below. */}
-          <div style={{ marginBottom: 22, paddingLeft: 4 }}>
-            <LineButton
-              href={isLoggedIn ? boutiqueLine : null}
-              label="ติดต่อร้านสอบถาม"
-              variant="inline"
-              source="detail_inline_ask"
-              productId={dress.id}
-              shopId={dress.shop_id}
-              isLoggedIn={isLoggedIn}
-              loginNext={`/product/${dress.slug}`}
-            />
-          </div>
-
           {/* Specs */}
           <div
             style={{
@@ -399,7 +376,7 @@ export default async function DressPage({ params }: { params: Params }) {
             <Spec lbl="ขนาด" val={dress.size} />
             <Spec lbl="สี" val={dress.color ? COLOR_LABELS_TH[dress.color] : "—"} />
             <Spec lbl="ร้านเช่า" val={dress.shop_name} />
-            <Spec lbl="ดีไซเนอร์" val={dress.designer ?? "—"} />
+            <Spec lbl="แบรนด์" val={dress.designer ?? "—"} />
           </div>
 
           {/* Price tiers / promotion table (read-only) */}
@@ -425,7 +402,6 @@ export default async function DressPage({ params }: { params: Params }) {
               omitted entirely for anonymous viewers — they see a login CTA
               instead of the booking button. */}
           <DateRangePicker
-            lineUrl={isLoggedIn ? boutiqueLine : ""}
             dressName={dress.name}
             boutiqueName={dress.shop_name}
             dressPageUrl={url}
@@ -463,9 +439,9 @@ export default async function DressPage({ params }: { params: Params }) {
             }}
           >
             <strong style={{ color: "var(--ink)", display: "block", marginBottom: 4 }}>
-              ขั้นตอนต่อจากนี้
+              วิธีเช่า
             </strong>
-            ตกลงวันใส่ ราคา การส่ง คุยกับร้านโดยตรงทาง LINE จ่ายผ่าน PromptPay หรือโอนตรงให้ร้าน DopRent ไม่เก็บเงิน
+            คุยกับร้านทาง LINE เพื่อตกลงวัน ราคา และการส่งเลยค่ะ จากนั้นจ่ายผ่าน PromptPay หรือโอนตรงให้ร้าน DopRent ไม่เก็บเงินคุณ
           </div>
         </div>
       </div>
