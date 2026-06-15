@@ -8,6 +8,7 @@ import type { BoundTagGroup } from "@/lib/tag-groups";
 import type { PriceTier, Size } from "@/lib/types";
 import { priceForNights, validateTiers } from "@/lib/pricing";
 import RequiredMark from "@/components/RequiredMark";
+import ToggleSwitch from "@/components/ToggleSwitch";
 
 /** กลุ่มแท็กสำหรับ dropdown ขอเพิ่มแท็ก */
 type TagGroupOption = { id: string; key: string; label: string };
@@ -617,13 +618,16 @@ export default function ProductForm(props: Props) {
 
         {/* 7) เปิด/ปิดให้เช่า — EDIT MODE ONLY, first item in Part B */}
         {isEdit ? (
-          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
-            <input
-              type="checkbox" checked={available}
-              onChange={(e) => setAvailable(e.target.checked)}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+            <ToggleSwitch
+              checked={available}
+              onChange={(next) => setAvailable(next)}
+              label="เปิดให้เช่า"
             />
-            <span style={{ fontSize: 14 }}>เปิดให้เช่า (ติ๊กออกเพื่อหยุดให้บริการชุดนี้ชั่วคราว)</span>
-          </label>
+            <span style={{ fontSize: 14 }}>
+              {available ? "เปิดให้เช่า" : "หยุดให้บริการชุดนี้ชั่วคราว"}
+            </span>
+          </div>
         ) : null}
 
         {/* 8) ราคาเช่า* */}

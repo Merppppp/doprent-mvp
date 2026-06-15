@@ -39,11 +39,6 @@ const PRODUCTS_NAV: DashNavItem[] = [
     label: "สินค้า",
     icon: <Icon d="M4 6h16M4 10h16M4 14h16M4 18h10" />,
   },
-  {
-    href: "/sell/products/new",
-    label: "เพิ่มสินค้า",
-    icon: <Icon d="M12 5v14M5 12h14" />,
-  },
 ];
 
 const OWNER_NAV: DashNavItem[] = [
