@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Dress gallery with a fullscreen lightbox.
@@ -16,6 +17,11 @@ export default function Gallery({ images, alt }: { images: string[]; alt: string
   const [active, setActive] = useState(0);
   const [errored, setErrored] = useState<Record<number, boolean>>({});
   const [lightbox, setLightbox] = useState(false);
+  // Portal target — only available after mount (SSR-safe). The lightbox MUST
+  // render at document.body level, otherwise the sticky `.detail-gallery`
+  // ancestor traps it in a low stacking context (navbar + calendar paint over it).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const count = safe.length;
   const go = useCallback(
@@ -128,8 +134,9 @@ export default function Gallery({ images, alt }: { images: string[]; alt: string
         </div>
       ) : null}
 
-      {/* lightbox */}
-      {lightbox ? (
+      {/* lightbox — portaled to <body> so it escapes the sticky gallery's
+          stacking context and renders above the navbar + booking column. */}
+      {lightbox && mounted ? createPortal(
         <div
           className="dr-lb"
           role="dialog"
@@ -175,7 +182,8 @@ export default function Gallery({ images, alt }: { images: string[]; alt: string
           ) : null}
 
           {count > 1 ? <span className="dr-lb-count">{active + 1} / {count}</span> : null}
-        </div>
+        </div>,
+        document.body,
       ) : null}
 
       <style

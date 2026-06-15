@@ -137,6 +137,12 @@ export type Shop = {
   hours: string | null;
   line_url: string;
   instagram: string | null;
+  /** Facebook page URL/handle (optional). */
+  facebook: string | null;
+  /** X (Twitter) handle/URL (optional). */
+  twitter: string | null;
+  /** TikTok handle/URL (optional). */
+  tiktok: string | null;
   /** PromptPay id (mobile/national-id) for in-web QR payments.
    *  Optional in the public Shop shape — only the booking flow selects it. */
   promptpay_id?: string | null;

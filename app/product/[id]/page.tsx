@@ -6,6 +6,8 @@ import Gallery from "@/components/Gallery";
 import DistanceBadge from "@/components/DistanceBadge";
 import ProductCard from "@/components/ProductCard";
 import SaveButton from "@/components/SaveButton";
+import ShareButton from "@/components/ShareButton";
+import ShopSocialLinks from "@/components/ShopSocialLinks";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import DateRangePicker, { type VariantOption } from "@/components/DateRangePicker";
 import { getCurrentUser } from "@/lib/auth";
@@ -239,13 +241,17 @@ export default async function DressPage({ params }: { params: Params }) {
         <Link href="/">← กลับไปดูทั้งหมด</Link>
       </div>
 
+      {/* HERO — sticky gallery (left) + compact booking essentials (right).
+          Everything verbose/reference (description, specs, price tiers, size
+          table, how-to) moved to full-width sections BELOW so the right rail
+          stays short and the two columns no longer become wildly uneven. */}
       <div
         className="detail-grid"
-        style={{ padding: "8px 0 60px" }}
+        style={{ padding: "8px 0 8px" }}
       >
         {/* GALLERY — real images get the fullscreen lightbox; listings with no
             uploaded photos fall back to the generated DressArt placeholder. */}
-        <div>
+        <div className="detail-gallery">
           {dress.images?.length ? (
             <Gallery images={dress.images} alt={dress.name} />
           ) : (
@@ -261,7 +267,7 @@ export default async function DressPage({ params }: { params: Params }) {
           )}
         </div>
 
-        {/* INFO */}
+        {/* BOOKING ESSENTIALS (compact) */}
         <div>
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8, fontWeight: 500 }}>
             {dress.designer || "—"}
@@ -286,12 +292,15 @@ export default async function DressPage({ params }: { params: Params }) {
             <h1 style={{ fontSize: 28, fontWeight: 600, lineHeight: 1.2, flex: 1 }}>
               {dress.name}
             </h1>
-            <SaveButton
-              productId={dress.id}
-              initialSaved={isSaved}
-              isLoggedIn={isLoggedIn}
-              variant="detail"
-            />
+            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+              <ShareButton url={url} title={dress.name} />
+              <SaveButton
+                productId={dress.id}
+                initialSaved={isSaved}
+                isLoggedIn={isLoggedIn}
+                variant="detail"
+              />
+            </div>
           </div>
           <div
             style={{
@@ -325,45 +334,9 @@ export default async function DressPage({ params }: { params: Params }) {
             </span>
           </div>
 
-          <p
-            style={{
-              color: "var(--ink-2)",
-              marginBottom: 18,
-              lineHeight: 1.65,
-              fontSize: 14,
-            }}
-          >
-            {dress.description ?? "—"}
-          </p>
-
-          {/* Occasion tags */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 22 }}>
-            {dress.occasions.map((okey) => {
-              const o = occasions.find((x) => x.key === okey);
-              return (
-                <Link
-                  key={okey}
-                  href={`/?occasion=${okey}`}
-                  style={{
-                    padding: "4px 10px",
-                    background: "var(--bg)",
-                    border: "1px solid var(--line)",
-                    borderRadius: 6,
-                    fontSize: 12,
-                    color: "var(--ink-2)",
-                  }}
-                >
-                  {o ? o.th : okey}
-                </Link>
-              );
-            })}
-          </div>
-
           {/* Boutique mini — primary discoverability hook for the boutique
-              behind this listing. The small "ติดต่อร้านสอบถาม" link below it
-              is the ONLY general-contact path on this page; all other LINE
-              CTAs are gated behind the date picker (so renters commit to
-              dates before booking). */}
+              behind this listing. Kept in the hero so renters see who they're
+              booking from right next to the date picker. */}
           {boutiqueSlug ? (
             <Link
               href={`/shop/${boutiqueSlug}`}
@@ -374,7 +347,7 @@ export default async function DressPage({ params }: { params: Params }) {
                 padding: 12,
                 border: "1px solid var(--line)",
                 borderRadius: 8,
-                marginBottom: 8,
+                marginBottom: 18,
                 cursor: "pointer",
               }}
             >
@@ -402,7 +375,7 @@ export default async function DressPage({ params }: { params: Params }) {
                 padding: 12,
                 border: "1px solid var(--line)",
                 borderRadius: 8,
-                marginBottom: 8,
+                marginBottom: 18,
                 fontSize: 14,
                 color: "var(--ink-2)",
               }}
@@ -411,102 +384,19 @@ export default async function DressPage({ params }: { params: Params }) {
             </div>
           )}
 
-          {/* Specs */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              rowGap: 14,
-              columnGap: 24,
-              marginBottom: 24,
-              paddingTop: 18,
-              borderTop: "1px solid var(--line)",
-            }}
-          >
-            <Spec lbl="ขนาด" val={dress.size} />
-            <Spec lbl="สี" val={dress.color ? COLOR_LABELS_TH[dress.color] : "—"} />
-            <Spec lbl="ร้านเช่า" val={dress.shop_name} />
-            <Spec lbl="แบรนด์" val={dress.designer ?? "—"} />
-          </div>
-
-          {/* Price tiers display */}
-          {hasPerVariantPriceTiers ? (
-            // Per-size mode: show a table of size → starting price
-            <div style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>ราคาต่อไซซ์</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {productVariants.filter((v) => v.available).map((v) => {
-                  const vTiers = productPriceTiers.filter((t) => t.variantId === v.id).sort((a, b) => a.minDays - b.minDays);
-                  const startingPrice = vTiers.length > 0 ? Math.min(...vTiers.map((t) => t.pricePerDay)) : v.pricePerDay;
-                  return (
-                    <div key={v.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 8 }}>
-                      <div style={{ padding: "8px 10px", borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)", fontWeight: 600, textAlign: "center" }}>
-                        {v.size}
-                      </div>
-                      <div style={{ padding: "8px 10px", borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)" }}>
-                        เริ่มต้น ฿{startingPrice.toLocaleString()}/วัน
-                        {vTiers.length > 1 ? ` (${vTiers.length} ช่วงราคา)` : ""}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : dress.price_tiers && dress.price_tiers.length > 0 ? (
-            // Shared mode: existing display (unchanged)
-            <div style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>แพ็กเกจราคา</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {dress.price_tiers.map((t, i) => (
-                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <div style={{ padding: 10, borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)" }}>
-                      {t.min}{t.max ? `–${t.max}` : "+"} วัน
-                    </div>
-                    <div style={{ padding: 10, borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)", textAlign: "right", fontWeight: 600 }}>
-                      ฿{(t.per_day ?? 0).toLocaleString()}/วัน
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {/* Boutique social channels — clickable icons sit just below the
+              shop card (outside the card's <Link> to avoid nested anchors). */}
+          {boutique && (boutique.instagram || boutique.facebook || boutique.twitter || boutique.tiktok) ? (
+            <div style={{ marginTop: -8, marginBottom: 18 }}>
+              <ShopSocialLinks
+                instagram={boutique.instagram}
+                facebook={boutique.facebook}
+                twitter={boutique.twitter}
+                tiktok={boutique.tiktok}
+                size={34}
+              />
             </div>
           ) : null}
-
-          {/* Measurement guide — shown only if at least one variant has measurements */}
-          {productVariants.some((v) => v.bustCm || v.waistCm || v.lengthCm) && (
-            <div style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>ตารางขนาด</div>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                  <thead>
-                    <tr>
-                      {["ไซซ์", "รอบอก (ซม.)", "รอบเอว (ซม.)", "ความยาว (ซม.)"].map((h) => (
-                        <th
-                          key={h}
-                          style={{
-                            padding: "6px 10px", textAlign: "left", fontWeight: 600,
-                            color: "var(--ink-2)", borderBottom: "1px solid var(--line)",
-                            whiteSpace: "nowrap",
-                          }}
-                        >{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {productVariants
-                      .filter((v) => v.available)
-                      .map((v) => (
-                        <tr key={v.id}>
-                          <td style={{ padding: "6px 10px", fontWeight: 600 }}>{v.size}</td>
-                          <td style={{ padding: "6px 10px", color: "var(--ink-2)" }}>{v.bustCm ?? "—"}</td>
-                          <td style={{ padding: "6px 10px", color: "var(--ink-2)" }}>{v.waistCm ?? "—"}</td>
-                          <td style={{ padding: "6px 10px", color: "var(--ink-2)" }}>{v.lengthCm ?? "—"}</td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
 
           {/* Date picker (renter). LINE href and pre-filled message are
               omitted entirely for anonymous viewers — they see a login CTA
@@ -531,30 +421,155 @@ export default async function DressPage({ params }: { params: Params }) {
             loginNext={`/product/${dress.slug}`}
             variants={variantOptions.length > 0 ? variantOptions : undefined}
           />
+        </div>
+      </div>
 
+      {/* FULL-WIDTH DETAIL SECTIONS — the verbose reference content now flows
+          across the page width instead of stacking in the narrow right rail. */}
+      <div className="detail-sections" style={{ paddingBottom: 40 }}>
+        {/* Description + occasion tags */}
+        <section>
+          <div className="detail-section-title">รายละเอียด</div>
+          <p style={{ color: "var(--ink-2)", lineHeight: 1.7, fontSize: 14, marginBottom: 16 }}>
+            {dress.description ?? "—"}
+          </p>
+          {dress.occasions.length > 0 ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {dress.occasions.map((okey) => {
+                const o = occasions.find((x) => x.key === okey);
+                return (
+                  <Link
+                    key={okey}
+                    href={`/?occasion=${okey}`}
+                    style={{
+                      padding: "4px 10px",
+                      background: "var(--bg)",
+                      border: "1px solid var(--line)",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      color: "var(--ink-2)",
+                    }}
+                  >
+                    {o ? o.th : okey}
+                  </Link>
+                );
+              })}
+            </div>
+          ) : null}
+        </section>
 
-          {/* (CTA stack removed — date picker above is the only booking
-              path; Save heart moved up to H1 row; small inline "ติดต่อ
-              ร้านสอบถาม" lives under the boutique card. This eliminates
-              the 3-stacked-LINE-buttons problem.) */}
+        {/* Specs */}
+        <section>
+          <div className="detail-section-title">ข้อมูลชุด</div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              rowGap: 14,
+              columnGap: 24,
+            }}
+          >
+            <Spec lbl="ขนาด" val={dress.size} />
+            <Spec lbl="สี" val={dress.color ? COLOR_LABELS_TH[dress.color] : "—"} />
+            <Spec lbl="ร้านเช่า" val={dress.shop_name} />
+            <Spec lbl="แบรนด์" val={dress.designer ?? "—"} />
+          </div>
+        </section>
 
+        {/* Price tiers display */}
+        {hasPerVariantPriceTiers ? (
+          <section>
+            <div className="detail-section-title">ราคาต่อไซซ์</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxWidth: 520 }}>
+              {productVariants.filter((v) => v.available).map((v) => {
+                const vTiers = productPriceTiers.filter((t) => t.variantId === v.id).sort((a, b) => a.minDays - b.minDays);
+                const startingPrice = vTiers.length > 0 ? Math.min(...vTiers.map((t) => t.pricePerDay)) : v.pricePerDay;
+                return (
+                  <div key={v.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 8 }}>
+                    <div style={{ padding: "8px 10px", borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)", fontWeight: 600, textAlign: "center" }}>
+                      {v.size}
+                    </div>
+                    <div style={{ padding: "8px 10px", borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)" }}>
+                      เริ่มต้น ฿{startingPrice.toLocaleString()}/วัน
+                      {vTiers.length > 1 ? ` (${vTiers.length} ช่วงราคา)` : ""}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : dress.price_tiers && dress.price_tiers.length > 0 ? (
+          <section>
+            <div className="detail-section-title">แพ็กเกจราคา</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxWidth: 520 }}>
+              {dress.price_tiers.map((t, i) => (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={{ padding: 10, borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)" }}>
+                    {t.min}{t.max ? `–${t.max}` : "+"} วัน
+                  </div>
+                  <div style={{ padding: 10, borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)", textAlign: "right", fontWeight: 600 }}>
+                    ฿{(t.per_day ?? 0).toLocaleString()}/วัน
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {/* Measurement guide — shown only if at least one variant has measurements */}
+        {productVariants.some((v) => v.bustCm || v.waistCm || v.lengthCm) && (
+          <section>
+            <div className="detail-section-title">ตารางขนาด</div>
+            <div style={{ overflowX: "auto", maxWidth: 560 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    {["ไซซ์", "รอบอก (ซม.)", "รอบเอว (ซม.)", "ความยาว (ซม.)"].map((h) => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: "6px 10px", textAlign: "left", fontWeight: 600,
+                          color: "var(--ink-2)", borderBottom: "1px solid var(--line)",
+                          whiteSpace: "nowrap",
+                        }}
+                      >{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {productVariants
+                    .filter((v) => v.available)
+                    .map((v) => (
+                      <tr key={v.id}>
+                        <td style={{ padding: "6px 10px", fontWeight: 600 }}>{v.size}</td>
+                        <td style={{ padding: "6px 10px", color: "var(--ink-2)" }}>{v.bustCm ?? "—"}</td>
+                        <td style={{ padding: "6px 10px", color: "var(--ink-2)" }}>{v.waistCm ?? "—"}</td>
+                        <td style={{ padding: "6px 10px", color: "var(--ink-2)" }}>{v.lengthCm ?? "—"}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {/* How to rent */}
+        <section>
+          <div className="detail-section-title">วิธีเช่า</div>
           <div
             style={{
               padding: 14,
               background: "var(--bg)",
               borderRadius: 6,
-              fontSize: 12,
+              fontSize: 13,
               color: "var(--ink-2)",
-              lineHeight: 1.55,
-              marginTop: 18,
+              lineHeight: 1.6,
+              maxWidth: 640,
             }}
           >
-            <strong style={{ color: "var(--ink)", display: "block", marginBottom: 4 }}>
-              วิธีเช่า
-            </strong>
             คุยกับร้านทาง LINE เพื่อตกลงวัน ราคา และการส่งเลยค่ะ จากนั้นจ่ายผ่าน PromptPay หรือโอนตรงให้ร้าน DopRent ไม่เก็บเงินคุณ
           </div>
-        </div>
+        </section>
       </div>
 
       {/* RELATED — content-based similarity: occasion overlap, color, size,

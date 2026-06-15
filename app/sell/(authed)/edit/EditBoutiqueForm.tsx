@@ -38,6 +38,9 @@ type Props = {
     area_label: string;
     line_url: string;
     instagram: string | null;
+    facebook?: string | null;
+    twitter?: string | null;
+    tiktok?: string | null;
     promptpay_id?: string | null;
     bank_name?: string | null;
     bank_account_number?: string | null;
@@ -145,6 +148,15 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
       </Labeled>
       <Labeled label="Instagram">
         <input type="text" name="instagram" defaultValue={boutique.instagram ?? ""} style={inputStyle} />
+      </Labeled>
+      <Labeled label="Facebook">
+        <input type="text" name="facebook" defaultValue={boutique.facebook ?? ""} placeholder="facebook.com/..." style={inputStyle} />
+      </Labeled>
+      <Labeled label="X / Twitter">
+        <input type="text" name="twitter" defaultValue={boutique.twitter ?? ""} placeholder="@..." style={inputStyle} />
+      </Labeled>
+      <Labeled label="TikTok">
+        <input type="text" name="tiktok" defaultValue={boutique.tiktok ?? ""} placeholder="@..." style={inputStyle} />
       </Labeled>
       <Labeled label="PromptPay (เบอร์มือถือ / เลขบัตร ปชช.) — สำหรับรับเงินจองผ่าน QR">
         <input

@@ -227,6 +227,18 @@ export default function SignupForm(_props: Props) {
         <input type="text" name="instagram" maxLength={40} style={inputStyle} placeholder="@..." />
       </Field>
 
+      <Field label="Facebook (ไม่บังคับ)" hint="ลิงก์เพจ หรือชื่อเพจ เช่น facebook.com/yourshop">
+        <input type="text" name="facebook" maxLength={120} style={inputStyle} placeholder="facebook.com/..." />
+      </Field>
+
+      <Field label="X / Twitter (ไม่บังคับ)" hint="เช่น @yourshop">
+        <input type="text" name="twitter" maxLength={40} style={inputStyle} placeholder="@..." />
+      </Field>
+
+      <Field label="TikTok (ไม่บังคับ)" hint="เช่น @yourshop">
+        <input type="text" name="tiktok" maxLength={40} style={inputStyle} placeholder="@..." />
+      </Field>
+
       <Field label="ปีที่เปิดบริการ (ไม่บังคับ)">
         <input
           type="number"

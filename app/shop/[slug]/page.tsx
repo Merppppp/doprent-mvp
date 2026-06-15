@@ -7,6 +7,7 @@ import LineButton from "@/components/LineButton";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import StarRating from "@/components/StarRating";
 import ReviewList from "@/components/ReviewList";
+import ShopSocialLinks from "@/components/ShopSocialLinks";
 import { getCurrentUser } from "@/lib/auth";
 import { getShopBySlug, listProductsByShop } from "@/lib/products";
 import { getShopReviews } from "@/lib/reviews";
@@ -126,11 +127,23 @@ export default async function BoutiquePage({ params }: { params: Params }) {
       >
         <InfoCell k="ย่าน" v={b.area_label} />
         {b.hours ? <InfoCell k="เวลาทำการ" v={b.hours} /> : null}
-        {b.instagram ? <InfoCell k="Instagram" v={b.instagram} /> : null}
         {b.since_year ? (
           <InfoCell k="เปิดบริการ" v={`ตั้งแต่ ${b.since_year}${b.owner_name ? ` · ดูแลโดย ${b.owner_name}` : ""}`} />
         ) : null}
       </div>
+
+      {/* Social channels — follow the boutique on its own platforms */}
+      {(b.instagram || b.facebook || b.twitter || b.tiktok) ? (
+        <div style={{ margin: "-12px 0 28px" }}>
+          <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8 }}>ช่องทางติดตามร้าน</div>
+          <ShopSocialLinks
+            instagram={b.instagram}
+            facebook={b.facebook}
+            twitter={b.twitter}
+            tiktok={b.tiktok}
+          />
+        </div>
+      ) : null}
 
       {/* Story */}
       {b.story ? (

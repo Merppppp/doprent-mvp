@@ -449,6 +449,12 @@ model Shop {
   lineUrl          String    @map("line_url")
   /// Instagram handle/URL
   instagram        String?
+  /// Facebook page URL/handle
+  facebook         String?
+  /// X (Twitter) handle/URL
+  twitter          String?
+  /// TikTok handle/URL
+  tiktok           String?
   /// PromptPay id รับเงิน (เบอร์/เลขบัตร ปชช.)
   promptpayId         String?   @map("promptpay_id")
   /// ชื่อธนาคาร สำหรับรับโอนเงิน (ไม่บังคับ)

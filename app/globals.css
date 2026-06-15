@@ -413,6 +413,32 @@ select:focus-visible {
   display: grid;
   grid-template-columns: 1.1fr 1fr;
   gap: 48px;
+  align-items: start;
+}
+
+/* Sticky gallery so it follows while reading the booking essentials */
+.detail-gallery {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+}
+
+/* Full-width reference sections below the hero (description, specs, sizes…) */
+.detail-sections {
+  max-width: 900px;
+}
+.detail-sections > section {
+  padding: 26px 0;
+  border-top: 1px solid var(--line);
+}
+.detail-sections > section:first-child {
+  border-top: none;
+  padding-top: 8px;
+}
+.detail-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 14px;
 }
 
 /* Account: sidebar + main */
@@ -470,6 +496,10 @@ select:focus-visible {
   .detail-grid {
     grid-template-columns: 1fr;
     gap: 28px;
+  }
+  /* On mobile the gallery should not pin — it would cover the booking essentials. */
+  .detail-gallery {
+    position: static;
   }
   .account-grid {
     grid-template-columns: 1fr;

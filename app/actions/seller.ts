@@ -139,6 +139,9 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
   const lineUrlRaw = String(formData.get("line_url") ?? "").trim();
   const lineUrl = normalizeLineUrl(lineUrlRaw);
   const instagram = String(formData.get("instagram") ?? "").trim() || null;
+  const facebook = String(formData.get("facebook") ?? "").trim() || null;
+  const twitter = String(formData.get("twitter") ?? "").trim() || null;
+  const tiktok = String(formData.get("tiktok") ?? "").trim() || null;
   const tag = String(formData.get("tag") ?? "").trim() || null;
   const story = String(formData.get("story") ?? "").trim() || null;
   const deliveryInfo = String(formData.get("delivery_info") ?? "").trim() || null;
@@ -190,7 +193,7 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
       data: {
         slug, name, ownerId: user.id, ownerName, areaId, areaLabel,
         address, houseNo, street, subdistrict, district, province, postalCode,
-        lineUrl, instagram, tag, story, sinceYear, coverColor, deliveryInfo,
+        lineUrl, instagram, facebook, twitter, tiktok, tag, story, sinceYear, coverColor, deliveryInfo,
         promptpayId, bankName, bankAccountNumber, bankAccountName,
         status: "pending", kycStatus: "none",
       },
@@ -216,7 +219,7 @@ export async function updateShop(shopId: string, formData: FormData): Promise<{ 
 
   const updates: Record<string, unknown> = {};
   // area_key handled separately (UUID FK resolution); exclude from generic camelCase loop
-  const scalarFields = ["name","area_label","instagram","tag","story","delivery_info","owner_name","address","hours","cover_color","promptpay_id","bank_name","bank_account_number","bank_account_name"] as const;
+  const scalarFields = ["name","area_label","instagram","facebook","twitter","tiktok","tag","story","delivery_info","owner_name","address","hours","cover_color","promptpay_id","bank_name","bank_account_number","bank_account_name"] as const;
   for (const f of scalarFields) {
     const v = formData.get(f);
     if (v !== null) {
