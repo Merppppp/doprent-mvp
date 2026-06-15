@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import ProductResults from "@/components/ProductResults";
+import ScrollToResults from "@/components/ScrollToResults";
 import BrowseFilters from "@/components/BrowseFilters";
 import BannerCarousel from "@/components/BannerCarousel";
 import type { BannerSlide } from "@/components/BannerCarousel";
@@ -168,6 +170,10 @@ export default async function HomePage({
 
   return (
     <div className="home-revamp">
+      <Suspense fallback={null}>
+        <ScrollToResults />
+      </Suspense>
+
       {/* ======== BANNER CAROUSEL ======== */}
       <section className="bg-bg pt-6">
         <div className="container">
@@ -208,7 +214,7 @@ export default async function HomePage({
       )}
 
       {/* ======== BROWSE (FILTERS + RESULTS) ======== */}
-      <section className="hr-browse">
+      <section id="results" className="hr-browse" style={{ scrollMarginTop: 0 }}>
         <div className="container">
           <div className="browse-grid">
             {/* SIDEBAR — hidden on mobile, sticky on desktop */}
