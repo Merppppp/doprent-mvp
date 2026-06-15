@@ -15,6 +15,8 @@ type Ctx = {
   requestGps: () => void;
   setArea: (key: string) => void;
   clear: () => void;
+  radius: number | null;
+  setRadius: (r: number | null) => void;
 };
 
 const LocationContext = createContext<Ctx | null>(null);
@@ -32,6 +34,7 @@ export default function LocationProvider({ children }: { children: React.ReactNo
   const [label, setLabel] = useState<string | null>(null);
   const [source, setSource] = useState<LocSource>(null);
   const [status, setStatus] = useState<LocStatus>("idle");
+  const [radius, setRadius] = useState<number | null>(null);
 
   // Restore last choice.
   useEffect(() => {
@@ -107,7 +110,7 @@ export default function LocationProvider({ children }: { children: React.ReactNo
   }, []);
 
   return (
-    <LocationContext.Provider value={{ loc, label, source, status, requestGps, setArea, clear }}>
+    <LocationContext.Provider value={{ loc, label, source, status, requestGps, setArea, clear, radius, setRadius }}>
       {children}
     </LocationContext.Provider>
   );

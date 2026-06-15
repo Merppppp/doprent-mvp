@@ -8,6 +8,8 @@ import { ProductArt } from "@/components/ProductArt";
 import SellerDashboardCalendarPanel from "@/components/SellerDashboardCalendarPanel";
 import { dressLimitFor, TIER_LABEL } from "@/lib/tiers";
 import type { AdsTier } from "@/lib/types";
+import { toggleShopOpen, toggleProductAvailable } from "@/app/actions/seller";
+import ToggleSwitch from "@/components/ToggleSwitch";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +47,9 @@ export default async function SellerDashboard({
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?next=/sell/dashboard");
 
-  const shopRaw = await db.shop.findFirst({ where: { ownerId: user.id } });
+  const shopRaw = await db.shop.findFirst({
+    where: { ownerId: user.id },
+  });
   if (!shopRaw) redirect("/sell/signup");
   if (shopRaw.kycStatus === "none" || shopRaw.kycStatus === "rejected") {
     redirect(`/sell/kyc?slug=${shopRaw.slug}`);
@@ -55,6 +59,7 @@ export default async function SellerDashboard({
     id: shopRaw.id, slug: shopRaw.slug, name: shopRaw.name,
     area_label: shopRaw.areaLabel, status: shopRaw.status,
     kyc_status: shopRaw.kycStatus, verified: shopRaw.verified,
+    is_open: shopRaw.isOpen,
   };
 
   const [productRows, totalClicks] = await Promise.all([
@@ -121,7 +126,7 @@ export default async function SellerDashboard({
             marginTop: 10,
             marginBottom: 6,
             letterSpacing: "-0.01em",
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
             gap: 10,
             flexWrap: "wrap",
@@ -192,6 +197,46 @@ export default async function SellerDashboard({
             ส่งเอกสาร KYC →
           </Link>
         ) : null}
+      </div>
+
+      {/* Shop open/close toggle */}
+      <div
+        style={{
+          padding: 14,
+          background: shop.is_open ? "var(--success-soft)" : "var(--warn-soft)",
+          border: `1px solid ${shop.is_open ? "color-mix(in oklch, var(--success) 30%, transparent)" : "color-mix(in oklch, var(--warn) 30%, transparent)"}`,
+          borderRadius: 8,
+          marginBottom: 18,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 4 }}>สถานะร้าน</div>
+          <div
+            style={{
+              fontWeight: 600,
+              fontSize: 15,
+              color: shop.is_open ? "var(--success)" : "var(--warn)",
+            }}
+          >
+            {shop.is_open ? "✓ ร้านเปิดอยู่ · ลูกค้าสามารถจองได้" : "⏸ ปิดร้านชั่วคราว · ลูกค้าจองไม่ได้"}
+          </div>
+        </div>
+        <form action={toggleShopOpen.bind(null, shop.id)}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ToggleSwitch
+              checked={shop.is_open}
+              label={shop.is_open ? "ร้านเปิด" : "ปิดชั่วคราว"}
+            />
+            <span style={{ fontSize: 13, color: shop.is_open ? "var(--success)" : "var(--warn)", fontWeight: 500 }}>
+              {shop.is_open ? "ร้านเปิด" : "ปิดชั่วคราว"}
+            </span>
+          </div>
+        </form>
       </div>
 
       {/* Stats */}
@@ -399,7 +444,7 @@ export default async function SellerDashboard({
                     </div>
                   ) : null}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0, alignItems: "flex-end" }}>
                   <Link
                     href={`/sell/products/${d.id}/edit`}
                     className="btn btn-outline"
@@ -414,6 +459,17 @@ export default async function SellerDashboard({
                   >
                     📅 ปฏิทิน
                   </Link>
+                  <form action={toggleProductAvailable.bind(null, d.id)}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <ToggleSwitch
+                        checked={d.available}
+                        label="เปิดให้เช่า"
+                      />
+                      <span style={{ fontSize: 11, color: "var(--ink-3)", whiteSpace: "nowrap" }}>
+                        เปิดให้เช่า
+                      </span>
+                    </div>
+                  </form>
                 </div>
               </div>
             );

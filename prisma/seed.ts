@@ -82,6 +82,142 @@ export async function seedBase() {
     });
   }
 
+  // Bind occasion to dress product type (mirrors 20260613190000 migration INSERT)
+  await db.productTypeTagGroup.upsert({
+    where: { productTypeId_tagGroupId: { productTypeId: dressType.id, tagGroupId: occasionGroup.id } },
+    update: {},
+    create: {
+      productTypeId: dressType.id,
+      tagGroupId: occasionGroup.id,
+      sortOrder: 0,
+      isRequired: false,
+      selectionMode: "multi",
+      isActive: true,
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // 3b. Tag group: dress-type (ประเภทชุด) — flat 16-tag multi-select group
+  //     mirrors 20260613200000 migration INSERT; sort_order=1 (after occasion)
+  // ---------------------------------------------------------------------------
+  const dressTypeGroup = await db.tagGroup.upsert({
+    where: { key: "dress-type" },
+    update: {},
+    create: { key: "dress-type", label: "ประเภทชุด", sortOrder: 1 },
+  });
+
+  const dressTypeTags = [
+    { key: "long-sleeve",     label: "แขนยาว" },
+    { key: "short-sleeve",    label: "แขนสั้น" },
+    { key: "sleeveless",      label: "แขนกุด" },
+    { key: "spaghetti-strap", label: "สายเดี่ยว" },
+    { key: "off-shoulder",    label: "ปาดไหล่" },
+    { key: "strapless",       label: "เกาะอก" },
+    { key: "outerwear",       label: "เสื้อคลุม" },
+    { key: "turtleneck-coat", label: "คอเต่า/เสื้อโค้ท" },
+    { key: "jacket",          label: "แจ็คเก็ต" },
+    { key: "sheer",           label: "ชีทรู" },
+    { key: "long-skirt",      label: "กระโปรงยาว" },
+    { key: "short-skirt",     label: "กระโปรงสั้น" },
+    { key: "long-pants",      label: "กางเกงขายาว" },
+    { key: "short-pants",     label: "กางเกงขาสั้น" },
+    { key: "long-dress",      label: "เดรสยาว" },
+    { key: "short-dress",     label: "เดรสสั้น" },
+  ];
+  for (const t of dressTypeTags) {
+    await db.tag.upsert({
+      where: { key: t.key },
+      update: {},
+      create: { ...t, tagGroupId: dressTypeGroup.id },
+    });
+  }
+
+  // Bind dress-type to dress product type (mirrors 20260613200000 migration INSERT)
+  await db.productTypeTagGroup.upsert({
+    where: { productTypeId_tagGroupId: { productTypeId: dressType.id, tagGroupId: dressTypeGroup.id } },
+    update: {},
+    create: {
+      productTypeId: dressType.id,
+      tagGroupId: dressTypeGroup.id,
+      sortOrder: 1,
+      isRequired: false,
+      selectionMode: "multi",
+      isActive: true,
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // 3c. Tag group: color (สี) — 8-tag multi-select group with swatch_hex
+  //     mirrors 20260614100000 migration INSERT; sort_order=2 (after dress-type)
+  // ---------------------------------------------------------------------------
+  const colorGroup = await db.tagGroup.upsert({
+    where: { key: "color" },
+    update: {},
+    create: { key: "color", label: "สี", sortOrder: 2 },
+  });
+
+  const colorTags = [
+    { key: "rose",   label: "กุหลาบ",  swatchHex: "#D9A4A0" },
+    { key: "ivory",  label: "งาช้าง",  swatchHex: "#EFE3CC" },
+    { key: "green",  label: "เขียว",   swatchHex: "#2F6F4E" },
+    { key: "black",  label: "ดำ",      swatchHex: "#1A1815" },
+    { key: "navy",   label: "กรมท่า",  swatchHex: "#1F2A4A" },
+    { key: "red",    label: "แดง",     swatchHex: "#B5302C" },
+    { key: "blue",   label: "ฟ้า",     swatchHex: "#7BA8C9" },
+    { key: "purple", label: "ม่วง",    swatchHex: "#A48BC4" },
+  ];
+  for (const t of colorTags) {
+    await db.tag.upsert({
+      where: { key: t.key },
+      update: {},
+      create: { key: t.key, label: t.label, swatchHex: t.swatchHex, tagGroupId: colorGroup.id },
+    });
+  }
+
+  // Bind color to dress product type (mirrors 20260614100000 migration INSERT)
+  await db.productTypeTagGroup.upsert({
+    where: { productTypeId_tagGroupId: { productTypeId: dressType.id, tagGroupId: colorGroup.id } },
+    update: {},
+    create: {
+      productTypeId: dressType.id,
+      tagGroupId: colorGroup.id,
+      sortOrder: 2,
+      isRequired: false,
+      selectionMode: "multi",
+      isActive: true,
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // 3d. Bind occasion + color to the suit product type (mirrors
+  //     20260614120000 migration). dress-type is intentionally NOT bound to suit
+  //     (its values are dress-specific). All bindings: multi, not required.
+  // ---------------------------------------------------------------------------
+  await db.productTypeTagGroup.upsert({
+    where: { productTypeId_tagGroupId: { productTypeId: suitType.id, tagGroupId: occasionGroup.id } },
+    update: {},
+    create: {
+      productTypeId: suitType.id,
+      tagGroupId: occasionGroup.id,
+      sortOrder: 0,
+      isRequired: false,
+      selectionMode: "multi",
+      isActive: true,
+    },
+  });
+  await db.productTypeTagGroup.upsert({
+    where: { productTypeId_tagGroupId: { productTypeId: suitType.id, tagGroupId: colorGroup.id } },
+    update: {},
+    create: {
+      productTypeId: suitType.id,
+      tagGroupId: colorGroup.id,
+      sortOrder: 1,
+      isRequired: false,
+      selectionMode: "multi",
+      isActive: true,
+    },
+  });
+
   // ---------------------------------------------------------------------------
   // 4. Areas (uuid PK + key UNIQUE — data unchanged from the old seed)
   // ---------------------------------------------------------------------------
@@ -116,7 +252,7 @@ export async function seedBase() {
     skipDuplicates: true,
   });
 
-  console.log("✅ Base seed complete (product_types + product_categories + tag_groups/tags + areas)");
+  console.log("✅ Base seed complete (product_types + product_categories + tag_groups/tags [occasion + dress-type + color] + bindings + areas)");
 }
 
 async function main() {

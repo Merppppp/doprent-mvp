@@ -4,11 +4,12 @@ import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import PriceRange from "./PriceRange";
 import type { SelectOption } from "./SearchSelect";
-import { t, DRESS_ITEM_EN, type Locale } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
+import type { BoundTagGroup } from "@/lib/tag-groups";
 
 export type BrowseFiltersProps = {
   q: string;
-  color: string | null;
+  color?: string | null;
   occasion: string | null;
   size: string | null;
   designer: string | null;
@@ -16,37 +17,29 @@ export type BrowseFiltersProps = {
   priceMax: number;
   priceBounds: { min: number; max: number };
   occasions: SelectOption[];
-  colors: SelectOption[];
+  colors?: SelectOption[];
   sizes: SelectOption[];
   designers: SelectOption[];
   locale?: Locale;
+  /** Bound tag groups for the current product type (from DB, server-fetched). */
+  tagGroups?: BoundTagGroup[];
+  /** Active tag selections keyed by group key, values are tag keys. */
+  activeTags?: Record<string, string[]>;
+  /** Body-measurement filter bounds (ซม.) */
+  bustMin?: number;
+  bustMax?: number;
+  waistMin?: number;
+  waistMax?: number;
+  lengthMin?: number;
+  lengthMax?: number;
 };
 
-// ── Dress type sub-groups (client-side URL only — no server filtering yet) ──
-
-const DRESS_TYPE_GROUPS: {
-  label: string;
-  key: "top" | "bottom" | "dress";
-  items: string[];
-}[] = [
-  {
-    label: "เสื้อ",
-    key: "top",
-    items: ["แขนยาว", "แขนสั้น", "แขนกุด", "สายเดี่ยว", "ปาดไหล่", "เกาะอก", "เสื้อคลุม", "คอเต่า/เสื้อโค้ท", "แจ็คเก็ต", "ชีทรู"],
-  },
-  {
-    label: "กางเกง / กระโปรง",
-    key: "bottom",
-    items: ["กระโปรงยาว", "กระโปรงสั้น", "กางเกงขายาว", "กางเกงขาสั้น"],
-  },
-  {
-    label: "เดรส",
-    key: "dress",
-    items: ["เดรสยาว", "เดรสสั้น"],
-  },
-];
-
 // ── Chip + Section helpers ────────────────────────────────────────────────────
+// NOTE: The "ประเภทชุด" (dress-type) filter section previously had a hardcoded
+// DRESS_TYPE_GROUPS client-side list here. It has been removed — dress-type is
+// now a DB-backed TagGroup (key='dress-type') bound to the dress product type via
+// product_type_tag_groups. It will appear automatically in the dynamic
+// tagGroups sections rendered by the bound-tag-group facet above.
 
 function SectionHeader({
   label,
@@ -265,6 +258,112 @@ function ColorSwatch({
   );
 }
 
+/** Chip list for a bound tag group — supports single and multi select.
+ *  Renders swatches (image > hex > plain chip) when swatch data is present.
+ *  For groups with more than VISIBLE_COUNT tags: shows a per-group search input
+ *  and a "show all / show less" collapse toggle, mirroring SearchableChipSection. */
+function TagGroupSection({
+  tags,
+  active,
+  selectionMode,
+  onToggle,
+  locale,
+}: {
+  tags: Array<{ id: string; key: string; label: string; swatchHex?: string | null; swatchImageUrl?: string | null }>;
+  active: string[];
+  selectionMode: "single" | "multi";
+  onToggle: (tagKey: string) => void;
+  locale: Locale;
+}) {
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState(false);
+
+  const showSearch = tags.length > VISIBLE_COUNT;
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? tags.filter((tag) =>
+        tag.label.toLowerCase().includes(q) || tag.key.toLowerCase().includes(q)
+      )
+    : tags;
+  // While a query is typed, show all matches (ignore collapsed state).
+  const visible = showSearch && !q && !expanded ? filtered.slice(0, VISIBLE_COUNT) : filtered;
+  const hiddenCount = tags.length - VISIBLE_COUNT;
+
+  function renderTag(tag: typeof tags[number]) {
+    const isActive = active.includes(tag.key);
+    if (tag.swatchImageUrl) {
+      return (
+        <button
+          key={tag.key}
+          type="button"
+          onClick={() => onToggle(tag.key)}
+          className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md cursor-pointer font-[inherit] transition-all duration-150 ${
+            isActive
+              ? "border border-[var(--accent)] bg-[var(--accent-soft)]"
+              : "border border-[var(--line)] bg-[var(--surface)]"
+          }`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={tag.swatchImageUrl} alt="" className="w-3.5 h-3.5 rounded-full shrink-0 object-cover" />
+          <span className={`text-[11px] ${isActive ? "text-[var(--accent)] font-semibold" : "text-[var(--ink-2)] font-normal"}`}>{tag.label}</span>
+        </button>
+      );
+    }
+    if (tag.swatchHex) {
+      return (
+        <ColorSwatch
+          key={tag.key}
+          value={tag.key}
+          label={tag.label}
+          hex={tag.swatchHex}
+          active={isActive}
+          onClick={() => onToggle(tag.key)}
+        />
+      );
+    }
+    return (
+      <Chip
+        key={tag.key}
+        label={tag.label}
+        active={isActive}
+        onClick={() => onToggle(tag.key)}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 mt-2">
+      {showSearch && (
+        <SectionSearchInput
+          value={query}
+          onChange={setQuery}
+          placeholder={t("filter.searchTags", locale)}
+        />
+      )}
+      {visible.length === 0 ? (
+        <div className="text-[11px] text-[var(--ink-3)] py-1.5 text-center">
+          {t("filter.noResults", locale)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-1.5">
+          {visible.map((tag) => renderTag(tag))}
+        </div>
+      )}
+      {showSearch && !q && hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="text-[11px] text-[var(--accent)] bg-transparent border-none cursor-pointer font-[inherit] font-medium text-left p-0"
+        >
+          {expanded
+            ? t("filter.showLess", locale)
+            : t("filter.showAll", locale).replace("{n}", String(tags.length))}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function BrowseFilters(props: BrowseFiltersProps) {
@@ -293,37 +392,47 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     [push],
   );
 
-  // Active filter values
-  const activeType = params.get("type");
+  /** Toggle a tag within a group in the URL (comma-separated), respecting selectionMode. */
+  const setTagParam = useCallback(
+    (groupKey: string, tagKey: string, selectionMode: "single" | "multi") => {
+      push((sp) => {
+        const current = sp.get(groupKey)?.split(",").filter(Boolean) ?? [];
+        let next: string[];
+        if (selectionMode === "single") {
+          next = current.includes(tagKey) ? [] : [tagKey];
+        } else {
+          next = current.includes(tagKey)
+            ? current.filter((k) => k !== tagKey)
+            : [...current, tagKey];
+        }
+        if (next.length === 0) sp.delete(groupKey);
+        else sp.set(groupKey, next.join(","));
+      });
+    },
+    [push],
+  );
 
   // Section open/close state
-  const [sections, setSections] = useState({
-    occasion: true,
-    type: false,
-    color: false,
-    size: false,
-    price: true,
+  const [sections, setSections] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = { occasion: true, color: false, size: false, price: true, measurements: false };
+    (props.tagGroups ?? []).forEach((g, i) => { init[`tg_${g.groupKey}`] = i === 0; });
+    return init;
   });
 
-  const toggleSection = (key: keyof typeof sections) =>
+  const toggleSection = (key: string) =>
     setSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const hasAny =
-    !!props.color ||
     !!props.occasion ||
     !!props.size ||
     !!props.designer ||
     !!props.q ||
-    !!activeType ||
+    Object.values(props.activeTags ?? {}).some((arr) => arr.length > 0) ||
     props.priceMin > props.priceBounds.min ||
-    props.priceMax < props.priceBounds.max;
-
-  // Use existing colors from props (backed by DB color keys + swatch hex)
-  const colorItems = props.colors.map((c) => ({
-    value: c.value,
-    label: c.label,
-    hex: (c as SelectOption & { swatch?: string }).swatch ?? "#ccc",
-  }));
+    props.priceMax < props.priceBounds.max ||
+    props.bustMin !== undefined || props.bustMax !== undefined ||
+    props.waistMin !== undefined || props.waistMax !== undefined ||
+    props.lengthMin !== undefined || props.lengthMax !== undefined;
 
   // ── Searchable items (match both th + en labels) ──────────────────────────
   const occasionItems: SearchableItem[] = useMemo(
@@ -336,44 +445,36 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     [props.occasions],
   );
 
-  const typeItems: SearchableItem[] = useMemo(
-    () =>
-      DRESS_TYPE_GROUPS.flatMap((group) =>
-        group.items.map((item) => ({
-          value: item,
-          label: locale === "en" ? (DRESS_ITEM_EN[item] ?? item) : item,
-          searchText: [item, DRESS_ITEM_EN[item] ?? ""].join(" "),
-        })),
-      ),
-    [locale],
-  );
-
   // ── Selected filter badges (top of sidebar) ───────────────────────────────
   const selectedBadges: { key: string; label: string; onRemove: () => void }[] = [];
   if (props.q) {
     selectedBadges.push({ key: "q", label: `"${props.q}"`, onRemove: () => setParam("q", null) });
   }
-  if (props.occasion) {
+  // Dynamic tag group badges (when tagGroups provided, replace hardcoded occasion badge)
+  if (props.tagGroups?.length) {
+    for (const group of props.tagGroups) {
+      const activeTgs = props.activeTags?.[group.groupKey] ?? [];
+      for (const tagKey of activeTgs) {
+        const tag = group.tags.find((t) => t.key === tagKey);
+        selectedBadges.push({
+          key: `tg_${group.groupKey}_${tagKey}`,
+          label: tag?.label ?? tagKey,
+          onRemove: () =>
+            push((sp) => {
+              const current = sp.get(group.groupKey)?.split(",").filter(Boolean) ?? [];
+              const next = current.filter((k) => k !== tagKey);
+              if (next.length === 0) sp.delete(group.groupKey);
+              else sp.set(group.groupKey, next.join(","));
+            }),
+        });
+      }
+    }
+  } else if (props.occasion) {
     const occ = props.occasions.find((o) => o.value === props.occasion);
     selectedBadges.push({
       key: "occasion",
       label: occ?.label ?? props.occasion,
       onRemove: () => setParam("occasion", null),
-    });
-  }
-  if (activeType) {
-    selectedBadges.push({
-      key: "type",
-      label: locale === "en" ? (DRESS_ITEM_EN[activeType] ?? activeType) : activeType,
-      onRemove: () => setParam("type", null),
-    });
-  }
-  if (props.color) {
-    const col = colorItems.find((c) => c.value === props.color);
-    selectedBadges.push({
-      key: "color",
-      label: col?.label ?? props.color,
-      onRemove: () => setParam("color", null),
     });
   }
   if (props.size) {
@@ -395,6 +496,31 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
           sp.delete("priceMin");
           sp.delete("priceMax");
         }),
+    });
+  }
+  // Body-measurement filter badges
+  if (props.bustMin !== undefined || props.bustMax !== undefined) {
+    const lo = props.bustMin ?? ""; const hi = props.bustMax ?? "";
+    selectedBadges.push({
+      key: "bust",
+      label: `${t("filter.bust", locale)} ${lo}–${hi} ${t("unit.cm", locale)}`,
+      onRemove: () => push((sp) => { sp.delete("bustMin"); sp.delete("bustMax"); }),
+    });
+  }
+  if (props.waistMin !== undefined || props.waistMax !== undefined) {
+    const lo = props.waistMin ?? ""; const hi = props.waistMax ?? "";
+    selectedBadges.push({
+      key: "waist",
+      label: `${t("filter.waist", locale)} ${lo}–${hi} ${t("unit.cm", locale)}`,
+      onRemove: () => push((sp) => { sp.delete("waistMin"); sp.delete("waistMax"); }),
+    });
+  }
+  if (props.lengthMin !== undefined || props.lengthMax !== undefined) {
+    const lo = props.lengthMin ?? ""; const hi = props.lengthMax ?? "";
+    selectedBadges.push({
+      key: "length",
+      label: `${t("filter.length", locale)} ${lo}–${hi} ${t("unit.cm", locale)}`,
+      onRemove: () => push((sp) => { sp.delete("lengthMin"); sp.delete("lengthMax"); }),
     });
   }
 
@@ -435,64 +561,45 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
         </div>
       )}
 
-      {/* ════ Section: Occasion (searchable) ════ */}
-      <div className="py-3 border-b border-[var(--line)]/50">
-        <SectionHeader
-          label={t("filter.occasion", locale)}
-          open={sections.occasion}
-          onToggle={() => toggleSection("occasion")}
-        />
-        {sections.occasion && (
-          <SearchableChipSection
-            items={occasionItems}
-            active={props.occasion}
-            onSelect={(value) => setParam("occasion", value)}
-            searchPlaceholder={t("filter.searchOccasion", locale)}
-            locale={locale}
-          />
-        )}
-      </div>
-
-      {/* ════ Section: Dress Type (searchable) ════ */}
-      <div className="py-3 border-b border-[var(--line)]/50">
-        <SectionHeader
-          label={t("filter.type", locale)}
-          open={sections.type}
-          onToggle={() => toggleSection("type")}
-        />
-        {sections.type && (
-          <SearchableChipSection
-            items={typeItems}
-            active={activeType}
-            onSelect={(value) => setParam("type", value)}
-            searchPlaceholder={t("filter.searchType", locale)}
-            locale={locale}
-          />
-        )}
-      </div>
-
-      {/* ════ Section: Color ════ */}
-      <div className="py-3 border-b border-[var(--line)]/50">
-        <SectionHeader
-          label={t("filter.color", locale)}
-          open={sections.color}
-          onToggle={() => toggleSection("color")}
-        />
-        {sections.color && (
-          <div className="grid grid-cols-2 gap-1.5 mt-2">
-            {colorItems.map((c) => (
-              <ColorSwatch
-                key={c.value}
-                value={c.value}
-                label={c.label}
-                hex={c.hex}
-                active={props.color === c.value}
-                onClick={() => setParam("color", props.color === c.value ? null : c.value)}
+      {/* ════ Dynamic tag group sections (data-driven from bound tag groups) ════ */}
+      {props.tagGroups?.length ? (
+        props.tagGroups.map((group) => (
+          <div key={group.groupKey} className="py-3 border-b border-[var(--line)]/50">
+            <SectionHeader
+              label={group.groupLabel}
+              open={!!sections[`tg_${group.groupKey}`]}
+              onToggle={() => toggleSection(`tg_${group.groupKey}`)}
+            />
+            {!!sections[`tg_${group.groupKey}`] && (
+              <TagGroupSection
+                tags={group.tags}
+                active={props.activeTags?.[group.groupKey] ?? []}
+                selectionMode={group.selectionMode}
+                onToggle={(tagKey) => setTagParam(group.groupKey, tagKey, group.selectionMode)}
+                locale={locale}
               />
-            ))}
+            )}
           </div>
-        )}
-      </div>
+        ))
+      ) : (
+        /* ════ Fallback: hardcoded Occasion section ════ */
+        <div className="py-3 border-b border-[var(--line)]/50">
+          <SectionHeader
+            label={t("filter.occasion", locale)}
+            open={!!sections.occasion}
+            onToggle={() => toggleSection("occasion")}
+          />
+          {!!sections.occasion && (
+            <SearchableChipSection
+              items={occasionItems}
+              active={props.occasion}
+              onSelect={(value) => setParam("occasion", value)}
+              searchPlaceholder={t("filter.searchOccasion", locale)}
+              locale={locale}
+            />
+          )}
+        </div>
+      )}
 
       {/* ════ Section: Size ════ */}
       <div className="py-3 border-b border-[var(--line)]/50">
@@ -510,6 +617,76 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
                 active={props.size === sz}
                 onClick={() => setParam("size", props.size === sz ? null : sz)}
               />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ════ Section: Body Measurements ════ */}
+      <div className="py-3 border-b border-[var(--line)]/50">
+        <SectionHeader
+          label={`${t("filter.bodyMeasurements", locale)} (${t("unit.cm", locale)})`}
+          open={!!sections.measurements}
+          onToggle={() => toggleSection("measurements")}
+        />
+        {!!sections.measurements && (
+          <div className="flex flex-col gap-3 mt-3">
+            {(
+              [
+                {
+                  label: t("filter.bust", locale),
+                  minKey: "bustMin" as const,
+                  maxKey: "bustMax" as const,
+                  minVal: props.bustMin,
+                  maxVal: props.bustMax,
+                },
+                {
+                  label: t("filter.waist", locale),
+                  minKey: "waistMin" as const,
+                  maxKey: "waistMax" as const,
+                  minVal: props.waistMin,
+                  maxVal: props.waistMax,
+                },
+                {
+                  label: t("filter.length", locale),
+                  minKey: "lengthMin" as const,
+                  maxKey: "lengthMax" as const,
+                  minVal: props.lengthMin,
+                  maxVal: props.lengthMax,
+                },
+              ] as const
+            ).map(({ label, minKey, maxKey, minVal, maxVal }) => (
+              <div key={minKey}>
+                <div className="text-[11px] font-medium text-[var(--ink-2)] mb-1.5">{label}</div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    placeholder="ต่ำสุด"
+                    value={minVal ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      setParam(minKey, v === "" ? null : v);
+                    }}
+                    className="w-full px-2 py-1.5 rounded-md border border-[var(--line)] bg-[var(--surface)] text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] outline-none focus:border-[var(--accent)] font-[inherit] text-center"
+                  />
+                  <span className="text-[10px] text-[var(--ink-3)] shrink-0">–</span>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    placeholder="สูงสุด"
+                    value={maxVal ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      setParam(maxKey, v === "" ? null : v);
+                    }}
+                    className="w-full px-2 py-1.5 rounded-md border border-[var(--line)] bg-[var(--surface)] text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] outline-none focus:border-[var(--accent)] font-[inherit] text-center"
+                  />
+                  <span className="text-[10px] text-[var(--ink-3)] shrink-0">{t("unit.cm", locale)}</span>
+                </div>
+              </div>
             ))}
           </div>
         )}

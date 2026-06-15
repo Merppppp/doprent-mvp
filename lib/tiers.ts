@@ -12,12 +12,14 @@ export const TIER_DRESS_LIMIT: Record<AdsTier, number | null> = {
   free: 10,
   boost: 30,
   featured: null,
+  full: null, // MVP default — unlimited
 };
 
 export const TIER_LABEL: Record<AdsTier, string> = {
   free: "Free",
   boost: "Boost",
   featured: "Featured",
+  full: "Full Plan",
 };
 
 /** Dress limit for a tier, defaulting to the Free limit when tier is missing/unknown. */

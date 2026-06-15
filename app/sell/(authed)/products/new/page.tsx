@@ -3,7 +3,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { listOccasions } from "@/lib/products";
+import { listTagGroups, listTagRequestsForShop } from "@/lib/tags";
+import { getTagGroupsForProductTypeKey } from "@/lib/tag-groups";
 import ProductForm from "../ProductForm";
 
 export const dynamic = "force-dynamic";
@@ -17,17 +18,29 @@ export default async function NewProductPage() {
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?next=/sell/products/new");
 
-  const [raw, occasions] = await Promise.all([
-    db.shop.findFirst({
-      where: { ownerId: user.id },
-      select: { id: true, slug: true, name: true, lineUrl: true, kycStatus: true },
-    }),
-    listOccasions(),
-  ]);
+  const raw = await db.shop.findFirst({
+    where: { ownerId: user.id },
+    select: { id: true, slug: true, name: true, lineUrl: true, kycStatus: true },
+  });
   if (!raw) redirect("/sell/signup");
   if (raw.kycStatus === "none" || raw.kycStatus === "rejected") {
     redirect(`/sell/kyc?slug=${raw.slug}`);
   }
+
+  const [{ productTypeId, groups }, tagGroups, tagRequestsRaw] = await Promise.all([
+    getTagGroupsForProductTypeKey("dress"),
+    listTagGroups(),
+    listTagRequestsForShop(raw.id),
+  ]);
+
+  const shopTagRequests = tagRequestsRaw.map((r) => ({
+    id: r.id,
+    requestedLabel: r.requestedLabel,
+    requestedKey: r.requestedKey,
+    status: r.status,
+    reviewNotes: r.reviewNotes,
+    tagGroup: r.tagGroup,
+  }));
 
   return (
     <div className="container" style={{ paddingTop: 32, paddingBottom: 80, maxWidth: 720 }}>
@@ -36,7 +49,15 @@ export default async function NewProductPage() {
       <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
         สินค้าจะเป็นสถานะ &ldquo;รอตรวจ&rdquo; จนกว่า admin จะอนุมัติ (ปกติ &lt; 24 ชม.)
       </p>
-      <ProductForm mode="create" shopId={raw.id} defaultLineUrl={raw.lineUrl} occasions={occasions} />
+      <ProductForm
+        mode="create"
+        shopId={raw.id}
+        defaultLineUrl={raw.lineUrl}
+        productTypeId={productTypeId ?? ""}
+        tagGroupSections={groups}
+        tagGroups={tagGroups}
+        shopTagRequests={shopTagRequests}
+      />
     </div>
   );
 }

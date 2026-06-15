@@ -3,28 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { submitKyc } from "@/app/actions/seller";
+import RequiredMark from "@/components/RequiredMark";
 
-type BusinessType = "individual" | "company";
-type Plan = "free" | "boost" | "featured";
-
-type Step = 1 | 2 | 3;
+// MVP: business type is always "individual"; plan is always "full".
+// The former Step 1 (businessType + plan choice) has been removed.
+type Step = 1 | 2;
 
 const STEPS: Array<{ id: Step; label: string }> = [
-  { id: 1, label: "ประเภทธุรกิจ" },
-  { id: 2, label: "เอกสาร" },
-  { id: 3, label: "ตรวจสอบ" },
-];
-
-const BANKS = [
-  "ธนาคารกสิกรไทย (KBANK)",
-  "ธนาคารไทยพาณิชย์ (SCB)",
-  "ธนาคารกรุงเทพ (BBL)",
-  "ธนาคารกรุงไทย (KTB)",
-  "ธนาคารกรุงศรีอยุธยา (BAY)",
-  "ธนาคารทหารไทยธนชาต (TTB)",
-  "ธนาคารออมสิน (GSB)",
-  "ธนาคาร UOB",
-  "ธนาคาร CIMB Thai",
+  { id: 1, label: "เอกสาร" },
+  { id: 2, label: "ตรวจสอบ" },
 ];
 
 type Props = { boutiqueId: string };
@@ -35,22 +22,14 @@ export default function KycWizard({ boutiqueId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState<{ field: string; pct: number } | null>(null);
+  const [kycConsent, setKycConsent] = useState(false);
 
   // form state
-  const [businessType, setBusinessType] = useState<BusinessType>("individual");
-  const [plan, setPlan] = useState<Plan>("free");
   const [legalName, setLegalName] = useState("");
   const [taxId, setTaxId] = useState("");
-  const [dbdRegNo, setDbdRegNo] = useState("");
-  // bank account fields are optional / commented out for now
-  // const [bankName, setBankName] = useState(BANKS[0]);
-  // const [bankAccNo, setBankAccNo] = useState("");
-  // const [bankAccName, setBankAccName] = useState("");
   const [idCardUrl, setIdCardUrl] = useState("");
-  const [dbdDocUrl, setDbdDocUrl] = useState("");
-  const [bookBankUrl, setBookBankUrl] = useState("");
 
-  async function uploadFile(field: "id_card" | "dbd_doc" | "book_bank", file: File) {
+  async function uploadFile(field: "id_card", file: File) {
     setError(null);
     setUploading({ field, pct: 1 });
     try {
@@ -66,10 +45,8 @@ export default function KycWizard({ boutiqueId }: Props) {
         return;
       }
       const json = await res.json();
-      const key = json.key ?? "";
+      const key = json.key ?? json.urls?.large ?? json.url ?? "";
       if (field === "id_card") setIdCardUrl(key);
-      if (field === "dbd_doc") setDbdDocUrl(key);
-      if (field === "book_bank") setBookBankUrl(key);
       setUploading(null);
     } catch (err) {
       setError((err as Error).message);
@@ -78,15 +55,14 @@ export default function KycWizard({ boutiqueId }: Props) {
   }
 
   function validateStep(s: Step): string | null {
-    if (s === 1) return null;
-    if (s === 2) {
+    if (s === 1) {
       if (!legalName.trim()) return "กรุณาใส่ชื่อตามเอกสาร";
-      if (!taxId.trim()) return "กรุณาใส่เลขบัตรประชาชน/เลขผู้เสียภาษี";
+      if (!taxId.trim()) return "กรุณาใส่เลขบัตรประชาชน";
       if (!idCardUrl) return "กรุณาอัปโหลดบัตรประชาชน";
-      if (businessType === "company" && !dbdDocUrl) return "กรุณาอัปโหลดหนังสือรับรองบริษัท";
       return null;
     }
-    if (s === 3) {
+    if (s === 2) {
+      if (!kycConsent) return "กรุณายืนยันความยินยอมการเก็บข้อมูลส่วนบุคคล (PDPA) ก่อนส่ง";
       return null;
     }
     return null;
@@ -99,7 +75,7 @@ export default function KycWizard({ boutiqueId }: Props) {
       return;
     }
     setError(null);
-    setStep((s) => (s < 3 ? ((s + 1) as Step) : s));
+    setStep((s) => (s < 2 ? ((s + 1) as Step) : s));
   }
 
   function prevStep() {
@@ -109,21 +85,18 @@ export default function KycWizard({ boutiqueId }: Props) {
 
   async function onSubmit() {
     setError(null);
+    if (!kycConsent) {
+      setError("กรุณายืนยันความยินยอมการเก็บข้อมูลส่วนบุคคล (PDPA) ก่อนส่ง");
+      return;
+    }
     setSubmitting(true);
     const fd = new FormData();
     fd.set("boutique_id", boutiqueId);
-    fd.set("business_type", businessType);
+    fd.set("business_type", "individual"); // MVP: always individual
     fd.set("legal_name", legalName);
     fd.set("tax_id", taxId);
-    if (dbdRegNo) fd.set("dbd_reg_no", dbdRegNo);
-    // Bank account data is optional / removed from submission
-    // fd.set("bank_name", bankName);
-    // fd.set("bank_acc_no", bankAccNo);
-    // fd.set("bank_acc_name", bankAccName);
     fd.set("id_card_url", idCardUrl);
-    if (dbdDocUrl) fd.set("dbd_doc_url", dbdDocUrl);
-    // fd.set("book_bank_url", bookBankUrl);
-    fd.set("plan", plan);
+    fd.set("plan", "full"); // MVP: all shops get full plan
     const res = await submitKyc(fd);
     if (!res.ok) {
       setError(res.error ?? "ส่งไม่สำเร็จ");
@@ -190,33 +163,23 @@ export default function KycWizard({ boutiqueId }: Props) {
 
       {/* Step content */}
       {step === 1 ? (
-        <Step1 businessType={businessType} setBusinessType={setBusinessType} plan={plan} setPlan={setPlan} />
-      ) : null}
-      {step === 2 ? (
-        <Step2
-          businessType={businessType}
+        <StepDocuments
           legalName={legalName}
           setLegalName={setLegalName}
           taxId={taxId}
           setTaxId={setTaxId}
-          dbdRegNo={dbdRegNo}
-          setDbdRegNo={setDbdRegNo}
           idCardUrl={idCardUrl}
-          dbdDocUrl={dbdDocUrl}
           uploading={uploading}
           uploadFile={uploadFile}
         />
       ) : null}
-      {step === 3 ? (
-        <Step4
-          businessType={businessType}
-          plan={plan}
+      {step === 2 ? (
+        <StepReview
           legalName={legalName}
           taxId={taxId}
-          dbdRegNo={dbdRegNo}
           idCardUrl={idCardUrl}
-          dbdDocUrl={dbdDocUrl}
-          bookBankUrl={bookBankUrl}
+          kycConsent={kycConsent}
+          setKycConsent={setKycConsent}
         />
       ) : null}
 
@@ -247,12 +210,18 @@ export default function KycWizard({ boutiqueId }: Props) {
         >
           ← ย้อนกลับ
         </button>
-        {step < 3 ? (
+        {step < 2 ? (
           <button type="button" className="btn btn-dark" onClick={nextStep}>
             ถัดไป →
           </button>
         ) : (
-          <button type="button" className="btn btn-dark" onClick={onSubmit} disabled={submitting}>
+          <button
+            type="button"
+            className="btn btn-dark"
+            onClick={onSubmit}
+            disabled={submitting || !kycConsent}
+            style={{ opacity: submitting || !kycConsent ? 0.6 : 1 }}
+          >
             {submitting ? "กำลังส่ง…" : "ส่งข้อมูล KYC"}
           </button>
         )}
@@ -263,229 +232,87 @@ export default function KycWizard({ boutiqueId }: Props) {
 
 /* === Step components === */
 
-function Step1({
-  businessType,
-  setBusinessType,
-  plan,
-  setPlan,
-}: {
-  businessType: BusinessType;
-  setBusinessType: (b: BusinessType) => void;
-  plan: Plan;
-  setPlan: (p: Plan) => void;
-}) {
-  return (
-    <div>
-      <h2 style={sectionTitle}>ประเภทธุรกิจ</h2>
-      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr", marginBottom: 28 }}>
-        {(["individual", "company"] as BusinessType[]).map((bt) => (
-          <button
-            key={bt}
-            type="button"
-            onClick={() => setBusinessType(bt)}
-            style={{
-              padding: "16px",
-              textAlign: "left",
-              border: `${businessType === bt ? 2 : 1}px solid ${businessType === bt ? "var(--ink)" : "var(--line)"}`,
-              background: businessType === bt ? "var(--bg)" : "var(--surface)",
-              borderRadius: 8,
-              cursor: "pointer",
-            }}
-          >
-            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
-              {bt === "individual" ? "บุคคลธรรมดา" : "นิติบุคคล"}
-            </div>
-            <div style={{ fontSize: 13, color: "var(--ink-3)", lineHeight: 1.5 }}>
-              {bt === "individual"
-                ? "เปิดร้านในชื่อตัวเอง ใช้บัตรประชาชน"
-                : "ในนามบริษัท/ห้าง ใช้หนังสือรับรองบริษัท"}
-            </div>
-          </button>
-        ))}
-      </div>
-
-      <h2 style={sectionTitle}>แพ็กเกจ</h2>
-      <p style={{ fontSize: 13, color: "var(--ink-3)", marginBottom: 14 }}>
-        เริ่มฟรีก่อนได้ อัปเกรดผ่าน LINE ของ DopRent ภายหลัง
-      </p>
-      <div style={{ display: "grid", gap: 10 }}>
-        {(["free", "boost", "featured"] as Plan[]).map((p) => (
-          <label
-            key={p}
-            style={{
-              display: "flex",
-              gap: 12,
-              padding: "12px 14px",
-              border: `${plan === p ? 2 : 1}px solid ${plan === p ? "var(--ink)" : "var(--line)"}`,
-              borderRadius: 8,
-              cursor: "pointer",
-              background: plan === p ? "var(--bg)" : "var(--surface)",
-            }}
-          >
-            <input
-              type="radio"
-              name="plan"
-              value={p}
-              checked={plan === p}
-              onChange={() => setPlan(p)}
-              style={{ marginTop: 2 }}
-            />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, textTransform: "capitalize" }}>{p}</div>
-              <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 2 }}>
-                {p === "free" ? "ฟรี ตลอดชีพ" : p === "boost" ? "฿990/เดือน" : "฿2,900/เดือน"}
-              </div>
-            </div>
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Step2(props: {
-  businessType: BusinessType;
+function StepDocuments(props: {
   legalName: string;
   setLegalName: (s: string) => void;
   taxId: string;
   setTaxId: (s: string) => void;
-  dbdRegNo: string;
-  setDbdRegNo: (s: string) => void;
   idCardUrl: string;
-  dbdDocUrl: string;
   uploading: { field: string; pct: number } | null;
-  uploadFile: (f: "id_card" | "dbd_doc" | "book_bank", file: File) => Promise<void>;
+  uploadFile: (f: "id_card", file: File) => Promise<void>;
 }) {
-  const isCompany = props.businessType === "company";
   return (
     <div>
       <h2 style={sectionTitle}>ข้อมูลผู้ดูแลร้าน</h2>
       <div style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 24 }}>
-        <Labeled label={isCompany ? "ชื่อบริษัท (ตามหนังสือรับรอง) *" : "ชื่อ-นามสกุล (ตามบัตรประชาชน) *"}>
+        <Labeled label="ชื่อ-นามสกุล (ตามบัตรประชาชน)" required>
           <input
             type="text"
             value={props.legalName}
             onChange={(e) => props.setLegalName(e.target.value)}
             required
+            aria-required={true}
             style={inputStyle}
           />
         </Labeled>
-        <Labeled label={isCompany ? "เลขประจำตัวผู้เสียภาษี (13 หลัก) *" : "เลขบัตรประชาชน (13 หลัก) *"}>
+        <Labeled label="เลขบัตรประชาชน (13 หลัก)" required>
           <input
             type="text"
             value={props.taxId}
             onChange={(e) => props.setTaxId(e.target.value.replace(/\D/g, "").slice(0, 13))}
             inputMode="numeric"
             maxLength={13}
+            aria-required={true}
             style={inputStyle}
           />
         </Labeled>
-        {isCompany ? (
-          <Labeled label="เลขทะเบียนนิติบุคคล (DBD)">
-            <input
-              type="text"
-              value={props.dbdRegNo}
-              onChange={(e) => props.setDbdRegNo(e.target.value)}
-              style={inputStyle}
-            />
-          </Labeled>
-        ) : null}
       </div>
 
       <h2 style={sectionTitle}>เอกสารยืนยันตัวตน</h2>
+      {/* Privacy reassurance note */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 8,
+          padding: "10px 14px",
+          background: "var(--surface)",
+          border: "1px solid var(--line)",
+          borderRadius: 8,
+          marginBottom: 16,
+          fontSize: 13,
+          color: "var(--ink-2)",
+          lineHeight: 1.55,
+        }}
+      >
+        <span style={{ fontSize: 16, flexShrink: 0 }}>🔒</span>
+        <span>
+          <strong>เอกสารถูกเก็บเป็นความลับ</strong> เข้าถึงได้เฉพาะเจ้าหน้าที่ตรวจสอบของ DopRent เท่านั้น
+          ไม่เปิดเผยต่อผู้ใช้รายอื่น ตาม{" "}
+          <a href="/privacy" target="_blank" rel="noreferrer noopener" style={{ color: "var(--accent)" }}>
+            นโยบายความเป็นส่วนตัว
+          </a>
+        </span>
+      </div>
       <FileSlot
-        label={isCompany ? "หน้าบัตรประชาชนกรรมการ *" : "หน้าบัตรประชาชน *"}
+        label="หน้าบัตรประชาชน"
         hint="JPG / PNG / PDF · ใช้สำหรับยืนยันตัวตนเท่านั้น เก็บเป็นความลับ"
+        required
         url={props.idCardUrl}
         field="id_card"
         uploading={props.uploading}
         uploadFile={props.uploadFile}
       />
-      {isCompany ? (
-        <FileSlot
-          label="หนังสือรับรองบริษัท (DBD) *"
-          hint="อายุไม่เกิน 3 เดือน"
-          url={props.dbdDocUrl}
-          field="dbd_doc"
-          uploading={props.uploading}
-          uploadFile={props.uploadFile}
-        />
-      ) : null}
     </div>
   );
 }
 
-function Step3(props: {
-  bankName: string;
-  setBankName: (s: string) => void;
-  bankAccNo: string;
-  setBankAccNo: (s: string) => void;
-  bankAccName: string;
-  setBankAccName: (s: string) => void;
-  bookBankUrl: string;
-  uploading: { field: string; pct: number } | null;
-  uploadFile: (f: "id_card" | "dbd_doc" | "book_bank", file: File) => Promise<void>;
-}) {
-  return (
-    <div>
-      <h2 style={sectionTitle}>บัญชีรับเงิน</h2>
-      <p style={{ fontSize: 13, color: "var(--ink-3)", marginBottom: 18 }}>
-        ลูกค้าจะโอนเงินตรงให้บัญชีนี้ (DopRent ไม่หักเงิน) หากยังไม่พร้อมสามารถเว้นไว้ก่อนแล้วส่งได้
-      </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 24 }}>
-        <Labeled label="ธนาคาร">
-          <select
-            value={props.bankName}
-            onChange={(e) => props.setBankName(e.target.value)}
-            style={inputStyle}
-          >
-            {BANKS.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-        </Labeled>
-        <Labeled label="เลขที่บัญชี">
-          <input
-            type="text"
-            value={props.bankAccNo}
-            onChange={(e) => props.setBankAccNo(e.target.value.replace(/\D/g, ""))}
-            inputMode="numeric"
-            style={inputStyle}
-          />
-        </Labeled>
-        <Labeled label="ชื่อบัญชี">
-          <input
-            type="text"
-            value={props.bankAccName}
-            onChange={(e) => props.setBankAccName(e.target.value)}
-            style={inputStyle}
-          />
-        </Labeled>
-      </div>
-
-      <FileSlot
-        label="หน้าสมุดบัญชีธนาคาร"
-        hint="หากมี ให้แนบหน้าที่มีชื่อบัญชีและเลขบัญชี"
-        url={props.bookBankUrl}
-        field="book_bank"
-        uploading={props.uploading}
-        uploadFile={props.uploadFile}
-      />
-    </div>
-  );
-}
-
-function Step4(props: {
-  businessType: BusinessType;
-  plan: Plan;
+function StepReview(props: {
   legalName: string;
   taxId: string;
-  dbdRegNo: string;
   idCardUrl: string;
-  dbdDocUrl: string;
-  bookBankUrl: string;
+  kycConsent: boolean;
+  setKycConsent: (v: boolean) => void;
 }) {
   return (
     <div>
@@ -493,17 +320,53 @@ function Step4(props: {
       <p style={{ fontSize: 13, color: "var(--ink-3)", marginBottom: 18 }}>
         เช็คข้อมูลก่อนกดส่ง ส่งแล้วแก้ไม่ได้ ถ้าตรวจไม่ผ่านทีม DopRent จะแจ้งให้ส่งใหม่
       </p>
-      <ReviewRow label="ประเภทธุรกิจ" value={props.businessType === "company" ? "นิติบุคคล" : "บุคคลธรรมดา"} />
-      <ReviewRow label="แพ็กเกจ" value={props.plan} />
       <ReviewRow label="ชื่อตามเอกสาร" value={props.legalName} />
       <ReviewRow label="เลขประจำตัว" value={props.taxId.replace(/.(?=.{4})/g, "•")} />
-      {props.dbdRegNo ? <ReviewRow label="เลข DBD" value={props.dbdRegNo} /> : null}
       <ReviewRow label="บัตรประชาชน" value={props.idCardUrl ? "✓ อัปโหลดแล้ว" : "✗ ยังไม่ได้อัปโหลด"} />
-      {props.businessType === "company" ? (
-        <ReviewRow label="หนังสือรับรอง" value={props.dbdDocUrl ? "✓ อัปโหลดแล้ว" : "—"} />
-      ) : null}
-      {/* Bank account section hidden as requested */}
-      {/* <ReviewRow label="สมุดบัญชี" value={props.bookBankUrl ? "✓ อัปโหลดแล้ว" : "✗"} /> */}
+
+      {/* PDPA KYC Consent */}
+      <div
+        style={{
+          marginTop: 24,
+          padding: "16px",
+          background: "var(--surface)",
+          border: "1px solid var(--line)",
+          borderRadius: 8,
+        }}
+      >
+        <label
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 10,
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={props.kycConsent}
+            onChange={(e) => props.setKycConsent(e.target.checked)}
+            required
+            style={{ marginTop: 3, flexShrink: 0, width: 16, height: 16, accentColor: "var(--ink)" }}
+          />
+          <span style={{ fontSize: 13, lineHeight: 1.7, color: "var(--ink)" }}>
+            ฉันยินยอมให้ DopRent เก็บ ใช้ และประมวลผลข้อมูลส่วนบุคคลและเอกสารยืนยันตัวตน
+            (บัตรประชาชน) เพื่อยืนยันตัวตนผู้ขายและป้องกันการทุจริต
+            ตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562{" "}
+            (
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noreferrer noopener"
+              style={{ color: "var(--accent)", textDecoration: "underline" }}
+            >
+              อ่านนโยบายความเป็นส่วนตัว
+            </a>
+            ){" "}
+            <span style={{ color: "var(--danger)" }}>*</span>
+          </span>
+        </label>
+      </div>
     </div>
   );
 }
@@ -528,6 +391,7 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 function FileSlot({
   label,
   hint,
+  required,
   url,
   field,
   uploading,
@@ -535,15 +399,18 @@ function FileSlot({
 }: {
   label: string;
   hint?: string;
+  required?: boolean;
   url: string;
-  field: "id_card" | "dbd_doc" | "book_bank";
+  field: "id_card";
   uploading: { field: string; pct: number } | null;
-  uploadFile: (f: "id_card" | "dbd_doc" | "book_bank", file: File) => Promise<void>;
+  uploadFile: (f: "id_card", file: File) => Promise<void>;
 }) {
   const isUploading = uploading?.field === field;
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
+        {label}{required ? <RequiredMark /> : null}
+      </div>
       {hint ? <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8 }}>{hint}</div> : null}
       <div
         style={{
@@ -596,10 +463,12 @@ function FileSlot({
   );
 }
 
-function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+function Labeled({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 6 }}>{label}</label>
+      <label style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
+        {label}{required ? <RequiredMark /> : null}
+      </label>
       {children}
     </div>
   );

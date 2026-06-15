@@ -26,8 +26,16 @@ const COLOR_GRAD: Record<Color, [string, string]> = {
   purple: ["oklch(0.55 0.09 292)", "oklch(0.34 0.08 298)"],
 };
 
+export type BannerSlide = {
+  id: string;
+  title: string;
+  imageUrl: string;
+  linkUrl: string | null;
+};
+
 type Props = {
   shops: Shop[];
+  slides?: BannerSlide[];
   locale?: Locale;
 };
 
@@ -61,6 +69,9 @@ const SAMPLE_SHOPS: Shop[] = [
     hours: null,
     line_url: "#",
     instagram: null,
+    facebook: null,
+    twitter: null,
+    tiktok: null,
     since_year: 2020,
     cover_color: "rose",
     cover_image: `${ASSET_BASE}/banners/banner-1.png`,
@@ -73,6 +84,9 @@ const SAMPLE_SHOPS: Shop[] = [
     status: "live",
     reject_reason: null,
     kyc_status: "verified",
+    rating_avg: null,
+    rating_count: 0,
+    is_open: true,
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
   },
@@ -96,6 +110,9 @@ const SAMPLE_SHOPS: Shop[] = [
     hours: null,
     line_url: "#",
     instagram: null,
+    facebook: null,
+    twitter: null,
+    tiktok: null,
     since_year: 2019,
     cover_color: "ivory",
     cover_image: `${ASSET_BASE}/banners/banner-2.png`,
@@ -108,6 +125,9 @@ const SAMPLE_SHOPS: Shop[] = [
     status: "live",
     reject_reason: null,
     kyc_status: "verified",
+    rating_avg: null,
+    rating_count: 0,
+    is_open: true,
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
   },
@@ -131,6 +151,9 @@ const SAMPLE_SHOPS: Shop[] = [
     hours: null,
     line_url: "#",
     instagram: null,
+    facebook: null,
+    twitter: null,
+    tiktok: null,
     since_year: 2021,
     cover_color: "black",
     cover_image: `${ASSET_BASE}/banners/banner-3.png`,
@@ -143,6 +166,9 @@ const SAMPLE_SHOPS: Shop[] = [
     status: "live",
     reject_reason: null,
     kyc_status: "verified",
+    rating_avg: null,
+    rating_count: 0,
+    is_open: true,
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
   },
@@ -166,6 +192,9 @@ const SAMPLE_SHOPS: Shop[] = [
     hours: null,
     line_url: "#",
     instagram: null,
+    facebook: null,
+    twitter: null,
+    tiktok: null,
     since_year: 2022,
     cover_color: "navy",
     cover_image: `${ASSET_BASE}/banners/banner-4.png`,
@@ -178,6 +207,9 @@ const SAMPLE_SHOPS: Shop[] = [
     status: "live",
     reject_reason: null,
     kyc_status: "verified",
+    rating_avg: null,
+    rating_count: 0,
+    is_open: true,
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
   },
@@ -201,6 +233,9 @@ const SAMPLE_SHOPS: Shop[] = [
     hours: null,
     line_url: "#",
     instagram: null,
+    facebook: null,
+    twitter: null,
+    tiktok: null,
     since_year: 2023,
     cover_color: "green",
     cover_image: `${ASSET_BASE}/banners/banner-5.png`,
@@ -213,6 +248,9 @@ const SAMPLE_SHOPS: Shop[] = [
     status: "live",
     reject_reason: null,
     kyc_status: "verified",
+    rating_avg: null,
+    rating_count: 0,
+    is_open: true,
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
   },
@@ -236,6 +274,9 @@ const SAMPLE_SHOPS: Shop[] = [
     hours: null,
     line_url: "#",
     instagram: null,
+    facebook: null,
+    twitter: null,
+    tiktok: null,
     since_year: 2018,
     cover_color: "purple",
     cover_image: `${ASSET_BASE}/banners/banner-6.png`,
@@ -248,24 +289,26 @@ const SAMPLE_SHOPS: Shop[] = [
     status: "live",
     reject_reason: null,
     kyc_status: "verified",
+    rating_avg: null,
+    rating_count: 0,
+    is_open: true,
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
   },
 ];
 
-export default function BannerCarousel({ shops, locale = "th" }: Props) {
+export default function BannerCarousel({ shops, slides, locale = "th" }: Props) {
   const swiperRef = useRef<SwiperType | null>(null);
   const paginationRef = useRef<HTMLDivElement>(null);
   const [swiperReady, setSwiperReady] = useState(false);
 
-  const displayShops = shops.length < 3 ? SAMPLE_SHOPS : shops;
+  // DB banners take priority; fall back to shop-derived slides
+  const useDbBanners = slides && slides.length > 0;
+  const displayShops = useDbBanners ? [] : (shops.length < 3 ? SAMPLE_SHOPS : shops);
 
-  // After Swiper mounts and the pagination DOM element is in the tree,
-  // wire up the custom pagination container (refs are null during render phase).
   useEffect(() => {
     const swiper = swiperRef.current;
     if (!swiper || !paginationRef.current) return;
-
     const pag = swiper.params.pagination;
     if (pag && typeof pag !== "boolean") {
       pag.el = paginationRef.current;
@@ -275,13 +318,14 @@ export default function BannerCarousel({ shops, locale = "th" }: Props) {
     swiper.pagination.update();
   }, [swiperReady]);
 
-  if (displayShops.length === 0) return null;
+  const totalSlides = useDbBanners ? slides!.length : displayShops.length;
+  if (totalSlides === 0) return null;
 
   return (
     <div className="banner-carousel">
       <Swiper
         modules={[Autoplay, Pagination]}
-        loop={displayShops.length >= 2}
+        loop={totalSlides >= 2}
         speed={700}
         autoplay={{ delay: 5500, disableOnInteraction: false, pauseOnMouseEnter: true }}
         pagination={{ clickable: true }}
@@ -291,67 +335,81 @@ export default function BannerCarousel({ shops, locale = "th" }: Props) {
         }}
         className="bc-swiper"
       >
-        {displayShops.map((b) => {
-          const [from, to] = COLOR_GRAD[b.cover_color] ?? COLOR_GRAD.green;
-          const bgStyle = b.cover_image
-            ? {
-                backgroundImage: `linear-gradient(rgba(0,0,0,0.25), rgba(0,0,0,0.55)), url(${b.cover_image})`,
-                backgroundSize: "cover" as const,
-                backgroundPosition: "center" as const,
-              }
-            : { background: `linear-gradient(135deg, ${from} 0%, ${to} 100%)` };
-
-          return (
-            <SwiperSlide key={b.id}>
-              <div className="bc-slide" style={bgStyle}>
-                {/* Noise texture overlay */}
-                <div className="bc-noise" aria-hidden />
-
-                {/* LEFT: Content */}
-                <div className="bc-content">
-                  <span className="bc-kicker">{t("banner.kicker", locale)}</span>
-
-                  <div className="bc-badges">
-                    {b.verified && (
-                      <span className="bc-badge bc-badge--verified">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><polyline points="4,12 10,18 20,6" /></svg>
-                        Verified
-                      </span>
-                    )}
-                    <span className="bc-badge bc-badge--area">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
-                      {b.area_label}
-                    </span>
+        {useDbBanners
+          ? slides!.map((s) => {
+              const bgStyle: React.CSSProperties = {
+                backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.6)), url(${s.imageUrl})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              };
+              const href = s.linkUrl ?? "#";
+              return (
+                <SwiperSlide key={s.id}>
+                  <div className="bc-slide" style={bgStyle}>
+                    <div className="bc-noise" aria-hidden />
+                    <div className="bc-content">
+                      <span className="bc-kicker">{t("banner.kicker", locale)}</span>
+                      <h2 className="bc-name">{s.title}</h2>
+                      {href !== "#" && (
+                        <a href={href} className="bc-cta">
+                          {t("banner.cta", locale)}
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                      )}
+                    </div>
                   </div>
+                </SwiperSlide>
+              );
+            })
+          : displayShops.map((b) => {
+              const [from, to] = COLOR_GRAD[b.cover_color] ?? COLOR_GRAD.green;
+              const bgStyle = b.cover_image
+                ? {
+                    backgroundImage: `linear-gradient(rgba(0,0,0,0.25), rgba(0,0,0,0.55)), url(${b.cover_image})`,
+                    backgroundSize: "cover" as const,
+                    backgroundPosition: "center" as const,
+                  }
+                : { background: `linear-gradient(135deg, ${from} 0%, ${to} 100%)` };
 
-                  <h2 className="bc-name">{b.name}</h2>
-
-                  {b.tag && (
-                    <p className="bc-tag">{b.tag}</p>
-                  )}
-
-                  <Link href={`/shop/${b.slug}`} className="bc-cta">
-                    {t("banner.cta", locale)}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                  </Link>
-                </div>
-
-                {/* Decorative shapes — only when no cover image */}
-                {!b.cover_image && (
-                  <>
-                    <div className="bc-deco bc-deco--1" aria-hidden />
-                    <div className="bc-deco bc-deco--2" aria-hidden />
-                  </>
-                )}
-              </div>
-            </SwiperSlide>
-          );
-        })}
+              return (
+                <SwiperSlide key={b.id}>
+                  <div className="bc-slide" style={bgStyle}>
+                    <div className="bc-noise" aria-hidden />
+                    <div className="bc-content">
+                      <span className="bc-kicker">{t("banner.kicker", locale)}</span>
+                      <div className="bc-badges">
+                        {b.verified && (
+                          <span className="bc-badge bc-badge--verified">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><polyline points="4,12 10,18 20,6" /></svg>
+                            Verified
+                          </span>
+                        )}
+                        <span className="bc-badge bc-badge--area">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                          {b.area_label}
+                        </span>
+                      </div>
+                      <h2 className="bc-name">{b.name}</h2>
+                      {b.tag && <p className="bc-tag">{b.tag}</p>}
+                      <Link href={`/shop/${b.slug}`} className="bc-cta">
+                        {t("banner.cta", locale)}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                      </Link>
+                    </div>
+                    {!b.cover_image && (
+                      <>
+                        <div className="bc-deco bc-deco--1" aria-hidden />
+                        <div className="bc-deco bc-deco--2" aria-hidden />
+                      </>
+                    )}
+                  </div>
+                </SwiperSlide>
+              );
+            })}
       </Swiper>
 
-      {displayShops.length >= 2 && (
+      {totalSlides >= 2 && (
         <>
-          {/* Custom nav arrows — direct slidePrev/slideNext avoids ref timing issues */}
           <button
             className="bc-arrow bc-arrow--prev"
             aria-label={t("banner.prevAria", locale)}
@@ -366,8 +424,6 @@ export default function BannerCarousel({ shops, locale = "th" }: Props) {
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
           </button>
-
-          {/* Custom pagination dots */}
           <div ref={paginationRef} className="bc-dots" />
         </>
       )}

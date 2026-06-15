@@ -38,6 +38,7 @@ export default function UserMenu({
   email,
   isAdmin,
   isSeller,
+  hasShop,
   initials,
   savedCount,
   renterBadge,
@@ -48,6 +49,8 @@ export default function UserMenu({
   email: string;
   isAdmin: boolean;
   isSeller: boolean;
+  /** true when the user actually owns a shop — independent of admin role */
+  hasShop?: boolean;
   initials: string;
   savedCount: number;
   renterBadge: number;
@@ -197,8 +200,8 @@ export default function UserMenu({
           </Link>
         </div>
 
-        {/* ── Group 2: Manage shop (seller only) ── */}
-        {isSeller && !isAdmin && (
+        {/* ── Group 2: Manage shop (any shop owner — incl. admin-with-shop) ── */}
+        {(hasShop ?? isSeller) && (
           <>
             <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
             <div
@@ -240,34 +243,6 @@ export default function UserMenu({
                 padding: "8px 16px 4px",
                 fontSize: 11,
                 fontWeight: 600,
-                color: "var(--ink-3)",
-                letterSpacing: "0.04em",
-                textTransform: "uppercase",
-              }}
-            >
-              {t("menu.manageShop", locale)}
-            </div>
-            <Link href="/sell/dashboard" style={menuItemStyle}>
-              {t("menu.shopDashboard", locale)}
-            </Link>
-            <Link
-              href="/sell/bookings"
-              style={{
-                ...menuItemStyle,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              {t("menu.shopBookings", locale)}
-              <Pill n={sellerBadge} />
-            </Link>
-            <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
-            <div
-              style={{
-                padding: "8px 16px 4px",
-                fontSize: 11,
-                fontWeight: 600,
                 color: "var(--info)",
                 letterSpacing: "0.04em",
                 textTransform: "uppercase",
@@ -284,10 +259,12 @@ export default function UserMenu({
           </>
         )}
 
-        {/* ── Language ── */}
-        <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
-        <div style={{ padding: "8px 16px" }}>
-          <LocaleToggle defaultLocale={locale} variant="dropdown" />
+        {/* ── Language (mobile only — desktop has the navbar-top switcher) ── */}
+        <div className="md:hidden">
+          <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
+          <div style={{ padding: "8px 16px" }}>
+            <LocaleToggle defaultLocale={locale} variant="dropdown" />
+          </div>
         </div>
 
         {/* ── Sign out ── */}

@@ -22,10 +22,11 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   "search.button":      { th: "ค้นหา",                  en: "Search" },
 
   // ── Sort ─────────────────────────────────────────────────────────────────
-  "sort.label":     { th: "เรียงลำดับ",      en: "Sort" },
-  "sort.featured":  { th: "เกี่ยวข้อง",      en: "Relevant" },
-  "sort.priceAsc":  { th: "ราคา ต่ำ→สูง",   en: "Price: Low → High" },
-  "sort.priceDesc": { th: "ราคา สูง→ต่ำ",   en: "Price: High → Low" },
+  "sort.label":       { th: "เรียงลำดับ",      en: "Sort" },
+  "sort.featured":    { th: "เกี่ยวข้อง",      en: "Relevant" },
+  "sort.priceAsc":    { th: "ราคา ต่ำ→สูง",   en: "Price: Low → High" },
+  "sort.priceDesc":   { th: "ราคา สูง→ต่ำ",   en: "Price: High → Low" },
+  "sort.ratingDesc":  { th: "คะแนนรีวิว",      en: "Top Rated" },
 
   // ── Filter ───────────────────────────────────────────────────────────────
   "filter.title":    { th: "Filter",         en: "Filter" },
@@ -41,7 +42,13 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   "filter.showAll":        { th: "แสดงทั้งหมด ({n})",   en: "Show all ({n})" },
   "filter.showLess":       { th: "แสดงน้อยลง",          en: "Show less" },
   "filter.noResults":      { th: "ไม่พบรายการ",         en: "No matches" },
-  "filter.removeFilter":   { th: "ลบตัวกรอง",           en: "Remove filter" },
+  "filter.removeFilter":        { th: "ลบตัวกรอง",               en: "Remove filter" },
+  "filter.searchTags":          { th: "ค้นหาแท็ก...",             en: "Search tags..." },
+  "filter.bodyMeasurements":    { th: "ขนาดตัว",                  en: "Body Measurements" },
+  "filter.bust":                { th: "รอบอก",                    en: "Bust" },
+  "filter.waist":               { th: "รอบเอว",                   en: "Waist" },
+  "filter.length":              { th: "ความยาว",                  en: "Length" },
+  "unit.cm":                    { th: "ซม.",                       en: "cm" },
 
   // Dress-type sub-group headers
   "type.group.top":    { th: "เสื้อ",                  en: "Tops" },
@@ -125,6 +132,8 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   "footer.myDashboard": { th: "Dashboard ร้านของฉัน", en: "My Shop Dashboard" },
   "footer.allBoutiques":{ th: "ร้านเช่าทั้งหมด",      en: "All Boutiques" },
   "footer.sellLink":    { th: "เปิดร้านขาย →",        en: "Open a Shop →" },
+  "footer.privacy":     { th: "นโยบายความเป็นส่วนตัว", en: "Privacy Policy" },
+  "footer.terms":       { th: "เงื่อนไขการใช้บริการ",  en: "Terms of Service" },
 
   // ── Banner ────────────────────────────────────────────────────────────────
   "banner.kicker":   { th: "ร้านค้าแนะนำ",  en: "Featured Shop" },

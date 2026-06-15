@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
+import { db } from "@/lib/db";
 
 import { getBookingBadges } from "@/lib/booking-queries";
 import Logo from "./Logo";
@@ -23,7 +24,18 @@ export default async function Header() {
     .toUpperCase();
   const savedCount = user?.savedProductIds?.length ?? 0;
   const badges = user ? await getBookingBadges() : { renter: 0, seller: 0 };
-  const isSeller = user?.role === "seller" || user?.role === "admin";
+  const isAdmin = user?.role === "admin";
+  // Shop ownership is independent of role: an admin can ALSO own a shop. Derive
+  // it from actual ownership (not the single Role enum) so an admin-with-shop
+  // still sees the "manage shop" surfaces. This gate is purely for display;
+  // real authorization lives in route guards and server actions.
+  const hasShop = user
+    ? (await db.shop.findFirst({
+        where: { ownerId: user.id },
+        select: { id: true },
+      })) !== null
+    : false;
+  const isSeller = user?.role === "seller";
 
   return (
     <header
@@ -43,14 +55,19 @@ export default async function Header() {
       >
         {/* Left */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {!isSeller && (
+          {!hasShop && !isAdmin && (
             <Link href="/sell/signup" style={topLinkStyle}>
               {t("nav.openShop", locale)}
             </Link>
           )}
-          {isSeller && (
+          {hasShop && (
             <Link href="/sell/dashboard" style={topLinkStyle}>
               {t("menu.shopDashboard", locale)}
+            </Link>
+          )}
+          {isAdmin && (
+            <Link href="/admin" style={topLinkStyle}>
+              Admin
             </Link>
           )}
           <span style={topDividerStyle}>|</span>
@@ -115,6 +132,7 @@ export default async function Header() {
               email={user.email}
               isAdmin={user.role === "admin"}
               isSeller={isSeller}
+              hasShop={hasShop}
               initials={initials}
               savedCount={savedCount}
               renterBadge={badges.renter}

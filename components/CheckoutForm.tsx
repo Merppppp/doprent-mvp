@@ -15,6 +15,8 @@ type Props = {
   priceTiers?: PriceTier[] | null;
   deposit: number;
   addresses: Address[];
+  /** Optional variant (size) chosen by the renter on the product detail page. */
+  variantId?: string | null;
 };
 
 const fmtThai = (s: string) => {
@@ -31,6 +33,7 @@ export default function CheckoutForm({
   priceTiers,
   deposit,
   addresses: initialAddresses,
+  variantId,
 }: Props) {
   const router = useRouter();
   const [addresses, setAddresses] = useState<Address[]>(initialAddresses);
@@ -80,6 +83,7 @@ export default function CheckoutForm({
     fd.set("address_id", selectedId);
     fd.set("start_date", startDate);
     fd.set("end_date", endDate);
+    if (variantId) fd.set("variant_id", variantId);
     const res = await createBooking(fd);
     if (!res.ok) {
       setBusy(false);

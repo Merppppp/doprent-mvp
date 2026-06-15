@@ -3,6 +3,7 @@ import ProductCardImage from "./ProductCardImage";
 import SaveButton from "./SaveButton";
 import VerifiedBadge from "./VerifiedBadge";
 import DistanceBadge from "./DistanceBadge";
+import StarRating from "./StarRating";
 import { hasMultipleRates, startingPerDay } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
 
@@ -33,7 +34,7 @@ export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn
             transition: "transform 0.2s",
           }}
         >
-          <ProductCardImage src={imgSrc} alt={product.name} color={product.color} variant={variant} />
+          <ProductCardImage src={imgSrc} alt={product.name} color={product.color ?? "rose"} variant={variant} />
           <SaveButton productId={product.id} initialSaved={isSaved} isLoggedIn={isLoggedIn} />
         </div>
         <div style={{ padding: "0 2px" }}>
@@ -71,6 +72,11 @@ export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn
               ) : null}
               {product.area_key ? (
                 <DistanceBadge areaKey={product.area_key} style={{ marginLeft: 6, verticalAlign: "middle" }} />
+              ) : null}
+              {product.shop_rating_count ? (
+                <span style={{ marginLeft: 6, display: "inline-flex", verticalAlign: "middle" }}>
+                  <StarRating avg={product.shop_rating_avg ?? null} count={product.shop_rating_count} size="sm" />
+                </span>
               ) : null}
             </span>
             <span style={{ fontWeight: 600, color: "var(--ink)", whiteSpace: "nowrap", fontSize: 14 }}>

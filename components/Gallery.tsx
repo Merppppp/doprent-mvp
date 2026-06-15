@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Dress gallery with a fullscreen lightbox.
@@ -16,6 +17,11 @@ export default function Gallery({ images, alt }: { images: string[]; alt: string
   const [active, setActive] = useState(0);
   const [errored, setErrored] = useState<Record<number, boolean>>({});
   const [lightbox, setLightbox] = useState(false);
+  // Portal target — only available after mount (SSR-safe). The lightbox MUST
+  // render at document.body level, otherwise the sticky `.detail-gallery`
+  // ancestor traps it in a low stacking context (navbar + calendar paint over it).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const count = safe.length;
   const go = useCallback(
@@ -128,8 +134,9 @@ export default function Gallery({ images, alt }: { images: string[]; alt: string
         </div>
       ) : null}
 
-      {/* lightbox */}
-      {lightbox ? (
+      {/* lightbox — portaled to <body> so it escapes the sticky gallery's
+          stacking context and renders above the navbar + booking column. */}
+      {lightbox && mounted ? createPortal(
         <div
           className="dr-lb"
           role="dialog"
@@ -175,7 +182,8 @@ export default function Gallery({ images, alt }: { images: string[]; alt: string
           ) : null}
 
           {count > 1 ? <span className="dr-lb-count">{active + 1} / {count}</span> : null}
-        </div>
+        </div>,
+        document.body,
       ) : null}
 
       <style
@@ -189,7 +197,7 @@ export default function Gallery({ images, alt }: { images: string[]; alt: string
 const GAL_CSS = `
 .dr-gal{display:flex;flex-direction:column;gap:10px}
 .dr-gal-main{position:relative;display:block;width:100%;aspect-ratio:4/5;border-radius:8px;overflow:hidden;background:var(--bg);border:0;padding:0;cursor:zoom-in}
-.dr-gal-main img{width:100%;height:100%;object-fit:cover;transition:transform .5s cubic-bezier(0.22,1,0.36,1)}
+.dr-gal-main img{width:100%;height:100%;object-fit:contain;transition:transform .5s cubic-bezier(0.22,1,0.36,1)}
 .dr-gal-main:hover img{transform:scale(1.03)}
 .dr-gal-broken{display:flex;width:100%;height:100%;align-items:center;justify-content:center;color:var(--ink-3);font-size:14px}
 .dr-gal-zoom{position:absolute;right:12px;bottom:12px;width:34px;height:34px;border-radius:999px;display:grid;place-items:center;background:color-mix(in oklch,var(--ink) 78%,transparent);opacity:0;transform:translateY(4px);transition:opacity .35s var(--ease,ease),transform .35s var(--ease,ease)}

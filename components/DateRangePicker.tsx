@@ -4,16 +4,20 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { priceForNights } from "@/lib/pricing";
 import type { PriceTier } from "@/lib/types";
-import LineMessageCopyBox from "@/components/LineMessageCopyBox";
+/** A size variant available for booking on the product. */
+export type VariantOption = {
+  id: string;
+  size: string;
+  quantity: number;
+  pricePerDay: number;
+  deposit: number;
+  available: boolean;
+  /** Per-variant unavailable dates (computed by the server). */
+  unavailable?: string[];
+};
 
 type Props = {
-  /**
-   * Base LINE URL (without our query params). Pass empty string "" for
-   * anonymous viewers — when isLoggedIn is false, the LINE href is
-   * never built or rendered.
-   */
-  lineUrl: string;
-  /** Dress display name (used in pre-filled LINE message). */
+  /** Dress display name. */
   dressName: string;
   /** Boutique name for the LINE message. */
   boutiqueName: string;
@@ -29,6 +33,14 @@ type Props = {
   deposit?: number;
   /** Unavailable dates as YYYY-MM-DD strings. Renter can't pick a range overlapping these. */
   blackouts?: string[];
+  /** Combined unavailable date set (blackouts + bookings + closed days). Renter can't pick a range overlapping these. */
+  unavailable?: string[];
+  /** Minimum days in advance the rental must start. */
+  leadTimeDays?: number;
+  /** Minimum rental length in days. */
+  minRentalDays?: number;
+  /** Maximum rental length in days; null = unlimited. */
+  maxRentalDays?: number | null;
   /** Optional dress ID to be tracked in /api/track when user clicks LINE. */
   productId?: string;
   shopId?: string;
@@ -42,6 +54,12 @@ type Props = {
   isLoggedIn?: boolean;
   /** Where to redirect back after login. Required when !isLoggedIn. */
   loginNext?: string;
+  /**
+   * Available size variants for this product. When provided, shows a size
+   * selector above the calendar. The chosen variant's pricePerDay/deposit
+   * and unavailable dates override the product-level ones.
+   */
+  variants?: VariantOption[];
 };
 
 /** Convert YYYY-MM-DD → "DD/MM/YYYY" Thai display format. */
@@ -100,7 +118,6 @@ const TH_DOW = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"]; // Monda
  * and pre-fills a LINE message with image, link, dates and price.
  */
 export default function DateRangePicker({
-  lineUrl,
   dressName,
   boutiqueName,
   dressPageUrl,
@@ -109,51 +126,87 @@ export default function DateRangePicker({
   priceTiers,
   deposit,
   blackouts = [],
+  unavailable = [],
+  leadTimeDays = 0,
+  minRentalDays = 1,
+  maxRentalDays = null,
   productId,
   shopId,
   dressTagCode,
   isLoggedIn,
+  variants,
 }: Props) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
 
-  const blackoutSet = useMemo(() => new Set(blackouts), [blackouts]);
-  const nights = nightsBetween(start, end);
-  const quote = priceForNights(priceTiers ?? null, pricePerDay ?? 0, nights);
+  // Variant / size selection state (only active when variants are provided)
+  const hasVariants = !!variants && variants.length > 0;
+  // Auto-select first available variant on first render
+  const defaultVariantId = hasVariants
+    ? (variants!.find((v) => v.available)?.id ?? variants![0].id)
+    : null;
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(defaultVariantId);
 
-  // Conflict check: does the selected range hit any blackout?
+  // Resolve the chosen variant object
+  const selectedVariant = hasVariants && selectedVariantId
+    ? variants!.find((v) => v.id === selectedVariantId) ?? null
+    : null;
+
+  // Effective price/deposit: use chosen variant's price when variants exist, else product-level
+  const effectivePricePerDay = selectedVariant ? selectedVariant.pricePerDay : pricePerDay;
+  const effectiveDeposit = selectedVariant ? selectedVariant.deposit : deposit;
+
+  // Effective unavailable set: merge product-level + variant-specific unavailable dates
+  const effectiveUnavailable = useMemo(() => {
+    if (selectedVariant?.unavailable && selectedVariant.unavailable.length > 0) {
+      return [...unavailable, ...selectedVariant.unavailable];
+    }
+    return unavailable;
+  }, [unavailable, selectedVariant]);
+
+  const blackoutSet = useMemo(() => new Set(blackouts), [blackouts]);
+  // Merged unavailable set: blackouts + policy-computed + variant-specific dates
+  const allUnavailableSet = useMemo(
+    () => (effectiveUnavailable.length === 0 ? blackoutSet : new Set([...blackoutSet, ...effectiveUnavailable])),
+    [blackoutSet, effectiveUnavailable],
+  );
+  // Minimum selectable ISO date: today + leadTimeDays
+  const minISO = useMemo(() => {
+    if (!leadTimeDays) return TODAY;
+    const d = new Date(TODAY + "T00:00:00");
+    d.setDate(d.getDate() + leadTimeDays);
+    return isoOf(d);
+  }, [leadTimeDays]);
+
+  const nights = nightsBetween(start, end);
+  const quote = priceForNights(priceTiers ?? null, effectivePricePerDay ?? 0, nights);
+
+  // Conflict check: does the selected range hit any unavailable date?
   const conflictDates = useMemo(() => {
     if (!start || !end) return [];
-    return rangeDates(start, end).filter((d) => blackoutSet.has(d));
-  }, [start, end, blackoutSet]);
+    return rangeDates(start, end).filter((d) => allUnavailableSet.has(d));
+  }, [start, end, allUnavailableSet]);
 
   const hasConflict = conflictDates.length > 0;
+
+  // Policy validation: min/max rental days (checked only when no date conflict)
+  const policyError = useMemo<string | null>(() => {
+    if (!start || !end || hasConflict) return null;
+    if (minRentalDays > 1 && nights < minRentalDays) {
+      return `ร้านนี้เช่าขั้นต่ำ ${minRentalDays} วัน`;
+    }
+    if (maxRentalDays !== null && maxRentalDays !== undefined && nights > maxRentalDays) {
+      return `เช่าได้สูงสุด ${maxRentalDays} วัน`;
+    }
+    return null;
+  }, [start, end, nights, minRentalDays, maxRentalDays, hasConflict]);
+
+  const isInvalid = hasConflict || !!policyError;
 
   // Up to 6 nearest future blackouts to show as warning
   const nextBlackouts = useMemo(() => {
     return blackouts.filter((d) => d >= TODAY).sort().slice(0, 6);
   }, [blackouts]);
-
-  const lineHref = useMemo(() => {
-    if (!isLoggedIn || !lineUrl) return "";
-    if (!start || !end || nights === 0 || hasConflict) return lineUrl;
-    const lines = [
-      `สวัสดีค่ะ สนใจเช่าชุด "${dressName}"`,
-      `ร้าน: ${boutiqueName}`,
-      `วันที่: ${fmtThai(start)} ถึง ${fmtThai(end)} (${nights} วัน)`,
-    ];
-    if (typeof pricePerDay === "number") {
-      lines.push(`ราคา: ฿${quote.perDay.toLocaleString()}/วัน × ${nights} = ฿${quote.total.toLocaleString()}`);
-    }
-    if (typeof deposit === "number" && deposit > 0) {
-      lines.push(`ค่ามัดจำ: ฿${deposit.toLocaleString()}`);
-    }
-    if (dressPageUrl) lines.push(`ลิงก์ชุด: ${dressPageUrl}`);
-    if (dressImageUrl) lines.push(`รูป: ${dressImageUrl}`);
-    const text = lines.join("\n");
-    const sep = lineUrl.includes("?") ? "&" : "?";
-    return `${lineUrl}${sep}text=${encodeURIComponent(text)}`;
-  }, [isLoggedIn, lineUrl, start, end, nights, hasConflict, dressName, boutiqueName, pricePerDay, priceTiers, deposit, dressPageUrl, dressImageUrl, quote.perDay, quote.total]);
 
   function trackAndGo(e: React.MouseEvent<HTMLAnchorElement>) {
     if (productId || shopId) {
@@ -170,8 +223,66 @@ export default function DateRangePicker({
     void e;
   }
 
+  // Checkout URL includes variantId when a variant is selected
+  const checkoutBase = `/checkout/address?product=${productId ?? ""}&start=${start}&end=${end}`;
+  const checkoutHref = selectedVariantId
+    ? `${checkoutBase}&variant=${selectedVariantId}`
+    : checkoutBase;
+
   return (
     <div style={{ border: "1px solid var(--line)", borderRadius: 8, padding: 14, marginBottom: 16, background: "var(--bg)" }}>
+      {/* ── Size selector (only shown when product has variants) ── */}
+      {hasVariants ? (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>เลือกไซซ์</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {variants!.map((v) => {
+              const isSelected = v.id === selectedVariantId;
+              // Check if this variant is "full" for the chosen range
+              const variantUnavailSet = new Set([...blackouts, ...(v.unavailable ?? [])]);
+              const isFullForRange = start && end
+                ? rangeDates(start, end).some((d) => variantUnavailSet.has(d))
+                : false;
+              const isDisabled = !v.available || isFullForRange;
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => {
+                    setSelectedVariantId(v.id);
+                    // Reset date range when switching size (availability differs per size)
+                    setStart("");
+                    setEnd("");
+                  }}
+                  title={isFullForRange ? "ไซซ์นี้เต็มสำหรับช่วงวันที่เลือก" : (!v.available ? "ไม่เปิดจองขณะนี้" : "")}
+                  style={{
+                    padding: "7px 14px",
+                    fontSize: 13,
+                    fontWeight: isSelected ? 600 : 400,
+                    border: `1.5px solid ${isSelected ? "var(--accent)" : "var(--line)"}`,
+                    background: isSelected ? "var(--accent)" : isDisabled ? "var(--bg)" : "var(--surface)",
+                    color: isSelected ? "var(--accent-ink)" : isDisabled ? "var(--ink-3)" : "var(--ink)",
+                    borderRadius: 8,
+                    cursor: isDisabled ? "default" : "pointer",
+                    opacity: isDisabled ? 0.55 : 1,
+                    textDecoration: isDisabled && !v.available ? "line-through" : "none",
+                  }}
+                >
+                  {v.size}
+                  {isFullForRange ? " (เต็ม)" : ""}
+                </button>
+              );
+            })}
+          </div>
+          {selectedVariant ? (
+            <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 6 }}>
+              ฿{selectedVariant.pricePerDay.toLocaleString()}/วัน · มัดจำ ฿{selectedVariant.deposit.toLocaleString()}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 600 }}>เลือกวันที่อยากเช่า (ไม่บังคับ)</div>
         {start ? (
@@ -188,8 +299,8 @@ export default function DateRangePicker({
       <Calendar
         start={start}
         end={end}
-        minISO={TODAY}
-        blackoutSet={blackoutSet}
+        minISO={minISO}
+        blackoutSet={allUnavailableSet}
         onChange={(s, e) => { setStart(s); setEnd(e); }}
       />
 
@@ -223,15 +334,25 @@ export default function DateRangePicker({
         </div>
       ) : null}
 
-      {nights > 0 && !hasConflict ? (
+      {/* Policy warning: min/max rental days */}
+      {policyError ? (
+        <div style={{ padding: "10px 12px", background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.4)", borderRadius: 6, fontSize: 13, color: "#92400E", marginBottom: 10, lineHeight: 1.5, fontWeight: 500 }}>
+          ⚠️ {policyError}
+        </div>
+      ) : null}
+
+      {nights > 0 && !isInvalid ? (
         <div style={{ padding: "8px 10px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 6, fontSize: 12, color: "var(--ink-2)", lineHeight: 1.5 }}>
           <div style={{ fontWeight: 500, color: "var(--ink)" }}>
             ระยะเวลา: {nights} วัน ({fmtThai(start)} ถึง {fmtThai(end)})
           </div>
-          {typeof pricePerDay === "number" ? (
+          {typeof effectivePricePerDay === "number" ? (
             <div style={{ marginTop: 2 }}>
               ราคา: ฿{quote.total.toLocaleString()} ({nights} × ฿{quote.perDay.toLocaleString()}/วัน)
             </div>
+          ) : null}
+          {typeof effectiveDeposit === "number" && effectiveDeposit > 0 ? (
+            <div style={{ marginTop: 2 }}>มัดจำ: ฿{effectiveDeposit.toLocaleString()}</div>
           ) : null}
           <div style={{ marginTop: 2 }}>
             กด &quot;จองเลย&quot; เพื่อเลือกที่อยู่จัดส่งและชำระเงินผ่าน QR PromptPay
@@ -239,37 +360,17 @@ export default function DateRangePicker({
         </div>
       ) : null}
 
-      {nights > 0 && !hasConflict ? (
+      {nights > 0 && !isInvalid ? (
         <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
           {isLoggedIn && productId ? (
-            <Link href={`/checkout/address?product=${productId}&start=${start}&end=${end}`} onClick={trackAndGo} className="btn btn-primary" style={{ display: "block", padding: "12px 16px", textAlign: "center", fontSize: 14, fontWeight: 600 }}>
+            <Link href={checkoutHref} onClick={trackAndGo} className="btn btn-primary" style={{ display: "block", padding: "12px 16px", textAlign: "center", fontSize: 14, fontWeight: 600 }}>
               จองเลย · {nights} วัน
             </Link>
           ) : (
-            <Link href={`/login?next=${encodeURIComponent(`/checkout/address?product=${productId ?? ""}&start=${start}&end=${end}`)}`} className="btn btn-dark" style={{ display: "block", padding: "12px 16px", textAlign: "center", fontSize: 14, fontWeight: 600 }}>
+            <Link href={`/login?next=${encodeURIComponent(checkoutHref)}`} className="btn btn-dark" style={{ display: "block", padding: "12px 16px", textAlign: "center", fontSize: 14, fontWeight: 600 }}>
               เข้าสู่ระบบเพื่อจอง · {nights} วัน
             </Link>
           )}
-          {isLoggedIn && lineHref ? (
-            <a href={lineHref} target="_blank" rel="noopener noreferrer" onClick={trackAndGo} style={{ display: "block", padding: "10px 16px", textAlign: "center", fontSize: 13, fontWeight: 500, color: "var(--ink-2)", border: "1px solid var(--line)", borderRadius: 8, textDecoration: "none" }}>
-              สอบถามร้านก่อน (LINE)
-            </a>
-          ) : null}
-        </div>
-      ) : null}
-
-      {/* Show copy box only when a valid range is selected */}
-      {start && end && !hasConflict ? (
-        <div style={{ marginTop: 12 }}>
-          <LineMessageCopyBox
-            dressName={dressName}
-            boutiqueName={boutiqueName}
-            pricePerDay={pricePerDay}
-            dressPageUrl={dressPageUrl ?? ""}
-            dateFrom={start}
-            dateTo={end}
-            tagCode={dressTagCode}
-          />
         </div>
       ) : null}
     </div>

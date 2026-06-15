@@ -1,11 +1,32 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
-export const runtime = "edge";
+// nodejs runtime so we can read the bundled Thai font from public/ via fs.
+export const runtime = "nodejs";
 export const alt = "doprent · เช่าชุดดีไซเนอร์ในกรุงเทพฯ";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default function OG() {
+// next/og (satori) ships NO Thai glyphs — without these the Thai text renders
+// as tofu boxes (□□□). Load Thai + Latin Noto Sans Thai subsets from public/fonts
+// (copied into the standalone image) so the OG card renders real Thai.
+async function loadFonts() {
+  const dir = join(process.cwd(), "public", "fonts");
+  const [thai, latin] = await Promise.all([
+    readFile(join(dir, "NotoSansThai-thai-600.ttf")),
+    readFile(join(dir, "NotoSansThai-latin-600.ttf")),
+  ]);
+  return [
+    { name: "Noto", data: latin, weight: 400 as const, style: "normal" as const },
+    { name: "Noto", data: latin, weight: 700 as const, style: "normal" as const },
+    { name: "Noto", data: thai, weight: 400 as const, style: "normal" as const },
+    { name: "Noto", data: thai, weight: 700 as const, style: "normal" as const },
+  ];
+}
+
+export default async function OG() {
+  const fonts = await loadFonts();
   return new ImageResponse(
     (
       <div
@@ -17,7 +38,7 @@ export default function OG() {
           display: "flex",
           flexDirection: "column",
           padding: "72px 80px",
-          fontFamily: "serif"
+          fontFamily: "Noto"
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -65,6 +86,6 @@ export default function OG() {
         </div>
       </div>
     ),
-    { ...size }
+    { ...size, fonts }
   );
 }

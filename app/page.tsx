@@ -1,9 +1,13 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import ProductResults from "@/components/ProductResults";
+import ScrollToResults from "@/components/ScrollToResults";
 import BrowseFilters from "@/components/BrowseFilters";
 import BannerCarousel from "@/components/BannerCarousel";
+import type { BannerSlide } from "@/components/BannerCarousel";
 import SortSelect from "@/components/SortSelect";
 import MobileFilterDrawer from "@/components/MobileFilterDrawer";
+import ResultsBarLocation from "@/components/ResultsBarLocation";
 import { OccasionTile } from "@/components/ProductArt";
 import {
   listDesigners,
@@ -13,10 +17,9 @@ import {
   listShops,
 } from "@/lib/products";
 import { getCurrentUser } from "@/lib/auth";
+import { getActiveBanners } from "@/lib/banners";
+import { getTagGroupsForProductTypeKey } from "@/lib/tag-groups";
 import {
-  COLOR_LABELS_TH,
-  COLOR_SWATCH,
-  type Color,
   type OccasionKey,
   SIZES,
 } from "@/lib/types";
@@ -26,7 +29,6 @@ import { getServerLocale } from "@/lib/i18n-server";
 export const dynamic = "force-dynamic";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
-const COLORS: Color[] = ["rose", "ivory", "green", "black", "navy", "red", "blue", "purple"];
 const PRICE_BOUNDS = { min: 0, max: 10000 };
 
 type SearchParams = {
@@ -40,6 +42,7 @@ type SearchParams = {
   dateTo?: string;
   priceMin?: string;
   priceMax?: string;
+  [key: string]: string | undefined;
 };
 
 export default async function HomePage({
@@ -47,7 +50,6 @@ export default async function HomePage({
 }: {
   searchParams: SearchParams;
 }) {
-  const activeColor = (searchParams?.color ?? "all") as Color | "all";
   const activeOcc = searchParams?.occasion as OccasionKey | undefined;
   const activeSize = searchParams?.size;
   const activeDesigner = searchParams?.designer?.trim() || undefined;
@@ -56,22 +58,54 @@ export default async function HomePage({
   const activeDateTo = searchParams?.dateTo?.trim() || undefined;
   const activePriceMin = Number(searchParams?.priceMin) || PRICE_BOUNDS.min;
   const activePriceMax = Number(searchParams?.priceMax) || PRICE_BOUNDS.max;
+  const activeBustMin = Number(searchParams?.bustMin) || undefined;
+  const activeBustMax = Number(searchParams?.bustMax) || undefined;
+  const activeWaistMin = Number(searchParams?.waistMin) || undefined;
+  const activeWaistMax = Number(searchParams?.waistMax) || undefined;
+  const activeLengthMin = Number(searchParams?.lengthMin) || undefined;
+  const activeLengthMax = Number(searchParams?.lengthMax) || undefined;
   const sort = (searchParams?.sort ?? "featured") as
     | "featured"
     | "price-asc"
     | "price-desc"
-    | "name";
+    | "name"
+    | "rating-desc";
+
+  // Known non-tag-group params — excluded when building tagsByGroup from URL
+  const KNOWN_FILTER_PARAMS = new Set([
+    "occasion", "size", "designer", "q", "sort",
+    "dateFrom", "dateTo", "priceMin", "priceMax", "page", "type",
+    "bustMin", "bustMax", "waistMin", "waistMax", "lengthMin", "lengthMax",
+  ]);
+
+  // Build tagsByGroup from URL params (all params not in the known list)
+  const tagsByGroup: Record<string, string[]> = {};
+  for (const [key, val] of Object.entries(searchParams ?? {})) {
+    if (!KNOWN_FILTER_PARAMS.has(key) && val) {
+      tagsByGroup[key] = val.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  // Backward compat: occasion URL param → tagsByGroup.occasion
+  if (activeOcc) {
+    const prev = tagsByGroup.occasion ?? [];
+    tagsByGroup.occasion = [...new Set([...prev, activeOcc])];
+  }
 
   const locale = getServerLocale();
 
-  const [{ items: products, total, hasMore }, occasions, designers, user, sponsors, shops] = await Promise.all([
+  const [{ items: products, total, hasMore }, occasions, designers, user, sponsors, shops, dbBanners, { groups: tagGroups }] = await Promise.all([
     listProducts({
-      color: activeColor === "all" ? undefined : activeColor,
-      occasions: activeOcc ? [activeOcc] : undefined,
+      tagsByGroup: Object.keys(tagsByGroup).length > 0 ? tagsByGroup : undefined,
       sizes: activeSize ? [activeSize] : undefined,
       designers: activeDesigner ? [activeDesigner] : undefined,
       priceMin: activePriceMin > PRICE_BOUNDS.min ? activePriceMin : undefined,
       priceMax: activePriceMax < PRICE_BOUNDS.max ? activePriceMax : undefined,
+      bustMin: activeBustMin,
+      bustMax: activeBustMax,
+      waistMin: activeWaistMin,
+      waistMax: activeWaistMax,
+      lengthMin: activeLengthMin,
+      lengthMax: activeLengthMax,
       search: search || undefined,
       sort,
       dateFrom: activeDateFrom,
@@ -82,21 +116,44 @@ export default async function HomePage({
     getCurrentUser().catch(() => null),
     listSponsorShops(8),
     listShops({ featuredFirst: true, limit: 6 }),
+    getActiveBanners(),
+    getTagGroupsForProductTypeKey("dress"),
   ]);
+
+  // Build activeTags from bound tag groups (for filter UI)
+  const activeTags: Record<string, string[]> = {};
+  for (const group of tagGroups) {
+    const raw = (searchParams ?? {})[group.groupKey];
+    if (raw) {
+      const vals = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      if (vals.length > 0) activeTags[group.groupKey] = vals;
+    }
+  }
+  // Merge in occasion backward-compat
+  if (activeOcc) {
+    activeTags.occasion = [...new Set([...(activeTags.occasion ?? []), activeOcc])];
+  }
+
+  // Serialize active tag groups back to string params for ProductResults infinite scroll
+  const tagParamsForResults: Record<string, string | undefined> = {};
+  for (const [groupKey, tagKeys] of Object.entries(tagsByGroup)) {
+    if (tagKeys.length > 0) tagParamsForResults[groupKey] = tagKeys.join(",");
+  }
 
   const savedSet = new Set<string>(user?.savedProductIds ?? []);
   const isLoggedIn = !!user;
   const bannerShops = sponsors.length > 0 ? sponsors : shops;
+  const bannerSlides: BannerSlide[] = dbBanners.map((b) => ({
+    id: b.id,
+    title: b.title,
+    imageUrl: b.imageUrl,
+    linkUrl: b.linkUrl,
+  }));
 
   // Locale-aware labels for filter chips
   const occasionOptions = occasions.map((o) => ({
     value: o.key,
     label: locale === "en" ? t(`occasion.${o.key}`, "en") : o.th,
-  }));
-  const colorOptions = COLORS.map((c) => ({
-    value: c,
-    label: locale === "en" ? t(`color.${c}`, "en") : COLOR_LABELS_TH[c],
-    swatch: COLOR_SWATCH[c],
   }));
   const sizeOptions = SIZES.map((sz) => ({ value: sz, label: sz }));
   const designerOptions = designers.map((d) => ({ value: d, label: d }));
@@ -113,10 +170,14 @@ export default async function HomePage({
 
   return (
     <div className="home-revamp">
+      <Suspense fallback={null}>
+        <ScrollToResults />
+      </Suspense>
+
       {/* ======== BANNER CAROUSEL ======== */}
       <section className="bg-bg pt-6">
         <div className="container">
-          <BannerCarousel shops={bannerShops} locale={locale} />
+          <BannerCarousel shops={bannerShops} slides={bannerSlides} locale={locale} />
         </div>
       </section>
 
@@ -153,14 +214,13 @@ export default async function HomePage({
       )}
 
       {/* ======== BROWSE (FILTERS + RESULTS) ======== */}
-      <section className="hr-browse">
+      <section id="results" className="hr-browse" style={{ scrollMarginTop: 0 }}>
         <div className="container">
           <div className="browse-grid">
             {/* SIDEBAR — hidden on mobile, sticky on desktop */}
-            <aside className="hidden md:block sticky top-[15px] self-start max-h-[calc(100vh-135px)] overflow-y-auto overscroll-contain text-sm filter-sidebar pr-[15px]">
+            <aside className="hidden md:block sticky top-[15px] self-start max-h-[calc(100vh-135px)] overflow-y-auto overscroll-contain text-sm filter-sidebar pl-1.5 pr-[15px] py-1">
               <BrowseFilters
                 q={search}
-                color={activeColor === "all" ? null : activeColor}
                 occasion={activeOcc ?? null}
                 size={activeSize ?? null}
                 designer={activeDesigner ?? null}
@@ -168,39 +228,59 @@ export default async function HomePage({
                 priceMax={activePriceMax}
                 priceBounds={PRICE_BOUNDS}
                 occasions={occasionOptions}
-                colors={colorOptions}
                 sizes={sizeOptions}
                 designers={designerOptions}
                 locale={locale}
+                tagGroups={tagGroups}
+                activeTags={activeTags}
+                bustMin={activeBustMin}
+                bustMax={activeBustMax}
+                waistMin={activeWaistMin}
+                waistMax={activeWaistMax}
+                lengthMin={activeLengthMin}
+                lengthMax={activeLengthMax}
               />
             </aside>
 
             {/* MAIN */}
             <main>
               <div className="hr-results-bar">
-                <div className="flex items-center gap-3">
-                  <MobileFilterDrawer
-                    q={search}
-                    color={activeColor === "all" ? null : activeColor}
-                    occasion={activeOcc ?? null}
-                    size={activeSize ?? null}
-                    designer={activeDesigner ?? null}
-                    priceMin={activePriceMin}
-                    priceMax={activePriceMax}
-                    priceBounds={PRICE_BOUNDS}
-                    occasions={occasionOptions}
-                    colors={colorOptions}
-                    sizes={sizeOptions}
-                    designers={designerOptions}
-                    locale={locale}
-                  />
-                  <div className="text-sm text-[var(--ink-2)]">
-                    {t("results.found", locale)}{" "}
-                    <b className="text-[var(--ink)]">{total}</b>{" "}
-                    {t("results.items", locale)}
+                {/* Location — desktop: inline controls; mobile: pin toggle + expandable panel */}
+                <ResultsBarLocation locale={locale} />
+
+                {/* Count + sort group, pinned to the right */}
+                <div className="hr-results-bar__right">
+                  {/* Mobile filter trigger + count */}
+                  <div className="flex items-center gap-2">
+                    <MobileFilterDrawer
+                      q={search}
+                      occasion={activeOcc ?? null}
+                      size={activeSize ?? null}
+                      designer={activeDesigner ?? null}
+                      priceMin={activePriceMin}
+                      priceMax={activePriceMax}
+                      priceBounds={PRICE_BOUNDS}
+                      occasions={occasionOptions}
+                      sizes={sizeOptions}
+                      designers={designerOptions}
+                      locale={locale}
+                      tagGroups={tagGroups}
+                      activeTags={activeTags}
+                      bustMin={activeBustMin}
+                      bustMax={activeBustMax}
+                      waistMin={activeWaistMin}
+                      waistMax={activeWaistMax}
+                      lengthMin={activeLengthMin}
+                      lengthMax={activeLengthMax}
+                    />
+                    <div className="text-sm text-[var(--ink-2)] whitespace-nowrap">
+                      {t("results.found", locale)}{" "}
+                      <b className="text-[var(--ink)]">{total}</b>{" "}
+                      {t("results.items", locale)}
+                    </div>
                   </div>
+                  <SortSelect locale={locale} />
                 </div>
-                <SortSelect locale={locale} />
               </div>
 
               {products.length === 0 ? (
@@ -226,8 +306,6 @@ export default async function HomePage({
                   locale={locale}
                   searchParams={{
                     q: search || undefined,
-                    color: activeColor === "all" ? undefined : activeColor,
-                    occasion: activeOcc,
                     size: activeSize,
                     designer: activeDesigner,
                     sort: sort === "featured" ? undefined : sort,
@@ -235,6 +313,13 @@ export default async function HomePage({
                     dateTo: activeDateTo,
                     priceMin: activePriceMin > PRICE_BOUNDS.min ? String(activePriceMin) : undefined,
                     priceMax: activePriceMax < PRICE_BOUNDS.max ? String(activePriceMax) : undefined,
+                    bustMin: activeBustMin !== undefined ? String(activeBustMin) : undefined,
+                    bustMax: activeBustMax !== undefined ? String(activeBustMax) : undefined,
+                    waistMin: activeWaistMin !== undefined ? String(activeWaistMin) : undefined,
+                    waistMax: activeWaistMax !== undefined ? String(activeWaistMax) : undefined,
+                    lengthMin: activeLengthMin !== undefined ? String(activeLengthMin) : undefined,
+                    lengthMax: activeLengthMax !== undefined ? String(activeLengthMax) : undefined,
+                    ...tagParamsForResults,
                   }}
                 />
               )}
@@ -301,15 +386,30 @@ const HR_CSS = `
   background:var(--bg);
 }
 
-/* Results bar — sticky on mobile */
+/* Results bar — sticky to the top of the #main scroll container.
+   Scrolling happens inside #main (layout.tsx: overflowY:auto) and the navbar is
+   a flex SIBLING above #main — not a window-fixed bar. So the correct sticky
+   offset is 0 (top of the scrollport = directly under the navbar). Using
+   --header-h here pushed it that many px DOWN into the content = floated
+   mid-screen and covered products. */
 .hr-results-bar{
-  display:flex;justify-content:space-between;align-items:center;
-  margin-bottom:16px;flex-wrap:wrap;gap:10px;
+  display:flex;align-items:center;
+  margin-bottom:16px;flex-wrap:wrap;gap:8px 12px;
   position:sticky;top:0;z-index:20;
   background:var(--bg);
   padding:10px 0;
   border-bottom:1px solid var(--line);
 }
+/* Right cluster: count + sort — shrinks but won't break */
+.hr-results-bar__right{
+  display:flex;align-items:center;gap:8px;
+  margin-left:auto;flex-shrink:0;flex-wrap:wrap;
+}
+
+/* Location: desktop = inline controls (wrapper is transparent), toggle hidden.
+   Mobile rules live in the max-width:767px block below. */
+.loc-toggle{display:none}
+.loc-panel{display:contents}
 
 /* Empty state */
 .hr-empty{
@@ -334,5 +434,50 @@ const HR_CSS = `
 /* ---- Responsive ---- */
 @media(max-width:600px){
   .hr-occasions{padding:18px 0 0}
+}
+/* Mobile: tighten the gap above the results bar, and when it wraps into
+   2 rows make EACH row span the full width with space-between within itself
+   (host directive). */
+@media(max-width:767px){
+  .hr-browse{padding-top:12px}
+  .hr-results-bar{padding:8px 0;gap:8px;margin-bottom:12px;align-items:center}
+  /* Single row: [pin] + [Filter · count · sort]. Location panel expands full-width below. */
+  .loc-toggle{
+    display:inline-flex;align-items:center;gap:3px;order:0;flex:0 0 auto;
+    height:34px;padding:0 8px;border:1px solid var(--line);border-radius:8px;
+    background:var(--bg);color:var(--accent-2);cursor:pointer;
+  }
+  /* icon-only on mobile to guarantee the single row fits; label shows once expanded */
+  .loc-toggle__text{display:none}
+  .hr-results-bar__right{
+    order:1;flex:1 1 auto;width:auto;margin-left:0;justify-content:space-between;
+    flex-wrap:nowrap;gap:6px;min-width:0;
+  }
+  /* Expandable location panel — hidden until toggled, then full-width row below */
+  .loc-panel{display:none;order:2;width:100%}
+  .loc-panel.is-open{display:block}
+  .loc-panel .loc-controls{width:100%;justify-content:space-between}
+}
+
+/* Squeezed desktop zone: the 240px filter sidebar is shown but the main column
+   is too narrow to fit the full inline location controls + count + sort on one
+   row, so they used to wrap and look misaligned. Collapse the location into the
+   compact pin toggle (same pattern as mobile) so the bar stays a clean single
+   row: [📍 label ▾] ............ [พบ X ชุด] [เรียงลำดับ]. */
+@media (min-width:901px) and (max-width:1080px){
+  .hr-results-bar{flex-wrap:nowrap;gap:10px}
+  .loc-toggle{
+    display:inline-flex;align-items:center;gap:5px;order:0;flex:0 1 auto;min-width:0;
+    height:34px;padding:0 12px;border:1px solid var(--line);border-radius:8px;
+    background:var(--bg);color:var(--accent-2);cursor:pointer;font-size:13px;
+  }
+  .loc-toggle__text{
+    display:inline;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .hr-results-bar__right{order:1;margin-left:auto;flex:0 0 auto;flex-wrap:nowrap}
+  /* Expandable panel drops full-width below the bar when the toggle is open */
+  .loc-panel{display:none;order:2;width:100%}
+  .loc-panel.is-open{display:block}
+  .loc-panel .loc-controls{width:100%;justify-content:flex-start;flex-wrap:wrap}
 }
 `;

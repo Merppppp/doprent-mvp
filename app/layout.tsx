@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
+import RouteProgress from "@/components/RouteProgress";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ScrollReveal from "@/components/ScrollReveal";
@@ -79,6 +81,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           ข้ามไปยังเนื้อหา
         </a>
+        <Suspense fallback={null}>
+          <RouteProgress />
+        </Suspense>
         <LocationProvider>
           <Header />
           <div id="main" style={{ flex: 1, overflowY: "auto" }}>

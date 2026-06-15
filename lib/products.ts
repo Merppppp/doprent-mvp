@@ -30,14 +30,23 @@ export type ProductFilters = {
   color?: Color | "all";
   sizes?: string[];
   occasions?: OccasionKey[];
+  /** Generic tag filter: keys = tag-group keys, values = tag keys (OR within group, AND across groups). */
+  tagsByGroup?: Record<string, string[]>;
   shopSlugs?: string[];
   designers?: string[];
   /** Category business key — additive optional filter (rev 3 taxonomy). */
   category?: string;
   priceMin?: number;
   priceMax?: number;
+  /** Body-measurement filters — a product matches if ANY available variant satisfies ALL active bounds. */
+  bustMin?: number;
+  bustMax?: number;
+  waistMin?: number;
+  waistMax?: number;
+  lengthMin?: number;
+  lengthMax?: number;
   search?: string;
-  sort?: "featured" | "price-asc" | "price-desc" | "name";
+  sort?: "featured" | "price-asc" | "price-desc" | "name" | "rating-desc";
   dateFrom?: string; // YYYY-MM-DD
   dateTo?: string;   // YYYY-MM-DD
   page?: number;
@@ -54,7 +63,7 @@ const PRODUCT_INCLUDE = {
   productTags: { select: { tag: { select: { key: true, tagGroup: { select: { key: true } } } } } },
   productType: { select: { key: true } },
   category: { select: { key: true } },
-  shop: { select: { name: true, verified: true, area: { select: { key: true } } } },
+  shop: { select: { name: true, verified: true, ratingAvg: true, ratingCount: true, area: { select: { key: true } } } },
 } satisfies Prisma.ProductInclude;
 
 type ProductRow = Prisma.ProductGetPayload<{ include: typeof PRODUCT_INCLUDE }>;
@@ -81,11 +90,13 @@ function mapProduct(d: ProductRow): Product {
     shop_id: d.shopId,
     shop_name: d.shop.name,
     shop_verified: d.shop.verified,
+    shop_rating_avg: d.shop.ratingAvg !== null && d.shop.ratingAvg !== undefined ? Number(d.shop.ratingAvg) : null,
+    shop_rating_count: d.shop.ratingCount,
     area_key: d.shop.area?.key ?? null,
     product_type_key: d.productType.key,
     category_key: d.category?.key ?? null,
     size: d.size as Size,
-    color: d.color as Color,
+    color: (d.productTags.find(pt => pt.tag.tagGroup.key === 'color')?.tag.key ?? d.color ?? null) as Color | null,
     price_per_day: d.pricePerDay,
     deposit: d.deposit,
     price_tiers: mapPriceTiers(d.priceTiers),
@@ -128,6 +139,9 @@ function mapShop(b: PrismaShop, coverImage?: string | null): Shop {
     hours: b.hours,
     line_url: b.lineUrl,
     instagram: b.instagram,
+    facebook: b.facebook,
+    twitter: b.twitter,
+    tiktok: b.tiktok,
     since_year: b.sinceYear,
     cover_color: b.coverColor as Color,
     cover_image: coverImage ?? null,
@@ -140,6 +154,9 @@ function mapShop(b: PrismaShop, coverImage?: string | null): Shop {
     status: b.status as Status,
     reject_reason: b.rejectReason,
     kyc_status: b.kycStatus as KycStatus,
+    rating_avg: b.ratingAvg !== null && b.ratingAvg !== undefined ? Number(b.ratingAvg) : null,
+    rating_count: b.ratingCount ?? 0,
+    is_open: b.isOpen,
     created_at: b.createdAt.toISOString(),
     updated_at: b.updatedAt.toISOString(),
   };
@@ -194,6 +211,59 @@ function mapShopWithCards(r: ShopWithPreviews, index: number): Shop {
 }
 
 // ---------------------------------------------------------------------------
+// Trigram search helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch up to 200 product IDs ranked by pg_trgm similarity score.
+ *
+ * Similarity score = GREATEST(
+ *   similarity(products.name,        query),
+ *   similarity(products.designer,    query),   -- NULLs coalesced to 0
+ *   similarity(products.description, query),   -- NULLs coalesced to 0
+ *   similarity(shops.name,           query)
+ * )
+ *
+ * Threshold: 0.15 (tune via pg_trgm.similarity_threshold if needed).
+ * Trigrams work on raw UTF-8 substrings, so Thai partial words and minor
+ * typos improve automatically without word segmentation.
+ *
+ * Returns null when no candidates exceed the threshold — caller falls back
+ * to the existing substring AND search so nothing regresses.
+ */
+async function getTrigamRankedIds(q: string): Promise<string[] | null> {
+  type Row = { id: string; score: number };
+
+  // All params are positional placeholders via Prisma tagged template —
+  // q is NEVER interpolated into the SQL string itself (no injection risk).
+  const rows = await db.$queryRaw<Row[]>`
+    SELECT sub.id::text AS id, sub.score
+    FROM (
+      SELECT
+        p.id,
+        GREATEST(
+          similarity(p.name,        ${q}),
+          COALESCE(similarity(p.designer,    ${q}), 0::real),
+          COALESCE(similarity(p.description, ${q}), 0::real),
+          similarity(s.name,        ${q})
+        ) AS score
+      FROM products p
+      JOIN shops s         ON s.id  = p.shop_id
+      JOIN product_types pt ON pt.id = p.product_type_id
+      WHERE p.status    = 'live'
+        AND p.available = true
+        AND pt.key      = ${DEFAULT_PRODUCT_TYPE_KEY}
+    ) sub
+    WHERE sub.score > 0.15
+    ORDER BY sub.score DESC
+    LIMIT 200
+  `;
+
+  if (rows.length === 0) return null;
+  return rows.map((r) => r.id);
+}
+
+// ---------------------------------------------------------------------------
 // Public queries
 // ---------------------------------------------------------------------------
 
@@ -211,7 +281,6 @@ export async function listProducts(
     productType: { key: DEFAULT_PRODUCT_TYPE_KEY },
   };
 
-  if (opts.color && opts.color !== "all") where.color = opts.color;
   if (opts.sizes?.length) where.size = { in: opts.sizes as unknown as Prisma.EnumSizeFilter<"Product">["in"] };
 
   // priceMin + priceMax
@@ -222,11 +291,26 @@ export async function listProducts(
     };
   }
 
-  // Occasions filter — rev 3: via product_tags (tag group "occasion")
+  // Generalized tag-group filter — one AND clause per group, OR within a group.
+  // occasions is a backward-compat alias that maps to tagsByGroup.occasion.
+  const effectiveTagsByGroup: Record<string, string[]> = { ...(opts.tagsByGroup ?? {}) };
   if (opts.occasions?.length) {
-    where.productTags = {
-      some: { tag: { key: { in: opts.occasions }, tagGroup: { key: "occasion" } } },
-    };
+    const prev = effectiveTagsByGroup.occasion ?? [];
+    effectiveTagsByGroup.occasion = [...new Set([...prev, ...opts.occasions])];
+  }
+  if (opts.color && opts.color !== "all") {
+    const prev = effectiveTagsByGroup.color ?? [];
+    effectiveTagsByGroup.color = [...new Set([...prev, opts.color])];
+  }
+  const tagGroupClauses = Object.entries(effectiveTagsByGroup)
+    .filter(([, tagKeys]) => tagKeys.length > 0)
+    .map(([groupKey, tagKeys]): Prisma.ProductWhereInput => ({
+      productTags: {
+        some: { tag: { key: { in: tagKeys }, tagGroup: { key: groupKey } } },
+      },
+    }));
+  if (tagGroupClauses.length > 0) {
+    where.AND = tagGroupClauses;
   }
 
   // Category filter (additive, key-based)
@@ -244,25 +328,38 @@ export async function listProducts(
     where.shop = { slug: { in: opts.shopSlugs } };
   }
 
-  // Fuzzy search — split terms, each must match at least one field.
-  // Shop name is matched via the relation (products no longer carry the
-  // denormalized boutique_name column, and the FTS vector no longer
-  // includes it — so the shop-name match is ORed in here explicitly).
-  if (opts.search) {
-    const terms = opts.search.split(/\s+/).filter(Boolean);
-    if (terms.length > 0) {
-      where.AND = terms.map((term) => ({
-        OR: [
-          { name: { contains: term, mode: "insensitive" as const } },
-          { designer: { contains: term, mode: "insensitive" as const } },
-          { shop: { name: { contains: term, mode: "insensitive" as const } } },
-          { description: { contains: term, mode: "insensitive" as const } },
-        ],
-      }));
+  // Body-measurement filter — one variant must satisfy ALL active bounds simultaneously.
+  // Placed on the Prisma `where` object so it applies to both the standard path and the
+  // trigram path (both call db.product.findMany({ where, ... }) with the same object).
+  const hasMeasurementFilter = [
+    opts.bustMin, opts.bustMax, opts.waistMin, opts.waistMax, opts.lengthMin, opts.lengthMax,
+  ].some((v) => v !== undefined);
+  if (hasMeasurementFilter) {
+    const variantFilter: Prisma.ProductVariantWhereInput = { available: true };
+    if (opts.bustMin !== undefined || opts.bustMax !== undefined) {
+      variantFilter.bustCm = {
+        ...(opts.bustMin !== undefined ? { gte: opts.bustMin } : {}),
+        ...(opts.bustMax !== undefined ? { lte: opts.bustMax } : {}),
+      };
     }
+    if (opts.waistMin !== undefined || opts.waistMax !== undefined) {
+      variantFilter.waistCm = {
+        ...(opts.waistMin !== undefined ? { gte: opts.waistMin } : {}),
+        ...(opts.waistMax !== undefined ? { lte: opts.waistMax } : {}),
+      };
+    }
+    if (opts.lengthMin !== undefined || opts.lengthMax !== undefined) {
+      variantFilter.lengthCm = {
+        ...(opts.lengthMin !== undefined ? { gte: opts.lengthMin } : {}),
+        ...(opts.lengthMax !== undefined ? { lte: opts.lengthMax } : {}),
+      };
+    }
+    where.variants = { some: variantFilter };
   }
 
-  // Date range: exclude products with any blackout in range
+  // Date range: compute blocked product IDs first — needed before the search
+  // section so the trigram path can pre-filter the ranked candidate list.
+  let blockedIds: string[] = [];
   if (opts.dateFrom || opts.dateTo) {
     const blocked = await db.productBlackoutDate.findMany({
       where: {
@@ -273,23 +370,91 @@ export async function listProducts(
       },
       select: { productId: true },
     });
-    const blockedIds = [...new Set(blocked.map((b) => b.productId))];
+    blockedIds = [...new Set(blocked.map((b) => b.productId))];
+  }
+
+  // Search — try trigram similarity first; fall back to substring AND when no
+  // trigram matches (e.g. very short query, novel word with 0 overlap).
+  // Empty query = current default listing unchanged.
+  let trigramRankedIds: string[] | null = null;
+  if (opts.search) {
+    const q = opts.search.trim();
+    // pg_trgm requires at least 2 characters to form meaningful trigrams.
+    if (q.length >= 2) {
+      trigramRankedIds = await getTrigamRankedIds(q);
+    }
+
+    if (trigramRankedIds !== null) {
+      // Trigram path: restrict Prisma query to the similarity-ranked candidates.
+      // Pre-filter date-blocked products out of the ranked list so the JS
+      // re-sort step below reflects only available items.
+      if (blockedIds.length > 0) {
+        const blockedSet = new Set(blockedIds);
+        trigramRankedIds = trigramRankedIds.filter((id) => !blockedSet.has(id));
+      }
+      where.id = { in: trigramRankedIds };
+    } else {
+      // Substring fallback: each whitespace-split term must match at least one field.
+      // Shop name is matched via the relation (products no longer carry the
+      // denormalized boutique_name column — so the shop-name match is ORed in here).
+      const terms = q.split(/\s+/).filter(Boolean);
+      if (terms.length > 0) {
+        const existingAnd: Prisma.ProductWhereInput[] = Array.isArray(where.AND) ? where.AND : [];
+        where.AND = [
+          ...existingAnd,
+          ...terms.map((term): Prisma.ProductWhereInput => ({
+            OR: [
+              { name: { contains: term, mode: "insensitive" as const } },
+              { designer: { contains: term, mode: "insensitive" as const } },
+              { shop: { name: { contains: term, mode: "insensitive" as const } } },
+              { description: { contains: term, mode: "insensitive" as const } },
+            ],
+          })),
+        ];
+      }
+      if (blockedIds.length > 0) where.id = { notIn: blockedIds };
+    }
+  } else {
+    // No search query — apply blocked IDs normally.
     if (blockedIds.length > 0) where.id = { notIn: blockedIds };
   }
 
   // DB-level sort
   let orderBy: Prisma.ProductOrderByWithRelationInput[];
   switch (opts.sort) {
-    case "price-asc":  orderBy = [{ pricePerDay: "asc" }]; break;
-    case "price-desc": orderBy = [{ pricePerDay: "desc" }]; break;
-    case "name":       orderBy = [{ name: "asc" }]; break;
-    default:           orderBy = [{ featured: "desc" }, { sponsored: "desc" }, { createdAt: "desc" }];
+    case "price-asc":    orderBy = [{ pricePerDay: "asc" }]; break;
+    case "price-desc":   orderBy = [{ pricePerDay: "desc" }]; break;
+    case "name":         orderBy = [{ name: "asc" }]; break;
+    case "rating-desc":  orderBy = [{ shop: { ratingAvg: { sort: "desc", nulls: "last" } } }]; break;
+    default:             orderBy = [{ featured: "desc" }, { sponsored: "desc" }, { createdAt: "desc" }];
   }
 
   // Pagination
   const take = opts.limit ?? PAGE_SIZE;
   const skip = opts.limit ? 0 : (page - 1) * PAGE_SIZE;
 
+  // Trigram path with no explicit sort override:
+  // Fetch all candidates (≤ 200 from the raw query), re-sort by similarity rank
+  // in JS, then paginate in memory. This preserves relevance order accurately
+  // regardless of secondary Prisma filters (color, size, price, etc.).
+  if (trigramRankedIds !== null && !opts.sort) {
+    const rows = await db.product.findMany({
+      where,
+      include: PRODUCT_INCLUDE,
+      orderBy, // stable featured/sponsored/createdAt tiebreaker
+    });
+    const all = rows.map(mapProduct);
+    // Re-sort by trigram rank: lower index in rankedIds = higher similarity score.
+    const rankMap = new Map(trigramRankedIds.map((id, i) => [id, i]));
+    all.sort((a, b) => (rankMap.get(a.id) ?? 9999) - (rankMap.get(b.id) ?? 9999));
+    const total = all.length;
+    const paged = all.slice(skip, skip + take);
+    const hasMore = opts.limit ? false : (skip + take) < total;
+    return { items: paged, total, hasMore };
+  }
+
+  // Standard path: no trigram active, OR user chose an explicit sort
+  // (price-asc / price-desc / name) which overrides similarity ranking.
   const [rows, total] = await Promise.all([
     db.product.findMany({
       where,
@@ -356,17 +521,23 @@ export async function listSponsorShops(limit = 8): Promise<Shop[]> {
   }
 }
 
-export async function listShops(opts: { limit?: number; featuredFirst?: boolean } = {}): Promise<Shop[]> {
+export async function listShops(opts: { limit?: number; featuredFirst?: boolean; sort?: "rating-desc" | "name" } = {}): Promise<Shop[]> {
+  let orderBy: Prisma.ShopOrderByWithRelationInput[];
+  if (opts.sort === "rating-desc") {
+    orderBy = [{ ratingAvg: { sort: "desc", nulls: "last" } }];
+  } else {
+    orderBy = [
+      ...(opts.featuredFirst ? [{ featured: "desc" as const }] : []),
+      { name: "asc" },
+    ];
+  }
   const rows = await db.shop.findMany({
     where: { status: "live" },
     include: {
       area: { select: { key: true } },
       products: SHOP_PRODUCT_PREVIEW,
     },
-    orderBy: [
-      ...(opts.featuredFirst ? [{ featured: "desc" as const }] : []),
-      { name: "asc" },
-    ],
+    orderBy,
     take: opts.limit,
   });
   return rows.map((r, index) => mapShopWithCards(r, index));

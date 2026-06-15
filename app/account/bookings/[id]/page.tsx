@@ -5,8 +5,11 @@ import { getCurrentUser } from "@/lib/auth";
 import { getBookingForView } from "@/lib/booking-queries";
 import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
 import { promptPayQrDataUrl } from "@/lib/payments";
+import { db } from "@/lib/db";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import RenterBookingActions from "@/components/RenterBookingActions";
+import ReviewForm from "@/components/ReviewForm";
+import EditAddressForm from "@/components/EditAddressForm";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +37,15 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
   const total = amountDue(b);
   const meta = BOOKING_STATUS_META[b.status];
 
+  // Fetch existing review for this booking
+  const existingReview = await db.review.findUnique({
+    where: { bookingId: b.id },
+    select: { id: true, rating: true, comment: true, createdAt: true, sellerRepliedAt: true },
+  });
+
+  const isReviewable = b.status === "returned" || b.status === "completed";
+  const canEditAddress = b.status === "booking_pending" || b.status === "waiting_for_payment";
+
   // QR only while waiting for payment + shop has PromptPay + fee set
   const qr =
     b.status === "waiting_for_payment" && b.shipping_fee != null
@@ -60,6 +72,14 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
         <Row label="วันเช่า" value={`${fmtThai(b.start_date)} – ${fmtThai(b.end_date)}`} />
         <Row label="ส่งถึง" value={`${b.recipient_name ?? ""} · ${b.phone ?? ""}`} />
         <Row label="ที่อยู่" value={b.address_text ?? "-"} />
+        {canEditAddress ? (
+          <EditAddressForm
+            bookingId={b.id}
+            recipientName={b.recipient_name}
+            phone={b.phone}
+            addressText={b.address_text}
+          />
+        ) : null}
       </div>
 
       <div style={card}>
@@ -76,23 +96,45 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
 
       {/* payment */}
       {b.status === "waiting_for_payment" ? (
-        qr ? (
-          <div style={{ ...card, textAlign: "center" }}>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>สแกนจ่ายผ่าน PromptPay</div>
-            <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 12 }}>
-              ยอด ฿{total.toLocaleString()} → {b.boutique_name}
+        <>
+          {qr ? (
+            <div style={{ ...card, textAlign: "center" }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>สแกนจ่ายผ่าน PromptPay</div>
+              <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 12 }}>
+                ยอด ฿{total.toLocaleString()} → {b.boutique_name}
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qr} alt="PromptPay QR" width={240} height={240} style={{ borderRadius: 8 }} />
+              <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 10, lineHeight: 1.5 }}>
+                โอนแล้วกดปุ่มด้านล่างเพื่ออัปโหลดสลิป ร้านจะตรวจและยืนยันให้
+              </p>
             </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qr} alt="PromptPay QR" width={240} height={240} style={{ borderRadius: 8 }} />
-            <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 10, lineHeight: 1.5 }}>
-              โอนแล้วกดปุ่มด้านล่างเพื่ออัปโหลดสลิป ร้านจะตรวจและยืนยันให้
-            </p>
-          </div>
-        ) : (
-          <div style={{ ...card, color: "var(--warn)", fontSize: 14 }}>
-            ร้านยังไม่ได้ตั้งค่า PromptPay กรุณาติดต่อร้าน{b.boutique_line_url ? " ผ่าน LINE" : ""}เพื่อชำระเงิน
-          </div>
-        )
+          ) : null}
+
+          {b.boutique_bank_name || b.boutique_bank_account_number ? (
+            <div style={card}>
+              <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>ช่องทางโอนเงินให้ร้าน</div>
+              {b.boutique_bank_name ? (
+                <Row label="ธนาคาร" value={b.boutique_bank_name} />
+              ) : null}
+              {b.boutique_bank_account_number ? (
+                <Row label="เลขบัญชี" value={b.boutique_bank_account_number} />
+              ) : null}
+              {b.boutique_bank_account_name ? (
+                <Row label="ชื่อบัญชี" value={b.boutique_bank_account_name} />
+              ) : null}
+              <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 8, lineHeight: 1.5 }}>
+                โอนแล้วกดปุ่มด้านล่างเพื่ออัปโหลดสลิป ร้านจะตรวจและยืนยันให้
+              </p>
+            </div>
+          ) : null}
+
+          {!qr && !b.boutique_bank_name && !b.boutique_bank_account_number ? (
+            <div style={{ ...card, color: "var(--warn)", fontSize: 14 }}>
+              ร้านยังไม่ได้ตั้งค่าช่องทางรับชำระเงิน กรุณาติดต่อร้าน{b.boutique_line_url ? " ผ่าน LINE" : ""}เพื่อชำระเงิน
+            </div>
+          ) : null}
+        </>
       ) : null}
 
       {b.status === "confirmed" ? (
@@ -118,6 +160,33 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
       ) : null}
 
       <RenterBookingActions bookingId={b.id} status={b.status} canPay={!!qr} />
+
+      {/* Review section — shown for completed/returned bookings */}
+      {isReviewable ? (
+        <div style={{ ...card, marginTop: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>รีวิวร้าน</div>
+          {existingReview ? (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span>
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <span key={s} style={{ color: s <= existingReview.rating ? "#F5A623" : "var(--line)", fontSize: 16 }}>★</span>
+                  ))}
+                </span>
+                <span style={{ fontSize: 13, color: "var(--ink-3)" }}>
+                  {existingReview.createdAt.toLocaleDateString("th-TH")}
+                </span>
+              </div>
+              {existingReview.comment ? (
+                <p style={{ fontSize: 14, color: "var(--ink-2)", margin: "4px 0 0" }}>{existingReview.comment}</p>
+              ) : null}
+              <p style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 8 }}>รีวิวถูกส่งแล้ว</p>
+            </div>
+          ) : (
+            <ReviewForm bookingId={b.id} />
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

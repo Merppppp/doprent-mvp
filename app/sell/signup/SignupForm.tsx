@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { createShop } from "@/app/actions/seller";
+import RequiredMark from "@/components/RequiredMark";
 import { BANGKOK_DISTRICTS, findDistrict, PROVINCE_TH } from "@/lib/bangkok-districts";
 
 const COLORS = [
@@ -94,8 +95,8 @@ export default function SignupForm(_props: Props) {
 
   return (
     <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-      <Field label="ชื่อร้าน *" hint="แสดงบนหน้าเว็บ ใช้ได้ทั้งไทย/อังกฤษ">
-        <input type="text" name="name" required maxLength={60} style={inputStyle} />
+      <Field label="ชื่อร้าน" hint="แสดงบนหน้าเว็บ ใช้ได้ทั้งไทย/อังกฤษ" required>
+        <input type="text" name="name" required aria-required={true} maxLength={60} style={inputStyle} />
       </Field>
 
       <Field label="ผู้ดูแล (ไม่บังคับ)" hint='เช่น "คุณนิด" — จะแสดงใต้ชื่อร้านในหน้าโปรไฟล์'>
@@ -117,11 +118,12 @@ export default function SignupForm(_props: Props) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <Field label="บ้านเลขที่ / อาคาร / ชั้น *">
+          <Field label="บ้านเลขที่ / อาคาร / ชั้น" required>
             <input
               type="text"
               name="house_no"
               required
+              aria-required={true}
               maxLength={80}
               placeholder="เช่น 88/8 ชั้น 2"
               style={inputStyle}
@@ -139,11 +141,12 @@ export default function SignupForm(_props: Props) {
           </Field>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="เขต *">
+            <Field label="เขต" required>
               <select
                 value={district}
                 onChange={(e) => onDistrictChange(e.target.value)}
                 required
+                aria-required={true}
                 style={inputStyle}
               >
                 <option value="">— เลือกเขต —</option>
@@ -155,11 +158,12 @@ export default function SignupForm(_props: Props) {
               </select>
             </Field>
 
-            <Field label="แขวง / ตำบล *">
+            <Field label="แขวง / ตำบล" required>
               <select
                 value={subdistrict}
                 onChange={(e) => onSubdistrictChange(e.target.value)}
                 required
+                aria-required={true}
                 disabled={!district}
                 style={{ ...inputStyle, opacity: !district ? 0.5 : 1 }}
               >
@@ -200,18 +204,20 @@ export default function SignupForm(_props: Props) {
       </div>
 
       <Field
-        label="LINE สำหรับลูกค้าทักร้าน *"
+        label="LINE สำหรับลูกค้าทักร้าน"
         hint={
           "ใส่ได้หลายแบบ:\n" +
           "• LINE Official: @yourshop หรือชื่อโดยไม่มี @\n" +
           "• LINE ส่วนตัว: ต้องใช้ลิงก์เต็ม (LINE → โปรไฟล์ → กดที่ ID → คัดลอกลิงก์)\n" +
           "• หรือลิงก์เชิญ https://lin.ee/..."
         }
+        required
       >
         <input
           type="text"
           name="line_url"
           required
+          aria-required={true}
           placeholder="@yourshop, https://line.me/..., หรือ https://lin.ee/..."
           style={inputStyle}
         />
@@ -219,6 +225,18 @@ export default function SignupForm(_props: Props) {
 
       <Field label="Instagram (ไม่บังคับ)" hint="เช่น @yourshop">
         <input type="text" name="instagram" maxLength={40} style={inputStyle} placeholder="@..." />
+      </Field>
+
+      <Field label="Facebook (ไม่บังคับ)" hint="ลิงก์เพจ หรือชื่อเพจ เช่น facebook.com/yourshop">
+        <input type="text" name="facebook" maxLength={120} style={inputStyle} placeholder="facebook.com/..." />
+      </Field>
+
+      <Field label="X / Twitter (ไม่บังคับ)" hint="เช่น @yourshop">
+        <input type="text" name="twitter" maxLength={40} style={inputStyle} placeholder="@..." />
+      </Field>
+
+      <Field label="TikTok (ไม่บังคับ)" hint="เช่น @yourshop">
+        <input type="text" name="tiktok" maxLength={40} style={inputStyle} placeholder="@..." />
       </Field>
 
       <Field label="ปีที่เปิดบริการ (ไม่บังคับ)">
@@ -258,6 +276,71 @@ export default function SignupForm(_props: Props) {
         </select>
       </Field>
 
+      {/* ==== PAYMENT SECTION ==== */}
+      <div
+        style={{
+          padding: 16,
+          background: "var(--bg)",
+          border: "1px solid var(--line)",
+          borderRadius: 8,
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>วิธีรับเงิน (ไม่บังคับ)</div>
+        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 14, lineHeight: 1.5 }}>
+          ลูกค้าจะโอนเงินให้ร้านโดยตรง DopRent ไม่เก็บเงินแทน
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Field
+            label="PromptPay (ไม่บังคับ)"
+            hint="เบอร์มือถือ / เลขบัตรประชาชน สำหรับรับเงินผ่าน PromptPay QR"
+          >
+            <input
+              type="text"
+              name="promptpay_id"
+              maxLength={20}
+              placeholder="เช่น 0812345678"
+              style={inputStyle}
+            />
+          </Field>
+
+          <Field label="ธนาคาร (ไม่บังคับ)">
+            <select name="bank_name" style={inputStyle} defaultValue="">
+              <option value="">— ไม่ระบุ —</option>
+              <option value="ธ.กสิกรไทย">ธ.กสิกรไทย</option>
+              <option value="ธ.ไทยพาณิชย์">ธ.ไทยพาณิชย์</option>
+              <option value="ธ.กรุงเทพ">ธ.กรุงเทพ</option>
+              <option value="ธ.กรุงไทย">ธ.กรุงไทย</option>
+              <option value="ธ.กรุงศรีอยุธยา">ธ.กรุงศรีอยุธยา</option>
+              <option value="ธ.ทหารไทยธนชาต">ธ.ทหารไทยธนชาต</option>
+              <option value="ธ.ออมสิน">ธ.ออมสิน</option>
+              <option value="อื่นๆ">อื่นๆ</option>
+            </select>
+          </Field>
+
+          <Field label="เลขบัญชี (ไม่บังคับ)" hint="เลขบัญชี">
+            <input
+              type="text"
+              name="bank_account_number"
+              inputMode="numeric"
+              maxLength={20}
+              placeholder="เช่น 123-4-56789-0"
+              style={inputStyle}
+            />
+          </Field>
+
+          <Field label="ชื่อบัญชี (ไม่บังคับ)" hint="ชื่อบัญชี">
+            <input
+              type="text"
+              name="bank_account_name"
+              maxLength={100}
+              placeholder="เช่น นางสาว วรรณิษา ใจดี"
+              style={inputStyle}
+            />
+          </Field>
+        </div>
+      </div>
+
       {/* Hidden inputs that createBoutique reads */}
       <input type="hidden" name="area_key" />
       <input type="hidden" name="area_label" />
@@ -296,16 +379,18 @@ export default function SignupForm(_props: Props) {
 function Field({
   label,
   hint,
+  required,
   children,
 }: {
   label: string;
   hint?: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div>
       <label style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
-        {label}
+        {label}{required ? <RequiredMark /> : null}
       </label>
       {hint ? (
         <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6, whiteSpace: "pre-line", lineHeight: 1.5 }}>{hint}</div>

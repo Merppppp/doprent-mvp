@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-type SP = { product?: string; dress?: string; start?: string; end?: string };
+type SP = { product?: string; dress?: string; start?: string; end?: string; variant?: string };
 
 export default async function CheckoutAddressPage({
   searchParams,
@@ -26,8 +26,9 @@ export default async function CheckoutAddressPage({
   const productId = searchParams.product ?? searchParams.dress ?? "";
   const start = searchParams.start ?? "";
   const end = searchParams.end ?? "";
+  const variantId = searchParams.variant ?? null;
 
-  const backHref = `/checkout/address?product=${productId}&start=${start}&end=${end}`;
+  const backHref = `/checkout/address?product=${productId}&start=${start}&end=${end}${variantId ? `&variant=${variantId}` : ""}`;
 
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(backHref)}`);
@@ -138,6 +139,7 @@ export default async function CheckoutAddressPage({
         priceTiers={normalizeTiers(dress.price_tiers)}
         deposit={Number(dress.deposit) || 0}
         addresses={addresses}
+        variantId={variantId}
       />
     </div>
   );

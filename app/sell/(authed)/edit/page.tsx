@@ -19,7 +19,10 @@ export default async function EditShopPage() {
   const [raw, areasRaw] = await Promise.all([
     db.shop.findFirst({
       where: { ownerId: user.id },
-      include: { area: { select: { key: true } } },
+      include: {
+        area: { select: { key: true } },
+        closedDates: { select: { date: true, note: true }, orderBy: { date: "asc" } },
+      },
     }),
     db.area.findMany({ orderBy: { th: "asc" }, select: { key: true, th: true } }),
   ]);
@@ -42,6 +45,13 @@ export default async function EditShopPage() {
           area_label: raw.areaLabel,
           line_url: raw.lineUrl,
           instagram: raw.instagram,
+          facebook: raw.facebook,
+          twitter: raw.twitter,
+          tiktok: raw.tiktok,
+          promptpay_id: raw.promptpayId,
+          bank_name: raw.bankName,
+          bank_account_number: raw.bankAccountNumber,
+          bank_account_name: raw.bankAccountName,
           since_year: raw.sinceYear,
           tag: raw.tag,
           story: raw.story,
@@ -50,6 +60,17 @@ export default async function EditShopPage() {
           address: raw.address,
           hours: raw.hours,
           cover_color: raw.coverColor,
+          // Booking policy fields
+          lead_time_days: raw.leadTimeDays,
+          min_rental_days: raw.minRentalDays,
+          max_rental_days: raw.maxRentalDays,
+          return_window_days: raw.returnWindowDays,
+          buffer_days_after: raw.bufferDaysAfter,
+          closed_weekdays: raw.closedWeekdays,
+          closed_dates: raw.closedDates.map((cd) => ({
+            date: cd.date.toISOString().slice(0, 10),
+            note: cd.note ?? "",
+          })),
         }}
       />
     </div>
