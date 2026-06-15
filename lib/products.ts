@@ -38,6 +38,13 @@ export type ProductFilters = {
   category?: string;
   priceMin?: number;
   priceMax?: number;
+  /** Body-measurement filters — a product matches if ANY available variant satisfies ALL active bounds. */
+  bustMin?: number;
+  bustMax?: number;
+  waistMin?: number;
+  waistMax?: number;
+  lengthMin?: number;
+  lengthMax?: number;
   search?: string;
   sort?: "featured" | "price-asc" | "price-desc" | "name" | "rating-desc";
   dateFrom?: string; // YYYY-MM-DD
@@ -316,6 +323,35 @@ export async function listProducts(
   // Shop slugs filter (DB level via relation)
   if (opts.shopSlugs?.length) {
     where.shop = { slug: { in: opts.shopSlugs } };
+  }
+
+  // Body-measurement filter — one variant must satisfy ALL active bounds simultaneously.
+  // Placed on the Prisma `where` object so it applies to both the standard path and the
+  // trigram path (both call db.product.findMany({ where, ... }) with the same object).
+  const hasMeasurementFilter = [
+    opts.bustMin, opts.bustMax, opts.waistMin, opts.waistMax, opts.lengthMin, opts.lengthMax,
+  ].some((v) => v !== undefined);
+  if (hasMeasurementFilter) {
+    const variantFilter: Prisma.ProductVariantWhereInput = { available: true };
+    if (opts.bustMin !== undefined || opts.bustMax !== undefined) {
+      variantFilter.bustCm = {
+        ...(opts.bustMin !== undefined ? { gte: opts.bustMin } : {}),
+        ...(opts.bustMax !== undefined ? { lte: opts.bustMax } : {}),
+      };
+    }
+    if (opts.waistMin !== undefined || opts.waistMax !== undefined) {
+      variantFilter.waistCm = {
+        ...(opts.waistMin !== undefined ? { gte: opts.waistMin } : {}),
+        ...(opts.waistMax !== undefined ? { lte: opts.waistMax } : {}),
+      };
+    }
+    if (opts.lengthMin !== undefined || opts.lengthMax !== undefined) {
+      variantFilter.lengthCm = {
+        ...(opts.lengthMin !== undefined ? { gte: opts.lengthMin } : {}),
+        ...(opts.lengthMax !== undefined ? { lte: opts.lengthMax } : {}),
+      };
+    }
+    where.variants = { some: variantFilter };
   }
 
   // Date range: compute blocked product IDs first — needed before the search

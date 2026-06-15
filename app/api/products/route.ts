@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
     const KNOWN_PARAMS = new Set([
       "color", "occasion", "size", "designer", "q", "sort",
       "dateFrom", "dateTo", "priceMin", "priceMax", "page", "type",
+      "bustMin", "bustMax", "waistMin", "waistMax", "lengthMin", "lengthMax",
     ]);
     const tagsByGroup: Record<string, string[]> = {};
     for (const [key, value] of sp.entries()) {
@@ -31,6 +32,12 @@ export async function GET(req: NextRequest) {
     const page = Number(sp.get("page")) || 1;
     const priceMin = sp.get("priceMin") ? Number(sp.get("priceMin")) : undefined;
     const priceMax = sp.get("priceMax") ? Number(sp.get("priceMax")) : undefined;
+    const bustMin = sp.get("bustMin") ? Number(sp.get("bustMin")) : undefined;
+    const bustMax = sp.get("bustMax") ? Number(sp.get("bustMax")) : undefined;
+    const waistMin = sp.get("waistMin") ? Number(sp.get("waistMin")) : undefined;
+    const waistMax = sp.get("waistMax") ? Number(sp.get("waistMax")) : undefined;
+    const lengthMin = sp.get("lengthMin") ? Number(sp.get("lengthMin")) : undefined;
+    const lengthMax = sp.get("lengthMax") ? Number(sp.get("lengthMax")) : undefined;
     const dateFrom = sp.get("dateFrom") || undefined;
     const dateTo = sp.get("dateTo") || undefined;
 
@@ -45,6 +52,12 @@ export async function GET(req: NextRequest) {
       page,
       priceMin,
       priceMax,
+      bustMin,
+      bustMax,
+      waistMin,
+      waistMax,
+      lengthMin,
+      lengthMax,
       dateFrom,
       dateTo,
     });

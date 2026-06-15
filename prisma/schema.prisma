@@ -733,6 +733,12 @@ model ProductVariant {
   deposit     Int     @default(0)
   /// เปิดให้จองไซซ์นี้ (false = ซ่อนจากตัวเลือก — อิสระจาก Product.available)
   available   Boolean @default(true)
+  /// รอบอก หน่วยเซนติเมตร (ไม่บังคับ — ใช้กรอง filter ขนาดตัว)
+  bustCm      Int?    @map("bust_cm")
+  /// รอบเอว หน่วยเซนติเมตร (ไม่บังคับ — ใช้กรอง filter ขนาดตัว)
+  waistCm     Int?    @map("waist_cm")
+  /// ความยาวชุด หน่วยเซนติเมตร (ไม่บังคับ — ใช้กรอง filter ขนาดตัว)
+  lengthCm    Int?    @map("length_cm")
 
   /// uuid ผู้สร้าง record (NULL = system/backfill)
   createdBy String?  @map("created_by") @db.Uuid

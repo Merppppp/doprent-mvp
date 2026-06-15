@@ -22,6 +22,9 @@ type VariantInput = {
   pricePerDay: number;
   deposit: number;
   available: boolean;
+  bustCm: number | null;
+  waistCm: number | null;
+  lengthCm: number | null;
 };
 
 /**
@@ -35,6 +38,11 @@ function parseVariants(formData: FormData): VariantInput[] {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
+    const parseNullableInt = (v: unknown): number | null => {
+      if (v === null || v === undefined || String(v).trim() === "") return null;
+      const n = parseInt(String(v), 10);
+      return isNaN(n) ? null : n;
+    };
     return (parsed as Array<Record<string, unknown>>)
       .filter((r) => typeof r === "object" && r !== null && VALID_SIZES.has(String(r.size ?? "")))
       .map((r) => ({
@@ -43,6 +51,9 @@ function parseVariants(formData: FormData): VariantInput[] {
         pricePerDay: Math.max(0, parseInt(String(r.pricePerDay ?? r.price_per_day ?? "0"), 10) || 0),
         deposit: Math.max(0, parseInt(String(r.deposit ?? "0"), 10) || 0),
         available: r.available !== false,
+        bustCm: parseNullableInt(r.bustCm ?? r.bust_cm),
+        waistCm: parseNullableInt(r.waistCm ?? r.waist_cm),
+        lengthCm: parseNullableInt(r.lengthCm ?? r.length_cm),
       }));
   } catch {
     return [];
@@ -451,7 +462,7 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
     // Upsert ProductVariant rows (one per submitted size; fallback: one default variant)
     const variantsToUpsert: VariantInput[] = variantInputs.length > 0
       ? variantInputs
-      : [{ size: sizeRaw, quantity: 1, pricePerDay: basePerDay, deposit: depositRaw, available: true }];
+      : [{ size: sizeRaw, quantity: 1, pricePerDay: basePerDay, deposit: depositRaw, available: true, bustCm: null, waistCm: null, lengthCm: null }];
 
     for (const vi of variantsToUpsert) {
       await db.productVariant.upsert({
@@ -463,12 +474,18 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
           pricePerDay: vi.pricePerDay,
           deposit: vi.deposit,
           available: vi.available,
+          bustCm: vi.bustCm,
+          waistCm: vi.waistCm,
+          lengthCm: vi.lengthCm,
         },
         update: {
           quantity: vi.quantity,
           pricePerDay: vi.pricePerDay,
           deposit: vi.deposit,
           available: vi.available,
+          bustCm: vi.bustCm,
+          waistCm: vi.waistCm,
+          lengthCm: vi.lengthCm,
         },
       });
     }
@@ -624,12 +641,18 @@ export async function updateProduct(productId: string, formData: FormData): Prom
             pricePerDay: vi.pricePerDay,
             deposit: vi.deposit,
             available: vi.available,
+            bustCm: vi.bustCm,
+            waistCm: vi.waistCm,
+            lengthCm: vi.lengthCm,
           },
           update: {
             quantity: vi.quantity,
             pricePerDay: vi.pricePerDay,
             deposit: vi.deposit,
             available: vi.available,
+            bustCm: vi.bustCm,
+            waistCm: vi.waistCm,
+            lengthCm: vi.lengthCm,
           },
         });
       }

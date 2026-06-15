@@ -48,7 +48,7 @@ export default async function EditProductPage({ params }: { params: { id: string
         },
         variants: {
           orderBy: { size: "asc" },
-          select: { size: true, quantity: true, pricePerDay: true, deposit: true, available: true },
+          select: { size: true, quantity: true, pricePerDay: true, deposit: true, available: true, bustCm: true, waistCm: true, lengthCm: true },
         },
       },
     }),
@@ -129,6 +129,9 @@ export default async function EditProductPage({ params }: { params: { id: string
             pricePerDay: v.pricePerDay,
             deposit: v.deposit,
             available: v.available,
+            bustCm: v.bustCm,
+            waistCm: v.waistCm,
+            lengthCm: v.lengthCm,
           })),
         }}
       />

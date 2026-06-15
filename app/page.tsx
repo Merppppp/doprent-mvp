@@ -56,6 +56,12 @@ export default async function HomePage({
   const activeDateTo = searchParams?.dateTo?.trim() || undefined;
   const activePriceMin = Number(searchParams?.priceMin) || PRICE_BOUNDS.min;
   const activePriceMax = Number(searchParams?.priceMax) || PRICE_BOUNDS.max;
+  const activeBustMin = Number(searchParams?.bustMin) || undefined;
+  const activeBustMax = Number(searchParams?.bustMax) || undefined;
+  const activeWaistMin = Number(searchParams?.waistMin) || undefined;
+  const activeWaistMax = Number(searchParams?.waistMax) || undefined;
+  const activeLengthMin = Number(searchParams?.lengthMin) || undefined;
+  const activeLengthMax = Number(searchParams?.lengthMax) || undefined;
   const sort = (searchParams?.sort ?? "featured") as
     | "featured"
     | "price-asc"
@@ -67,6 +73,7 @@ export default async function HomePage({
   const KNOWN_FILTER_PARAMS = new Set([
     "occasion", "size", "designer", "q", "sort",
     "dateFrom", "dateTo", "priceMin", "priceMax", "page", "type",
+    "bustMin", "bustMax", "waistMin", "waistMax", "lengthMin", "lengthMax",
   ]);
 
   // Build tagsByGroup from URL params (all params not in the known list)
@@ -91,6 +98,12 @@ export default async function HomePage({
       designers: activeDesigner ? [activeDesigner] : undefined,
       priceMin: activePriceMin > PRICE_BOUNDS.min ? activePriceMin : undefined,
       priceMax: activePriceMax < PRICE_BOUNDS.max ? activePriceMax : undefined,
+      bustMin: activeBustMin,
+      bustMax: activeBustMax,
+      waistMin: activeWaistMin,
+      waistMax: activeWaistMax,
+      lengthMin: activeLengthMin,
+      lengthMax: activeLengthMax,
       search: search || undefined,
       sort,
       dateFrom: activeDateFrom,
@@ -214,6 +227,12 @@ export default async function HomePage({
                 locale={locale}
                 tagGroups={tagGroups}
                 activeTags={activeTags}
+                bustMin={activeBustMin}
+                bustMax={activeBustMax}
+                waistMin={activeWaistMin}
+                waistMax={activeWaistMax}
+                lengthMin={activeLengthMin}
+                lengthMax={activeLengthMax}
               />
             </aside>
 
@@ -241,6 +260,12 @@ export default async function HomePage({
                       locale={locale}
                       tagGroups={tagGroups}
                       activeTags={activeTags}
+                      bustMin={activeBustMin}
+                      bustMax={activeBustMax}
+                      waistMin={activeWaistMin}
+                      waistMax={activeWaistMax}
+                      lengthMin={activeLengthMin}
+                      lengthMax={activeLengthMax}
                     />
                     <div className="text-sm text-[var(--ink-2)] whitespace-nowrap">
                       {t("results.found", locale)}{" "}
@@ -282,6 +307,12 @@ export default async function HomePage({
                     dateTo: activeDateTo,
                     priceMin: activePriceMin > PRICE_BOUNDS.min ? String(activePriceMin) : undefined,
                     priceMax: activePriceMax < PRICE_BOUNDS.max ? String(activePriceMax) : undefined,
+                    bustMin: activeBustMin !== undefined ? String(activeBustMin) : undefined,
+                    bustMax: activeBustMax !== undefined ? String(activeBustMax) : undefined,
+                    waistMin: activeWaistMin !== undefined ? String(activeWaistMin) : undefined,
+                    waistMax: activeWaistMax !== undefined ? String(activeWaistMax) : undefined,
+                    lengthMin: activeLengthMin !== undefined ? String(activeLengthMin) : undefined,
+                    lengthMax: activeLengthMax !== undefined ? String(activeLengthMax) : undefined,
                     ...tagParamsForResults,
                   }}
                 />

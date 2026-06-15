@@ -25,6 +25,13 @@ export type BrowseFiltersProps = {
   tagGroups?: BoundTagGroup[];
   /** Active tag selections keyed by group key, values are tag keys. */
   activeTags?: Record<string, string[]>;
+  /** Body-measurement filter bounds (ซม.) */
+  bustMin?: number;
+  bustMax?: number;
+  waistMin?: number;
+  waistMax?: number;
+  lengthMin?: number;
+  lengthMax?: number;
 };
 
 // ── Chip + Section helpers ────────────────────────────────────────────────────
@@ -407,7 +414,7 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
 
   // Section open/close state
   const [sections, setSections] = useState<Record<string, boolean>>(() => {
-    const init: Record<string, boolean> = { occasion: true, color: false, size: false, price: true };
+    const init: Record<string, boolean> = { occasion: true, color: false, size: false, price: true, measurements: false };
     (props.tagGroups ?? []).forEach((g, i) => { init[`tg_${g.groupKey}`] = i === 0; });
     return init;
   });
@@ -422,7 +429,10 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     !!props.q ||
     Object.values(props.activeTags ?? {}).some((arr) => arr.length > 0) ||
     props.priceMin > props.priceBounds.min ||
-    props.priceMax < props.priceBounds.max;
+    props.priceMax < props.priceBounds.max ||
+    props.bustMin !== undefined || props.bustMax !== undefined ||
+    props.waistMin !== undefined || props.waistMax !== undefined ||
+    props.lengthMin !== undefined || props.lengthMax !== undefined;
 
   // ── Searchable items (match both th + en labels) ──────────────────────────
   const occasionItems: SearchableItem[] = useMemo(
@@ -486,6 +496,31 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
           sp.delete("priceMin");
           sp.delete("priceMax");
         }),
+    });
+  }
+  // Body-measurement filter badges
+  if (props.bustMin !== undefined || props.bustMax !== undefined) {
+    const lo = props.bustMin ?? ""; const hi = props.bustMax ?? "";
+    selectedBadges.push({
+      key: "bust",
+      label: `${t("filter.bust", locale)} ${lo}–${hi} ${t("unit.cm", locale)}`,
+      onRemove: () => push((sp) => { sp.delete("bustMin"); sp.delete("bustMax"); }),
+    });
+  }
+  if (props.waistMin !== undefined || props.waistMax !== undefined) {
+    const lo = props.waistMin ?? ""; const hi = props.waistMax ?? "";
+    selectedBadges.push({
+      key: "waist",
+      label: `${t("filter.waist", locale)} ${lo}–${hi} ${t("unit.cm", locale)}`,
+      onRemove: () => push((sp) => { sp.delete("waistMin"); sp.delete("waistMax"); }),
+    });
+  }
+  if (props.lengthMin !== undefined || props.lengthMax !== undefined) {
+    const lo = props.lengthMin ?? ""; const hi = props.lengthMax ?? "";
+    selectedBadges.push({
+      key: "length",
+      label: `${t("filter.length", locale)} ${lo}–${hi} ${t("unit.cm", locale)}`,
+      onRemove: () => push((sp) => { sp.delete("lengthMin"); sp.delete("lengthMax"); }),
     });
   }
 
@@ -582,6 +617,76 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
                 active={props.size === sz}
                 onClick={() => setParam("size", props.size === sz ? null : sz)}
               />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ════ Section: Body Measurements ════ */}
+      <div className="py-3 border-b border-[var(--line)]/50">
+        <SectionHeader
+          label={`${t("filter.bodyMeasurements", locale)} (${t("unit.cm", locale)})`}
+          open={!!sections.measurements}
+          onToggle={() => toggleSection("measurements")}
+        />
+        {!!sections.measurements && (
+          <div className="flex flex-col gap-3 mt-3">
+            {(
+              [
+                {
+                  label: t("filter.bust", locale),
+                  minKey: "bustMin" as const,
+                  maxKey: "bustMax" as const,
+                  minVal: props.bustMin,
+                  maxVal: props.bustMax,
+                },
+                {
+                  label: t("filter.waist", locale),
+                  minKey: "waistMin" as const,
+                  maxKey: "waistMax" as const,
+                  minVal: props.waistMin,
+                  maxVal: props.waistMax,
+                },
+                {
+                  label: t("filter.length", locale),
+                  minKey: "lengthMin" as const,
+                  maxKey: "lengthMax" as const,
+                  minVal: props.lengthMin,
+                  maxVal: props.lengthMax,
+                },
+              ] as const
+            ).map(({ label, minKey, maxKey, minVal, maxVal }) => (
+              <div key={minKey}>
+                <div className="text-[11px] font-medium text-[var(--ink-2)] mb-1.5">{label}</div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    placeholder="ต่ำสุด"
+                    value={minVal ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      setParam(minKey, v === "" ? null : v);
+                    }}
+                    className="w-full px-2 py-1.5 rounded-md border border-[var(--line)] bg-[var(--surface)] text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] outline-none focus:border-[var(--accent)] font-[inherit] text-center"
+                  />
+                  <span className="text-[10px] text-[var(--ink-3)] shrink-0">–</span>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    placeholder="สูงสุด"
+                    value={maxVal ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      setParam(maxKey, v === "" ? null : v);
+                    }}
+                    className="w-full px-2 py-1.5 rounded-md border border-[var(--line)] bg-[var(--surface)] text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] outline-none focus:border-[var(--accent)] font-[inherit] text-center"
+                  />
+                  <span className="text-[10px] text-[var(--ink-3)] shrink-0">{t("unit.cm", locale)}</span>
+                </div>
+              </div>
             ))}
           </div>
         )}

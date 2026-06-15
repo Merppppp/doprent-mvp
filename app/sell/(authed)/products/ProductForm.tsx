@@ -55,6 +55,9 @@ type VariantRow = {
   pricePerDay: number;
   deposit: number;
   available: boolean;
+  bustCm: number | null;
+  waistCm: number | null;
+  lengthCm: number | null;
 };
 
 type InitialData = {
@@ -116,7 +119,7 @@ export default function ProductForm(props: Props) {
   // Default: one variant inheriting the product's current size/price/deposit
   const defaultVariantRows: VariantRow[] = initial?.variants?.length
     ? initial.variants
-    : [{ size: initial?.size ?? "M", quantity: 1, pricePerDay: initial?.price_per_day ?? 500, deposit: initial?.deposit ?? 3000, available: true }];
+    : [{ size: initial?.size ?? "M", quantity: 1, pricePerDay: initial?.price_per_day ?? 500, deposit: initial?.deposit ?? 3000, available: true, bustCm: null, waistCm: null, lengthCm: null }];
   const [variantRows, setVariantRows] = useState<VariantRow[]>(defaultVariantRows);
 
   const addVariantRow = () => {
@@ -126,7 +129,7 @@ export default function ProductForm(props: Props) {
     const lastRow = variantRows[variantRows.length - 1];
     setVariantRows((prev) => [
       ...prev,
-      { size: nextSize, quantity: 1, pricePerDay: lastRow?.pricePerDay ?? 500, deposit: lastRow?.deposit ?? 0, available: true },
+      { size: nextSize, quantity: 1, pricePerDay: lastRow?.pricePerDay ?? 500, deposit: lastRow?.deposit ?? 0, available: true, bustCm: null, waistCm: null, lengthCm: null },
     ]);
   };
 
@@ -473,49 +476,76 @@ export default function ProductForm(props: Props) {
           <div style={{ fontSize: 11, color: "var(--ink-3)", fontWeight: 500 }}>เปิดจอง</div>
           <div />
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {variantRows.map((row, i) => {
             const usedSizes = new Set(variantRows.map((r, ri) => ri !== i ? r.size : null).filter(Boolean));
             return (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "90px 80px 1fr 1fr 60px 30px", gap: 6, alignItems: "center" }}>
-                <select
-                  value={row.size}
-                  onChange={(e) => updateVariantRow(i, { size: e.target.value as Size })}
-                  style={{ ...inputStyle, padding: "8px 6px", fontSize: 13 }}
-                >
-                  {SIZES.map((s) => (
-                    <option key={s} value={s} disabled={usedSizes.has(s) && s !== row.size}>{s}</option>
-                  ))}
-                </select>
-                <input
-                  type="number" min={1} step={1} value={row.quantity}
-                  onChange={(e) => updateVariantRow(i, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
-                  style={{ ...inputStyle, padding: "8px 6px", fontSize: 13 }}
-                />
-                <input
-                  type="number" min={100} step={1} value={row.pricePerDay}
-                  onChange={(e) => updateVariantRow(i, { pricePerDay: parseInt(e.target.value) || 0 })}
-                  style={{ ...inputStyle, padding: "8px 6px", fontSize: 13 }}
-                />
-                <input
-                  type="number" min={0} step={1} value={row.deposit}
-                  onChange={(e) => updateVariantRow(i, { deposit: parseInt(e.target.value) || 0 })}
-                  style={{ ...inputStyle, padding: "8px 6px", fontSize: 13 }}
-                />
-                <div style={{ display: "flex", justifyContent: "center" }}>
+              <div key={i} style={{ borderBottom: "1px solid var(--line)", paddingBottom: 8 }}>
+                {/* Main row: size / qty / price / deposit / available / delete */}
+                <div style={{ display: "grid", gridTemplateColumns: "90px 80px 1fr 1fr 60px 30px", gap: 6, alignItems: "center" }}>
+                  <select
+                    value={row.size}
+                    onChange={(e) => updateVariantRow(i, { size: e.target.value as Size })}
+                    style={{ ...inputStyle, padding: "8px 6px", fontSize: 13 }}
+                  >
+                    {SIZES.map((s) => (
+                      <option key={s} value={s} disabled={usedSizes.has(s) && s !== row.size}>{s}</option>
+                    ))}
+                  </select>
                   <input
-                    type="checkbox" checked={row.available}
-                    onChange={(e) => updateVariantRow(i, { available: e.target.checked })}
-                    style={{ width: 16, height: 16 }}
+                    type="number" min={1} step={1} value={row.quantity}
+                    onChange={(e) => updateVariantRow(i, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
+                    style={{ ...inputStyle, padding: "8px 6px", fontSize: 13 }}
                   />
+                  <input
+                    type="number" min={100} step={1} value={row.pricePerDay}
+                    onChange={(e) => updateVariantRow(i, { pricePerDay: parseInt(e.target.value) || 0 })}
+                    style={{ ...inputStyle, padding: "8px 6px", fontSize: 13 }}
+                  />
+                  <input
+                    type="number" min={0} step={1} value={row.deposit}
+                    onChange={(e) => updateVariantRow(i, { deposit: parseInt(e.target.value) || 0 })}
+                    style={{ ...inputStyle, padding: "8px 6px", fontSize: 13 }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "center" }}>
+                    <input
+                      type="checkbox" checked={row.available}
+                      onChange={(e) => updateVariantRow(i, { available: e.target.checked })}
+                      style={{ width: 16, height: 16 }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeVariantRow(i)}
+                    disabled={variantRows.length <= 1}
+                    aria-label="ลบไซซ์"
+                    style={{ border: 0, background: "none", color: variantRows.length <= 1 ? "var(--ink-3)" : "var(--danger)", cursor: variantRows.length <= 1 ? "default" : "pointer", fontSize: 18, lineHeight: 1, opacity: variantRows.length <= 1 ? 0.35 : 1 }}
+                  >×</button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeVariantRow(i)}
-                  disabled={variantRows.length <= 1}
-                  aria-label="ลบไซซ์"
-                  style={{ border: 0, background: "none", color: variantRows.length <= 1 ? "var(--ink-3)" : "var(--danger)", cursor: variantRows.length <= 1 ? "default" : "pointer", fontSize: 18, lineHeight: 1, opacity: variantRows.length <= 1 ? 0.35 : 1 }}
-                >×</button>
+                {/* Measurement sub-row: รอบอก / รอบเอว / ความยาว (ไม่บังคับ) */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginTop: 6 }}>
+                  {(
+                    [
+                      { label: "รอบอก (ซม.)", field: "bustCm" as const, value: row.bustCm },
+                      { label: "รอบเอว (ซม.)", field: "waistCm" as const, value: row.waistCm },
+                      { label: "ความยาว (ซม.)", field: "lengthCm" as const, value: row.lengthCm },
+                    ] as const
+                  ).map(({ label, field, value }) => (
+                    <div key={field}>
+                      <div style={{ fontSize: 10, color: "var(--ink-3)", marginBottom: 2 }}>{label}</div>
+                      <input
+                        type="number" min={1} step={1}
+                        value={value ?? ""}
+                        placeholder="—"
+                        onChange={(e) => {
+                          const v = e.target.value.trim();
+                          updateVariantRow(i, { [field]: v === "" ? null : (parseInt(v) || null) });
+                        }}
+                        style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })}

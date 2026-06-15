@@ -102,7 +102,7 @@ export default async function DressPage({ params }: { params: Params }) {
     db.productVariant.findMany({
       where: { productId: dress.id },
       orderBy: [{ size: "asc" }],
-      select: { id: true, size: true, quantity: true, pricePerDay: true, deposit: true, available: true },
+      select: { id: true, size: true, quantity: true, pricePerDay: true, deposit: true, available: true, bustCm: true, waistCm: true, lengthCm: true },
     }),
   ]);
 
@@ -440,6 +440,43 @@ export default async function DressPage({ params }: { params: Params }) {
               </div>
             </div>
           ) : null}
+
+          {/* Measurement guide — shown only if at least one variant has measurements */}
+          {productVariants.some((v) => v.bustCm || v.waistCm || v.lengthCm) && (
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>ตารางขนาด</div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      {["ไซซ์", "รอบอก (ซม.)", "รอบเอว (ซม.)", "ความยาว (ซม.)"].map((h) => (
+                        <th
+                          key={h}
+                          style={{
+                            padding: "6px 10px", textAlign: "left", fontWeight: 600,
+                            color: "var(--ink-2)", borderBottom: "1px solid var(--line)",
+                            whiteSpace: "nowrap",
+                          }}
+                        >{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productVariants
+                      .filter((v) => v.available)
+                      .map((v) => (
+                        <tr key={v.id}>
+                          <td style={{ padding: "6px 10px", fontWeight: 600 }}>{v.size}</td>
+                          <td style={{ padding: "6px 10px", color: "var(--ink-2)" }}>{v.bustCm ?? "—"}</td>
+                          <td style={{ padding: "6px 10px", color: "var(--ink-2)" }}>{v.waistCm ?? "—"}</td>
+                          <td style={{ padding: "6px 10px", color: "var(--ink-2)" }}>{v.lengthCm ?? "—"}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Date picker (renter). LINE href and pre-filled message are
               omitted entirely for anonymous viewers — they see a login CTA
