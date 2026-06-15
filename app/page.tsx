@@ -218,7 +218,7 @@ export default async function HomePage({
         <div className="container">
           <div className="browse-grid">
             {/* SIDEBAR — hidden on mobile, sticky on desktop */}
-            <aside className="hidden md:block sticky top-[15px] self-start max-h-[calc(100vh-135px)] overflow-y-auto overscroll-contain text-sm filter-sidebar pr-[15px]">
+            <aside className="hidden md:block sticky top-[15px] self-start max-h-[calc(100vh-135px)] overflow-y-auto overscroll-contain text-sm filter-sidebar pl-1.5 pr-[15px] py-1">
               <BrowseFilters
                 q={search}
                 occasion={activeOcc ?? null}
