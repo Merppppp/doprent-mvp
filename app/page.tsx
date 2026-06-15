@@ -349,11 +349,16 @@ const HR_CSS = `
   background:var(--bg);
 }
 
-/* Results bar — sticky on mobile */
+/* Results bar — sticky to the top of the #main scroll container.
+   Scrolling happens inside #main (layout.tsx: overflowY:auto) and the navbar is
+   a flex SIBLING above #main — not a window-fixed bar. So the correct sticky
+   offset is 0 (top of the scrollport = directly under the navbar). Using
+   --header-h here pushed it that many px DOWN into the content = floated
+   mid-screen and covered products. */
 .hr-results-bar{
   display:flex;align-items:center;
   margin-bottom:16px;flex-wrap:wrap;gap:8px 12px;
-  position:sticky;top:var(--header-h,120px);z-index:20;
+  position:sticky;top:0;z-index:20;
   background:var(--bg);
   padding:10px 0;
   border-bottom:1px solid var(--line);

@@ -25,6 +25,8 @@ export default function TagRequestRow({ req }: { req: TagRequestRowData }) {
   const [approveKey, setApproveKey] = useState(req.requestedKey ?? "");
   const [swatchHex, setSwatchHex] = useState("");
   const [swatchImageUrl, setSwatchImageUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +55,28 @@ export default function TagRequestRow({ req }: { req: TagRequestRowData }) {
       return;
     }
     router.refresh();
+  }
+
+  async function onSwatchFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const json: { url?: string; urls?: { thumb: string; medium: string; large: string }; error?: string } = await res.json();
+      if (!res.ok) {
+        setUploadError(json.error ?? "อัปโหลดไม่สำเร็จ");
+      } else {
+        setSwatchImageUrl(json.urls!.thumb);
+      }
+    } catch {
+      setUploadError("อัปโหลดไม่สำเร็จ");
+    } finally {
+      setUploading(false);
+    }
   }
 
   const statusTone =
@@ -233,14 +257,27 @@ export default function TagRequestRow({ req }: { req: TagRequestRowData }) {
                       placeholder="#RRGGBB (ไม่บังคับ)"
                       style={{ width: 130, padding: "6px 10px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 12 }}
                     />
-                    <label style={{ fontSize: 12, color: "var(--ink-2)", whiteSpace: "nowrap" }}>URL รูป:</label>
+                    <label style={{ fontSize: 12, color: "var(--ink-2)", whiteSpace: "nowrap" }}>รูป swatch:</label>
                     <input
-                      type="text"
-                      value={swatchImageUrl}
-                      onChange={(e) => setSwatchImageUrl(e.target.value)}
-                      placeholder="https://... (ไม่บังคับ)"
-                      style={{ flex: 1, minWidth: 160, padding: "6px 10px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 12 }}
+                      type="file"
+                      accept="image/*"
+                      disabled={uploading}
+                      onChange={onSwatchFileChange}
+                      style={{ fontSize: 12 }}
                     />
+                    {uploading && (
+                      <span style={{ fontSize: 12, color: "var(--ink-3)" }}>กำลังอัปโหลด...</span>
+                    )}
+                    {swatchImageUrl && !uploading && (
+                      <img
+                        src={swatchImageUrl}
+                        alt="swatch preview"
+                        style={{ width: 14, height: 14, borderRadius: "50%", objectFit: "cover" }}
+                      />
+                    )}
+                    {uploadError && (
+                      <span style={{ fontSize: 12, color: "var(--danger)" }}>{uploadError}</span>
+                    )}
                   </div>
                 )}
               </div>

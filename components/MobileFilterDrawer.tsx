@@ -1,10 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import BrowseFilters, { type BrowseFiltersProps } from "./BrowseFilters";
 
 export default function MobileFilterDrawer(props: BrowseFiltersProps) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // The trigger button lives inside the sticky `.hr-results-bar` (position:
+  // sticky + z-index:20), which CREATES A STACKING CONTEXT. A child `fixed`
+  // overlay can't escape it, so the navbar (z-40) paints over the drawer's
+  // top. Render the overlay in a portal on <body> so it overlays everything.
+  useEffect(() => setMounted(true), []);
+
+  // Lock background scroll while the drawer is open.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   return (
     <>
@@ -21,24 +39,27 @@ export default function MobileFilterDrawer(props: BrowseFiltersProps) {
         Filter
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setOpen(false)}
-          />
-          <div className="absolute left-0 top-0 bottom-0 w-[280px] max-w-[85vw] bg-[var(--bg)] overflow-y-auto p-4 shadow-xl animate-slide-in-left">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-[var(--surface)] border border-[var(--line)] text-[var(--ink-3)] cursor-pointer text-sm"
-            >
-              ✕
-            </button>
-            <BrowseFilters {...props} />
-          </div>
-        </div>
-      )}
+      {mounted && open
+        ? createPortal(
+            <div className="fixed inset-0 z-[60] md:hidden">
+              <div
+                className="absolute inset-0 bg-black/40"
+                onClick={() => setOpen(false)}
+              />
+              <div className="absolute left-0 top-0 bottom-0 w-[280px] max-w-[85vw] bg-[var(--bg)] overflow-y-auto p-4 shadow-xl animate-slide-in-left">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-[var(--surface)] border border-[var(--line)] text-[var(--ink-3)] cursor-pointer text-sm"
+                >
+                  ✕
+                </button>
+                <BrowseFilters {...props} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
