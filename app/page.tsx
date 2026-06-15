@@ -5,7 +5,7 @@ import BannerCarousel from "@/components/BannerCarousel";
 import type { BannerSlide } from "@/components/BannerCarousel";
 import SortSelect from "@/components/SortSelect";
 import MobileFilterDrawer from "@/components/MobileFilterDrawer";
-import LocationControls from "@/components/LocationControls";
+import ResultsBarLocation from "@/components/ResultsBarLocation";
 import { OccasionTile } from "@/components/ProductArt";
 import {
   listDesigners,
@@ -239,8 +239,8 @@ export default async function HomePage({
             {/* MAIN */}
             <main>
               <div className="hr-results-bar">
-                {/* Location controls — GPS / district / radius chips */}
-                <LocationControls locale={locale} />
+                {/* Location — desktop: inline controls; mobile: pin toggle + expandable panel */}
+                <ResultsBarLocation locale={locale} />
 
                 {/* Count + sort group, pinned to the right */}
                 <div className="hr-results-bar__right">
@@ -400,6 +400,11 @@ const HR_CSS = `
   margin-left:auto;flex-shrink:0;flex-wrap:wrap;
 }
 
+/* Location: desktop = inline controls (wrapper is transparent), toggle hidden.
+   Mobile rules live in the max-width:767px block below. */
+.loc-toggle{display:none}
+.loc-panel{display:contents}
+
 /* Empty state */
 .hr-empty{
   padding:60px 20px;text-align:center;
@@ -429,9 +434,22 @@ const HR_CSS = `
    (host directive). */
 @media(max-width:767px){
   .hr-browse{padding-top:12px}
-  .hr-results-bar{padding:8px 0;gap:8px;margin-bottom:12px}
-  .hr-results-bar>*{width:100%}
-  .hr-results-bar .loc-controls{width:100%;justify-content:space-between}
-  .hr-results-bar__right{width:100%;margin-left:0;justify-content:space-between}
+  .hr-results-bar{padding:8px 0;gap:8px;margin-bottom:12px;align-items:center}
+  /* Single row: [pin] + [Filter · count · sort]. Location panel expands full-width below. */
+  .loc-toggle{
+    display:inline-flex;align-items:center;gap:3px;order:0;flex:0 0 auto;
+    height:34px;padding:0 8px;border:1px solid var(--line);border-radius:8px;
+    background:var(--bg);color:var(--accent-2);cursor:pointer;
+  }
+  /* icon-only on mobile to guarantee the single row fits; label shows once expanded */
+  .loc-toggle__text{display:none}
+  .hr-results-bar__right{
+    order:1;flex:1 1 auto;width:auto;margin-left:0;justify-content:space-between;
+    flex-wrap:nowrap;gap:6px;min-width:0;
+  }
+  /* Expandable location panel — hidden until toggled, then full-width row below */
+  .loc-panel{display:none;order:2;width:100%}
+  .loc-panel.is-open{display:block}
+  .loc-panel .loc-controls{width:100%;justify-content:space-between}
 }
 `;
