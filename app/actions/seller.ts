@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { withActor } from "@/lib/db-context";
 import { isValidLineContact, normalizeLineUrl } from "@/lib/line";
 import { dressLimitFor } from "@/lib/tiers";
-import { normalizeTiers, validateTiers } from "@/lib/pricing";
+// normalizeTiers/validateTiers removed — replaced by parsePriceTiersFromForm
 import type { AdsTier, Color, PriceTier } from "@/lib/types";
 // DB-valid size enum values only (Prisma schema has XS..XL; no new enum values allowed)
 type DbSize = "XS" | "S" | "M" | "L" | "XL";
@@ -19,8 +19,6 @@ const VALID_SIZES = new Set<string>(["XS", "S", "M", "L", "XL"]);
 type VariantInput = {
   size: DbSize;
   quantity: number;
-  pricePerDay: number;
-  deposit: number;
   available: boolean;
   bustCm: number | null;
   waistCm: number | null;
@@ -48,8 +46,6 @@ function parseVariants(formData: FormData): VariantInput[] {
       .map((r) => ({
         size: String(r.size) as DbSize,
         quantity: Math.max(1, parseInt(String(r.quantity ?? "1"), 10) || 1),
-        pricePerDay: Math.max(0, parseInt(String(r.pricePerDay ?? r.price_per_day ?? "0"), 10) || 0),
-        deposit: Math.max(0, parseInt(String(r.deposit ?? "0"), 10) || 0),
         available: r.available !== false,
         bustCm: parseNullableInt(r.bustCm ?? r.bust_cm),
         waistCm: parseNullableInt(r.waistCm ?? r.waist_cm),
@@ -57,6 +53,67 @@ function parseVariants(formData: FormData): VariantInput[] {
       }));
   } catch {
     return [];
+  }
+}
+
+type TierInput = { minDays: number; pricePerDay: number };
+type SharedTiers = TierInput[];
+type PerSizeTiers = { size: DbSize; tiers: TierInput[] }[];
+
+/** Validate a set of tier entries: at least one with minDays=1, all minDays>=1, pricePerDay>=0, unique minDays. */
+function validateTierSet(tiers: TierInput[], label?: string): { ok: boolean; error?: string } {
+  if (!tiers.length) return { ok: false, error: `${label ? label + ': ' : ''}ต้องมีอย่างน้อย 1 ช่วงราคา` };
+  if (!tiers.some((t) => t.minDays === 1)) return { ok: false, error: `${label ? label + ': ' : ''}ต้องมีช่วงเริ่มต้นที่ 1 วัน` };
+  for (const t of tiers) {
+    if (!Number.isInteger(t.minDays) || t.minDays < 1) return { ok: false, error: `${label ? label + ': ' : ''}จำนวนวันขั้นต่ำต้องเป็นจำนวนเต็ม >= 1` };
+    if (!Number.isInteger(t.pricePerDay) || t.pricePerDay < 0) return { ok: false, error: `${label ? label + ': ' : ''}ราคาต้องเป็นจำนวนเต็ม >= 0` };
+  }
+  const mins = tiers.map((t) => t.minDays);
+  if (new Set(mins).size !== mins.length) return { ok: false, error: `${label ? label + ': ' : ''}จำนวนวัน (minDays) ซ้ำกัน` };
+  // ราคาเช่าต่อวันต้องอย่างน้อย ฿100 (รักษา behavior เดิม กัน seller ตั้ง ฿0)
+  if (Math.min(...tiers.map((t) => t.pricePerDay)) < 100) return { ok: false, error: `${label ? label + ': ' : ''}ราคาเช่าต่อวันต้องอย่างน้อย ฿100` };
+  return { ok: true };
+}
+
+/** Parse the price_mode + price_tiers fields from form data. Returns null on parse error. */
+function parsePriceTiersFromForm(formData: FormData):
+  | { mode: "shared"; shared: SharedTiers; deposit: number }
+  | { mode: "per_size"; perSize: PerSizeTiers; deposit: number }
+  | { ok: false; error: string } {
+  const mode = String(formData.get("price_mode") ?? "shared") as "shared" | "per_size";
+  const depositRaw = parseInt(String(formData.get("deposit") ?? "0"), 10);
+  const deposit = isNaN(depositRaw) || depositRaw < 0 ? 0 : depositRaw;
+  const raw = formData.get("price_tiers");
+  if (!raw || typeof raw !== "string") return { ok: false, error: "ไม่พบข้อมูลราคา" };
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return { ok: false, error: "ข้อมูลราคาไม่ถูกต้อง" }; }
+  if (!Array.isArray(parsed)) return { ok: false, error: "ข้อมูลราคาต้องเป็น array" };
+
+  if (mode === "per_size") {
+    const perSize: PerSizeTiers = [];
+    for (const item of parsed as Array<Record<string, unknown>>) {
+      const size = String(item.size ?? "");
+      if (!VALID_SIZES.has(size)) return { ok: false, error: `ไซซ์ไม่ถูกต้อง: ${size}` };
+      const ts = item.tiers;
+      if (!Array.isArray(ts)) return { ok: false, error: `tiers ของไซซ์ ${size} ต้องเป็น array` };
+      const tiers: TierInput[] = ts.map((t: Record<string, unknown>) => ({
+        minDays: parseInt(String(t.minDays ?? "0"), 10),
+        pricePerDay: parseInt(String(t.pricePerDay ?? "0"), 10),
+      }));
+      const v = validateTierSet(tiers, `ไซซ์ ${size}`);
+      if (!v.ok) return { ok: false, error: v.error! };
+      perSize.push({ size: size as DbSize, tiers });
+    }
+    if (perSize.length === 0) return { ok: false, error: "ต้องมีข้อมูลราคาอย่างน้อย 1 ไซซ์" };
+    return { mode: "per_size", perSize, deposit };
+  } else {
+    const shared: SharedTiers = (parsed as Array<Record<string, unknown>>).map((t) => ({
+      minDays: parseInt(String(t.minDays ?? "0"), 10),
+      pricePerDay: parseInt(String(t.pricePerDay ?? "0"), 10),
+    }));
+    const v = validateTierSet(shared);
+    if (!v.ok) return { ok: false, error: v.error! };
+    return { mode: "shared", shared, deposit };
   }
 }
 
@@ -372,18 +429,33 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { ok: false, error: "กรุณาใส่ชื่อสินค้า" };
 
-  const pricePerDay = parseInt(String(formData.get("price_per_day") ?? "0"), 10);
-  const tiersRaw = normalizeTiers(String(formData.get("price_tiers") ?? ""));
-  let tiers: PriceTier[] = [];
-  if (tiersRaw.length) {
-    const v = validateTiers(tiersRaw);
-    if (!v.ok) return { ok: false, error: v.error ?? "ราคาตามช่วงไม่ถูกต้อง" };
-    tiers = tiersRaw;
-  } else if (pricePerDay < 100) {
-    return { ok: false, error: "ราคาเช่าต่อวันต้องอย่างน้อย ฿100" };
+  // Parse price tiers + deposit (new format: price_mode + price_tiers)
+  const priceData = parsePriceTiersFromForm(formData);
+  if ("ok" in priceData) return { ok: false, error: priceData.error };
+
+  const sharedDeposit = priceData.deposit;
+
+  // Parse variants
+  const variantInputs = parseVariants(formData);
+  const sizeRaw = (String(formData.get("size") ?? "M") as DbSize);
+
+  const variantsToCreate: VariantInput[] = variantInputs.length > 0
+    ? variantInputs
+    : [{ size: sizeRaw, quantity: 1, available: true, bustCm: null, waistCm: null, lengthCm: null }];
+
+  // Compute derived base prices
+  let basePerDay: number;
+  let variantPriceMap: Map<DbSize, number>;
+
+  if (priceData.mode === "shared") {
+    basePerDay = Math.min(...priceData.shared.map((t) => t.pricePerDay));
+    variantPriceMap = new Map(variantsToCreate.map((v) => [v.size, basePerDay]));
+  } else {
+    variantPriceMap = new Map(
+      priceData.perSize.map((ps) => [ps.size, Math.min(...ps.tiers.map((t) => t.pricePerDay))])
+    );
+    basePerDay = Math.min(...Array.from(variantPriceMap.values()));
   }
-  // base price = lowest tier rate (or flat pricePerDay)
-  const basePerDay = tiers.length ? Math.min(...tiers.map((t) => t.per_day)) : pricePerDay;
 
   const lineUrlRaw = String(formData.get("line_url") ?? "").trim();
   const lineUrl = lineUrlRaw ? normalizeLineUrl(lineUrlRaw) : shop.lineUrl;
@@ -422,12 +494,6 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
     return isNaN(n) || n < 0 ? null : n;
   };
 
-  // Parse variants from formData
-  const variantInputs = parseVariants(formData);
-  // If no variants submitted (legacy path), create one default variant from product fields
-  const sizeRaw = (String(formData.get("size") ?? "M") as DbSize);
-  const depositRaw = parseInt(String(formData.get("deposit") ?? "0"), 10) || 0;
-
   return withActor(user.id, async () => {
     const created = await db.product.create({
       data: {
@@ -439,7 +505,7 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
         productTypeId: productType.id,
         size: sizeRaw,
         pricePerDay: basePerDay,
-        deposit: depositRaw,
+        deposit: sharedDeposit,
         description: String(formData.get("description") ?? "").trim() || null,
         lineUrl,
         status: "pending",
@@ -451,28 +517,23 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
         returnWindowDays: policyOverride ? parsePolicyInt("return_window_days") : null,
         bufferDaysAfter: policyOverride ? parsePolicyInt("buffer_days_after") : null,
         images: { create: images.map((url, i) => ({ url, sortOrder: i })) },
-        priceTiers: tiers.length
-          ? { create: tiers.map((t) => ({ minDays: t.min, pricePerDay: t.per_day })) }
-          : { create: [{ minDays: 1, pricePerDay: basePerDay }] },
         ...(tagIds.length > 0 ? { productTags: { create: tagIds.map((tagId) => ({ tagId })) } } : {}),
       },
       select: { id: true, slug: true },
     });
 
-    // Upsert ProductVariant rows (one per submitted size; fallback: one default variant)
-    const variantsToUpsert: VariantInput[] = variantInputs.length > 0
-      ? variantInputs
-      : [{ size: sizeRaw, quantity: 1, pricePerDay: basePerDay, deposit: depositRaw, available: true, bustCm: null, waistCm: null, lengthCm: null }];
-
-    for (const vi of variantsToUpsert) {
-      await db.productVariant.upsert({
+    // Create variants
+    const createdVariants: { id: string; size: DbSize }[] = [];
+    for (const vi of variantsToCreate) {
+      const variantPrice = variantPriceMap.get(vi.size) ?? basePerDay;
+      const created_v = await db.productVariant.upsert({
         where: { productId_size: { productId: created.id, size: vi.size } },
         create: {
           productId: created.id,
           size: vi.size,
           quantity: vi.quantity,
-          pricePerDay: vi.pricePerDay,
-          deposit: vi.deposit,
+          pricePerDay: variantPrice,
+          deposit: sharedDeposit,
           available: vi.available,
           bustCm: vi.bustCm,
           waistCm: vi.waistCm,
@@ -480,14 +541,31 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
         },
         update: {
           quantity: vi.quantity,
-          pricePerDay: vi.pricePerDay,
-          deposit: vi.deposit,
+          pricePerDay: variantPrice,
+          deposit: sharedDeposit,
           available: vi.available,
           bustCm: vi.bustCm,
           waistCm: vi.waistCm,
           lengthCm: vi.lengthCm,
         },
+        select: { id: true, size: true },
       });
+      createdVariants.push({ id: created_v.id, size: created_v.size as DbSize });
+    }
+
+    // Create ProductPriceTier rows
+    if (priceData.mode === "shared") {
+      await db.productPriceTier.createMany({
+        data: priceData.shared.map((t) => ({ productId: created.id, variantId: null, minDays: t.minDays, pricePerDay: t.pricePerDay })),
+      });
+    } else {
+      for (const ps of priceData.perSize) {
+        const variant = createdVariants.find((v) => v.size === ps.size);
+        if (!variant) continue;
+        await db.productPriceTier.createMany({
+          data: ps.tiers.map((t) => ({ productId: created.id, variantId: variant.id, minDays: t.minDays, pricePerDay: t.pricePerDay })),
+        });
+      }
     }
 
     revalidatePath("/sell/dashboard");
@@ -553,18 +631,24 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     }
   }
 
-  // Parse price tiers (child table replace)
-  let newTiers: PriceTier[] | null = null;
-  const tiersRaw = formData.get("price_tiers");
-  if (typeof tiersRaw === "string") {
-    const parsed = normalizeTiers(tiersRaw);
-    if (parsed.length) {
-      const v = validateTiers(parsed);
-      if (!v.ok) return { ok: false, error: v.error ?? "ราคาตามช่วงไม่ถูกต้อง" };
-      newTiers = parsed;
-      // Update base price to lowest tier rate
-      scalarUpdates.pricePerDay = Math.min(...parsed.map((t) => t.per_day));
+  // Parse price tiers (new format: price_mode + price_tiers)
+  const hasPriceMode = formData.has("price_mode");
+  let priceData: ReturnType<typeof parsePriceTiersFromForm> | null = null;
+  if (hasPriceMode) {
+    priceData = parsePriceTiersFromForm(formData);
+    if ("ok" in priceData) return { ok: false, error: priceData.error };
+  }
+
+  // If price mode submitted, update derived price fields
+  if (priceData && !("ok" in priceData)) {
+    const sharedDeposit = priceData.deposit;
+    scalarUpdates.deposit = sharedDeposit;
+
+    if (priceData.mode === "shared") {
+      const basePerDay = Math.min(...priceData.shared.map((t) => t.pricePerDay));
+      scalarUpdates.pricePerDay = basePerDay;
     }
+    // per_size: pricePerDay computed after variant upsert below
   }
 
   // Parse images (child table replace)
@@ -612,13 +696,6 @@ export async function updateProduct(productId: string, formData: FormData): Prom
         });
       }
     }
-    // Replace price tiers if provided
-    if (newTiers !== null) {
-      await db.productPriceTier.deleteMany({ where: { productId } });
-      await db.productPriceTier.createMany({
-        data: newTiers.map((t) => ({ productId, minDays: t.min, pricePerDay: t.per_day })),
-      });
-    }
     // Replace occasions/tags if provided
     if (newTagIds !== null) {
       await db.productTag.deleteMany({ where: { productId } });
@@ -629,32 +706,65 @@ export async function updateProduct(productId: string, formData: FormData): Prom
         });
       }
     }
-    // Upsert ProductVariant rows if variants were submitted
-    if (newVariants.length > 0) {
+
+    // Upsert variants
+    const updatedVariants: { id: string; size: string }[] = [];
+    if (newVariants.length > 0 && priceData && !("ok" in priceData)) {
+      const sharedDeposit = priceData.deposit;
+      const variantPriceMap: Map<string, number> = new Map();
+      if (priceData.mode === "shared") {
+        const basePerDay = Math.min(...priceData.shared.map((t) => t.pricePerDay));
+        for (const vi of newVariants) variantPriceMap.set(vi.size, basePerDay);
+      } else {
+        for (const ps of priceData.perSize) {
+          variantPriceMap.set(ps.size, Math.min(...ps.tiers.map((t) => t.pricePerDay)));
+        }
+      }
       for (const vi of newVariants) {
-        await db.productVariant.upsert({
+        const variantPrice = variantPriceMap.get(vi.size) ?? (scalarUpdates.pricePerDay as number ?? 0);
+        const v = await db.productVariant.upsert({
           where: { productId_size: { productId, size: vi.size } },
-          create: {
-            productId,
-            size: vi.size,
-            quantity: vi.quantity,
-            pricePerDay: vi.pricePerDay,
-            deposit: vi.deposit,
-            available: vi.available,
-            bustCm: vi.bustCm,
-            waistCm: vi.waistCm,
-            lengthCm: vi.lengthCm,
-          },
-          update: {
-            quantity: vi.quantity,
-            pricePerDay: vi.pricePerDay,
-            deposit: vi.deposit,
-            available: vi.available,
-            bustCm: vi.bustCm,
-            waistCm: vi.waistCm,
-            lengthCm: vi.lengthCm,
-          },
+          create: { productId, size: vi.size, quantity: vi.quantity, pricePerDay: variantPrice, deposit: sharedDeposit, available: vi.available, bustCm: vi.bustCm, waistCm: vi.waistCm, lengthCm: vi.lengthCm },
+          update: { quantity: vi.quantity, pricePerDay: variantPrice, deposit: sharedDeposit, available: vi.available, bustCm: vi.bustCm, waistCm: vi.waistCm, lengthCm: vi.lengthCm },
+          select: { id: true, size: true },
         });
+        updatedVariants.push({ id: v.id, size: v.size });
+      }
+      // Update product.pricePerDay from min variant price (per_size mode)
+      if (priceData.mode === "per_size" && updatedVariants.length > 0) {
+        const minVariantPrice = Math.min(...updatedVariants.map((v) => variantPriceMap.get(v.size) ?? Infinity));
+        if (Number.isFinite(minVariantPrice)) {
+          await db.product.update({ where: { id: productId }, data: { pricePerDay: minVariantPrice } });
+        }
+      }
+    } else if (newVariants.length > 0) {
+      // No price mode — legacy path (just update qty/available/measurements)
+      for (const vi of newVariants) {
+        const v = await db.productVariant.upsert({
+          where: { productId_size: { productId, size: vi.size } },
+          create: { productId, size: vi.size, quantity: vi.quantity, pricePerDay: 0, deposit: 0, available: vi.available, bustCm: vi.bustCm, waistCm: vi.waistCm, lengthCm: vi.lengthCm },
+          update: { quantity: vi.quantity, available: vi.available, bustCm: vi.bustCm, waistCm: vi.waistCm, lengthCm: vi.lengthCm },
+          select: { id: true, size: true },
+        });
+        updatedVariants.push({ id: v.id, size: v.size });
+      }
+    }
+
+    // Replace price tiers if price_mode was submitted
+    if (priceData && !("ok" in priceData)) {
+      await db.productPriceTier.deleteMany({ where: { productId } });
+      if (priceData.mode === "shared") {
+        await db.productPriceTier.createMany({
+          data: priceData.shared.map((t) => ({ productId, variantId: null, minDays: t.minDays, pricePerDay: t.pricePerDay })),
+        });
+      } else {
+        for (const ps of priceData.perSize) {
+          const variant = updatedVariants.find((v) => v.size === ps.size);
+          if (!variant) continue;
+          await db.productPriceTier.createMany({
+            data: ps.tiers.map((t) => ({ productId, variantId: variant.id, minDays: t.minDays, pricePerDay: t.pricePerDay })),
+          });
+        }
       }
     }
 
