@@ -82,7 +82,96 @@ export async function addAddress(formData: FormData): Promise<Result<{ id: strin
     });
 
     revalidatePath("/checkout/address");
+    revalidatePath("/account/addresses");
     return { ok: true, id: created.id };
+  });
+}
+
+export async function updateAddress(formData: FormData): Promise<Result<{ id: string }>> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const id = String(formData.get("id") ?? "").trim();
+  const recipient = String(formData.get("recipient_name") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const addressLine = String(formData.get("address_line") ?? formData.get("address_text") ?? "").trim();
+  if (!id) return { ok: false, error: "ไม่พบที่อยู่" };
+  if (!recipient) return { ok: false, error: "กรุณาใส่ชื่อผู้รับ" };
+  if (!phone) return { ok: false, error: "กรุณาใส่เบอร์โทร" };
+  if (!addressLine) return { ok: false, error: "กรุณาใส่ที่อยู่จัดส่ง" };
+
+  return withActor(user.id, async () => {
+    const existing = await db.address.findFirst({
+      where: { id, userId: user.id },
+      select: { id: true },
+    });
+    if (!existing) return { ok: false, error: "ไม่พบที่อยู่" };
+
+    await db.address.update({
+      where: { id },
+      data: { recipientName: recipient, phone, addressLine },
+    });
+
+    revalidatePath("/checkout/address");
+    revalidatePath("/account/addresses");
+    return { ok: true, id };
+  });
+}
+
+export async function deleteAddress(formData: FormData): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return { ok: false, error: "ไม่พบที่อยู่" };
+
+  return withActor(user.id, async () => {
+    const existing = await db.address.findFirst({
+      where: { id, userId: user.id },
+      select: { id: true, isDefault: true },
+    });
+    if (!existing) return { ok: false, error: "ไม่พบที่อยู่" };
+
+    await db.address.delete({ where: { id } });
+
+    // If we removed the default, promote the most-recent remaining address.
+    if (existing.isDefault) {
+      const next = await db.address.findFirst({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      if (next) {
+        await db.address.update({ where: { id: next.id }, data: { isDefault: true } });
+      }
+    }
+
+    revalidatePath("/checkout/address");
+    revalidatePath("/account/addresses");
+    return { ok: true };
+  });
+}
+
+export async function setDefaultAddress(formData: FormData): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return { ok: false, error: "ไม่พบที่อยู่" };
+
+  return withActor(user.id, async () => {
+    const existing = await db.address.findFirst({
+      where: { id, userId: user.id },
+      select: { id: true },
+    });
+    if (!existing) return { ok: false, error: "ไม่พบที่อยู่" };
+
+    await db.address.updateMany({ where: { userId: user.id }, data: { isDefault: false } });
+    await db.address.update({ where: { id }, data: { isDefault: true } });
+
+    revalidatePath("/checkout/address");
+    revalidatePath("/account/addresses");
+    return { ok: true };
   });
 }
 

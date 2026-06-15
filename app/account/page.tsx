@@ -97,6 +97,23 @@ export default async function AccountPage() {
           ) : null}
 
           <Link
+            href="/account/addresses"
+            style={{
+              display: "block",
+              padding: "10px 12px",
+              borderRadius: 6,
+              fontSize: 14,
+              color: "var(--ink-2)",
+              border: "1px solid var(--line)",
+              textAlign: "center",
+              marginBottom: 8,
+              textDecoration: "none",
+            }}
+          >
+            ที่อยู่จัดส่ง
+          </Link>
+
+          <Link
             href="/account/billing"
             style={{
               display: "block",
