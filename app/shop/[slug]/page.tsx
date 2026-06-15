@@ -18,8 +18,23 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 
 type Params = { slug: string };
 
+/**
+ * Next.js 14 hands the dynamic `[slug]` segment to us still percent-encoded
+ * (e.g. a Thai slug arrives as "%E0%B8%8A..."). The DB stores the decoded
+ * UTF-8 slug, so we must decode before querying or non-ASCII shops 404.
+ * Guarded: a malformed `%` sequence falls back to the raw value, and an
+ * already-decoded slug (no `%`) is returned unchanged.
+ */
+function decodeSlug(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const b = await getShopBySlug(params.slug);
+  const b = await getShopBySlug(decodeSlug(params.slug));
   if (!b) return { title: "ไม่พบร้าน", robots: { index: false } };
   return {
     title: b.name,
@@ -29,7 +44,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 export default async function BoutiquePage({ params }: { params: Params }) {
-  const b = await getShopBySlug(params.slug);
+  const b = await getShopBySlug(decodeSlug(params.slug));
   if (!b) notFound();
   const [dresses, user, reviews] = await Promise.all([
     listProductsByShop(b.id),
