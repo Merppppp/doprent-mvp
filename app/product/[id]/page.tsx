@@ -91,7 +91,7 @@ export default async function DressPage({ params }: { params: Params }) {
       })
     : null;
 
-  const [activeBookings, productVariants] = await Promise.all([
+  const [activeBookings, productVariants, productPriceTiers] = await Promise.all([
     db.booking.findMany({
       where: {
         productId: dress.id,
@@ -104,7 +104,14 @@ export default async function DressPage({ params }: { params: Params }) {
       orderBy: [{ size: "asc" }],
       select: { id: true, size: true, quantity: true, pricePerDay: true, deposit: true, available: true, bustCm: true, waistCm: true, lengthCm: true },
     }),
+    db.productPriceTier.findMany({
+      where: { productId: dress.id },
+      orderBy: [{ minDays: "asc" }],
+      select: { variantId: true, minDays: true, pricePerDay: true },
+    }),
   ]);
+
+  const hasPerVariantPriceTiers = productPriceTiers.some((t) => t.variantId !== null);
 
   const rangeStart = new Date().toISOString().slice(0, 10);
   // Scan 180 days ahead for the calendar
@@ -422,8 +429,31 @@ export default async function DressPage({ params }: { params: Params }) {
             <Spec lbl="แบรนด์" val={dress.designer ?? "—"} />
           </div>
 
-          {/* Price tiers / promotion table (read-only) */}
-          {dress.price_tiers && dress.price_tiers.length > 0 ? (
+          {/* Price tiers display */}
+          {hasPerVariantPriceTiers ? (
+            // Per-size mode: show a table of size → starting price
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>ราคาต่อไซซ์</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {productVariants.filter((v) => v.available).map((v) => {
+                  const vTiers = productPriceTiers.filter((t) => t.variantId === v.id).sort((a, b) => a.minDays - b.minDays);
+                  const startingPrice = vTiers.length > 0 ? Math.min(...vTiers.map((t) => t.pricePerDay)) : v.pricePerDay;
+                  return (
+                    <div key={v.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 8 }}>
+                      <div style={{ padding: "8px 10px", borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)", fontWeight: 600, textAlign: "center" }}>
+                        {v.size}
+                      </div>
+                      <div style={{ padding: "8px 10px", borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)" }}>
+                        เริ่มต้น ฿{startingPrice.toLocaleString()}/วัน
+                        {vTiers.length > 1 ? ` (${vTiers.length} ช่วงราคา)` : ""}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : dress.price_tiers && dress.price_tiers.length > 0 ? (
+            // Shared mode: existing display (unchanged)
             <div style={{ marginBottom: 22 }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>แพ็กเกจราคา</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>

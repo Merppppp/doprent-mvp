@@ -674,22 +674,25 @@ model ProductImage {
 /// ราคาเช่าแบบขั้นบันไดตามจำนวนวัน (เดิมเก็บเป็น Json ใน dresses.price_tiers)
 model ProductPriceTier {
   /// Primary key (uuid)
-  id          String @id @default(uuid()) @db.Uuid
+  id          String  @id @default(uuid()) @db.Uuid
   /// FK → products.id (Cascade)
-  productId   String @map("product_id") @db.Uuid
+  productId   String  @map("product_id") @db.Uuid
+  /// FK → product_variants.id (nullable — null = shared across all sizes)
+  variantId   String? @map("variant_id") @db.Uuid
   /// จำนวนวันขั้นต่ำที่ tier นี้เริ่มใช้
-  minDays     Int    @map("min_days")
+  minDays     Int     @map("min_days")
   /// ราคาต่อวันของ tier นี้ (บาท)
-  pricePerDay Int    @map("price_per_day")
+  pricePerDay Int     @map("price_per_day")
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedBy String?  @map("updated_by") @db.Uuid
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
-  @@unique([productId, minDays])
+  @@unique([productId, variantId, minDays])
   @@map("product_price_tiers")
 }
 
@@ -749,8 +752,9 @@ model ProductVariant {
   /// เวลาแก้ไขล่าสุด
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  product  Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  bookings Booking[]
+  product    Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  bookings   Booking[]
+  priceTiers ProductPriceTier[]
 
   @@unique([productId, size])
   @@index([productId])
