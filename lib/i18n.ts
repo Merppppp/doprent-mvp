@@ -42,8 +42,13 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   "filter.showAll":        { th: "แสดงทั้งหมด ({n})",   en: "Show all ({n})" },
   "filter.showLess":       { th: "แสดงน้อยลง",          en: "Show less" },
   "filter.noResults":      { th: "ไม่พบรายการ",         en: "No matches" },
-  "filter.removeFilter":   { th: "ลบตัวกรอง",           en: "Remove filter" },
-  "filter.searchTags":     { th: "ค้นหาแท็ก...",         en: "Search tags..." },
+  "filter.removeFilter":        { th: "ลบตัวกรอง",               en: "Remove filter" },
+  "filter.searchTags":          { th: "ค้นหาแท็ก...",             en: "Search tags..." },
+  "filter.bodyMeasurements":    { th: "ขนาดตัว",                  en: "Body Measurements" },
+  "filter.bust":                { th: "รอบอก",                    en: "Bust" },
+  "filter.waist":               { th: "รอบเอว",                   en: "Waist" },
+  "filter.length":              { th: "ความยาว",                  en: "Length" },
+  "unit.cm":                    { th: "ซม.",                       en: "cm" },
 
   // Dress-type sub-group headers
   "type.group.top":    { th: "เสื้อ",                  en: "Tops" },
