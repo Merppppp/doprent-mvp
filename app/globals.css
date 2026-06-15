@@ -204,6 +204,17 @@ img {
   border-radius: 4px;
 }
 
+/* Dropdowns (<select>): clicking one triggers :focus-visible in most browsers,
+   which showed a harsh black ring. Replace it app-wide with a soft accent ring
+   so an active/focused dropdown looks intentional instead of "ดำๆ". */
+select:focus,
+select:focus-visible {
+  outline: none;
+  outline-offset: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 /* ============================================================
    Utility component classes (reusable across pages)
    ============================================================ */
