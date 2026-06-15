@@ -458,4 +458,26 @@ const HR_CSS = `
   .loc-panel.is-open{display:block}
   .loc-panel .loc-controls{width:100%;justify-content:space-between}
 }
+
+/* Squeezed desktop zone: the 240px filter sidebar is shown but the main column
+   is too narrow to fit the full inline location controls + count + sort on one
+   row, so they used to wrap and look misaligned. Collapse the location into the
+   compact pin toggle (same pattern as mobile) so the bar stays a clean single
+   row: [📍 label ▾] ............ [พบ X ชุด] [เรียงลำดับ]. */
+@media (min-width:901px) and (max-width:1080px){
+  .hr-results-bar{flex-wrap:nowrap;gap:10px}
+  .loc-toggle{
+    display:inline-flex;align-items:center;gap:5px;order:0;flex:0 1 auto;min-width:0;
+    height:34px;padding:0 12px;border:1px solid var(--line);border-radius:8px;
+    background:var(--bg);color:var(--accent-2);cursor:pointer;font-size:13px;
+  }
+  .loc-toggle__text{
+    display:inline;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .hr-results-bar__right{order:1;margin-left:auto;flex:0 0 auto;flex-wrap:nowrap}
+  /* Expandable panel drops full-width below the bar when the toggle is open */
+  .loc-panel{display:none;order:2;width:100%}
+  .loc-panel.is-open{display:block}
+  .loc-panel .loc-controls{width:100%;justify-content:flex-start;flex-wrap:wrap}
+}
 `;
