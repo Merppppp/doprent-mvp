@@ -47,21 +47,21 @@ export default function ToggleSwitch({
   style,
 }: ToggleSwitchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   function handleClick() {
     const next = !checked;
     if (onChange) {
       onChange(next);
     } else {
-      // auto-submit parent form
-      const form = inputRef.current?.form;
-      if (form) {
-        // Flip the hidden checkbox value before submitting
-        if (inputRef.current) {
-          inputRef.current.checked = next;
-        }
-        form.requestSubmit();
+      // auto-submit parent form. Resolve the form from the hidden input (when a
+      // `name` is set) OR fall back to the button's own form — so the toggle works
+      // even as a pure server-action trigger with no `name` (dashboard pattern).
+      if (inputRef.current) {
+        inputRef.current.checked = next;
       }
+      const form = inputRef.current?.form ?? buttonRef.current?.form;
+      form?.requestSubmit();
     }
   }
 
@@ -70,6 +70,7 @@ export default function ToggleSwitch({
 
   return (
     <button
+      ref={buttonRef}
       type="button"
       role="switch"
       aria-checked={checked}

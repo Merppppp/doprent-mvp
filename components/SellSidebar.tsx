@@ -53,11 +53,6 @@ const OWNER_NAV: DashNavItem[] = [
     icon: <Icon d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />,
   },
   {
-    href: "/sell/banners",
-    label: "แบนเนอร์ร้าน",
-    icon: <Icon d="M4 5h16a1 1 0 011 1v8a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zM8 17h8M10 17v2M14 17v2" />,
-  },
-  {
     href: "/sell/tags",
     label: "ขอเพิ่มแท็ก",
     icon: <Icon d="M7 7h10M7 12h6M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zM16 17l2 2 4-4" />,

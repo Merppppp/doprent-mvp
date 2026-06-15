@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ProductArt } from "@/components/ProductArt";
 import { toggleProductAvailable } from "@/app/actions/seller";
+import ToggleSwitch from "@/components/ToggleSwitch";
 
 export const dynamic = "force-dynamic";
 
@@ -202,19 +203,12 @@ export default async function SellerProductsPage() {
                     📅 ปฏิทิน
                   </Link>
                   <form action={toggleProductAvailable.bind(null, d.id)}>
-                    <button
-                      type="submit"
-                      className="btn btn-outline"
-                      style={{
-                        padding: "6px 10px",
-                        fontSize: 12,
-                        width: "100%",
-                        color: d.available ? "var(--danger)" : "var(--success)",
-                        borderColor: d.available ? "var(--danger)" : "var(--success)",
-                      }}
-                    >
-                      {d.available ? "ปิดการเช่า" : "เปิดให้เช่า"}
-                    </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <ToggleSwitch checked={d.available} label="เปิดให้เช่า" />
+                      <span style={{ fontSize: 11, color: "var(--ink-3)", whiteSpace: "nowrap" }}>
+                        เปิดให้เช่า
+                      </span>
+                    </div>
                   </form>
                 </div>
               </div>

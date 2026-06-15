@@ -171,7 +171,7 @@ export default function SellerCalendar({ data }: Props) {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div>
+    <div style={{ maxWidth: 440, marginInline: "auto" }}>
       {/* ── Header: title + product filter ── */}
       <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
         {data.products.length > 1 && (
@@ -248,26 +248,24 @@ export default function SellerCalendar({ data }: Props) {
           const dayBookings = bookingsByDay.get(dateStr) ?? [];
           const hasBookings = dayBookings.length > 0;
           const isBlackout = blackoutDaySet.has(dateStr) && !hasBookings;
+          // "ไม่ว่าง" = ชุดถูกจอง หรือ ร้านปิดเอง (blackout) → ต้องเป็นสีแดง
+          const isUnavailable = hasBookings || isBlackout;
           const isClosed = isShopClosed(dateStr);
           const isToday = dateStr === todayStr;
           const isPast = dateStr < todayStr;
           const isSelected = dateStr === selectedDay;
 
-          // Background priority: booked > blackout > closed
-          const bg = hasBookings
-            ? "var(--accent-soft)"
-            : isBlackout
-            ? "var(--warn-soft)"
+          // Background priority: unavailable (booked/blackout) > closed
+          const bg = isUnavailable
+            ? "var(--danger-soft)"
             : isClosed
             ? "var(--bg)"
             : "var(--surface)";
 
           const borderColor = isSelected
             ? "var(--ink)"
-            : hasBookings
-            ? "var(--accent)"
-            : isBlackout
-            ? "var(--warn)"
+            : isUnavailable
+            ? "var(--danger)"
             : isToday
             ? "var(--cobalt)"
             : "var(--line)";
@@ -297,8 +295,8 @@ export default function SellerCalendar({ data }: Props) {
                 gap: 1,
                 padding: "2px 1px",
                 transition: "border-color 0.12s, box-shadow 0.12s",
-                boxShadow: isSelected ? "0 0 0 2px var(--accent-soft)" : undefined,
-                minHeight: 44, // touch-target
+                boxShadow: isSelected ? "0 0 0 2px var(--danger-soft)" : undefined,
+                minHeight: 38, // touch-target
               }}
             >
               {/* Day number */}
@@ -308,8 +306,8 @@ export default function SellerCalendar({ data }: Props) {
               {hasBookings && (
                 <span
                   style={{
-                    background: "var(--accent)",
-                    color: "var(--accent-ink)",
+                    background: "var(--danger)",
+                    color: "#fff",
                     fontSize: 9,
                     fontWeight: 700,
                     lineHeight: 1,
@@ -327,7 +325,7 @@ export default function SellerCalendar({ data }: Props) {
               {(isBlackout || (isClosed && hasBookings) || (isClosed && !hasBookings && !isPast)) && (
                 <span style={{ display: "flex", gap: 2, alignItems: "center" }}>
                   {isBlackout && (
-                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--warn)", display: "block" }} />
+                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--danger)", display: "block" }} />
                   )}
                   {isClosed && (
                     <span style={{ fontSize: 8, color: "var(--ink-3)", lineHeight: 1 }}>ปิด</span>
@@ -354,8 +352,7 @@ export default function SellerCalendar({ data }: Props) {
           alignItems: "center",
         }}
       >
-        <LegendItem color="var(--accent-soft)" border="var(--accent)" label="จองแล้ว" />
-        <LegendItem color="var(--warn-soft)" border="var(--warn)" label="ปิดเอง (blackout)" />
+        <LegendItem color="var(--danger-soft)" border="var(--danger)" label="ไม่ว่าง (จอง/ปิดเอง)" />
         <LegendItem color="var(--bg)" border="var(--line)" label="ร้านหยุด" dim />
         <LegendItem color="var(--surface)" border="var(--cobalt)" label="วันนี้" />
       </div>
