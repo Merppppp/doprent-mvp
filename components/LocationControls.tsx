@@ -50,6 +50,7 @@ export default function LocationControls({ locale = "th" }: { locale?: Locale })
   if (loc) {
     return (
       <div
+        className="loc-controls"
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -99,6 +100,7 @@ export default function LocationControls({ locale = "th" }: { locale?: Locale })
   // No location set
   return (
     <div
+      className="loc-controls"
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -117,38 +119,46 @@ export default function LocationControls({ locale = "th" }: { locale?: Locale })
         <Pin />
         {status === "loading" ? t("results.findingLocation", locale) : t("results.nearMe", locale)}
       </button>
-      <span style={{ fontSize: 13, color: "var(--ink-3)", whiteSpace: "nowrap" }}>
-        {t("results.orSelectDistrict", locale)}
-      </span>
-      <select
-        defaultValue=""
-        onChange={(e) => e.target.value && setArea(e.target.value)}
-        aria-label={t("results.selectDistrict", locale)}
-        className="loc-district-select"
-        style={{
-          padding: "5px 8px",
-          border: "1px solid var(--line)",
-          borderRadius: 8,
-          background: "var(--bg)",
-          fontSize: 13,
-          color: "var(--ink)",
-          fontFamily: "inherit",
-          maxWidth: 160,
-          minWidth: 0,
-          height: 34,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
+      <div
+        className="loc-district-group"
+        style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 0 }}
       >
+        <span
+          className="loc-district-label"
+          style={{ fontSize: 13, color: "var(--ink-3)", whiteSpace: "nowrap" }}
+        >
+          {t("results.orSelectDistrict", locale)}
+        </span>
+        <select
+          defaultValue=""
+          onChange={(e) => e.target.value && setArea(e.target.value)}
+          aria-label={t("results.selectDistrict", locale)}
+          className="loc-district-select"
+          style={{
+            padding: "5px 8px",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            background: "var(--bg)",
+            fontSize: 13,
+            color: "var(--ink)",
+            fontFamily: "inherit",
+            maxWidth: 160,
+            minWidth: 0,
+            height: 34,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
         <option value="" disabled>
           {t("results.selectDistrict", locale)}
         </option>
         {AREA_LIST.map((a) => (
-          <option key={a.key} value={a.key}>
-            {a.th}
-          </option>
-        ))}
-      </select>
+            <option key={a.key} value={a.key}>
+              {a.th}
+            </option>
+          ))}
+        </select>
+      </div>
       {status === "denied" ? (
         <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
           {t("results.locationDenied", locale)}

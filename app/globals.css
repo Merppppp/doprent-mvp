@@ -501,11 +501,26 @@ img {
   :root {
     --header-h: 144px;
   }
-  .loc-district-select {
+  /* District + sort dropdowns: identical size & font on mobile */
+  .loc-district-select,
+  .sort-select {
     max-width: 130px !important;
     font-size: 12px !important;
     height: 30px !important;
     padding: 3px 6px !important;
+  }
+  /* Turn the inline "หรือเลือกเขต" / "เรียงลำดับ" text into a small label
+     stacked ABOVE its dropdown (host directive: label เล็กๆ ด้านบน) */
+  .loc-district-group,
+  .sort-group {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 2px !important;
+  }
+  .loc-district-label,
+  .sort-label {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
   }
 }
 

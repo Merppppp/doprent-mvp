@@ -393,4 +393,14 @@ const HR_CSS = `
 @media(max-width:600px){
   .hr-occasions{padding:18px 0 0}
 }
+/* Mobile: tighten the gap above the results bar, and when it wraps into
+   2 rows make EACH row span the full width with space-between within itself
+   (host directive). */
+@media(max-width:767px){
+  .hr-browse{padding-top:12px}
+  .hr-results-bar{padding:8px 0;gap:8px;margin-bottom:12px}
+  .hr-results-bar>*{width:100%}
+  .hr-results-bar .loc-controls{width:100%;justify-content:space-between}
+  .hr-results-bar__right{width:100%;margin-left:0;justify-content:space-between}
+}
 `;
