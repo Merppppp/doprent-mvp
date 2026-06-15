@@ -8,7 +8,8 @@ import { ProductArt } from "@/components/ProductArt";
 import SellerDashboardCalendarPanel from "@/components/SellerDashboardCalendarPanel";
 import { dressLimitFor, TIER_LABEL } from "@/lib/tiers";
 import type { AdsTier } from "@/lib/types";
-import { toggleShopOpen } from "@/app/actions/seller";
+import { toggleShopOpen, toggleProductAvailable } from "@/app/actions/seller";
+import ToggleSwitch from "@/components/ToggleSwitch";
 
 export const dynamic = "force-dynamic";
 
@@ -125,7 +126,7 @@ export default async function SellerDashboard({
             marginTop: 10,
             marginBottom: 6,
             letterSpacing: "-0.01em",
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
             gap: 10,
             flexWrap: "wrap",
@@ -226,13 +227,15 @@ export default async function SellerDashboard({
           </div>
         </div>
         <form action={toggleShopOpen.bind(null, shop.id)}>
-          <button
-            type="submit"
-            className="btn btn-outline"
-            style={{ padding: "8px 14px", fontSize: 13 }}
-          >
-            {shop.is_open ? "ปิดร้านชั่วคราว" : "เปิดร้าน"}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ToggleSwitch
+              checked={shop.is_open}
+              label={shop.is_open ? "ร้านเปิด" : "ปิดชั่วคราว"}
+            />
+            <span style={{ fontSize: 13, color: shop.is_open ? "var(--success)" : "var(--warn)", fontWeight: 500 }}>
+              {shop.is_open ? "ร้านเปิด" : "ปิดชั่วคราว"}
+            </span>
+          </div>
         </form>
       </div>
 
@@ -441,7 +444,7 @@ export default async function SellerDashboard({
                     </div>
                   ) : null}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0, alignItems: "flex-end" }}>
                   <Link
                     href={`/sell/products/${d.id}/edit`}
                     className="btn btn-outline"
@@ -456,6 +459,17 @@ export default async function SellerDashboard({
                   >
                     📅 ปฏิทิน
                   </Link>
+                  <form action={toggleProductAvailable.bind(null, d.id)}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <ToggleSwitch
+                        checked={d.available}
+                        label="เปิดให้เช่า"
+                      />
+                      <span style={{ fontSize: 11, color: "var(--ink-3)", whiteSpace: "nowrap" }}>
+                        เปิดให้เช่า
+                      </span>
+                    </div>
+                  </form>
                 </div>
               </div>
             );
