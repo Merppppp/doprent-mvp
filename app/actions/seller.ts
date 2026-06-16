@@ -477,8 +477,14 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
     if (occasionKeys.length > 0) selectionsByGroup = { occasion: occasionKeys };
   }
 
-  // Resolve productTypeId (seller UI is dress-only today)
-  const productType = await db.productType.findUnique({ where: { key: "dress" }, select: { id: true } });
+  // Resolve productTypeId from form data; fall back to "dress" for backward compat
+  const submittedTypeId = String(formData.get("productTypeId") ?? "").trim();
+  let productType: { id: string } | null;
+  if (submittedTypeId) {
+    productType = await db.productType.findFirst({ where: { id: submittedTypeId, isActive: true }, select: { id: true } });
+  } else {
+    productType = await db.productType.findUnique({ where: { key: "dress" }, select: { id: true } });
+  }
   if (!productType) return { ok: false, error: "product type ไม่พบ — กรุณาแจ้ง admin" };
 
   // Resolve tags via binding-aware validator

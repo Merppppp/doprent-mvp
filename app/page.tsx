@@ -42,14 +42,22 @@ type SearchParams = {
   dateTo?: string;
   priceMin?: string;
   priceMax?: string;
+  type?: string;
   [key: string]: string | undefined;
 };
+
+/** Active product type keys. */
+const KNOWN_TYPE_KEYS = ["dress", "suit"] as const;
 
 export default async function HomePage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
+  // Determine active product type (validate; default "dress")
+  const rawType = searchParams?.type?.trim();
+  const activeTypeKey: string = rawType && (KNOWN_TYPE_KEYS as readonly string[]).includes(rawType) ? rawType : "dress";
+
   const activeOcc = searchParams?.occasion as OccasionKey | undefined;
   const activeSize = searchParams?.size;
   const activeDesigner = searchParams?.designer?.trim() || undefined;
@@ -110,6 +118,7 @@ export default async function HomePage({
       sort,
       dateFrom: activeDateFrom,
       dateTo: activeDateTo,
+      productTypeKey: activeTypeKey,
     }),
     listOccasions(),
     listDesigners(),
@@ -117,7 +126,7 @@ export default async function HomePage({
     listSponsorShops(8),
     listShops({ featuredFirst: true, limit: 6 }),
     getActiveBanners(),
-    getTagGroupsForProductTypeKey("dress"),
+    getTagGroupsForProductTypeKey(activeTypeKey),
   ]);
 
   // Build activeTags from bound tag groups (for filter UI)
@@ -181,23 +190,69 @@ export default async function HomePage({
         </div>
       </section>
 
+      {/* ======== PRODUCT TYPE SWITCHER ======== */}
+      <section style={{ background: "var(--bg)", padding: "14px 0 0" }}>
+        <div className="container">
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {KNOWN_TYPE_KEYS.map((typeKey) => {
+              const label = typeKey === "dress" ? "ชุด" : "สูท";
+              const isActive = activeTypeKey === typeKey;
+              // Build link preserving current params but overriding type
+              const preservedParams = Object.entries(searchParams ?? {})
+                .filter(([k, v]) => k !== "type" && v !== undefined)
+                .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v!)}`)
+                .join("&");
+              const typeParam = typeKey !== "dress" ? `type=${encodeURIComponent(typeKey)}` : "";
+              const qs = [preservedParams, typeParam].filter(Boolean).join("&");
+              const href = qs ? `/?${qs}` : "/";
+              return (
+                <Link
+                  key={typeKey}
+                  href={href}
+                  style={{
+                    display: "inline-block",
+                    padding: "7px 20px",
+                    fontSize: 14,
+                    fontWeight: isActive ? 600 : 400,
+                    borderRadius: 999,
+                    border: `1.5px solid ${isActive ? "var(--ink)" : "var(--line)"}`,
+                    background: isActive ? "var(--ink)" : "var(--surface)",
+                    color: isActive ? "var(--on-dark)" : "var(--ink-2)",
+                    textDecoration: "none",
+                    transition: "background 0.15s, color 0.15s",
+                  }}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
       {/* ======== OCCASIONS ROW ======== */}
       {occasions.length > 0 && (
         <section className="hr-occasions">
           <div className="container">
             <div className="hr-occ-head">
               <h2 className="hr-occ-title">{t("browse.byOccasion", locale)}</h2>
-              <Link href="/" className="hr-occ-more">
+              <Link
+                href={activeTypeKey !== "dress" ? `/?type=${activeTypeKey}` : "/"}
+                className="hr-occ-more"
+              >
                 {t("browse.viewAll", locale)}
               </Link>
             </div>
             <div className="hr-occ-row">
               {occasions.map((o) => {
                 const label = locale === "en" ? t(`occasion.${o.key}`, "en") : o.th;
+                const occasionHref = activeTypeKey !== "dress"
+                  ? `/?occasion=${o.key}&type=${activeTypeKey}`
+                  : `/?occasion=${o.key}`;
                 return (
                   <Link
                     key={o.key}
-                    href={`/?occasion=${o.key}`}
+                    href={occasionHref}
                     className="hr-occ-chip media-zoom"
                     data-active={activeOcc === o.key ? "true" : undefined}
                   >
@@ -319,6 +374,8 @@ export default async function HomePage({
                     waistMax: activeWaistMax !== undefined ? String(activeWaistMax) : undefined,
                     lengthMin: activeLengthMin !== undefined ? String(activeLengthMin) : undefined,
                     lengthMax: activeLengthMax !== undefined ? String(activeLengthMax) : undefined,
+                    // Preserve type for infinite scroll (omit when default dress to keep URLs clean)
+                    type: activeTypeKey !== "dress" ? activeTypeKey : undefined,
                     ...tagParamsForResults,
                   }}
                 />

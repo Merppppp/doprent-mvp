@@ -40,6 +40,9 @@ export async function GET(req: NextRequest) {
     const lengthMax = sp.get("lengthMax") ? Number(sp.get("lengthMax")) : undefined;
     const dateFrom = sp.get("dateFrom") || undefined;
     const dateTo = sp.get("dateTo") || undefined;
+    const KNOWN_TYPE_KEYS = ["dress", "suit"];
+    const rawType = sp.get("type")?.trim();
+    const productTypeKey = rawType && KNOWN_TYPE_KEYS.includes(rawType) ? rawType : undefined;
 
     const result = await listProducts({
       color: color ?? undefined,
@@ -60,6 +63,7 @@ export async function GET(req: NextRequest) {
       lengthMax,
       dateFrom,
       dateTo,
+      productTypeKey,
     });
 
     return NextResponse.json(result);

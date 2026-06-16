@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { listTagGroups, listTagRequestsForShop } from "@/lib/tags";
-import { getTagGroupsForProductTypeKey } from "@/lib/tag-groups";
+import { getTagGroupsForProductType } from "@/lib/tag-groups";
+import type { BoundTagGroup } from "@/lib/tag-groups";
 import ProductForm from "../ProductForm";
 
 export const dynamic = "force-dynamic";
@@ -27,11 +28,29 @@ export default async function NewProductPage() {
     redirect(`/sell/kyc?slug=${raw.slug}`);
   }
 
-  const [{ productTypeId, groups }, tagGroups, tagRequestsRaw] = await Promise.all([
-    getTagGroupsForProductTypeKey("dress"),
+  // Fetch all active product types + tag-group sections for each
+  const [productTypesRaw, tagGroups, tagRequestsRaw] = await Promise.all([
+    db.productType.findMany({
+      where: { isActive: true },
+      orderBy: { label: "asc" },
+      select: { id: true, key: true, label: true },
+    }),
     listTagGroups(),
     listTagRequestsForShop(raw.id),
   ]);
+
+  // Build tagGroupSectionsByType map: productTypeId → BoundTagGroup[]
+  const tagGroupSectionsByType: Record<string, BoundTagGroup[]> = {};
+  await Promise.all(
+    productTypesRaw.map(async (pt) => {
+      tagGroupSectionsByType[pt.id] = await getTagGroupsForProductType(pt.id);
+    }),
+  );
+
+  // Default to dress type; fall back to first type if dress is missing
+  const dressType = productTypesRaw.find((pt) => pt.key === "dress");
+  const defaultProductTypeId = dressType?.id ?? productTypesRaw[0]?.id ?? "";
+  const defaultTagGroupSections = tagGroupSectionsByType[defaultProductTypeId] ?? [];
 
   const shopTagRequests = tagRequestsRaw.map((r) => ({
     id: r.id,
@@ -53,10 +72,12 @@ export default async function NewProductPage() {
         mode="create"
         shopId={raw.id}
         defaultLineUrl={raw.lineUrl}
-        productTypeId={productTypeId ?? ""}
-        tagGroupSections={groups}
+        productTypeId={defaultProductTypeId}
+        tagGroupSections={defaultTagGroupSections}
         tagGroups={tagGroups}
         shopTagRequests={shopTagRequests}
+        productTypes={productTypesRaw}
+        tagGroupSectionsByType={tagGroupSectionsByType}
       />
     </div>
   );

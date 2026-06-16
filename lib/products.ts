@@ -50,6 +50,8 @@ export type ProductFilters = {
   lengthMax?: number;
   search?: string;
   sort?: "featured" | "price-asc" | "price-desc" | "name" | "rating-desc";
+  /** Filter by product type key (e.g. "suit"). Defaults to "dress" when absent. */
+  productTypeKey?: string;
   dateFrom?: string; // YYYY-MM-DD
   dateTo?: string;   // YYYY-MM-DD
   page?: number;
@@ -234,7 +236,10 @@ function mapShopWithCards(r: ShopWithPreviews, index: number): Shop {
  * Returns null when no candidates exceed the threshold — caller falls back
  * to the existing substring AND search so nothing regresses.
  */
-async function getTrigamRankedIds(q: string): Promise<string[] | null> {
+async function getTrigamRankedIds(
+  q: string,
+  productTypeKey: string = DEFAULT_PRODUCT_TYPE_KEY,
+): Promise<string[] | null> {
   type Row = { id: string; score: number };
 
   // All params are positional placeholders via Prisma tagged template —
@@ -259,7 +264,7 @@ async function getTrigamRankedIds(q: string): Promise<string[] | null> {
       LEFT JOIN tags t           ON t.id = ptg.tag_id
       WHERE p.status    = 'live'
         AND p.available = true
-        AND pt.key      = ${DEFAULT_PRODUCT_TYPE_KEY}
+        AND pt.key      = ${productTypeKey}
       GROUP BY p.id
     ) sub
     WHERE sub.score > 0.15
@@ -281,12 +286,12 @@ export async function listProducts(
   const PAGE_SIZE = 25;
   const page = Math.max(1, opts.page ?? 1);
 
-  // Build where clause — catalog default: dress-type products only
-  // (preserves today's behavior until multi-type browse ships).
+  // Build where clause — default to dress when no productTypeKey provided.
+  const effectiveTypeKey = opts.productTypeKey ?? DEFAULT_PRODUCT_TYPE_KEY;
   const where: Prisma.ProductWhereInput = {
     status: "live",
     available: true,
-    productType: { key: DEFAULT_PRODUCT_TYPE_KEY },
+    productType: { key: effectiveTypeKey },
   };
 
   if (opts.sizes?.length) where.size = { in: opts.sizes as unknown as Prisma.EnumSizeFilter<"Product">["in"] };
@@ -389,7 +394,7 @@ export async function listProducts(
     const q = opts.search.trim();
     // pg_trgm requires at least 2 characters to form meaningful trigrams.
     if (q.length >= 2) {
-      trigramRankedIds = await getTrigamRankedIds(q);
+      trigramRankedIds = await getTrigamRankedIds(q, effectiveTypeKey);
     }
 
     if (trigramRankedIds !== null) {
