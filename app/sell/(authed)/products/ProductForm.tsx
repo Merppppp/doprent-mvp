@@ -7,6 +7,7 @@ import { requestTag } from "@/app/actions/seller-tags";
 import type { BoundTagGroup } from "@/lib/tag-groups";
 import type { PriceTier, Size } from "@/lib/types";
 import { priceForNights } from "@/lib/pricing";
+import { prepareImageFileForUpload } from "@/lib/image";
 import RequiredMark from "@/components/RequiredMark";
 import ToggleSwitch from "@/components/ToggleSwitch";
 
@@ -323,8 +324,11 @@ export default function ProductForm(props: Props) {
     setUploadingCount(files.length);
     try {
       for (let i = 0; i < files.length; i++) {
+        // Downscale + re-encode (WebP/JPEG, <=1920px, <=2MB) in the browser
+        // before upload so large phone photos don't blow the 2MB server limit.
+        const prepared = await prepareImageFileForUpload(files[i]);
         const fd = new FormData();
-        fd.append("file", files[i]);
+        fd.append("file", prepared);
         const res = await fetch("/api/upload", { method: "POST", body: fd });
         if (!res.ok) {
           setError("อัปโหลดรูปไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง");
@@ -334,6 +338,9 @@ export default function ProductForm(props: Props) {
         uploads.push(json.urls?.large ?? json.url ?? "");
       }
       setImages((curr) => [...curr, ...uploads.filter(Boolean)]);
+    } catch (err) {
+      // Surface the Thai 2MB / unreadable-image error thrown by prepareImageFileForUpload.
+      setError((err as Error).message || "อัปโหลดรูปไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง");
     } finally {
       setUploadingCount(0);
     }
