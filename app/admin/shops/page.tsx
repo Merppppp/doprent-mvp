@@ -79,6 +79,9 @@ export default async function ShopsAdmin({
       featured: true,
       createdAt: true,
       ownerId: true,
+      bankbookImagePath: true,
+      bankAccountNumber: true,
+      bankAccountName: true,
     },
   });
 
@@ -97,6 +100,9 @@ export default async function ShopsAdmin({
     featured: b.featured,
     created_at: b.createdAt.toISOString(),
     owner_id: b.ownerId,
+    bankbook_image_path: b.bankbookImagePath,
+    bank_account_number: b.bankAccountNumber,
+    bank_account_name: b.bankAccountName,
   }));
 
   const base = "/admin/shops";

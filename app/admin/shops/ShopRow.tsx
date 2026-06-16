@@ -25,6 +25,9 @@ type Shop = {
   featured: boolean;
   created_at: string;
   owner_id: string | null;
+  bankbook_image_path?: string | null;
+  bank_account_number?: string | null;
+  bank_account_name?: string | null;
 };
 
 export default function ShopRow({ b }: { b: Shop }) {
@@ -196,6 +199,19 @@ export default function ShopRow({ b }: { b: Shop }) {
             >
               ดูร้าน →
             </Link>
+
+            {b.bankbook_image_path ? (
+              <a
+                href={`/api/admin/bankbook-doc?key=${encodeURIComponent(b.bankbook_image_path)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-outline"
+                style={{ ...btnSm, color: "var(--info, #0EA5E9)" }}
+                title={`บัญชี: ${b.bank_account_number ?? ""}${b.bank_account_name ? ` · ${b.bank_account_name}` : ""}`}
+              >
+                ดูสมุดบัญชี
+              </a>
+            ) : null}
           </div>
         </td>
       </tr>

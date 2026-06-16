@@ -159,6 +159,7 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
   const bankName = String(formData.get("bank_name") ?? "").trim() || null;
   const bankAccountNumber = String(formData.get("bank_account_number") ?? "").trim() || null;
   const bankAccountName = String(formData.get("bank_account_name") ?? "").trim() || null;
+  const bankbookImagePath = String(formData.get("bankbook_image_path") ?? "").trim() || null;
 
   const address = [houseNo, street, subdistrict ? `แขวง${subdistrict}` : null, district ? `เขต${district}` : null, province, postalCode]
     .filter(Boolean).join(" ") || null;
@@ -172,6 +173,12 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
   if (sinceYear !== null && (isNaN(sinceYear) || sinceYear < 1980 || sinceYear > new Date().getFullYear())) {
     return { ok: false, error: "ปีที่เปิดบริการไม่ถูกต้อง" };
   }
+
+  // HARD-BLOCK: bank account number provided but no bankbook image
+  if (bankAccountNumber && !bankbookImagePath) {
+    return { ok: false, error: "กรุณาแนบรูปหน้าสมุดบัญชีเพื่อยืนยันเลขบัญชี" };
+  }
+  // SOFT: no payment channel at all — save succeeds, UI shows the warning
 
   // Resolve area_key → areaId (UUID FK)
   let areaId: string | null = null;
@@ -194,7 +201,7 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
         slug, name, ownerId: user.id, ownerName, areaId, areaLabel,
         address, houseNo, street, subdistrict, district, province, postalCode,
         lineUrl, instagram, facebook, twitter, tiktok, tag, story, sinceYear, coverColor, deliveryInfo,
-        promptpayId, bankName, bankAccountNumber, bankAccountName,
+        promptpayId, bankName, bankAccountNumber, bankAccountName, bankbookImagePath,
         status: "pending", kycStatus: "none",
       },
       select: { slug: true },
@@ -219,7 +226,7 @@ export async function updateShop(shopId: string, formData: FormData): Promise<{ 
 
   const updates: Record<string, unknown> = {};
   // area_key handled separately (UUID FK resolution); exclude from generic camelCase loop
-  const scalarFields = ["name","area_label","instagram","facebook","twitter","tiktok","tag","story","delivery_info","owner_name","address","hours","cover_color","promptpay_id","bank_name","bank_account_number","bank_account_name"] as const;
+  const scalarFields = ["name","area_label","instagram","facebook","twitter","tiktok","tag","story","delivery_info","owner_name","address","hours","cover_color","promptpay_id","bank_name","bank_account_number","bank_account_name","bankbook_image_path"] as const;
   for (const f of scalarFields) {
     const v = formData.get(f);
     if (v !== null) {
@@ -309,6 +316,16 @@ export async function updateShop(shopId: string, formData: FormData): Promise<{ 
       }
     } catch { /* ignore malformed */ }
   }
+
+  // HARD-BLOCK: bank account number provided but no bankbook image attached
+  const bankAcctNum = String(formData.get("bank_account_number") ?? "").trim();
+  const bankbookPath = String(formData.get("bankbook_image_path") ?? "").trim();
+  if (bankAcctNum && !bankbookPath) {
+    return { ok: false, error: "กรุณาแนบรูปหน้าสมุดบัญชีเพื่อยืนยันเลขบัญชี" };
+  }
+
+  // SOFT WARNING (non-blocking): no payment channel at all — save succeeds
+  // The UI already shows the warning; the action just allows it through.
 
   return withActor(user.id, async () => {
     await db.shop.update({ where: { id: shopId }, data: updates });
@@ -410,11 +427,15 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
 
   const shop = await db.shop.findUnique({
     where: { id: shopId },
-    select: { ownerId: true, name: true, lineUrl: true, kycStatus: true, adsTier: true },
+    select: { ownerId: true, name: true, lineUrl: true, kycStatus: true, adsTier: true, promptpayId: true, bankAccountNumber: true },
   });
   if (!shop || shop.ownerId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์เพิ่มสินค้าในร้านนี้" };
   if (shop.kycStatus === "none" || shop.kycStatus === "rejected") {
     return { ok: false, error: "ต้องส่งเอกสาร KYC ก่อนถึงจะเพิ่มสินค้าได้" };
+  }
+  // HARD-BLOCK: shop must have at least one payment channel before listing products
+  if (!shop.promptpayId && !shop.bankAccountNumber) {
+    return { ok: false, error: "กรุณาตั้งค่าช่องทางรับชำระเงิน (PromptPay หรือบัญชีธนาคาร) ก่อนลงขายสินค้า" };
   }
 
   // Enforce per-plan listing quota.
