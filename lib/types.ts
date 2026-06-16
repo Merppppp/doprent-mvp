@@ -278,6 +278,21 @@ export type Booking = {
   current_due_at: string | null;
   cancel_reason: string | null;
   cancel_from_status: string | null;
+  /** Post-payment address-change sub-flow (see lib/bookings.ts ADDR_CHANGE_*).
+   *  null/"none" → "requested" → "approved" → "paid_review" → "done" | "rejected". */
+  addr_change_status: string | null;
+  /** Proposed new delivery address (pending shop approval). */
+  pending_recipient_name: string | null;
+  pending_phone: string | null;
+  pending_address_text: string | null;
+  /** New shipping fee the shop set for the proposed address (THB). */
+  pending_shipping_fee: number | null;
+  /** Positive difference the renter must top-up = max(0, pending − current) (THB). */
+  addr_change_diff: number | null;
+  /** Private bucket key of the top-up payment slip. */
+  addr_change_slip_path: string | null;
+  /** Shop's reason when an address-change request is rejected. */
+  addr_change_reason: string | null;
   created_at: string;
   updated_at: string;
 };

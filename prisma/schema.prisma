@@ -1074,6 +1074,24 @@ model Booking {
   /// สถานะก่อนยกเลิก (เดิมเป็น String → ใช้ enum เดียวกับ status)
   cancelFromStatus BookingStatus? @map("cancel_from_status")
 
+  /// สถานะคำขอแก้ที่อยู่หลังชำระเงิน (post-payment): null/none → requested → approved → paid_review → done | rejected.
+  /// ไม่กระทบ booking.status หลัก (sub-flow คุมด้วยคอลัมน์ชุดนี้ล้วน ๆ)
+  addrChangeStatus     String? @map("addr_change_status")
+  /// ที่อยู่ใหม่ที่ผู้เช่าขอเปลี่ยน — snapshot ชื่อผู้รับ (รอร้านอนุมัติ)
+  pendingRecipientName String? @map("pending_recipient_name")
+  /// ที่อยู่ใหม่ — snapshot เบอร์โทร
+  pendingPhone         String? @map("pending_phone")
+  /// ที่อยู่ใหม่ — snapshot ที่อยู่เต็ม
+  pendingAddressText   String? @map("pending_address_text")
+  /// ค่าจัดส่งใหม่ที่ร้านคำนวณสำหรับที่อยู่ใหม่ (บาท)
+  pendingShippingFee   Int?    @map("pending_shipping_fee")
+  /// ส่วนต่างค่าจัดส่งที่ผู้เช่าต้องจ่ายเพิ่ม = max(0, pendingShippingFee − shippingFee) (บาท)
+  addrChangeDiff       Int?    @map("addr_change_diff")
+  /// path สลิปจ่ายส่วนต่าง (private bucket)
+  addrChangeSlipPath   String? @map("addr_change_slip_path")
+  /// เหตุผลที่ร้านปฏิเสธคำขอแก้ที่อยู่ (ถ้ามี)
+  addrChangeReason     String? @map("addr_change_reason")
+
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedBy String?  @map("updated_by") @db.Uuid

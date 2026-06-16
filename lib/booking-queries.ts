@@ -36,6 +36,14 @@ type PrismaBookingWithJoins = {
   currentDueAt: Date | null;
   cancelReason: string | null;
   cancelFromStatus: string | null;
+  addrChangeStatus: string | null;
+  pendingRecipientName: string | null;
+  pendingPhone: string | null;
+  pendingAddressText: string | null;
+  pendingShippingFee: number | null;
+  addrChangeDiff: number | null;
+  addrChangeSlipPath: string | null;
+  addrChangeReason: string | null;
   createdAt: Date;
   updatedAt: Date;
   product?: { name: string | null; slug: string | null; images: Array<{ url: string }> } | null;
@@ -81,6 +89,14 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     current_due_at: b.currentDueAt ? b.currentDueAt.toISOString() : null,
     cancel_reason: b.cancelReason,
     cancel_from_status: b.cancelFromStatus,
+    addr_change_status: b.addrChangeStatus,
+    pending_recipient_name: b.pendingRecipientName,
+    pending_phone: b.pendingPhone,
+    pending_address_text: b.pendingAddressText,
+    pending_shipping_fee: b.pendingShippingFee,
+    addr_change_diff: b.addrChangeDiff,
+    addr_change_slip_path: b.addrChangeSlipPath,
+    addr_change_reason: b.addrChangeReason,
     created_at: b.createdAt.toISOString(),
     updated_at: b.updatedAt.toISOString(),
     dress_name: b.product?.name ?? null,
