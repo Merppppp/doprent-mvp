@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { randomUUID } from "node:crypto";
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { withActor } from "@/lib/db-context";
 import { getCurrentUser } from "@/lib/auth";
@@ -200,6 +201,14 @@ function dateRangeLocal(start: string, end: string): string[] {
 }
 
 export async function createBooking(formData: FormData): Promise<Result<{ id: string }>> {
+  // Staff accounts are shop-management logins only — they must NEVER be able to
+  // place a rental order. Block them explicitly before any user resolution
+  // (a staff session id is "staff:<id>", not a real user, so getCurrentUser()
+  // would otherwise throw on the non-UUID id).
+  const session = await auth();
+  if (session?.user?.role === "staff")
+    return { ok: false, error: "บัญชีพนักงานไม่สามารถสั่งเช่าสินค้าได้" };
+
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
 

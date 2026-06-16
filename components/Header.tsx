@@ -357,9 +357,12 @@ export default async function Header() {
 
 const PRODUCT_CATEGORIES = [
   {
-    key: "clothing", th: "เสื้อผ้า / ชุด", en: "Clothing", icon: "👗", href: "/", active: true,
+    key: "clothing", th: "เสื้อผ้า / ชุด", en: "Clothing", icon: "👗", href: "/#results", active: true,
     subs: [
-      { key: "dress", th: "ชุด", en: "Dress", href: "/" },
+      // "ชุด" / "ทั้งหมด" lead to the param-less homepage (dress is the default
+      // type), so they carry the #results hash — otherwise ScrollToResults has
+      // no query param to react to and the page stays stuck on the hero banner.
+      { key: "dress", th: "ชุด", en: "Dress", href: "/#results" },
       { key: "suit", th: "สูท", en: "Suit", href: "/?type=suit" },
     ],
   },

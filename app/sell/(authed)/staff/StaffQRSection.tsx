@@ -18,6 +18,41 @@ export default function StaffQRSection({ code, url, shopName }: Props) {
       .catch(console.error);
   }, [url]);
 
+  // Print ONLY the QR label (not the whole admin page). We open a minimal
+  // print-only document containing just the QR image + shop name + code.
+  function printQR() {
+    if (!qrDataUrl) return;
+    const win = window.open("", "_blank", "width=420,height=560");
+    if (!win) return;
+    const esc = (s: string) =>
+      s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] ?? c));
+    win.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="utf-8" />
+<title>QR เข้าสู่ระบบพนักงาน</title>
+<style>
+  @page { margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; text-align: center; margin: 0; padding: 24px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p { font-size: 13px; color: #555; margin: 0 0 16px; }
+  img { width: 260px; height: 260px; display: block; margin: 0 auto 14px; }
+  .code { font-size: 26px; font-weight: 700; letter-spacing: 0.18em; margin-top: 6px; }
+  .label { font-size: 12px; color: #777; margin-top: 14px; }
+</style></head><body>
+  <h1>${esc(shopName)}</h1>
+  <p>สแกนเพื่อเข้าสู่ระบบพนักงาน</p>
+  <img src="${qrDataUrl}" alt="QR เข้าสู่ระบบพนักงาน" />
+  <div class="label">รหัสร้าน</div>
+  <div class="code">${esc(code)}</div>
+</body></html>`);
+    win.document.close();
+    win.focus();
+    // Give the image a tick to render before invoking the print dialog.
+    setTimeout(() => {
+      win.print();
+      win.close();
+    }, 250);
+  }
+
   return (
     <div
       style={{
@@ -93,7 +128,7 @@ export default function StaffQRSection({ code, url, shopName }: Props) {
             type="button"
             className="btn btn-outline"
             style={{ fontSize: 13, padding: "7px 16px" }}
-            onClick={() => window.print()}
+            onClick={printQR}
           >
             🖨️ พิมพ์
           </button>

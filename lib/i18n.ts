@@ -20,6 +20,14 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   "search.placeholder": { th: "ค้นหาชุด...",             en: "Search dresses..." },
   "search.label":       { th: "ค้นหาชุดเช่า",            en: "Search dress rentals" },
   "search.button":      { th: "ค้นหา",                  en: "Search" },
+  "search.loading":     { th: "กำลังค้นหา...",          en: "Searching..." },
+  "search.empty":       { th: "ไม่พบผลลัพธ์",            en: "No results" },
+  "search.products":    { th: "สินค้า",                 en: "Products" },
+  "search.shops":       { th: "ร้านค้า",                en: "Shops" },
+  "search.shop":        { th: "ร้านค้า",                en: "Shop" },
+  "search.brands":      { th: "แบรนด์",                 en: "Brands" },
+  "search.brand":       { th: "แบรนด์",                 en: "Brand" },
+  "search.searchFor":   { th: "ค้นหา",                  en: "Search for" },
 
   // ── Sort ─────────────────────────────────────────────────────────────────
   "sort.label":       { th: "เรียงลำดับ",      en: "Sort" },

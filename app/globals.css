@@ -792,6 +792,27 @@ select:focus-visible {
   border-color: var(--line-2);
 }
 
+/* Product grid card — a contained surface (border + resting shadow). The photo
+   is full-bleed to the card edges (overflow:hidden clips its top corners to the
+   card radius); only the text block carries padding. Background is clean white.
+   Resting shadow lives here (a class) so .card-surface:hover can still raise it
+   to --shadow-2 (higher specificity); an inline box-shadow would block that. */
+.product-card {
+  padding: 0;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: var(--shadow-1);
+}
+.product-card .pc-body {
+  padding: 10px 12px 12px;
+}
+/* On hover, only the border turns brand-green (the lift/shadow come from
+   .card-surface:hover). Defined after .card-surface:hover so it wins on equal
+   specificity. */
+.product-card:hover {
+  border-color: var(--accent);
+}
+
 /* Generic hover lift for links/tiles that aren't full cards */
 .hover-lift {
   transition: transform var(--dur-2) var(--ease),
