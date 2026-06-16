@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@/auth";
 import {
+  getStaffLoginInfo,
   listShopStaff,
   createStaff,
   resetStaffPin,
@@ -10,6 +11,7 @@ import {
   updateStaffPermissions,
   removeStaff,
 } from "@/app/actions/staff";
+import StaffQRSection from "./StaffQRSection";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +52,7 @@ export default async function StaffManagementPage({
 
   const result = await listShopStaff();
   const staffList = result.ok ? (result.data ?? []) : [];
+  const loginInfo = await getStaffLoginInfo();
 
   const total = staffList.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -73,6 +76,9 @@ export default async function StaffManagementPage({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600 }}>จัดการพนักงาน ({total} คน)</h1>
       </div>
+
+      {/* QR Code Login Section */}
+      {loginInfo.ok && <StaffQRSection code={loginInfo.code} url={loginInfo.url} shopName={loginInfo.shopName} />}
 
       {/* Create Staff Form */}
       <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 10, padding: 20, marginBottom: 28, maxWidth: 700 }}>

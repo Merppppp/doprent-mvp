@@ -509,6 +509,8 @@ model Shop {
   ratingCount      Int       @default(0) @map("rating_count")
   /// เปิด/ปิดร้านชั่วคราว (seller-controlled toggle) — false = แสดง 'ปิดชั่วคราว' บนหน้าร้านสาธารณะ
   isOpen           Boolean   @default(true) @map("is_open")
+  /// opaque code ฝังใน QR สำหรับพนักงานเข้าระบบ — immutable หลัง allocate
+  staffLoginCode   String?   @unique @map("staff_login_code")
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -540,8 +542,8 @@ model Shop {
 model ShopStaff {
   id            String   @id @default(uuid()) @db.Uuid
   shopId        String   @map("shop_id") @db.Uuid
-  /// login handle — GLOBAL unique (ไม่ต้องเลือกร้านตอน login)
-  username      String   @unique
+  /// login handle — unique per shop (scoped via staffLoginCode at login)
+  username      String
   displayName   String   @map("display_name")
   /// bcrypt hash ของ PIN — ห้ามเก็บ plaintext
   pinHash       String   @map("pin_hash")
@@ -562,6 +564,7 @@ model ShopStaff {
   shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
   @@index([shopId])
+  @@unique([shopId, username])
   @@map("shop_staff")
 }
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth } from "@/auth";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 
@@ -14,6 +15,14 @@ import { getServerLocale } from "@/lib/i18n-server";
 export default async function Header() {
   const locale = getServerLocale();
   const user = await getCurrentUser().catch(() => null);
+
+  // Staff principals have a synthetic session id ("staff:<id>") that getCurrentUser
+  // can't resolve to a users row, so it returns null. Detect the staff session
+  // separately so the global nav reflects the logged-in staff (name + shop dashboard
+  // + sign out) instead of falsely showing the logged-out "เข้าสู่ระบบ" button.
+  const staffSession = user ? null : await auth().catch(() => null);
+  const staff = staffSession?.user?.role === "staff" ? staffSession.user : null;
+  const staffName = staff?.name?.split(" ")[0] || "พนักงาน";
 
   const fullName = user?.fullName || user?.email.split("@")[0] || "";
   const initials = fullName
@@ -56,7 +65,12 @@ export default async function Header() {
       >
         {/* Left */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {!hasShop && !isAdmin && (
+          {staff && (
+            <Link href="/sell/dashboard" style={topLinkStyle}>
+              {t("menu.shopDashboard", locale)}
+            </Link>
+          )}
+          {!staff && !hasShop && !isAdmin && (
             <Link href="/sell/signup" style={topLinkStyle}>
               {t("nav.openShop", locale)}
             </Link>
@@ -90,6 +104,11 @@ export default async function Header() {
             <>
               <span style={topDividerStyle}>|</span>
               <span style={{ ...topLinkStyle, fontWeight: 500 }}>{fullName.split(" ")[0]}</span>
+            </>
+          ) : staff ? (
+            <>
+              <span style={topDividerStyle}>|</span>
+              <span style={{ ...topLinkStyle, fontWeight: 500 }}>{staffName} · พนักงาน</span>
             </>
           ) : (
             <>
@@ -140,6 +159,49 @@ export default async function Header() {
               sellerBadge={badges.seller}
               locale={locale}
             />
+          ) : staff ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Link
+                href="/sell/dashboard"
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#4A6B5A",
+                  background: "#fff",
+                  padding: "0 16px",
+                  height: 38,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  borderRadius: 6,
+                  whiteSpace: "nowrap",
+                  textDecoration: "none",
+                  border: "1px solid #fff",
+                }}
+              >
+                {t("menu.shopDashboard", locale)}
+              </Link>
+              <form action="/auth/signout" method="POST" style={{ display: "inline-flex" }}>
+                <button
+                  type="submit"
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#fff",
+                    background: "transparent",
+                    padding: "0 12px",
+                    height: 38,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    borderRadius: 6,
+                    whiteSpace: "nowrap",
+                    border: "1px solid rgba(255,255,255,0.5)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {t("menu.signOut", locale)}
+                </button>
+              </form>
+            </div>
           ) : (
             <>
               <Link
@@ -295,9 +357,12 @@ export default async function Header() {
 
 const PRODUCT_CATEGORIES = [
   {
-    key: "clothing", th: "เสื้อผ้า / ชุด", en: "Clothing", icon: "👗", href: "/", active: true,
+    key: "clothing", th: "เสื้อผ้า / ชุด", en: "Clothing", icon: "👗", href: "/#results", active: true,
     subs: [
-      { key: "dress", th: "ชุด", en: "Dress", href: "/" },
+      // "ชุด" / "ทั้งหมด" lead to the param-less homepage (dress is the default
+      // type), so they carry the #results hash — otherwise ScrollToResults has
+      // no query param to react to and the page stays stuck on the hero banner.
+      { key: "dress", th: "ชุด", en: "Dress", href: "/#results" },
       { key: "suit", th: "สูท", en: "Suit", href: "/?type=suit" },
     ],
   },

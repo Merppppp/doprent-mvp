@@ -19,7 +19,7 @@ import {
   listSimilarProducts,
 } from "@/lib/products";
 import { hasMultipleRates, startingPerDay } from "@/lib/pricing";
-import { COLOR_LABELS_TH, sizeLabel } from "@/lib/types";
+import { COLOR_LABELS_TH, sizeLabel, formatVariantSizes } from "@/lib/types";
 import { db } from "@/lib/db";
 import {
   resolveEffectivePolicy,
@@ -469,7 +469,7 @@ export default async function DressPage({ params }: { params: Params }) {
               columnGap: 24,
             }}
           >
-            <Spec lbl="ขนาด" val={sizeLabel(dress.size)} />
+            <Spec lbl="ขนาด" val={formatVariantSizes(productVariants, dress.size)} />
             <Spec lbl="สี" val={dress.color ? COLOR_LABELS_TH[dress.color] : "—"} />
             <Spec lbl="ร้านเช่า" val={dress.shop_name} />
             <Spec lbl="แบรนด์" val={dress.designer ?? "—"} />

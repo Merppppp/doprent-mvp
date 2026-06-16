@@ -5,7 +5,7 @@ import { requireShopAccess } from "@/lib/shop-access";
 import { ProductArt } from "@/components/ProductArt";
 import { toggleProductAvailable } from "@/app/actions/seller";
 import ToggleSwitch from "@/components/ToggleSwitch";
-import { sizeLabel } from "@/lib/types";
+import { formatVariantSizes } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +78,7 @@ export default async function SellerProductsPage({
       available: true,
       views: true,
       images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+      variants: { select: { size: true, available: true } },
     },
   });
 
@@ -191,7 +192,7 @@ export default async function SellerProductsPage({
                           </div>
                         </div>
                       </td>
-                      <td style={tdStyle}>{sizeLabel(d.size)}</td>
+                      <td style={tdStyle}>{formatVariantSizes(d.variants, d.size)}</td>
                       <td style={{ ...tdStyle, textAlign: "right", whiteSpace: "nowrap" }}>
                         ฿{d.pricePerDay.toLocaleString()}
                       </td>

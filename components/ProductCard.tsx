@@ -5,7 +5,7 @@ import VerifiedBadge from "./VerifiedBadge";
 import DistanceBadge from "./DistanceBadge";
 import StarRating from "./StarRating";
 import { hasMultipleRates, startingPerDay } from "@/lib/pricing";
-import { type Product, sizeLabel } from "@/lib/types";
+import { type Product } from "@/lib/types";
 
 type Props = {
   product: Product;
@@ -22,63 +22,74 @@ export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn
   const isSaved = savedSet ? savedSet.has(product.id) : false;
 
   return (
-    <div className="card" style={{ position: "relative" }}>
+    <div className="card card-surface product-card" style={{ position: "relative" }}>
       <Link href={`/product/${product.slug}`} style={{ display: "block", cursor: "pointer" }}>
         <div
+          className="pc-media media"
           style={{
             aspectRatio: "3/4",
-            borderRadius: 8,
-            overflow: "hidden",
-            marginBottom: 10,
             position: "relative",
-            transition: "transform 0.2s",
           }}
         >
           <ProductCardImage src={imgSrc} alt={product.name} color={product.color ?? "rose"} variant={variant} />
           <SaveButton productId={product.id} initialSaved={isSaved} isLoggedIn={isLoggedIn} />
         </div>
-        <div style={{ padding: "0 2px" }}>
+        <div className="pc-body">
+          {/* Top row: brand (left) + distance (right). */}
           <div
             style={{
-              fontSize: 11,
-              color: "var(--ink-3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
               marginBottom: 4,
-              fontWeight: 500,
-              letterSpacing: "0.02em",
             }}
           >
-            {product.designer || "—"}
+            <span
+              style={{
+                fontSize: 11,
+                color: "var(--ink-3)",
+                fontWeight: 500,
+                letterSpacing: "0.02em",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {product.designer || "—"}
+            </span>
+            {product.area_key ? (
+              <DistanceBadge areaKey={product.area_key} style={{ flexShrink: 0, verticalAlign: "middle" }} />
+            ) : null}
           </div>
           <div style={{ fontSize: 15, fontWeight: 500, lineHeight: 1.3, marginBottom: 4 }}>
             {product.name}
           </div>
+          {/* Shop line — below the product name. Smaller & grey, with trust badges. */}
           <div
             style={{
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "baseline",
-              gap: 8,
-              fontSize: 12,
-              color: "var(--ink-2)",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 5,
+              fontSize: 11,
+              color: "var(--ink-3)",
+              marginBottom: 4,
             }}
           >
-            <span>
-              Size {sizeLabel(product.size)} ·{" "}
-              <span style={{ color: "var(--ink-2)" }}>{product.shop_name}</span>
-              {product.shop_verified ? (
-                <span style={{ marginLeft: 4, display: "inline-flex", verticalAlign: "middle" }}>
-                  <VerifiedBadge size="sm" />
-                </span>
-              ) : null}
-              {product.area_key ? (
-                <DistanceBadge areaKey={product.area_key} style={{ marginLeft: 6, verticalAlign: "middle" }} />
-              ) : null}
-              {product.shop_rating_count ? (
-                <span style={{ marginLeft: 6, display: "inline-flex", verticalAlign: "middle" }}>
-                  <StarRating avg={product.shop_rating_avg ?? null} count={product.shop_rating_count} size="sm" />
-                </span>
-              ) : null}
-            </span>
+            <span style={{ fontWeight: 500 }}>{product.shop_name}</span>
+            {product.shop_verified ? (
+              <span style={{ display: "inline-flex", verticalAlign: "middle" }}>
+                <VerifiedBadge size="sm" />
+              </span>
+            ) : null}
+            {product.shop_rating_count ? (
+              <span style={{ display: "inline-flex", verticalAlign: "middle" }}>
+                <StarRating avg={product.shop_rating_avg ?? null} count={product.shop_rating_count} size="sm" />
+              </span>
+            ) : null}
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <span style={{ fontWeight: 600, color: "var(--ink)", whiteSpace: "nowrap", fontSize: 14 }}>
               {hasMultipleRates(product.price_tiers) ? (
                 <span style={{ fontSize: 11, fontWeight: 400, color: "var(--ink-3)" }}>เริ่ม </span>

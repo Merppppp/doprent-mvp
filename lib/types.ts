@@ -48,6 +48,32 @@ export const SIZE_LABELS: Record<Size, string> = {
 export const sizeLabel = (s: string | null | undefined): string =>
   s == null ? "" : (SIZE_LABELS[s as Size] ?? s);
 
+/**
+ * Format a product's variant sizes into ONE consistent label, e.g. "S · M · L",
+ * so every surface (product detail, seller list, etc.) shows sizes the same way.
+ * Prefers available variants; if none available it still lists them. Sizes are
+ * de-duplicated and ordered by the canonical SIZES order. Falls back to the
+ * legacy single Product.size when there are no variants at all.
+ */
+export function formatVariantSizes(
+  variants: ReadonlyArray<{ size: Size | string; available?: boolean }>,
+  fallbackSize?: Size | string | null,
+): string {
+  const pool = variants.some((v) => v.available !== false)
+    ? variants.filter((v) => v.available !== false)
+    : variants;
+  const uniq = Array.from(new Set(pool.map((v) => v.size)));
+  if (uniq.length === 0) {
+    return fallbackSize ? sizeLabel(fallbackSize) : "—";
+  }
+  uniq.sort((a, b) => {
+    const ia = SIZES.indexOf(a as Size);
+    const ib = SIZES.indexOf(b as Size);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+  return uniq.map((s) => sizeLabel(s)).join(" · ");
+}
+
 export type OccasionKey =
   | "engagement"
   | "wedding"
