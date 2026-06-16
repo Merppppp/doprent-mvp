@@ -289,6 +289,10 @@ export type BookingDetail = Booking & {
   boutique_bank_name: string | null;
   boutique_bank_account_number: string | null;
   boutique_bank_account_name: string | null;
+  boutique_instagram: string | null;
+  boutique_facebook: string | null;
+  boutique_twitter: string | null;
+  boutique_tiktok: string | null;
 };
 
 export type Profile = {

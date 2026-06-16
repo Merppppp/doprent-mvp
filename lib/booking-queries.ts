@@ -11,7 +11,7 @@ const BOOKING_INCLUDE = {
       images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } },
     },
   },
-  shop: { select: { name: true, slug: true, lineUrl: true, promptpayId: true, bankName: true, bankAccountNumber: true, bankAccountName: true } },
+  shop: { select: { name: true, slug: true, lineUrl: true, promptpayId: true, bankName: true, bankAccountNumber: true, bankAccountName: true, instagram: true, facebook: true, twitter: true, tiktok: true } },
 } as const;
 
 type PrismaBookingWithJoins = {
@@ -47,6 +47,10 @@ type PrismaBookingWithJoins = {
     bankName: string | null;
     bankAccountNumber: string | null;
     bankAccountName: string | null;
+    instagram: string | null;
+    facebook: string | null;
+    twitter: string | null;
+    tiktok: string | null;
   } | null;
 };
 
@@ -89,6 +93,10 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     boutique_bank_name: b.shop?.bankName ?? null,
     boutique_bank_account_number: b.shop?.bankAccountNumber ?? null,
     boutique_bank_account_name: b.shop?.bankAccountName ?? null,
+    boutique_instagram: b.shop?.instagram ?? null,
+    boutique_facebook: b.shop?.facebook ?? null,
+    boutique_twitter: b.shop?.twitter ?? null,
+    boutique_tiktok: b.shop?.tiktok ?? null,
   };
 }
 
@@ -167,7 +175,7 @@ export async function getBookingForView(id: string): Promise<BookingDetail | nul
         },
       },
       shop: {
-        select: { name: true, slug: true, lineUrl: true, promptpayId: true, ownerId: true, bankName: true, bankAccountNumber: true, bankAccountName: true },
+        select: { name: true, slug: true, lineUrl: true, promptpayId: true, ownerId: true, bankName: true, bankAccountNumber: true, bankAccountName: true, instagram: true, facebook: true, twitter: true, tiktok: true },
       },
     },
   });

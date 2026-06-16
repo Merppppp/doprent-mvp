@@ -10,6 +10,7 @@ import BookingStatusBadge from "@/components/BookingStatusBadge";
 import RenterBookingActions from "@/components/RenterBookingActions";
 import ReviewForm from "@/components/ReviewForm";
 import EditAddressForm from "@/components/EditAddressForm";
+import ShopSocialLinks from "@/components/ShopSocialLinks";
 
 export const dynamic = "force-dynamic";
 
@@ -104,7 +105,9 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
                 ยอด ฿{total.toLocaleString()} → {b.boutique_name}
               </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qr} alt="PromptPay QR" width={240} height={240} style={{ borderRadius: 8 }} />
+              {/* display:block + margin auto centers it — Tailwind preflight sets
+                  img{display:block}, so the parent textAlign:center alone won't. */}
+              <img src={qr} alt="PromptPay QR" width={240} height={240} style={{ borderRadius: 8, display: "block", margin: "0 auto" }} />
               <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 10, lineHeight: 1.5 }}>
                 โอนแล้วกดปุ่มด้านล่างเพื่ออัปโหลดสลิป ร้านจะตรวจและยืนยันให้
               </p>
@@ -156,6 +159,20 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
               มีคำถาม? ติดต่อร้าน (LINE)
             </a>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* Contact shop — surface every channel the shop configured (LINE/IG/FB/X/TikTok) */}
+      {(b.boutique_line_url || b.boutique_instagram || b.boutique_facebook || b.boutique_twitter || b.boutique_tiktok) ? (
+        <div style={card}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>ติดต่อร้านค้า</div>
+          <ShopSocialLinks
+            lineUrl={b.boutique_line_url}
+            instagram={b.boutique_instagram}
+            facebook={b.boutique_facebook}
+            twitter={b.boutique_twitter}
+            tiktok={b.boutique_tiktok}
+          />
         </div>
       ) : null}
 
