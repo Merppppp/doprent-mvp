@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import AvailabilityCalendar from "./AvailabilityCalendar";
+import { sizeLabel } from "@/lib/types";
 
 type DressOption = {
   id: string;
@@ -135,7 +136,7 @@ export default function SellerAvailabilityPicker({ dresses }: { dresses: DressOp
             <>
               <div style={{ fontWeight: 600, color: "var(--ink)" }}>{selectedDress.name}</div>
               <div style={{ marginTop: 4 }}>
-                {selectedDress.designer || "—"} · Size {selectedDress.size} · ฿{selectedDress.price_per_day.toLocaleString()}/วัน
+                {selectedDress.designer || "—"} · Size {sizeLabel(selectedDress.size)} · ฿{selectedDress.price_per_day.toLocaleString()}/วัน
               </div>
             </>
           ) : (

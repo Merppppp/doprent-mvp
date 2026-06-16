@@ -5,7 +5,7 @@ import { useState } from "react";
 import { createProduct, updateProduct } from "@/app/actions/seller";
 import { requestTag } from "@/app/actions/seller-tags";
 import type { BoundTagGroup } from "@/lib/tag-groups";
-import type { PriceTier, Size } from "@/lib/types";
+import { type PriceTier, type Size, SIZES, sizeLabel } from "@/lib/types";
 import { priceForNights } from "@/lib/pricing";
 import { prepareImageFileForUpload } from "@/lib/image";
 import RequiredMark from "@/components/RequiredMark";
@@ -28,8 +28,8 @@ type ShopTagRequest = {
   tagGroup: { label: string; key: string };
 };
 
-/** Sizes available in the DB enum (XS–XL only — no enum additions allowed) */
-const SIZES: Size[] = ["XS", "S", "M", "L", "XL"];
+// Canonical size list (XXXS … 4XL, Free size) lives in lib/types — shared with
+// the browse filter so the form offers exactly the sizes a shopper can filter by.
 
 type TierEntry = { minDays: number; pricePerDay: number };
 
@@ -445,7 +445,7 @@ export default function ProductForm(props: Props) {
     }
     for (const vr of variantRows) {
       if (vr.quantity < 1) {
-        setError(`จำนวนสต็อกของไซซ์ ${vr.size} ต้องอย่างน้อย 1`);
+        setError(`จำนวนสต็อกของไซซ์ ${sizeLabel(vr.size)} ต้องอย่างน้อย 1`);
         setSubmitting(false);
         return;
       }
@@ -458,7 +458,7 @@ export default function ProductForm(props: Props) {
     } else {
       for (const vr of variantRows) {
         const tiers = perSizeTiers[vr.size] ?? sharedTiers;
-        const tierErr = validateTierEntries(tiers, `ไซซ์ ${vr.size}`);
+        const tierErr = validateTierEntries(tiers, `ไซซ์ ${sizeLabel(vr.size)}`);
         if (tierErr) { setError(tierErr); setSubmitting(false); return; }
       }
     }
@@ -738,7 +738,7 @@ export default function ProductForm(props: Props) {
                     style={{ ...inputStyle, width: 90, padding: "8px 6px", fontSize: 13 }}
                   >
                     {SIZES.map((s) => (
-                      <option key={s} value={s} disabled={usedSizes.has(s) && s !== row.size}>{s}</option>
+                      <option key={s} value={s} disabled={usedSizes.has(s) && s !== row.size}>{sizeLabel(s)}</option>
                     ))}
                   </select>
                   {/* Qty stepper */}
@@ -860,7 +860,7 @@ export default function ProductForm(props: Props) {
               return (
                 <div key={row.size}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)", marginBottom: 8 }}>
-                    ไซซ์ {row.size}
+                    ไซซ์ {sizeLabel(row.size)}
                   </div>
                   <TierEditor
                     tiers={tiers}

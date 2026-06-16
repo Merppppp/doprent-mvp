@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import ShopFinder from "@/components/ShopFinder";
-import { listShops } from "@/lib/products";
+import { listShopsPage, SHOPS_PAGE_SIZE } from "@/lib/products";
 
 export const dynamic = "force-dynamic";
 
@@ -21,15 +21,13 @@ export default async function BoutiquesPage({
   searchParams: SearchParams;
 }) {
   const search = (searchParams?.q ?? "").trim();
-  const all = await listShops({ featuredFirst: true });
-  const needle = search.toLowerCase();
-  const boutiques = needle
-    ? all.filter((b) =>
-        `${b.name} ${b.area_label} ${b.instagram ?? ""} ${b.tag ?? ""}`
-          .toLowerCase()
-          .includes(needle),
-      )
-    : all;
+  // First page only — the rest streams in via "load more" (server action).
+  // Filtering + pagination happen at the DB so this scales to thousands of shops.
+  const { rows: boutiques, total } = await listShopsPage({
+    q: search,
+    skip: 0,
+    take: SHOPS_PAGE_SIZE,
+  });
 
   return (
     <div className="container boutiques-list" style={{ paddingTop: 28, paddingBottom: 80 }}>
@@ -37,14 +35,14 @@ export default async function BoutiquesPage({
       <div style={{ color: "var(--ink-3)", fontSize: 14, marginTop: 6, marginBottom: 18 }}>
         {search ? (
           <>
-            พบ <b style={{ color: "var(--ink)" }}>{boutiques.length}</b> ร้านสำหรับ &ldquo;{search}&rdquo;
+            พบ <b style={{ color: "var(--ink)" }}>{total}</b> ร้านสำหรับ &ldquo;{search}&rdquo;
             {" · "}
             <Link href="/shops" style={{ color: "var(--ink-2)" }}>
               ล้างการค้นหา
             </Link>
           </>
         ) : (
-          <>{all.length} ร้านในกรุงเทพ</>
+          <>{total} ร้านในกรุงเทพ</>
         )}
       </div>
 
@@ -81,7 +79,7 @@ export default async function BoutiquesPage({
         </span>
       </form>
 
-      {boutiques.length === 0 ? (
+      {total === 0 ? (
         <div
           style={{
             padding: "48px 20px",
@@ -102,19 +100,11 @@ export default async function BoutiquesPage({
         </div>
       ) : (
       <ShopFinder
-        shops={boutiques.map((b) => ({
-          id: b.id,
-          slug: b.slug,
-          name: b.name,
-          areaKey: b.area_key,
-          areaLabel: b.area_label,
-          coverColor: b.cover_color,
-          featured: b.featured,
-          verified: b.verified,
-          tag: b.tag,
-          sinceYear: b.since_year,
-          instagram: b.instagram,
-        }))}
+        key={search || "all"}
+        shops={boutiques}
+        total={total}
+        query={search}
+        pageSize={SHOPS_PAGE_SIZE}
       />
       )}
     </div>

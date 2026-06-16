@@ -11,7 +11,7 @@ const BOOKING_INCLUDE = {
       images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } },
     },
   },
-  shop: { select: { name: true, slug: true, lineUrl: true, promptpayId: true, bankName: true, bankAccountNumber: true, bankAccountName: true, instagram: true, facebook: true, twitter: true, tiktok: true } },
+  shop: { select: { name: true, slug: true, lineUrl: true, promptpayId: true, bankName: true, bankAccountNumber: true, bankAccountName: true, defaultPaymentMethod: true, instagram: true, facebook: true, twitter: true, tiktok: true } },
 } as const;
 
 type PrismaBookingWithJoins = {
@@ -29,6 +29,7 @@ type PrismaBookingWithJoins = {
   channel: string | null;
   status: string;
   slipPath: string | null;
+  paymentMethod: "promptpay" | "bank" | null;
   addressId: string | null;
   recipientName: string | null;
   phone: string | null;
@@ -55,6 +56,7 @@ type PrismaBookingWithJoins = {
     bankName: string | null;
     bankAccountNumber: string | null;
     bankAccountName: string | null;
+    defaultPaymentMethod: "promptpay" | "bank" | null;
     instagram: string | null;
     facebook: string | null;
     twitter: string | null;
@@ -82,6 +84,7 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     channel: b.channel,
     status: b.status as BookingDetail["status"],
     slip_path: b.slipPath,
+    payment_method: b.paymentMethod,
     address_id: b.addressId,
     recipient_name: b.recipientName,
     phone: b.phone,
@@ -109,6 +112,7 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     boutique_bank_name: b.shop?.bankName ?? null,
     boutique_bank_account_number: b.shop?.bankAccountNumber ?? null,
     boutique_bank_account_name: b.shop?.bankAccountName ?? null,
+    boutique_default_payment_method: b.shop?.defaultPaymentMethod ?? null,
     boutique_instagram: b.shop?.instagram ?? null,
     boutique_facebook: b.shop?.facebook ?? null,
     boutique_twitter: b.shop?.twitter ?? null,
@@ -191,7 +195,7 @@ export async function getBookingForView(id: string): Promise<BookingDetail | nul
         },
       },
       shop: {
-        select: { name: true, slug: true, lineUrl: true, promptpayId: true, ownerId: true, bankName: true, bankAccountNumber: true, bankAccountName: true, instagram: true, facebook: true, twitter: true, tiktok: true },
+        select: { name: true, slug: true, lineUrl: true, promptpayId: true, ownerId: true, bankName: true, bankAccountNumber: true, bankAccountName: true, defaultPaymentMethod: true, instagram: true, facebook: true, twitter: true, tiktok: true },
       },
     },
   });

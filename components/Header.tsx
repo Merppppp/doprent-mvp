@@ -6,6 +6,7 @@ import { getBookingBadges } from "@/lib/booking-queries";
 import Logo from "./Logo";
 import NavbarSearch from "./NavbarSearch";
 import UserMenu from "./UserMenu";
+import DetailsAutoClose from "./DetailsAutoClose";
 import LocaleToggle from "./LocaleToggle";
 import { t } from "@/lib/i18n";
 import { getServerLocale } from "@/lib/i18n-server";
@@ -171,13 +172,11 @@ export default async function Header() {
         <NavbarSearch locale={locale} />
       </div>
 
-      {/* ═══ BOTTOM ROW ═══ (32px — product categories) */}
+      {/* ═══ BOTTOM ROW ═══ (category nav) */}
       <div
         style={{
-          background: "rgba(0,0,0,0.08)",
-          borderTop: "1px solid rgba(255,255,255,0.08)",
-          height: 40,
-          padding: "4px 0",
+          background: "rgba(0,0,0,0.10)",
+          borderTop: "1px solid rgba(255,255,255,0.10)",
         }}
       >
         <div
@@ -185,64 +184,78 @@ export default async function Header() {
           style={{
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            height: "100%",
-            gap: 0,
-            overflow: "hidden",
+            gap: 6,
+            minHeight: 46,
+            overflow: "visible",
           }}
         >
-          {/* Product type dropdown */}
+          {/* Product-type dropdown — left, styled as a menu button */}
           <details className="hdr-cat-details" style={{ position: "relative", flexShrink: 0 }}>
-            <summary
-              className="hdr-cat-link hdr-cat-active"
-              style={{ ...catLinkStyle, listStyle: "none", fontWeight: 600 }}
-            >
-              {PRODUCT_CATEGORIES[0].icon} {locale === "en" ? PRODUCT_CATEGORIES[0].en : PRODUCT_CATEGORIES[0].th}
-              <span style={{ fontSize: 9, marginLeft: 3, opacity: 0.7 }}>▼</span>
+            <summary className="hdr-cat-trigger" style={{ ...catTriggerStyle, listStyle: "none" }}>
+              <span className="hdr-burger" aria-hidden="true">
+                <span /><span /><span />
+              </span>
+              {locale === "en" ? "All categories" : "หมวดหมู่ทั้งหมด"}
+              <span className="hdr-cat-caret" style={{ fontSize: 9, opacity: 0.85 }}>▾</span>
             </summary>
             <div className="hdr-cat-dropdown" style={{
               position: "absolute",
-              top: "calc(100% + 4px)",
+              top: "calc(100% + 6px)",
               left: 0,
               background: "var(--surface)",
               border: "1px solid var(--line)",
-              borderRadius: 8,
-              minWidth: 200,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
+              borderRadius: 10,
+              minWidth: 230,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.14)",
               zIndex: 50,
               padding: "8px 0",
             }}>
               {PRODUCT_CATEGORIES.map((cat) => (
-                <span key={cat.key}>
+                <div key={cat.key}>
                   {cat.active ? (
-                    <Link href={cat.href} style={{ ...catDropdownItemStyle, fontWeight: 600 }}>
-                      {cat.icon} {locale === "en" ? cat.en : cat.th}
-                    </Link>
+                    <>
+                      <div style={{ ...catDropdownItemStyle, fontWeight: 700, cursor: "default", paddingBottom: 2, color: "var(--ink-3)", fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                        {locale === "en" ? cat.en : cat.th}
+                      </div>
+                      <Link href={cat.href} className="hdr-dd-item" style={{ ...catDropdownItemStyle, paddingLeft: 24, fontWeight: 600 }}>
+                        {locale === "en" ? "All" : "ทั้งหมด"}
+                      </Link>
+                      {cat.subs.map((sub) => (
+                        <Link key={sub.key} href={sub.href} className="hdr-dd-item" style={{ ...catDropdownItemStyle, paddingLeft: 24 }}>
+                          {locale === "en" ? sub.en : sub.th}
+                        </Link>
+                      ))}
+                    </>
                   ) : (
-                    <span style={{ ...catDropdownItemStyle, opacity: 0.45, cursor: "default" }}>
-                      {cat.icon} {locale === "en" ? cat.en : cat.th}
+                    <span style={{ ...catDropdownItemStyle, opacity: 0.4, cursor: "default", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      {locale === "en" ? cat.en : cat.th}
                       <span style={comingSoonBadge}>Soon</span>
                     </span>
                   )}
-                </span>
+                </div>
               ))}
             </div>
           </details>
+          <DetailsAutoClose selector="details.hdr-cat-details" />
 
-          {/* Divider */}
-          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 14, margin: "0 8px" }}>|</span>
+          <span style={{ width: 1, height: 18, background: "rgba(255,255,255,0.18)", flexShrink: 0, margin: "0 2px" }} />
 
-          {/* Sub-categories of active product type */}
-          <div className="hdr-subs" style={{ display: "flex", alignItems: "center", gap: 2, overflow: "hidden" }}>
-            <Link href={PRODUCT_CATEGORIES[0].href} className="hdr-cat-link" style={{ ...catLinkStyle, opacity: 0.7 }}>
-              {locale === "en" ? "All" : "ทั้งหมด"}
-            </Link>
-            {PRODUCT_CATEGORIES[0].subs.map((sub) => (
-              <Link key={sub.key} href={sub.href} className="hdr-cat-link" style={catLinkStyle}>
-                {locale === "en" ? sub.en : sub.th}
+          {/* Occasion quick-links — scrollable, a different taxonomy from product type */}
+          <nav className="hdr-quick" style={{ display: "flex", alignItems: "center", gap: 2, overflowX: "auto", flex: 1, minWidth: 0 }}>
+            <span style={{ ...catLinkStyle, color: "rgba(255,255,255,0.55)", fontWeight: 500, padding: "4px 6px 4px 4px", cursor: "default" }}>
+              {locale === "en" ? "By occasion:" : "ตามโอกาส:"}
+            </span>
+            {QUICK_OCCASIONS.map((q) => (
+              <Link key={q.key} href={q.href} className="hdr-cat-link" style={catLinkStyle}>
+                {locale === "en" ? q.en : q.th}
               </Link>
             ))}
-          </div>
+          </nav>
+
+          {/* Right — shops CTA */}
+          <Link href="/shops" className="hdr-cat-link hdr-shops-link" style={{ ...catLinkStyle, flexShrink: 0, fontWeight: 600 }}>
+            {locale === "en" ? "All shops →" : "ร้านค้าทั้งหมด →"}
+          </Link>
         </div>
       </div>
 
@@ -258,10 +271,18 @@ export default async function Header() {
         .hdr-cat-details > summary::-webkit-details-marker { display: none; }
         .hdr-cat-details > summary::marker { content: ""; }
         .hdr-cat-dropdown a:hover { background: var(--bg-hover, rgba(0,0,0,0.04)); }
+        /* category menu button */
+        .hdr-cat-trigger:hover { background: rgba(255,255,255,0.26) !important; }
+        .hdr-cat-details[open] .hdr-cat-trigger { background: rgba(255,255,255,0.30) !important; }
+        .hdr-cat-details[open] .hdr-cat-caret { transform: rotate(180deg); }
+        .hdr-burger { display: inline-flex; flex-direction: column; justify-content: center; gap: 3px; width: 14px; }
+        .hdr-burger span { display: block; height: 2px; border-radius: 2px; background: currentColor; }
+        .hdr-quick { scrollbar-width: none; }
+        .hdr-quick::-webkit-scrollbar { display: none; }
+        .hdr-shops-link:hover { background: rgba(255,255,255,0.12); }
         @media(max-width:768px) {
           .hdr-top-row { display: none !important; }
-          .hdr-subs { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
-          .hdr-subs::-webkit-scrollbar { display: none; }
+          .hdr-quick { -webkit-overflow-scrolling: touch; }
         }
       ` }} />
     </header>
@@ -276,12 +297,8 @@ const PRODUCT_CATEGORIES = [
   {
     key: "clothing", th: "เสื้อผ้า / ชุด", en: "Clothing", icon: "👗", href: "/", active: true,
     subs: [
-      { key: "evening", th: "ชุดราตรี", en: "Evening Dress", href: "/?occasion=evening" },
-      { key: "thai", th: "ชุดไทย", en: "Thai Dress", href: "/?occasion=thai" },
-      { key: "wedding", th: "ชุดแต่งงาน", en: "Wedding Dress", href: "/?occasion=wedding" },
-      { key: "casual", th: "ชุดลำลอง", en: "Casual", href: "/?occasion=casual" },
-      { key: "costume", th: "ชุดคอสตูม / แฟนซี", en: "Costume / Fancy", href: "/?occasion=costume" },
-      { key: "graduation", th: "ชุดรับปริญญา", en: "Graduation", href: "/?occasion=graduation" },
+      { key: "dress", th: "ชุด", en: "Dress", href: "/" },
+      { key: "suit", th: "สูท", en: "Suit", href: "/?type=suit" },
     ],
   },
   { key: "bags", th: "กระเป๋า", en: "Bags", icon: "👜", href: "#", active: false, subs: [] },
@@ -290,6 +307,33 @@ const PRODUCT_CATEGORIES = [
   { key: "electronics", th: "อิเล็กทรอนิกส์", en: "Electronics", icon: "📱", href: "#", active: false, subs: [] },
   { key: "cameras", th: "กล้อง", en: "Cameras", icon: "📷", href: "#", active: false, subs: [] },
 ];
+
+// Popular occasions surfaced inline in the category bar (different taxonomy from
+// product type — these filter by ?occasion=, while the dropdown picks dress/suit).
+const QUICK_OCCASIONS = [
+  { key: "wedding", th: "งานแต่ง", en: "Wedding", href: "/?occasion=wedding" },
+  { key: "engagement", th: "งานหมั้น", en: "Engagement", href: "/?occasion=engagement" },
+  { key: "evening", th: "ราตรี", en: "Evening", href: "/?occasion=evening" },
+  { key: "gala", th: "กาล่า", en: "Gala", href: "/?occasion=gala" },
+  { key: "cocktail", th: "ค็อกเทล", en: "Cocktail", href: "/?occasion=cocktail" },
+  { key: "thai", th: "ชุดไทย", en: "Thai", href: "/?occasion=thai" },
+];
+
+const catTriggerStyle: React.CSSProperties = {
+  color: "#fff",
+  background: "rgba(255,255,255,0.16)",
+  textDecoration: "none",
+  fontSize: 12.5,
+  fontWeight: 600,
+  padding: "7px 14px",
+  borderRadius: 999,
+  whiteSpace: "nowrap",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 7,
+  cursor: "pointer",
+  transition: "background 0.15s",
+};
 
 const catLinkStyle: React.CSSProperties = {
   color: "rgba(255,255,255,0.85)",

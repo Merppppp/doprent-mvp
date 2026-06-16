@@ -48,9 +48,15 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
   const isReviewable = b.status === "returned" || b.status === "completed";
   const canEditAddress = b.status === "booking_pending" || b.status === "waiting_for_payment";
 
-  // QR only while waiting for payment + shop has PromptPay + fee set
+  // Once the shop accepts, it picks ONE channel to collect through — show only
+  // that one. Legacy bookings (accepted before this feature, payment_method
+  // null) fall back to showing every channel the shop has configured.
+  const showPromptpay = b.payment_method ? b.payment_method === "promptpay" : true;
+  const showBank = b.payment_method ? b.payment_method === "bank" : true;
+
+  // QR only while waiting for payment + shop has PromptPay + fee set + chosen channel
   const qr =
-    b.status === "waiting_for_payment" && b.shipping_fee != null
+    b.status === "waiting_for_payment" && b.shipping_fee != null && showPromptpay
       ? await promptPayQrDataUrl(b.boutique_promptpay_id, total)
       : null;
 
@@ -58,7 +64,8 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
   const diffQr =
     b.status === "confirmed" &&
     b.addr_change_status === "approved" &&
-    (b.addr_change_diff ?? 0) > 0
+    (b.addr_change_diff ?? 0) > 0 &&
+    showPromptpay
       ? await promptPayQrDataUrl(b.boutique_promptpay_id, b.addr_change_diff!)
       : null;
 
@@ -141,7 +148,7 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
             </div>
           ) : null}
 
-          {b.boutique_bank_name || b.boutique_bank_account_number ? (
+          {showBank && (b.boutique_bank_name || b.boutique_bank_account_number) ? (
             <div style={card}>
               <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>ช่องทางโอนเงินให้ร้าน</div>
               {b.boutique_bank_name ? (

@@ -9,6 +9,10 @@ export type Color =
   | "blue"
   | "purple";
 
+// NOTE: these are the Prisma enum *member names* (not the raw DB labels). The
+// Postgres `size` enum stores "3XL"/"4XL"/"Free size", but Prisma maps those to
+// the identifiers XL3/XL4/FreeSize (@map in schema.prisma). Always use these
+// identifiers in code; use sizeLabel() for anything shown to a user.
 export type Size =
   | "XXXS"
   | "XXS"
@@ -18,11 +22,31 @@ export type Size =
   | "L"
   | "XL"
   | "XXL"
-  | "3XL"
-  | "4XL";
+  | "XL3"
+  | "XL4"
+  | "FreeSize";
 
 /** Canonical size order — single source for forms + filters. */
-export const SIZES: Size[] = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"];
+export const SIZES: Size[] = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "XL3", "XL4", "FreeSize"];
+
+/** Human-facing labels for sizes whose code identifier differs from the display text. */
+export const SIZE_LABELS: Record<Size, string> = {
+  XXXS: "XXXS",
+  XXS: "XXS",
+  XS: "XS",
+  S: "S",
+  M: "M",
+  L: "L",
+  XL: "XL",
+  XXL: "XXL",
+  XL3: "3XL",
+  XL4: "4XL",
+  FreeSize: "Free size",
+};
+
+/** Display label for a size value (falls back to the raw value for unknowns). */
+export const sizeLabel = (s: string | null | undefined): string =>
+  s == null ? "" : (SIZE_LABELS[s as Size] ?? s);
 
 export type OccasionKey =
   | "engagement"
@@ -160,6 +184,8 @@ export type Shop = {
   since_year: number | null;
   cover_color: Color;
   cover_image: string | null;
+  /** Shop logo (PUBLIC bucket URL); null = no logo uploaded. */
+  logo_url: string | null;
   tag: string | null;
   story: string | null;
   delivery_info: string | null;
@@ -271,6 +297,8 @@ export type Booking = {
   channel: string | null;
   status: BookingStatus;
   slip_path: string | null;
+  /** Channel the shop chose to collect through (snapshot at accept). */
+  payment_method: "promptpay" | "bank" | null;
   address_id: string | null;
   recipient_name: string | null; // snapshot at booking time
   phone: string | null;
@@ -309,6 +337,8 @@ export type BookingDetail = Booking & {
   boutique_bank_name: string | null;
   boutique_bank_account_number: string | null;
   boutique_bank_account_name: string | null;
+  /** Shop's preferred default channel (used to default the accept-flow picker). */
+  boutique_default_payment_method: "promptpay" | "bank" | null;
   boutique_instagram: string | null;
   boutique_facebook: string | null;
   boutique_twitter: string | null;

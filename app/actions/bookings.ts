@@ -21,6 +21,7 @@ import {
   validateBookingRange,
 } from "@/lib/booking-policy";
 import { normalizeTiers, priceForNights } from "@/lib/pricing";
+import { resolvePaymentChannel, type PaymentChannel } from "@/lib/payments";
 import {
   notifyBookingAccepted,
   notifyBookingConfirmed,
@@ -559,7 +560,16 @@ async function loadBooking(bookingId: string) {
       renterId: true,
       shopId: true,
       status: true,
-      shop: { select: { ownerId: true } },
+      shop: {
+        select: {
+          ownerId: true,
+          promptpayId: true,
+          bankName: true,
+          bankAccountNumber: true,
+          bankAccountName: true,
+          defaultPaymentMethod: true,
+        },
+      },
       renter: { select: { email: true } },
       product: { select: { name: true } },
     },
@@ -568,7 +578,11 @@ async function loadBooking(bookingId: string) {
 
 /* ------------------------------ seller ------------------------------- */
 
-export async function acceptBooking(bookingId: string, shippingFee: number): Promise<Result> {
+export async function acceptBooking(
+  bookingId: string,
+  shippingFee: number,
+  paymentMethod?: PaymentChannel | null,
+): Promise<Result> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
   const booking = await loadBooking(bookingId);
@@ -580,12 +594,18 @@ export async function acceptBooking(bookingId: string, shippingFee: number): Pro
   if (!findTransition(booking.status as BookingStatus, "waiting_for_payment", "seller"))
     return { ok: false, error: "สถานะไม่ถูกต้องสำหรับการรับจอง" };
 
+  // Snapshot which channel to collect through. With both channels configured we
+  // honour the seller's pick (or fall back to the shop default); with only one
+  // we force it; with none it stays null.
+  const channel = resolvePaymentChannel(booking.shop ?? {}, paymentMethod);
+
   // Atomic transition guard: only flips if still in the expected source status.
   const res = await withActor(user.id, () =>
     db.booking.updateMany({
       where: { id: bookingId, status: "booking_pending" },
       data: {
         shippingFee: Math.round(shippingFee),
+        paymentMethod: channel,
         status: "waiting_for_payment",
         currentDueAt: new Date(dueAt()),
       },

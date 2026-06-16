@@ -8,13 +8,14 @@ import { withActor } from "@/lib/db-context";
 import { isValidLineContact, normalizeLineUrl } from "@/lib/line";
 import { dressLimitFor } from "@/lib/tiers";
 // normalizeTiers/validateTiers removed — replaced by parsePriceTiersFromForm
-import type { AdsTier, Color, PriceTier } from "@/lib/types";
-// DB-valid size enum values only (Prisma schema has XS..XL; no new enum values allowed)
-type DbSize = "XS" | "S" | "M" | "L" | "XL";
+import { type AdsTier, type Color, type PriceTier, type Size, SIZES } from "@/lib/types";
+// DB-valid size enum values — single source is the canonical SIZES list in lib/types,
+// which is kept in sync with the Postgres `size` enum (see migration size_enum_expand).
+type DbSize = Size;
 import { resolveTagSelections } from "@/lib/tag-groups";
 
-/** Valid Size enum values in the DB (no enum additions — Postgres 55P04 guard). */
-const VALID_SIZES = new Set<string>(["XS", "S", "M", "L", "XL"]);
+/** Valid Size enum values in the DB — mirrors the canonical SIZES list. */
+const VALID_SIZES = new Set<string>(SIZES);
 
 type VariantInput = {
   size: DbSize;
@@ -226,7 +227,7 @@ export async function updateShop(shopId: string, formData: FormData): Promise<{ 
 
   const updates: Record<string, unknown> = {};
   // area_key handled separately (UUID FK resolution); exclude from generic camelCase loop
-  const scalarFields = ["name","area_label","instagram","facebook","twitter","tiktok","tag","story","delivery_info","owner_name","address","hours","cover_color","promptpay_id","bank_name","bank_account_number","bank_account_name","bankbook_image_path"] as const;
+  const scalarFields = ["name","area_label","instagram","facebook","twitter","tiktok","tag","story","delivery_info","owner_name","address","hours","cover_color","logo_url","promptpay_id","bank_name","bank_account_number","bank_account_name","bankbook_image_path"] as const;
   for (const f of scalarFields) {
     const v = formData.get(f);
     if (v !== null) {
@@ -326,6 +327,16 @@ export async function updateShop(shopId: string, formData: FormData): Promise<{ 
 
   // SOFT WARNING (non-blocking): no payment channel at all — save succeeds
   // The UI already shows the warning; the action just allows it through.
+
+  // Default payment channel: only meaningful when BOTH channels are configured.
+  // Otherwise force null so the picker never defaults to an unconfigured channel.
+  const finalPromptpay = String(formData.get("promptpay_id") ?? "").trim();
+  const dpmRaw = String(formData.get("default_payment_method") ?? "").trim();
+  if (finalPromptpay && bankAcctNum) {
+    updates.defaultPaymentMethod = dpmRaw === "promptpay" || dpmRaw === "bank" ? dpmRaw : null;
+  } else {
+    updates.defaultPaymentMethod = null;
+  }
 
   return withActor(user.id, async () => {
     await db.shop.update({ where: { id: shopId }, data: updates });

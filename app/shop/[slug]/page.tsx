@@ -11,6 +11,7 @@ import ShopSocialLinks from "@/components/ShopSocialLinks";
 import { getCurrentUser } from "@/lib/auth";
 import { getShopBySlug, listProductsByShop } from "@/lib/products";
 import { getShopReviews } from "@/lib/reviews";
+import { parseBusinessHours, formatBusinessHoursLines } from "@/lib/hours";
 
 export const dynamic = "force-dynamic";
 
@@ -141,7 +142,26 @@ export default async function BoutiquePage({ params }: { params: Params }) {
         }}
       >
         <InfoCell k="ย่าน" v={b.area_label} />
-        {b.hours ? <InfoCell k="เวลาทำการ" v={b.hours} /> : null}
+        {b.hours ? (
+          (() => {
+            const schedule = parseBusinessHours(b.hours);
+            if (schedule) {
+              return (
+                <InfoCell
+                  k="เวลาทำการ"
+                  v={
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      {formatBusinessHoursLines(schedule).map((line) => (
+                        <span key={line}>{line}</span>
+                      ))}
+                    </div>
+                  }
+                />
+              );
+            }
+            return <InfoCell k="เวลาทำการ" v={b.hours} />;
+          })()
+        ) : null}
         {b.since_year ? (
           <InfoCell k="เปิดบริการ" v={`ตั้งแต่ ${b.since_year}${b.owner_name ? ` · ดูแลโดย ${b.owner_name}` : ""}`} />
         ) : null}
@@ -220,7 +240,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
   );
 }
 
-function InfoCell({ k, v }: { k: string; v: string }) {
+function InfoCell({ k, v }: { k: string; v: React.ReactNode }) {
   return (
     <div>
       <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 4 }}>{k}</div>

@@ -190,46 +190,6 @@ export default async function HomePage({
         </div>
       </section>
 
-      {/* ======== PRODUCT TYPE SWITCHER ======== */}
-      <section style={{ background: "var(--bg)", padding: "14px 0 0" }}>
-        <div className="container">
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {KNOWN_TYPE_KEYS.map((typeKey) => {
-              const label = typeKey === "dress" ? "ชุด" : "สูท";
-              const isActive = activeTypeKey === typeKey;
-              // Build link preserving current params but overriding type
-              const preservedParams = Object.entries(searchParams ?? {})
-                .filter(([k, v]) => k !== "type" && v !== undefined)
-                .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v!)}`)
-                .join("&");
-              const typeParam = typeKey !== "dress" ? `type=${encodeURIComponent(typeKey)}` : "";
-              const qs = [preservedParams, typeParam].filter(Boolean).join("&");
-              const href = qs ? `/?${qs}` : "/";
-              return (
-                <Link
-                  key={typeKey}
-                  href={href}
-                  style={{
-                    display: "inline-block",
-                    padding: "7px 20px",
-                    fontSize: 14,
-                    fontWeight: isActive ? 600 : 400,
-                    borderRadius: 999,
-                    border: `1.5px solid ${isActive ? "var(--ink)" : "var(--line)"}`,
-                    background: isActive ? "var(--ink)" : "var(--surface)",
-                    color: isActive ? "var(--on-dark)" : "var(--ink-2)",
-                    textDecoration: "none",
-                    transition: "background 0.15s, color 0.15s",
-                  }}
-                >
-                  {label}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
       {/* ======== OCCASIONS ROW ======== */}
       {occasions.length > 0 && (
         <section className="hr-occasions">
@@ -244,6 +204,19 @@ export default async function HomePage({
               </Link>
             </div>
             <div className="hr-occ-row">
+              {/* "ทั้งหมด" — default-active when no occasion is selected. The
+                  #results hash makes it scroll to the product zone (it clears all
+                  query params, so ScrollToResults relies on the hash here). */}
+              <Link
+                href={activeTypeKey !== "dress" ? `/?type=${activeTypeKey}#results` : "/#results"}
+                className="hr-occ-chip media-zoom"
+                data-active={!activeOcc ? "true" : undefined}
+              >
+                <span className="hr-occ-tile">
+                  <OccasionTile color="green" />
+                </span>
+                <span className="hr-occ-label">{locale === "en" ? "All" : "ทั้งหมด"}</span>
+              </Link>
               {occasions.map((o) => {
                 const label = locale === "en" ? t(`occasion.${o.key}`, "en") : o.th;
                 const occasionHref = activeTypeKey !== "dress"
@@ -412,7 +385,9 @@ const HR_CSS = `
 .hr-occ-row{
   display:flex;gap:10px;
   overflow-x:auto;scrollbar-width:none;
-  padding-bottom:14px;
+  /* horizontal + top padding so the active chip outline (offset 2px) isn't
+     clipped by the scroll container's edges */
+  padding:5px 6px 14px;
 }
 .hr-occ-row::-webkit-scrollbar{display:none}
 

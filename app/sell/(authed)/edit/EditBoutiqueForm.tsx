@@ -6,18 +6,16 @@ import { updateShop } from "@/app/actions/seller";
 import type { Color } from "@/lib/types";
 import RequiredMark from "@/components/RequiredMark";
 import { prepareImageFileForUpload } from "@/lib/image";
+import {
+  type BusinessHours,
+  WEEKDAYS_MON_FIRST,
+  parseBusinessHours,
+  defaultBusinessHours,
+  serializeBusinessHours,
+  closedWeekdaysFromHours,
+} from "@/lib/hours";
 
 type ClosedDateRow = { date: string; note: string };
-
-const WEEKDAY_LABELS: Array<{ value: number; label: string }> = [
-  { value: 0, label: "อาทิตย์" },
-  { value: 1, label: "จันทร์" },
-  { value: 2, label: "อังคาร" },
-  { value: 3, label: "พุธ" },
-  { value: 4, label: "พฤหัสฯ" },
-  { value: 5, label: "ศุกร์" },
-  { value: 6, label: "เสาร์" },
-];
 
 const COLORS: Array<{ key: Color; label: string }> = [
   { key: "rose", label: "กุหลาบ" },
@@ -47,6 +45,7 @@ type Props = {
     bank_account_number?: string | null;
     bank_account_name?: string | null;
     bankbook_image_path?: string | null;
+    default_payment_method?: "promptpay" | "bank" | null;
     delivery_info?: string | null;
     since_year: number | null;
     tag: string | null;
@@ -55,6 +54,7 @@ type Props = {
     address: string | null;
     hours: string | null;
     cover_color: Color;
+    logo_url?: string | null;
     // Booking policy (optional — absent = use DB defaults)
     lead_time_days?: number;
     min_rental_days?: number;
@@ -72,8 +72,23 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  // Weekly business hours — structured schedule (toggle + open/close per day).
+  // Seeds from the stored JSON; legacy free-text falls back to a default schedule
+  // (with existing closed weekdays preserved) and the old text is shown as a note.
+  const parsedHours = parseBusinessHours(boutique.hours);
+  const legacyHoursText = !parsedHours && boutique.hours?.trim() ? boutique.hours.trim() : null;
+  const [hoursDays, setHoursDays] = useState<BusinessHours>(
+    parsedHours ?? defaultBusinessHours(boutique.closed_weekdays ?? []),
+  );
+
+  function setDayOpen(idx: number, open: boolean) {
+    setHoursDays((prev) => prev.map((d, i) => (i === idx ? { ...d, open } : d)));
+  }
+  function setDayTime(idx: number, field: "from" | "to", value: string) {
+    setHoursDays((prev) => prev.map((d, i) => (i === idx ? { ...d, [field]: value } : d)));
+  }
+
   // Booking policy state
-  const [closedWeekdays, setClosedWeekdays] = useState<number[]>(boutique.closed_weekdays ?? []);
   const [closedDates, setClosedDates] = useState<ClosedDateRow[]>(boutique.closed_dates ?? []);
   const [newDateInput, setNewDateInput] = useState("");
   const [newNoteInput, setNewNoteInput] = useState("");
@@ -84,12 +99,36 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
   const [bankbookUploading, setBankbookUploading] = useState(false);
   const [bankbookError, setBankbookError] = useState<string | null>(null);
   const [promptpayId, setPromptpayId] = useState(boutique.promptpay_id ?? "");
+  const [defaultPaymentMethod, setDefaultPaymentMethod] = useState<"promptpay" | "bank" | "">(
+    boutique.default_payment_method ?? "",
+  );
   const bankbookInputRef = useRef<HTMLInputElement>(null);
 
-  function toggleWeekday(day: number) {
-    setClosedWeekdays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort(),
-    );
+  // Shop logo (PUBLIC image — reuses the generic /api/upload endpoint).
+  const [logoUrl, setLogoUrl] = useState<string>(boutique.logo_url ?? "");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleLogoFile(file: File) {
+    setLogoError(null);
+    setLogoUploading(true);
+    try {
+      const prepared = await prepareImageFileForUpload(file);
+      const fd = new FormData();
+      fd.append("file", prepared);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error((j as { error?: string }).error ?? "อัปโหลดไม่สำเร็จ");
+      }
+      const j = (await res.json()) as { url: string };
+      setLogoUrl(j.url);
+    } catch (e) {
+      setLogoError((e as Error).message);
+    } finally {
+      setLogoUploading(false);
+    }
   }
 
   function addClosedDate() {
@@ -140,8 +179,10 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
       const matched = areas.find((a) => a.key === areaKey);
       if (matched) fd.set("area_label", `${matched.key} · ${matched.th}`);
 
-      // Serialize policy state as JSON (not DOM form fields)
-      fd.set("closed_weekdays", JSON.stringify(closedWeekdays));
+      // Business hours → JSON in `hours`; closed weekdays derive from the schedule
+      // (the "ปิด" toggle is the single source of truth, synced to booking logic).
+      fd.set("hours", serializeBusinessHours(hoursDays));
+      fd.set("closed_weekdays", JSON.stringify(closedWeekdaysFromHours(hoursDays)));
       fd.set("closed_dates", JSON.stringify(closedDates));
 
       // Ensure latest bankbook key is in FormData
@@ -211,15 +252,112 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
       <Labeled label="ที่อยู่ร้าน">
         <input type="text" name="address" defaultValue={boutique.address ?? ""} style={inputStyle} />
       </Labeled>
-      <Labeled label="เวลาทำการ">
-        <input
-          type="text"
-          name="hours"
-          defaultValue={boutique.hours ?? ""}
-          placeholder="เช่น จ-ศ 10:00-19:00, ส-อา 10:00-20:00"
-          style={inputStyle}
-        />
-      </Labeled>
+      <div>
+        <label style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
+          วันและเวลาทำการ
+        </label>
+        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 10, lineHeight: 1.5 }}>
+          เปิด/ปิดแต่ละวัน แล้วกำหนดเวลาเปิด–ปิด — วันที่ปิดจะไม่รับจองอัตโนมัติ
+        </div>
+
+        {legacyHoursText ? (
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--ink-3)",
+              background: "var(--surface)",
+              border: "1px solid var(--line)",
+              borderRadius: 6,
+              padding: "8px 10px",
+              marginBottom: 12,
+              lineHeight: 1.5,
+            }}
+          >
+            ข้อมูลเดิม: “{legacyHoursText}” — ตั้งเวลาใหม่ด้านล่างแล้วกดบันทึกเพื่ออัปเดต
+          </div>
+        ) : null}
+
+        {/* Hidden field carries the serialized schedule (set in onSubmit too). */}
+        <input type="hidden" name="hours" value={serializeBusinessHours(hoursDays)} readOnly />
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {WEEKDAYS_MON_FIRST.map(({ idx, th }) => {
+            const day = hoursDays[idx];
+            const open = day?.open ?? false;
+            return (
+              <div
+                key={idx}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  padding: "8px 12px",
+                  border: "1px solid var(--line)",
+                  borderRadius: 8,
+                  background: open ? "var(--surface)" : "var(--bg)",
+                }}
+              >
+                {/* Toggle switch */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={open}
+                  aria-label={`${th} ${open ? "เปิด" : "ปิด"}`}
+                  onClick={() => setDayOpen(idx, !open)}
+                  style={{
+                    position: "relative",
+                    width: 42,
+                    height: 24,
+                    borderRadius: 999,
+                    border: 0,
+                    cursor: "pointer",
+                    flexShrink: 0,
+                    background: open ? "var(--primary, #2e9c65)" : "var(--line)",
+                    transition: "background .15s",
+                  }}
+                >
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      left: open ? 20 : 2,
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      background: "#fff",
+                      transition: "left .15s",
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.25)",
+                    }}
+                  />
+                </button>
+
+                <span style={{ width: 72, fontSize: 14, fontWeight: 500, flexShrink: 0 }}>{th}</span>
+
+                {open ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="time"
+                      value={day.from}
+                      onChange={(e) => setDayTime(idx, "from", e.target.value)}
+                      style={{ ...inputStyle, width: 120, padding: "7px 10px" }}
+                    />
+                    <span style={{ color: "var(--ink-3)" }}>–</span>
+                    <input
+                      type="time"
+                      value={day.to}
+                      onChange={(e) => setDayTime(idx, "to", e.target.value)}
+                      style={{ ...inputStyle, width: 120, padding: "7px 10px" }}
+                    />
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 13, color: "var(--ink-3)" }}>ปิด</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
       <Labeled label="ปีที่เปิดบริการ">
         <input
           type="number"
@@ -252,13 +390,110 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
         </select>
       </Labeled>
 
+      {/* Shop logo — public image shown on the shop card / shop page.
+          Falls back to the gradient cover color when not uploaded. */}
+      <div>
+        <label style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
+          โลโก้ร้าน
+        </label>
+        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8, lineHeight: 1.5 }}>
+          แสดงบนการ์ดร้านในหน้ารวมร้าน — ถ้าไม่อัปโหลด จะใช้พื้นสีหลักของร้านแทน (รองรับ JPG / PNG / WebP ไม่เกิน 2MB)
+        </div>
+
+        {/* Hidden field carries the uploaded URL into the form submission. */}
+        <input type="hidden" name="logo_url" value={logoUrl} readOnly />
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt="โลโก้ร้าน"
+              style={{
+                width: 64,
+                height: 64,
+                objectFit: "contain",
+                borderRadius: 10,
+                border: "1px solid var(--line)",
+                background: "var(--surface)",
+                padding: 4,
+              }}
+            />
+          ) : null}
+
+          <label
+            style={{
+              display: "inline-block",
+              padding: "9px 14px",
+              border: "1px solid var(--line)",
+              borderRadius: 6,
+              fontSize: 13,
+              background: "var(--surface)",
+              cursor: logoUploading ? "wait" : "pointer",
+              color: "var(--ink)",
+            }}
+          >
+            {logoUploading ? "กำลังอัปโหลด…" : logoUrl ? "เปลี่ยนโลโก้" : "เลือกรูปโลโก้"}
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              style={{ display: "none" }}
+              disabled={logoUploading}
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (f) await handleLogoFile(f);
+              }}
+            />
+          </label>
+
+          {logoUrl ? (
+            <button
+              type="button"
+              onClick={() => {
+                setLogoUrl("");
+                if (logoInputRef.current) logoInputRef.current.value = "";
+              }}
+              style={{
+                border: 0,
+                background: "none",
+                color: "var(--ink-3)",
+                cursor: "pointer",
+                fontSize: 12,
+                textDecoration: "underline",
+              }}
+            >
+              ลบโลโก้
+            </button>
+          ) : null}
+        </div>
+
+        {logoError ? (
+          <div style={{ color: "var(--danger)", fontSize: 12, marginTop: 6 }}>{logoError}</div>
+        ) : null}
+      </div>
+
       {/* ═══════════════════════════════════════════════ */}
       {/* ช่องทางรับชำระเงิน                              */}
       {/* ═══════════════════════════════════════════════ */}
       <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>ช่องทางรับชำระเงิน</div>
-        <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 16, lineHeight: 1.5 }}>
-          ต้องมีอย่างน้อยหนึ่งช่องทาง (PromptPay หรือบัญชีธนาคาร) ก่อนลงขายสินค้าได้
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>ช่องทางรับชำระเงิน</div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 14px",
+            background: "var(--danger-soft, #FEF2F2)",
+            border: "1px solid var(--danger, #DC2626)",
+            borderRadius: 8,
+            marginBottom: 16,
+          }}
+        >
+          <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0 }} aria-hidden>⚠️</span>
+          <div style={{ fontSize: 13.5, color: "var(--danger, #DC2626)", fontWeight: 700, lineHeight: 1.5 }}>
+            ต้องมีอย่างน้อย 1 ช่องทาง (PromptPay หรือบัญชีธนาคาร) จึงจะลงขายสินค้าได้
+          </div>
         </div>
 
         {/* Soft warning when no channel */}
@@ -422,6 +657,61 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
             <div style={{ color: "var(--danger)", fontSize: 12, marginTop: 6 }}>{bankbookError}</div>
           ) : null}
         </div>
+
+        {/* Default channel — only relevant when BOTH channels are configured.
+            Carried in a hidden input so the server only stores it when both
+            channels exist (else it's left blank → null). */}
+        {promptpayId.trim() && bankAccountNumber.trim() ? (
+          <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px dashed var(--line)" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>ช่องทางรับเงินเริ่มต้น</div>
+            <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 10, lineHeight: 1.5 }}>
+              คุณกรอกทั้งสองช่องทาง เลือกว่าจะใช้อันไหนเป็นค่าเริ่มต้นตอนยอมรับการจอง
+              (ยังเปลี่ยนเป็นรายครั้งได้ตอนรับจอง)
+            </div>
+            <input type="hidden" name="default_payment_method" value={defaultPaymentMethod} />
+            <div style={{ display: "grid", gap: 8 }}>
+              {([
+                { v: "promptpay", label: "PromptPay", detail: promptpayId.trim() },
+                {
+                  v: "bank",
+                  label: "โอนเข้าบัญชีธนาคาร",
+                  detail: [boutique.bank_name, bankAccountNumber.trim()].filter((s) => s && String(s).trim()).join(" · "),
+                },
+              ] as const).map((o) => {
+                const active = defaultPaymentMethod === o.v;
+                return (
+                  <label
+                    key={o.v}
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "flex-start",
+                      padding: "10px 12px",
+                      border: `1.5px solid ${active ? "var(--primary, #2e9c65)" : "var(--line)"}`,
+                      borderRadius: 9,
+                      cursor: "pointer",
+                      background: active ? "var(--success-soft, rgba(46,156,101,0.07))" : "var(--bg)",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="default_payment_method_radio"
+                      checked={active}
+                      onChange={() => setDefaultPaymentMethod(o.v)}
+                      style={{ marginTop: 2, accentColor: "var(--primary, #2e9c65)" }}
+                    />
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ fontWeight: 600, fontSize: 13.5 }}>{o.label}</span>
+                      <span style={{ display: "block", fontSize: 12, color: "var(--ink-3)", marginTop: 2, wordBreak: "break-word" }}>
+                        {o.detail || "—"}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* ═══════════════════════════════════════════════ */}
@@ -482,37 +772,10 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
           </Labeled>
         </div>
 
-        {/* Closed weekdays */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>วันปิดทำการประจำสัปดาห์</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {WEEKDAY_LABELS.map(({ value, label }) => {
-              const active = closedWeekdays.includes(value);
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => toggleWeekday(value)}
-                  style={{
-                    padding: "6px 12px",
-                    fontSize: 13,
-                    border: `1px solid ${active ? "var(--danger)" : "var(--line)"}`,
-                    background: active ? "rgba(220,38,38,0.08)" : "var(--surface)",
-                    color: active ? "#DC2626" : "var(--ink)",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                  }}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-          {closedWeekdays.length > 0 ? (
-            <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 6 }}>
-              ปิด: {closedWeekdays.map((d) => WEEKDAY_LABELS.find((w) => w.value === d)?.label).join(", ")}
-            </div>
-          ) : null}
+        {/* วันปิดประจำสัปดาห์ย้ายไปคุมที่ "วันและเวลาทำการ" ด้านบนแล้ว
+            (toggle ปิดวันไหน = บล็อกการจองวันนั้นโดยอัตโนมัติ) */}
+        <div style={{ fontSize: 12.5, color: "var(--ink-3)", marginBottom: 16, lineHeight: 1.5 }}>
+          วันปิดประจำสัปดาห์กำหนดได้ที่หัวข้อ “วันและเวลาทำการ” ด้านบน — วันที่ปิดจะไม่รับจองอัตโนมัติ
         </div>
 
         {/* Closed specific dates */}

@@ -465,10 +465,14 @@ model Shop {
   bankAccountName     String?   @map("bank_account_name")
   /// คีย์รูปหน้าสมุดบัญชี (PRIVATE bucket) — แนบเมื่อกรอกเลขบัญชี, admin ตรวจผ่าน signedUrl
   bankbookImagePath   String?   @map("bankbook_image_path")
+  /// ช่องทางรับเงินเริ่มต้นของร้าน (ใช้เป็น default ตอนยอมรับการจอง เมื่อกรอกทั้ง PromptPay + บัญชี)
+  defaultPaymentMethod PaymentMethod? @map("default_payment_method")
   /// ปีที่เปิดร้าน
   sinceYear        Int?      @map("since_year")
   /// โทนสี cover การ์ดร้าน
   coverColor       Color     @default(rose) @map("cover_color")
+  /// URL รูป logo ร้าน (PUBLIC bucket — แสดงบนการ์ดร้าน; null = ใช้ gradient cover_color)
+  logoUrl          String?   @map("logo_url")
   /// ป้าย tag การตลาดสั้น ๆ
   tag              String?
   /// เรื่องราว/คำแนะนำร้าน
@@ -1059,6 +1063,8 @@ model Booking {
   status           BookingStatus  @default(booking_pending)
   /// path ไฟล์สลิปโอนเงิน (private bucket)
   slipPath         String?        @map("slip_path")
+  /// ช่องทางที่ร้านเลือกเก็บเงินสำหรับการจองนี้ (snapshot ณ ตอนยอมรับการจอง)
+  paymentMethod    PaymentMethod? @map("payment_method")
   /// FK → addresses.id ที่อยู่ที่เลือกตอนจอง (SetNull — ใช้ snapshot ด้านล่างแสดงผล)
   addressId        String?        @map("address_id") @db.Uuid
   /// snapshot ชื่อผู้รับ
@@ -1376,11 +1382,17 @@ enum Color {
 
 /// ไซซ์สินค้า
 enum Size {
+  XXXS
+  XXS
   XS
   S
   M
   L
   XL
+  XXL
+  XL3      @map("3XL")
+  XL4      @map("4XL")
+  FreeSize @map("Free size")
 
   @@map("size")
 }
@@ -1469,4 +1481,12 @@ enum BillingCycle {
   yearly
 
   @@map("billing_cycle")
+}
+
+/// ช่องทางการรับชำระเงิน (PromptPay หรือ โอนเข้าบัญชีธนาคาร)
+enum PaymentMethod {
+  promptpay
+  bank
+
+  @@map("payment_method")
 }

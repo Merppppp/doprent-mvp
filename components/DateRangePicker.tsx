@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { priceForNights } from "@/lib/pricing";
-import type { PriceTier } from "@/lib/types";
+import { type PriceTier, sizeLabel } from "@/lib/types";
 /** A size variant available for booking on the product. */
 export type VariantOption = {
   id: string;
@@ -269,7 +269,7 @@ export default function DateRangePicker({
                     textDecoration: isDisabled && !v.available ? "line-through" : "none",
                   }}
                 >
-                  {v.size}
+                  {sizeLabel(v.size)}
                   {isFullForRange ? " (เต็ม)" : ""}
                 </button>
               );

@@ -150,6 +150,7 @@ function mapShop(b: PrismaShop, coverImage?: string | null): Shop {
     since_year: b.sinceYear,
     cover_color: b.coverColor as Color,
     cover_image: coverImage ?? null,
+    logo_url: b.logoUrl ?? null,
     tag: b.tag,
     story: b.story,
     delivery_info: b.deliveryInfo,
@@ -554,6 +555,94 @@ export async function listShops(opts: { limit?: number; featuredFirst?: boolean;
     take: opts.limit,
   });
   return rows.map((r, index) => mapShopWithCards(r, index));
+}
+
+/** Default page size for the public /shops "load more" feed. */
+export const SHOPS_PAGE_SIZE = 24;
+
+/** Minimal shop row for the /shops finder grid (no product join — the finder
+ *  doesn't render previews, so we keep this query light enough for thousands of
+ *  shops with offset pagination + a free-text DB filter). */
+export type ShopListItem = {
+  id: string;
+  slug: string;
+  name: string;
+  areaKey: string | null;
+  areaLabel: string;
+  coverColor: Color;
+  /** Shop logo URL, else null (card falls back to the gradient cover). */
+  coverImage: string | null;
+  featured: boolean;
+  verified: boolean;
+  tag: string | null;
+  sinceYear: number | null;
+  instagram: string | null;
+};
+
+/**
+ * Paginated, DB-filtered list of live shops for the public finder.
+ * Search (`q`) matches name / area / IG / tag case-insensitively at the DB.
+ * Returns the rows for this page plus the total matching count (for "hasMore").
+ */
+export async function listShopsPage(opts: {
+  q?: string;
+  skip?: number;
+  take?: number;
+} = {}): Promise<{ rows: ShopListItem[]; total: number }> {
+  const q = (opts.q ?? "").trim();
+  const where: Prisma.ShopWhereInput = {
+    status: "live",
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { areaLabel: { contains: q, mode: "insensitive" } },
+            { instagram: { contains: q, mode: "insensitive" } },
+            { tag: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+  const [rows, total] = await Promise.all([
+    db.shop.findMany({
+      where,
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        areaLabel: true,
+        coverColor: true,
+        featured: true,
+        verified: true,
+        tag: true,
+        sinceYear: true,
+        instagram: true,
+        logoUrl: true,
+        area: { select: { key: true } },
+      },
+      orderBy: [{ featured: "desc" }, { name: "asc" }],
+      skip: opts.skip ?? 0,
+      take: opts.take ?? SHOPS_PAGE_SIZE,
+    }),
+    db.shop.count({ where }),
+  ]);
+  return {
+    rows: rows.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      name: r.name,
+      areaKey: r.area?.key ?? null,
+      areaLabel: r.areaLabel,
+      coverColor: r.coverColor as Color,
+      coverImage: r.logoUrl ?? null,
+      featured: r.featured,
+      verified: r.verified,
+      tag: r.tag,
+      sinceYear: r.sinceYear,
+      instagram: r.instagram,
+    })),
+    total,
+  };
 }
 
 export async function getShopBySlug(slug: string): Promise<Shop | null> {

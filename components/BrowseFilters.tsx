@@ -6,6 +6,7 @@ import PriceRange from "./PriceRange";
 import type { SelectOption } from "./SearchSelect";
 import { t, type Locale } from "@/lib/i18n";
 import type { BoundTagGroup } from "@/lib/tag-groups";
+import { SIZES, sizeLabel } from "@/lib/types";
 
 export type BrowseFiltersProps = {
   q: string;
@@ -478,7 +479,7 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     });
   }
   if (props.size) {
-    selectedBadges.push({ key: "size", label: props.size, onRemove: () => setParam("size", null) });
+    selectedBadges.push({ key: "size", label: sizeLabel(props.size), onRemove: () => setParam("size", null) });
   }
   if (props.designer) {
     selectedBadges.push({
@@ -610,10 +611,10 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
         />
         {sections.size && (
           <div className="grid grid-cols-2 gap-1.5 mt-2">
-            {["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "Free size"].map((sz) => (
+            {SIZES.map((sz) => (
               <Chip
                 key={sz}
-                label={sz}
+                label={sizeLabel(sz)}
                 active={props.size === sz}
                 onClick={() => setParam("size", props.size === sz ? null : sz)}
               />
