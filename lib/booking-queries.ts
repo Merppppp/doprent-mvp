@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import type { Address, BookingDetail } from "@/lib/types";
+import type { Address, BookingDetail, BookingStatus } from "@/lib/types";
 
 /** Prisma include that hydrates the product + shop fields a BookingDetail needs. */
 const BOOKING_INCLUDE = {
@@ -175,6 +175,95 @@ export async function getSellerBookings(shopId?: string): Promise<BookingDetail[
     orderBy: { createdAt: "desc" },
   });
   return rows.map(toBookingDetail);
+}
+
+/** Lightweight card row for the seller bookings list (tabbed + paginated). */
+export type SellerBookingCard = {
+  id: string;
+  dress_name: string | null;
+  dress_image: string | null;
+  recipient_name: string | null;
+  renter_id: string;
+  start_date: string;
+  end_date: string;
+  amount_due: number;
+  status: BookingStatus;
+  created_at: string;
+};
+
+/**
+ * Paginated + filtered seller bookings for the tabbed list UI.
+ * - `statuses`: restrict to these statuses (a tab group); null/empty = all.
+ * - `sinceDays`: only bookings created within the last N days; null = no limit.
+ * Sorted newest → oldest. Returns the page rows plus the total matching count.
+ */
+export async function getSellerBookingsPage(
+  shopId: string,
+  opts: {
+    statuses?: BookingStatus[] | null;
+    sinceDays?: number | null;
+    skip?: number;
+    take?: number;
+  } = {},
+): Promise<{ rows: SellerBookingCard[]; total: number }> {
+  const take = opts.take ?? 20;
+  const skip = opts.skip ?? 0;
+
+  const where: {
+    shopId: string;
+    status?: { in: BookingStatus[] };
+    createdAt?: { gte: Date };
+  } = { shopId };
+  if (opts.statuses && opts.statuses.length > 0) {
+    where.status = { in: opts.statuses };
+  }
+  if (opts.sinceDays && opts.sinceDays > 0) {
+    where.createdAt = { gte: new Date(Date.now() - opts.sinceDays * 86400 * 1000) };
+  }
+
+  const [total, rows] = await Promise.all([
+    db.booking.count({ where }),
+    db.booking.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take,
+      select: {
+        id: true,
+        renterId: true,
+        startDate: true,
+        endDate: true,
+        rentalTotal: true,
+        deposit: true,
+        shippingFee: true,
+        status: true,
+        recipientName: true,
+        createdAt: true,
+        product: {
+          select: {
+            name: true,
+            images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+          },
+        },
+      },
+    }),
+  ]);
+
+  return {
+    total,
+    rows: rows.map((b) => ({
+      id: b.id,
+      dress_name: b.product?.name ?? null,
+      dress_image: b.product?.images[0]?.url ?? null,
+      recipient_name: b.recipientName,
+      renter_id: b.renterId,
+      start_date: ymd(b.startDate),
+      end_date: ymd(b.endDate),
+      amount_due: b.rentalTotal + b.deposit + (b.shippingFee ?? 0),
+      status: b.status as BookingStatus,
+      created_at: b.createdAt.toISOString(),
+    })),
+  };
 }
 
 /**
