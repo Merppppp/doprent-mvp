@@ -18,6 +18,28 @@ async function getOwnerContext(): Promise<{ userId: string; shopId: string } | n
   return { userId, shopId: shop.id };
 }
 
+/** Return the shop's staff login code + URL for QR display. */
+export async function getStaffLoginInfo(): Promise<
+  { ok: true; code: string; url: string; shopName: string } | { ok: false; error: string }
+> {
+  const ctx = await getOwnerContext();
+  if (!ctx) return { ok: false, error: "ไม่มีสิทธิ์" };
+
+  const shop = await db.shop.findUnique({
+    where: { id: ctx.shopId },
+    select: { staffLoginCode: true, name: true },
+  });
+  if (!shop?.staffLoginCode) return { ok: false, error: "ร้านยังไม่มีรหัสพนักงาน" };
+
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  return {
+    ok: true,
+    code: shop.staffLoginCode,
+    url: `${base}/staff/${shop.staffLoginCode}`,
+    shopName: shop.name,
+  };
+}
+
 /** List all staff for the owner's shop. */
 export async function listShopStaff(): Promise<Result<{
   id: string;
@@ -66,9 +88,9 @@ export async function createStaff(formData: FormData): Promise<Result<{ id: stri
   if (!displayName) return { ok: false, error: "กรุณาใส่ชื่อที่แสดง" };
   if (!/^\d{6,8}$/.test(pin)) return { ok: false, error: "PIN ต้องเป็นตัวเลข 6-8 หลัก" };
 
-  // Check username uniqueness
-  const existing = await db.shopStaff.findUnique({ where: { username }, select: { id: true } });
-  if (existing) return { ok: false, error: `ชื่อผู้ใช้ "${username}" ถูกใช้แล้ว กรุณาเลือกชื่ออื่น` };
+  // Check username uniqueness within this shop (scoped — not global anymore)
+  const existing = await db.shopStaff.findUnique({ where: { shopId_username: { shopId: ctx.shopId, username } }, select: { id: true } });
+  if (existing) return { ok: false, error: `ชื่อผู้ใช้ "${username}" ถูกใช้แล้วในร้านนี้ กรุณาเลือกชื่ออื่น` };
 
   const pinHash = await bcrypt.hash(pin, 12);
 

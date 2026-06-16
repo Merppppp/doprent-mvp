@@ -13,6 +13,7 @@ import { type AdsTier, type Color, type PriceTier, type Size, SIZES } from "@/li
 // which is kept in sync with the Postgres `size` enum (see migration size_enum_expand).
 type DbSize = Size;
 import { resolveTagSelections } from "@/lib/tag-groups";
+import { allocateStaffLoginCode } from "@/lib/staff-login-code";
 
 /** Valid Size enum values in the DB — mirrors the canonical SIZES list. */
 const VALID_SIZES = new Set<string>(SIZES);
@@ -196,6 +197,8 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
     slug = `${slugify(name)}-${i + 2}`;
   }
 
+  const staffLoginCode = await allocateStaffLoginCode();
+
   return withActor(user.id, async () => {
     const created = await db.shop.create({
       data: {
@@ -204,6 +207,7 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
         lineUrl, instagram, facebook, twitter, tiktok, tag, story, sinceYear, coverColor, deliveryInfo,
         promptpayId, bankName, bankAccountNumber, bankAccountName, bankbookImagePath,
         status: "pending", kycStatus: "none",
+        staffLoginCode,
       },
       select: { slug: true },
     });

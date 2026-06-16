@@ -19,6 +19,39 @@ async function main() {
   // ---------------------------------------------------------------------------
   // Mock shops (dev only) — เดิม boutiques; area_key เดิม → area_id FK lookup
   // ---------------------------------------------------------------------------
+  const SEED_STAFF_LOGIN_CODES: Record<string, string> = {
+    "siam-couture":          "SC000001",
+    "thonglor-atelier":      "TA000002",
+    "ekkamai-edit":          "EE000003",
+    "phrom-phong-bridal":    "PPB00004",
+    "ari-vintage-closet":    "AVC00005",
+    "asok-style-co":         "ASC00006",
+    "sathorn-atelier":       "SA000007",
+    "silom-eveningwear":     "SEW00008",
+    "ploenchit-premier":     "PP000009",
+    "watthana-bridal":       "WB000010",
+    "the-dress-library":     "DRS00011",
+    "chitlom-boutique":      "CB000012",
+    "sukhumvit-11":          "SK000013",
+    "sala-daeng-couture":    "SDC00014",
+    "bangrak-bridal":        "BB000015",
+    "pra-sai-couture":       "PSC00016",
+    "sai-mai":               "SM000017",
+    "bangkok-bridal-studio": "BBS00018",
+    "closet-collective":     "CC000019",
+    "riverside-atelier":     "RA000020",
+    "lumpini-lookbook":      "MN000021",
+    "phra-khanong-edit":     "PKE00022",
+    "onnut-atelier":         "NN000023",
+    "yaowarat-heritage":     "YW000024",
+    "wireless-couture":      "WC000025",
+    "soi-49-studio":         "S4900026",
+    "surawong-suite":        "SW000027",
+    "sathorn-soiree":        "SS000028",
+    "sukhumvit-couture":     "SKC00029",
+    "closet-at-park":        "CP000030",
+  };
+
   const shopsData = [
     { slug: "siam-couture",        name: "Siam Couture",             ownerName: "คุณนิด",         areaKey: "Siam",        areaLabel: "Siam · ปทุมวัน",         address: "ชั้น 3, Siam Paragon · BTS สยาม",                  hours: "จันทร์-เสาร์ 11:00-19:00", lineUrl: "https://line.me/R/ti/p/@siamcouture",       instagram: "@siamcouture.bkk",    sinceYear: 2018, coverColor: "rose",   tag: "ชุดราตรีและงานหมั้นโทนหวานคลาสสิก ผ้าซิลค์ ลูกไม้ ออร์แกนซ่า — คัดจากดีไซเนอร์ไทย",     story: "Siam Couture เริ่มจากร้านชุดเจ้าสาวเล็กๆ ในสยามตั้งแต่ปี 2018",           featured: true,  district: "ปทุมวัน",     subdistrict: "ปทุมวัน",     province: "กรุงเทพมหานคร", postalCode: "10330" },
     { slug: "thonglor-atelier",    name: "Thonglor Atelier",         ownerName: "คุณแอน",         areaKey: "Thonglor",    areaLabel: "Thonglor · วัฒนา",        address: "Eight Thonglor (ชั้น 2), ซอย 13 · BTS ทองหล่อ",     hours: "ทุกวัน 12:00-20:00",       lineUrl: "https://line.me/R/ti/p/@thonglor",          instagram: "@thonglor.atelier",   sinceYear: 2020, coverColor: "navy",   tag: "ดีไซน์โมเดิร์น ทรงคม สีสะดุดตา — งานเลี้ยงค่ำ ปาร์ตี้ ค็อกเทล หรือชุดทำงาน statement",  story: "Thonglor Atelier ก่อตั้งปี 2020 คัดดีไซเนอร์ที่มี vision ชัด",            featured: true,  district: "วัฒนา",       subdistrict: "คลองตันเหนือ", province: "กรุงเทพมหานคร", postalCode: "10110" },
@@ -70,6 +103,7 @@ async function main() {
         sinceYear: s.sinceYear, coverColor: s.coverColor,
         tag: s.tag, story: s.story, featured: s.featured,
         status: "live", kycStatus: "none",
+        staffLoginCode: SEED_STAFF_LOGIN_CODES[s.slug],
       },
     });
   }

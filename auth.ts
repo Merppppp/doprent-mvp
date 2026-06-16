@@ -80,15 +80,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       id: "staff",
       credentials: {
+        loginCode: { label: "Shop", type: "text" },
         username: { label: "Username", type: "text" },
         pin: { label: "PIN", type: "password" },
       },
       async authorize(credentials) {
+        const loginCode = (credentials?.loginCode as string | undefined)?.toUpperCase().trim();
         const username = (credentials?.username as string | undefined)?.toLowerCase().trim();
         const pin = credentials?.pin as string | undefined;
-        if (!username || !pin) throw new StaffAuthError();
+        if (!loginCode || !username || !pin) throw new StaffAuthError();
 
-        const staff = await db.shopStaff.findUnique({ where: { username } });
+        // Resolve shop from opaque login code
+        const shop = await db.shop.findUnique({ where: { staffLoginCode: loginCode } });
+        if (!shop) throw new StaffAuthError();
+
+        const staff = await db.shopStaff.findUnique({ where: { shopId_username: { shopId: shop.id, username } } });
         // Generic error — don't leak which field is wrong
         if (!staff || !staff.isActive) throw new StaffAuthError();
 
