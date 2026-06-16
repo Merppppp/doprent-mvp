@@ -9,6 +9,7 @@ import { getTrustScore } from "@/lib/trust-score";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import TrustBadge from "@/components/TrustBadge";
 import SellerBookingActions from "@/components/SellerBookingActions";
+import SellerAddressChange from "@/components/SellerAddressChange";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,11 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
 
   // Slip is private — sign a short-lived URL for the seller (authorized above).
   const slipUrl = b.slip_path ? await getSignedPrivateUrl(b.slip_path) : null;
+
+  // Sign the addr-change top-up slip URL (only for active sub-flow states)
+  const addrSlipUrl = b.addr_change_slip_path
+    ? await getSignedPrivateUrl(b.addr_change_slip_path)
+    : null;
 
   // Trust score for this renter (single query — only one renter on a detail page).
   const renterTrust = await getTrustScore(b.renter_id);
@@ -92,6 +98,26 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
         <div style={{ ...card, fontSize: 14, color: "var(--ink-2)" }}>
           <b>เหตุผล:</b> {b.cancel_reason}
         </div>
+      ) : null}
+
+      {["requested", "approved", "paid_review"].includes(b.addr_change_status ?? "") ? (
+        <SellerAddressChange
+          bookingId={b.id}
+          status={b.addr_change_status}
+          pending={
+            b.pending_recipient_name || b.pending_phone || b.pending_address_text
+              ? {
+                  recipientName: b.pending_recipient_name,
+                  phone: b.pending_phone,
+                  addressText: b.pending_address_text,
+                }
+              : null
+          }
+          currentShippingFee={b.shipping_fee}
+          diff={b.addr_change_diff}
+          slipUrl={addrSlipUrl}
+          reason={b.addr_change_reason}
+        />
       ) : null}
 
       <SellerBookingActions bookingId={b.id} status={b.status} />

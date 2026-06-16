@@ -11,6 +11,7 @@ import RenterBookingActions from "@/components/RenterBookingActions";
 import ReviewForm from "@/components/ReviewForm";
 import EditAddressForm from "@/components/EditAddressForm";
 import ShopSocialLinks from "@/components/ShopSocialLinks";
+import RenterAddressChange from "@/components/RenterAddressChange";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,14 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
       ? await promptPayQrDataUrl(b.boutique_promptpay_id, total)
       : null;
 
+  // QR for addr-change diff top-up (only when approved + diff > 0 + shop has PromptPay)
+  const diffQr =
+    b.status === "confirmed" &&
+    b.addr_change_status === "approved" &&
+    (b.addr_change_diff ?? 0) > 0
+      ? await promptPayQrDataUrl(b.boutique_promptpay_id, b.addr_change_diff!)
+      : null;
+
   return (
     <div className="container" style={{ paddingTop: 36, paddingBottom: 80, maxWidth: 560 }}>
       <Link href="/account/bookings" style={{ fontSize: 14, color: "var(--ink-3)" }}>
@@ -79,6 +88,24 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
             recipientName={b.recipient_name}
             phone={b.phone}
             addressText={b.address_text}
+          />
+        ) : null}
+        {b.status === "confirmed" ? (
+          <RenterAddressChange
+            bookingId={b.id}
+            status={b.addr_change_status}
+            pending={
+              b.pending_recipient_name || b.pending_phone || b.pending_address_text
+                ? {
+                    recipientName: b.pending_recipient_name,
+                    phone: b.pending_phone,
+                    addressText: b.pending_address_text,
+                  }
+                : null
+            }
+            diff={b.addr_change_diff}
+            diffQrDataUrl={diffQr}
+            reason={b.addr_change_reason}
           />
         ) : null}
       </div>
