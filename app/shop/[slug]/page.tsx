@@ -11,6 +11,7 @@ import ShopSocialLinks from "@/components/ShopSocialLinks";
 import { getCurrentUser } from "@/lib/auth";
 import { getShopBySlug, listProductsByShop } from "@/lib/products";
 import { getShopReviews } from "@/lib/reviews";
+import { parseBusinessHours, formatBusinessHoursLines } from "@/lib/hours";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,19 @@ export default async function BoutiquePage({ params }: { params: Params }) {
               loginNext={`/shop/${b.slug}`}
             />
           ) : null}
+          {/* Social follow channels grouped with the LINE CTA so all contact
+              links live together at the top (not scattered down the page). */}
+          {(b.instagram || b.facebook || b.twitter || b.tiktok) ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: "var(--ink-3)" }}>ช่องทางติดตามร้าน</div>
+              <ShopSocialLinks
+                instagram={b.instagram}
+                facebook={b.facebook}
+                twitter={b.twitter}
+                tiktok={b.tiktok}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -141,24 +155,30 @@ export default async function BoutiquePage({ params }: { params: Params }) {
         }}
       >
         <InfoCell k="ย่าน" v={b.area_label} />
-        {b.hours ? <InfoCell k="เวลาทำการ" v={b.hours} /> : null}
+        {b.hours ? (
+          (() => {
+            const schedule = parseBusinessHours(b.hours);
+            if (schedule) {
+              return (
+                <InfoCell
+                  k="เวลาทำการ"
+                  v={
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      {formatBusinessHoursLines(schedule).map((line) => (
+                        <span key={line}>{line}</span>
+                      ))}
+                    </div>
+                  }
+                />
+              );
+            }
+            return <InfoCell k="เวลาทำการ" v={b.hours} />;
+          })()
+        ) : null}
         {b.since_year ? (
           <InfoCell k="เปิดบริการ" v={`ตั้งแต่ ${b.since_year}${b.owner_name ? ` · ดูแลโดย ${b.owner_name}` : ""}`} />
         ) : null}
       </div>
-
-      {/* Social channels — follow the boutique on its own platforms */}
-      {(b.instagram || b.facebook || b.twitter || b.tiktok) ? (
-        <div style={{ margin: "-12px 0 28px" }}>
-          <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8 }}>ช่องทางติดตามร้าน</div>
-          <ShopSocialLinks
-            instagram={b.instagram}
-            facebook={b.facebook}
-            twitter={b.twitter}
-            tiktok={b.tiktok}
-          />
-        </div>
-      ) : null}
 
       {/* Story */}
       {b.story ? (
@@ -220,7 +240,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
   );
 }
 
-function InfoCell({ k, v }: { k: string; v: string }) {
+function InfoCell({ k, v }: { k: string; v: React.ReactNode }) {
   return (
     <div>
       <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 4 }}>{k}</div>

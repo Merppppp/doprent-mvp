@@ -19,7 +19,7 @@ import {
   listSimilarProducts,
 } from "@/lib/products";
 import { hasMultipleRates, startingPerDay } from "@/lib/pricing";
-import { COLOR_LABELS_TH } from "@/lib/types";
+import { COLOR_LABELS_TH, sizeLabel } from "@/lib/types";
 import { db } from "@/lib/db";
 import {
   resolveEffectivePolicy,
@@ -469,7 +469,7 @@ export default async function DressPage({ params }: { params: Params }) {
               columnGap: 24,
             }}
           >
-            <Spec lbl="ขนาด" val={dress.size} />
+            <Spec lbl="ขนาด" val={sizeLabel(dress.size)} />
             <Spec lbl="สี" val={dress.color ? COLOR_LABELS_TH[dress.color] : "—"} />
             <Spec lbl="ร้านเช่า" val={dress.shop_name} />
             <Spec lbl="แบรนด์" val={dress.designer ?? "—"} />
@@ -487,7 +487,7 @@ export default async function DressPage({ params }: { params: Params }) {
                 return (
                   <div key={v.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 8 }}>
                     <div style={{ padding: "8px 10px", borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)", fontWeight: 600, textAlign: "center" }}>
-                      {v.size}
+                      {sizeLabel(v.size)}
                     </div>
                     <div style={{ padding: "8px 10px", borderRadius: 6, background: "var(--surface)", border: "1px solid var(--line)" }}>
                       เริ่มต้น ฿{startingPrice.toLocaleString()}/วัน
@@ -541,7 +541,7 @@ export default async function DressPage({ params }: { params: Params }) {
                     .filter((v) => v.available)
                     .map((v) => (
                       <tr key={v.id}>
-                        <td style={{ padding: "6px 10px", fontWeight: 600 }}>{v.size}</td>
+                        <td style={{ padding: "6px 10px", fontWeight: 600 }}>{sizeLabel(v.size)}</td>
                         <td style={{ padding: "6px 10px", color: "var(--ink-2)" }}>{v.bustCm ?? "—"}</td>
                         <td style={{ padding: "6px 10px", color: "var(--ink-2)" }}>{v.waistCm ?? "—"}</td>
                         <td style={{ padding: "6px 10px", color: "var(--ink-2)" }}>{v.lengthCm ?? "—"}</td>

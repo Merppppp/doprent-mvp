@@ -5,7 +5,7 @@ import VerifiedBadge from "./VerifiedBadge";
 import DistanceBadge from "./DistanceBadge";
 import StarRating from "./StarRating";
 import { hasMultipleRates, startingPerDay } from "@/lib/pricing";
-import type { Product } from "@/lib/types";
+import { type Product, sizeLabel } from "@/lib/types";
 
 type Props = {
   product: Product;
@@ -63,7 +63,7 @@ export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn
             }}
           >
             <span>
-              Size {product.size} ·{" "}
+              Size {sizeLabel(product.size)} ·{" "}
               <span style={{ color: "var(--ink-2)" }}>{product.shop_name}</span>
               {product.shop_verified ? (
                 <span style={{ marginLeft: 4, display: "inline-flex", verticalAlign: "middle" }}>

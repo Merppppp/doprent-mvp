@@ -25,6 +25,9 @@ type Shop = {
   featured: boolean;
   created_at: string;
   owner_id: string | null;
+  bankbook_image_path?: string | null;
+  bank_account_number?: string | null;
+  bank_account_name?: string | null;
 };
 
 export default function ShopRow({ b }: { b: Shop }) {
@@ -43,156 +46,221 @@ export default function ShopRow({ b }: { b: Shop }) {
     router.refresh();
   }
 
+  const thaiDate = new Date(b.created_at).toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
   return (
-    <div
-      style={{
-        padding: 14,
-        border: "1px solid var(--line)",
-        borderRadius: 8,
-        background: "var(--surface)",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          gap: 12,
-          marginBottom: 10,
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <Link href={`/boutique/${b.slug}`} target="_blank" style={{ fontWeight: 600, fontSize: 16 }}>
+    <>
+      <tr style={{ borderBottom: "1px solid var(--line)" }}>
+        {/* ร้าน */}
+        <td style={tdStyle}>
+          <Link
+            href={`/boutique/${b.slug}`}
+            target="_blank"
+            style={{ fontWeight: 600, fontSize: 14 }}
+          >
             {b.name}
           </Link>
-          <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>
+          <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>
             {b.area_label}
-            {b.owner_name ? ` · ดูแลโดย ${b.owner_name}` : ""}
+            {b.owner_name ? ` · ${b.owner_name}` : ""}
             {b.since_year ? ` · ตั้งแต่ ${b.since_year}` : ""}
             {b.instagram ? ` · ${b.instagram}` : ""}
           </div>
-        </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <StatusBadge
-            text={b.status}
-            tone={b.status === "live" ? "success" : b.status === "rejected" ? "danger" : "warn"}
-          />
-          <StatusBadge
-            text={`KYC: ${b.kyc_status}`}
-            tone={
-              b.kyc_status === "verified" ? "success" :
-              b.kyc_status === "rejected" ? "danger" :
-              b.kyc_status === "submitted" ? "info" :
-              "neutral"
-            }
-          />
-          {b.verified ? <StatusBadge text="✓ Verified" tone="info" /> : null}
-          {b.featured ? <StatusBadge text="★ Featured" tone="warn" /> : null}
-        </div>
-      </div>
+        </td>
 
-      {error ? (
-        <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 10 }}>{error}</div>
-      ) : null}
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {b.status === "pending" ? (
-          <>
-            <button
-              type="button"
-              className="btn btn-dark"
-              style={btnSm}
-              disabled={working}
-              onClick={() => act(() => setShopStatus(b.id, "live"))}
+        {/* สถานะ */}
+        <td style={tdStyle}>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            <StatusBadge
+              text={b.status}
+              tone={
+                b.status === "live"
+                  ? "success"
+                  : b.status === "rejected"
+                  ? "danger"
+                  : "warn"
+              }
+            />
+            <StatusBadge
+              text={`KYC: ${b.kyc_status}`}
+              tone={
+                b.kyc_status === "verified"
+                  ? "success"
+                  : b.kyc_status === "rejected"
+                  ? "danger"
+                  : b.kyc_status === "submitted"
+                  ? "info"
+                  : "neutral"
+              }
+            />
+            {b.verified ? (
+              <StatusBadge text="✓ Verified" tone="info" />
+            ) : null}
+            {b.featured ? (
+              <StatusBadge text="★ Featured" tone="warn" />
+            ) : null}
+          </div>
+          {error ? (
+            <div
+              style={{ color: "var(--danger)", fontSize: 11, marginTop: 4 }}
             >
-              ✓ Approve
-            </button>
+              {error}
+            </div>
+          ) : null}
+        </td>
+
+        {/* สร้างเมื่อ */}
+        <td
+          style={{
+            ...tdStyle,
+            whiteSpace: "nowrap",
+            color: "var(--ink-3)",
+            fontSize: 12,
+          }}
+        >
+          {thaiDate}
+        </td>
+
+        {/* จัดการ */}
+        <td style={{ ...tdStyle, textAlign: "right" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              justifyContent: "flex-end",
+              flexWrap: "wrap",
+            }}
+          >
+            {b.status === "pending" ? (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-dark"
+                  style={btnSm}
+                  disabled={working}
+                  onClick={() => act(() => setShopStatus(b.id, "live"))}
+                >
+                  ✓ Approve
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{
+                    ...btnSm,
+                    color: "var(--danger)",
+                    borderColor: "var(--danger)",
+                  }}
+                  onClick={() => setShowReject((s) => !s)}
+                >
+                  Reject
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ ...btnSm, color: "var(--warn)" }}
+                disabled={working}
+                onClick={() => act(() => setShopStatus(b.id, "pending"))}
+              >
+                กลับเป็น pending
+              </button>
+            )}
+
             <button
               type="button"
               className="btn btn-outline"
-              style={{ ...btnSm, color: "var(--danger)", borderColor: "var(--danger)" }}
-              onClick={() => setShowReject((s) => !s)}
+              style={btnSm}
+              disabled={working}
+              onClick={() => act(() => toggleShopVerified(b.id, !b.verified))}
             >
-              Reject
+              {b.verified ? "✕ ถอด Verified" : "✓ ติด Verified"}
             </button>
-          </>
-        ) : b.status === "live" ? (
-          <button
-            type="button"
-            className="btn btn-outline"
-            style={{ ...btnSm, color: "var(--warn)" }}
-            disabled={working}
-            onClick={() => act(() => setShopStatus(b.id, "pending"))}
-          >
-            กลับเป็น pending
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="btn btn-outline"
-            style={btnSm}
-            disabled={working}
-            onClick={() => act(() => setShopStatus(b.id, "pending"))}
-          >
-            กลับเป็น pending
-          </button>
-        )}
 
-        <button
-          type="button"
-          className="btn btn-outline"
-          style={btnSm}
-          disabled={working}
-          onClick={() => act(() => toggleShopVerified(b.id, !b.verified))}
-        >
-          {b.verified ? "✕ ถอด Verified" : "✓ ติด Verified"}
-        </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={btnSm}
+              disabled={working}
+              onClick={() => act(() => toggleShopFeatured(b.id, !b.featured))}
+            >
+              {b.featured ? "✕ ถอด Featured" : "★ ติด Featured"}
+            </button>
 
-        <button
-          type="button"
-          className="btn btn-outline"
-          style={btnSm}
-          disabled={working}
-          onClick={() => act(() => toggleShopFeatured(b.id, !b.featured))}
-        >
-          {b.featured ? "✕ ถอด Featured" : "★ ติด Featured"}
-        </button>
+            <Link
+              href={`/boutique/${b.slug}`}
+              target="_blank"
+              className="btn btn-outline"
+              style={btnSm}
+            >
+              ดูร้าน →
+            </Link>
 
-        <Link href={`/boutique/${b.slug}`} target="_blank" className="btn btn-outline" style={btnSm}>
-          ดูหน้าร้าน →
-        </Link>
-      </div>
+            {b.bankbook_image_path ? (
+              <a
+                href={`/api/admin/bankbook-doc?key=${encodeURIComponent(b.bankbook_image_path)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-outline"
+                style={{ ...btnSm, color: "var(--info, #0EA5E9)" }}
+                title={`บัญชี: ${b.bank_account_number ?? ""}${b.bank_account_name ? ` · ${b.bank_account_name}` : ""}`}
+              >
+                ดูสมุดบัญชี
+              </a>
+            ) : null}
+          </div>
+        </td>
+      </tr>
 
       {showReject ? (
-        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-          <input
-            type="text"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="เหตุผลที่ปฏิเสธ"
-            style={{
-              flex: 1,
-              padding: "9px 12px",
-              border: "1px solid var(--line)",
-              borderRadius: 6,
-              fontSize: 13,
-              minWidth: 250,
-            }}
-          />
-          <button
-            type="button"
-            className="btn btn-dark"
-            style={{ ...btnSm, background: "var(--danger)", borderColor: "var(--danger)" }}
-            disabled={working}
-            onClick={() => act(() => setShopStatus(b.id, "rejected", reason))}
-          >
-            ยืนยัน Reject
-          </button>
-        </div>
+        <tr
+          style={{
+            borderBottom: "1px solid var(--line)",
+            background: "var(--bg)",
+          }}
+        >
+          <td colSpan={4} style={{ padding: "10px 12px" }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <input
+                type="text"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="เหตุผลที่ปฏิเสธ"
+                style={{
+                  flex: 1,
+                  padding: "9px 12px",
+                  border: "1px solid var(--line)",
+                  borderRadius: 6,
+                  fontSize: 13,
+                  minWidth: 250,
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn-dark"
+                style={{
+                  ...btnSm,
+                  background: "var(--danger)",
+                  borderColor: "var(--danger)",
+                }}
+                disabled={working}
+                onClick={() =>
+                  act(() => setShopStatus(b.id, "rejected", reason))
+                }
+              >
+                ยืนยัน Reject
+              </button>
+            </div>
+          </td>
+        </tr>
       ) : null}
-    </div>
+    </>
   );
 }
 
-const btnSm: React.CSSProperties = { padding: "7px 12px", fontSize: 12 };
+const tdStyle: React.CSSProperties = { padding: "10px 12px", verticalAlign: "top" };
+const btnSm: React.CSSProperties = { padding: "5px 10px", fontSize: 11 };

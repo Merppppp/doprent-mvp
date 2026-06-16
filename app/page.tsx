@@ -42,14 +42,22 @@ type SearchParams = {
   dateTo?: string;
   priceMin?: string;
   priceMax?: string;
+  type?: string;
   [key: string]: string | undefined;
 };
+
+/** Active product type keys. */
+const KNOWN_TYPE_KEYS = ["dress", "suit"] as const;
 
 export default async function HomePage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
+  // Determine active product type (validate; default "dress")
+  const rawType = searchParams?.type?.trim();
+  const activeTypeKey: string = rawType && (KNOWN_TYPE_KEYS as readonly string[]).includes(rawType) ? rawType : "dress";
+
   const activeOcc = searchParams?.occasion as OccasionKey | undefined;
   const activeSize = searchParams?.size;
   const activeDesigner = searchParams?.designer?.trim() || undefined;
@@ -110,6 +118,7 @@ export default async function HomePage({
       sort,
       dateFrom: activeDateFrom,
       dateTo: activeDateTo,
+      productTypeKey: activeTypeKey,
     }),
     listOccasions(),
     listDesigners(),
@@ -117,7 +126,7 @@ export default async function HomePage({
     listSponsorShops(8),
     listShops({ featuredFirst: true, limit: 6 }),
     getActiveBanners(),
-    getTagGroupsForProductTypeKey("dress"),
+    getTagGroupsForProductTypeKey(activeTypeKey),
   ]);
 
   // Build activeTags from bound tag groups (for filter UI)
@@ -187,17 +196,36 @@ export default async function HomePage({
           <div className="container">
             <div className="hr-occ-head">
               <h2 className="hr-occ-title">{t("browse.byOccasion", locale)}</h2>
-              <Link href="/" className="hr-occ-more">
+              <Link
+                href={activeTypeKey !== "dress" ? `/?type=${activeTypeKey}` : "/"}
+                className="hr-occ-more"
+              >
                 {t("browse.viewAll", locale)}
               </Link>
             </div>
             <div className="hr-occ-row">
+              {/* "ทั้งหมด" — default-active when no occasion is selected. The
+                  #results hash makes it scroll to the product zone (it clears all
+                  query params, so ScrollToResults relies on the hash here). */}
+              <Link
+                href={activeTypeKey !== "dress" ? `/?type=${activeTypeKey}#results` : "/#results"}
+                className="hr-occ-chip media-zoom"
+                data-active={!activeOcc ? "true" : undefined}
+              >
+                <span className="hr-occ-tile">
+                  <OccasionTile color="green" />
+                </span>
+                <span className="hr-occ-label">{locale === "en" ? "All" : "ทั้งหมด"}</span>
+              </Link>
               {occasions.map((o) => {
                 const label = locale === "en" ? t(`occasion.${o.key}`, "en") : o.th;
+                const occasionHref = activeTypeKey !== "dress"
+                  ? `/?occasion=${o.key}&type=${activeTypeKey}`
+                  : `/?occasion=${o.key}`;
                 return (
                   <Link
                     key={o.key}
-                    href={`/?occasion=${o.key}`}
+                    href={occasionHref}
                     className="hr-occ-chip media-zoom"
                     data-active={activeOcc === o.key ? "true" : undefined}
                   >
@@ -319,6 +347,8 @@ export default async function HomePage({
                     waistMax: activeWaistMax !== undefined ? String(activeWaistMax) : undefined,
                     lengthMin: activeLengthMin !== undefined ? String(activeLengthMin) : undefined,
                     lengthMax: activeLengthMax !== undefined ? String(activeLengthMax) : undefined,
+                    // Preserve type for infinite scroll (omit when default dress to keep URLs clean)
+                    type: activeTypeKey !== "dress" ? activeTypeKey : undefined,
                     ...tagParamsForResults,
                   }}
                 />
@@ -355,7 +385,9 @@ const HR_CSS = `
 .hr-occ-row{
   display:flex;gap:10px;
   overflow-x:auto;scrollbar-width:none;
-  padding-bottom:14px;
+  /* horizontal + top padding so the active chip outline (offset 2px) isn't
+     clipped by the scroll container's edges */
+  padding:5px 6px 14px;
 }
 .hr-occ-row::-webkit-scrollbar{display:none}
 

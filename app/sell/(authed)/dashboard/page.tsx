@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { auth } from "@/auth";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { ProductArt } from "@/components/ProductArt";
 import SellerDashboardCalendarPanel from "@/components/SellerDashboardCalendarPanel";
 import { dressLimitFor, TIER_LABEL } from "@/lib/tiers";
-import type { AdsTier } from "@/lib/types";
+import { type AdsTier, sizeLabel } from "@/lib/types";
 import { toggleShopOpen, toggleProductAvailable } from "@/app/actions/seller";
 import ToggleSwitch from "@/components/ToggleSwitch";
 
@@ -44,6 +45,21 @@ export default async function SellerDashboard({
 }: {
   searchParams: { kyc?: string };
 }) {
+  // Staff principals have no User row, so getCurrentUser() below returns null and
+  // would bounce them straight back to /login (the "staff login loop" bug). The
+  // owner dashboard is owner-only anyway — route staff to the first surface they
+  // are permitted to manage instead.
+  const session = await auth();
+  if (session?.user?.role === "staff") {
+    if (session.user.canManageBookings) redirect("/sell/bookings");
+    if (session.user.canManageProducts) redirect("/sell/products");
+    return (
+      <div style={{ padding: "48px 0", textAlign: "center", color: "var(--ink-2)", fontSize: 14 }}>
+        บัญชีพนักงานนี้ยังไม่ได้รับสิทธิ์จัดการการจองหรือสินค้า กรุณาติดต่อเจ้าของร้าน
+      </div>
+    );
+  }
+
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?next=/sell/dashboard");
 
@@ -408,7 +424,7 @@ export default async function SellerDashboard({
                     {d.name}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6 }}>
-                    {d.tag_code ? `รหัส: ${d.tag_code} · ` : ""}{d.designer || "—"} · Size {d.size} · ฿{d.price_per_day.toLocaleString()}/วัน
+                    {d.tag_code ? `รหัส: ${d.tag_code} · ` : ""}{d.designer || "—"} · Size {sizeLabel(d.size)} · ฿{d.price_per_day.toLocaleString()}/วัน
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                     <span

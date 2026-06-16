@@ -10,6 +10,8 @@ import BookingStatusBadge from "@/components/BookingStatusBadge";
 import RenterBookingActions from "@/components/RenterBookingActions";
 import ReviewForm from "@/components/ReviewForm";
 import EditAddressForm from "@/components/EditAddressForm";
+import ShopSocialLinks from "@/components/ShopSocialLinks";
+import RenterAddressChange from "@/components/RenterAddressChange";
 
 export const dynamic = "force-dynamic";
 
@@ -46,10 +48,25 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
   const isReviewable = b.status === "returned" || b.status === "completed";
   const canEditAddress = b.status === "booking_pending" || b.status === "waiting_for_payment";
 
-  // QR only while waiting for payment + shop has PromptPay + fee set
+  // Once the shop accepts, it picks ONE channel to collect through — show only
+  // that one. Legacy bookings (accepted before this feature, payment_method
+  // null) fall back to showing every channel the shop has configured.
+  const showPromptpay = b.payment_method ? b.payment_method === "promptpay" : true;
+  const showBank = b.payment_method ? b.payment_method === "bank" : true;
+
+  // QR only while waiting for payment + shop has PromptPay + fee set + chosen channel
   const qr =
-    b.status === "waiting_for_payment" && b.shipping_fee != null
+    b.status === "waiting_for_payment" && b.shipping_fee != null && showPromptpay
       ? await promptPayQrDataUrl(b.boutique_promptpay_id, total)
+      : null;
+
+  // QR for addr-change diff top-up (only when approved + diff > 0 + shop has PromptPay)
+  const diffQr =
+    b.status === "confirmed" &&
+    b.addr_change_status === "approved" &&
+    (b.addr_change_diff ?? 0) > 0 &&
+    showPromptpay
+      ? await promptPayQrDataUrl(b.boutique_promptpay_id, b.addr_change_diff!)
       : null;
 
   return (
@@ -80,6 +97,24 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
             addressText={b.address_text}
           />
         ) : null}
+        {b.status === "confirmed" ? (
+          <RenterAddressChange
+            bookingId={b.id}
+            status={b.addr_change_status}
+            pending={
+              b.pending_recipient_name || b.pending_phone || b.pending_address_text
+                ? {
+                    recipientName: b.pending_recipient_name,
+                    phone: b.pending_phone,
+                    addressText: b.pending_address_text,
+                  }
+                : null
+            }
+            diff={b.addr_change_diff}
+            diffQrDataUrl={diffQr}
+            reason={b.addr_change_reason}
+          />
+        ) : null}
       </div>
 
       <div style={card}>
@@ -104,14 +139,16 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
                 ยอด ฿{total.toLocaleString()} → {b.boutique_name}
               </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qr} alt="PromptPay QR" width={240} height={240} style={{ borderRadius: 8 }} />
+              {/* display:block + margin auto centers it — Tailwind preflight sets
+                  img{display:block}, so the parent textAlign:center alone won't. */}
+              <img src={qr} alt="PromptPay QR" width={240} height={240} style={{ borderRadius: 8, display: "block", margin: "0 auto" }} />
               <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 10, lineHeight: 1.5 }}>
                 โอนแล้วกดปุ่มด้านล่างเพื่ออัปโหลดสลิป ร้านจะตรวจและยืนยันให้
               </p>
             </div>
           ) : null}
 
-          {b.boutique_bank_name || b.boutique_bank_account_number ? (
+          {showBank && (b.boutique_bank_name || b.boutique_bank_account_number) ? (
             <div style={card}>
               <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>ช่องทางโอนเงินให้ร้าน</div>
               {b.boutique_bank_name ? (
@@ -156,6 +193,20 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
               มีคำถาม? ติดต่อร้าน (LINE)
             </a>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* Contact shop — surface every channel the shop configured (LINE/IG/FB/X/TikTok) */}
+      {(b.boutique_line_url || b.boutique_instagram || b.boutique_facebook || b.boutique_twitter || b.boutique_tiktok) ? (
+        <div style={card}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>ติดต่อร้านค้า</div>
+          <ShopSocialLinks
+            lineUrl={b.boutique_line_url}
+            instagram={b.boutique_instagram}
+            facebook={b.boutique_facebook}
+            twitter={b.boutique_twitter}
+            tiktok={b.boutique_tiktok}
+          />
         </div>
       ) : null}
 

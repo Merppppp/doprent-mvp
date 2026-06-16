@@ -20,8 +20,13 @@ export default function ScrollToResults() {
   const isFirstRender = useRef(true);
 
   useEffect(() => {
-    // No active search/filter → keep the hero banner in view.
-    if (!key) {
+    // "ทั้งหมด" (clear occasion) navigates to "/#results" with NO query params —
+    // honour the #results hash so it still scrolls down to the product zone.
+    const hasResultsHash =
+      typeof window !== "undefined" && window.location.hash === "#results";
+
+    // No active search/filter AND no #results hash → keep the hero banner in view.
+    if (!key && !hasResultsHash) {
       isFirstRender.current = false;
       return;
     }
@@ -39,6 +44,19 @@ export default function ScrollToResults() {
 
     return () => window.cancelAnimationFrame(id);
   }, [key]);
+
+  // Hash-only navigations (e.g. clicking "ทั้งหมด" → "/#results" while already on
+  // a param-less homepage) don't change searchParams, so the effect above won't
+  // re-run. Listen for hashchange to scroll in that case too.
+  useEffect(() => {
+    function onHashChange() {
+      if (window.location.hash !== "#results") return;
+      const el = document.getElementById("results");
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
 
   return null;
 }

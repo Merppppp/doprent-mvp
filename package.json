@@ -1,6 +1,6 @@
 {
   "name": "doprent-mvp",
-  "version": "0.0.0-beta.1",
+  "version": "0.0.0-beta.2",
   "private": true,
   "prisma": {
     "seed": "tsx prisma/seed.ts"

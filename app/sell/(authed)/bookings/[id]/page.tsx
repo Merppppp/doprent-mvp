@@ -8,7 +8,9 @@ import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
 import { getTrustScore } from "@/lib/trust-score";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import TrustBadge from "@/components/TrustBadge";
-import SellerBookingActions from "@/components/SellerBookingActions";
+import SellerBookingActions, { type ChannelOption } from "@/components/SellerBookingActions";
+import SellerAddressChange from "@/components/SellerAddressChange";
+import { PAYMENT_CHANNEL_LABEL } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +39,32 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
   // Slip is private — sign a short-lived URL for the seller (authorized above).
   const slipUrl = b.slip_path ? await getSignedPrivateUrl(b.slip_path) : null;
 
+  // Sign the addr-change top-up slip URL (only for active sub-flow states)
+  const addrSlipUrl = b.addr_change_slip_path
+    ? await getSignedPrivateUrl(b.addr_change_slip_path)
+    : null;
+
   // Trust score for this renter (single query — only one renter on a detail page).
   const renterTrust = await getTrustScore(b.renter_id);
+
+  // Channels the shop has configured — drives the accept-flow channel picker.
+  const channels: ChannelOption[] = [];
+  if (b.boutique_promptpay_id?.trim()) {
+    channels.push({
+      method: "promptpay",
+      label: PAYMENT_CHANNEL_LABEL.promptpay,
+      detail: b.boutique_promptpay_id.trim(),
+    });
+  }
+  if (b.boutique_bank_account_number?.trim()) {
+    channels.push({
+      method: "bank",
+      label: PAYMENT_CHANNEL_LABEL.bank,
+      detail: [b.boutique_bank_name, b.boutique_bank_account_number, b.boutique_bank_account_name]
+        .filter((s) => s && s.trim())
+        .join(" · "),
+    });
+  }
 
   return (
     <div className="container" style={{ paddingTop: 36, paddingBottom: 80, maxWidth: 560 }}>
@@ -78,6 +104,9 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
         />
         <div style={{ borderTop: "1px solid var(--line)", margin: "8px 0" }} />
         <Row label="ยอดที่ลูกค้าจ่าย" value={`฿${amountDue(b).toLocaleString()}`} bold />
+        {b.payment_method ? (
+          <Row label="เก็บเงินผ่าน" value={PAYMENT_CHANNEL_LABEL[b.payment_method]} />
+        ) : null}
       </div>
 
       {slipUrl ? (
@@ -94,7 +123,32 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
         </div>
       ) : null}
 
-      <SellerBookingActions bookingId={b.id} status={b.status} />
+      {["requested", "approved", "paid_review"].includes(b.addr_change_status ?? "") ? (
+        <SellerAddressChange
+          bookingId={b.id}
+          status={b.addr_change_status}
+          pending={
+            b.pending_recipient_name || b.pending_phone || b.pending_address_text
+              ? {
+                  recipientName: b.pending_recipient_name,
+                  phone: b.pending_phone,
+                  addressText: b.pending_address_text,
+                }
+              : null
+          }
+          currentShippingFee={b.shipping_fee}
+          diff={b.addr_change_diff}
+          slipUrl={addrSlipUrl}
+          reason={b.addr_change_reason}
+        />
+      ) : null}
+
+      <SellerBookingActions
+        bookingId={b.id}
+        status={b.status}
+        channels={channels}
+        defaultMethod={b.boutique_default_payment_method}
+      />
     </div>
   );
 }

@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { listTagGroups, listTagRequestsForShop } from "@/lib/tags";
-import { getTagGroupsForProductTypeKey } from "@/lib/tag-groups";
+import { getTagGroupsForProductType } from "@/lib/tag-groups";
+import type { BoundTagGroup } from "@/lib/tag-groups";
 import ProductForm from "../ProductForm";
 
 export const dynamic = "force-dynamic";
@@ -20,18 +21,39 @@ export default async function NewProductPage() {
 
   const raw = await db.shop.findFirst({
     where: { ownerId: user.id },
-    select: { id: true, slug: true, name: true, lineUrl: true, kycStatus: true },
+    select: { id: true, slug: true, name: true, lineUrl: true, kycStatus: true, promptpayId: true, bankAccountNumber: true },
   });
   if (!raw) redirect("/sell/signup");
   if (raw.kycStatus === "none" || raw.kycStatus === "rejected") {
     redirect(`/sell/kyc?slug=${raw.slug}`);
   }
 
-  const [{ productTypeId, groups }, tagGroups, tagRequestsRaw] = await Promise.all([
-    getTagGroupsForProductTypeKey("dress"),
+  // Check payment channel (guard — also hard-blocked in createProduct action)
+  const hasPaymentChannel = !!(raw.promptpayId || raw.bankAccountNumber);
+
+  // Fetch all active product types + tag-group sections for each
+  const [productTypesRaw, tagGroups, tagRequestsRaw] = await Promise.all([
+    db.productType.findMany({
+      where: { isActive: true },
+      orderBy: { label: "asc" },
+      select: { id: true, key: true, label: true },
+    }),
     listTagGroups(),
     listTagRequestsForShop(raw.id),
   ]);
+
+  // Build tagGroupSectionsByType map: productTypeId → BoundTagGroup[]
+  const tagGroupSectionsByType: Record<string, BoundTagGroup[]> = {};
+  await Promise.all(
+    productTypesRaw.map(async (pt) => {
+      tagGroupSectionsByType[pt.id] = await getTagGroupsForProductType(pt.id);
+    }),
+  );
+
+  // Default to dress type; fall back to first type if dress is missing
+  const dressType = productTypesRaw.find((pt) => pt.key === "dress");
+  const defaultProductTypeId = dressType?.id ?? productTypesRaw[0]?.id ?? "";
+  const defaultTagGroupSections = tagGroupSectionsByType[defaultProductTypeId] ?? [];
 
   const shopTagRequests = tagRequestsRaw.map((r) => ({
     id: r.id,
@@ -49,14 +71,51 @@ export default async function NewProductPage() {
       <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
         สินค้าจะเป็นสถานะ &ldquo;รอตรวจ&rdquo; จนกว่า admin จะอนุมัติ (ปกติ &lt; 24 ชม.)
       </p>
+      {!hasPaymentChannel && (
+        <div
+          style={{
+            padding: "16px 18px",
+            background: "#FFFBEB",
+            border: "1px solid #F59E0B",
+            borderRadius: 8,
+            marginBottom: 24,
+          }}
+        >
+          <div style={{ fontWeight: 600, fontSize: 14, color: "#92400E", marginBottom: 6 }}>
+            ⚠️ ยังไม่มีช่องทางรับชำระเงิน
+          </div>
+          <div style={{ fontSize: 13, color: "#78350F", lineHeight: 1.6 }}>
+            ต้องตั้งค่า PromptPay หรือบัญชีธนาคารก่อนจึงจะลงขายสินค้าได้
+          </div>
+          <a
+            href="/sell/edit"
+            style={{
+              display: "inline-block",
+              marginTop: 10,
+              padding: "8px 14px",
+              fontSize: 13,
+              fontWeight: 600,
+              border: "1px solid #F59E0B",
+              borderRadius: 6,
+              color: "#92400E",
+              background: "#FEF3C7",
+              textDecoration: "none",
+            }}
+          >
+            ไปตั้งค่าช่องทางรับเงิน →
+          </a>
+        </div>
+      )}
       <ProductForm
         mode="create"
         shopId={raw.id}
         defaultLineUrl={raw.lineUrl}
-        productTypeId={productTypeId ?? ""}
-        tagGroupSections={groups}
+        productTypeId={defaultProductTypeId}
+        tagGroupSections={defaultTagGroupSections}
         tagGroups={tagGroups}
         shopTagRequests={shopTagRequests}
+        productTypes={productTypesRaw}
+        tagGroupSectionsByType={tagGroupSectionsByType}
       />
     </div>
   );

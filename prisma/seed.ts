@@ -73,6 +73,9 @@ export async function seedBase() {
     { key: "party", label: "ปาร์ตี้" },
     { key: "work", label: "ทำงาน" },
     { key: "casual", label: "ลำลอง" },
+    { key: "thai", label: "ชุดไทย" },
+    { key: "graduation", label: "รับปริญญา" },
+    { key: "costume", label: "คอสตูม/แฟนซี" },
   ];
   for (const t of occasionTags) {
     await db.tag.upsert({

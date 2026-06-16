@@ -8,13 +8,14 @@ import { withActor } from "@/lib/db-context";
 import { isValidLineContact, normalizeLineUrl } from "@/lib/line";
 import { dressLimitFor } from "@/lib/tiers";
 // normalizeTiers/validateTiers removed — replaced by parsePriceTiersFromForm
-import type { AdsTier, Color, PriceTier } from "@/lib/types";
-// DB-valid size enum values only (Prisma schema has XS..XL; no new enum values allowed)
-type DbSize = "XS" | "S" | "M" | "L" | "XL";
+import { type AdsTier, type Color, type PriceTier, type Size, SIZES } from "@/lib/types";
+// DB-valid size enum values — single source is the canonical SIZES list in lib/types,
+// which is kept in sync with the Postgres `size` enum (see migration size_enum_expand).
+type DbSize = Size;
 import { resolveTagSelections } from "@/lib/tag-groups";
 
-/** Valid Size enum values in the DB (no enum additions — Postgres 55P04 guard). */
-const VALID_SIZES = new Set<string>(["XS", "S", "M", "L", "XL"]);
+/** Valid Size enum values in the DB — mirrors the canonical SIZES list. */
+const VALID_SIZES = new Set<string>(SIZES);
 
 type VariantInput = {
   size: DbSize;
@@ -159,6 +160,7 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
   const bankName = String(formData.get("bank_name") ?? "").trim() || null;
   const bankAccountNumber = String(formData.get("bank_account_number") ?? "").trim() || null;
   const bankAccountName = String(formData.get("bank_account_name") ?? "").trim() || null;
+  const bankbookImagePath = String(formData.get("bankbook_image_path") ?? "").trim() || null;
 
   const address = [houseNo, street, subdistrict ? `แขวง${subdistrict}` : null, district ? `เขต${district}` : null, province, postalCode]
     .filter(Boolean).join(" ") || null;
@@ -172,6 +174,12 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
   if (sinceYear !== null && (isNaN(sinceYear) || sinceYear < 1980 || sinceYear > new Date().getFullYear())) {
     return { ok: false, error: "ปีที่เปิดบริการไม่ถูกต้อง" };
   }
+
+  // HARD-BLOCK: bank account number provided but no bankbook image
+  if (bankAccountNumber && !bankbookImagePath) {
+    return { ok: false, error: "กรุณาแนบรูปหน้าสมุดบัญชีเพื่อยืนยันเลขบัญชี" };
+  }
+  // SOFT: no payment channel at all — save succeeds, UI shows the warning
 
   // Resolve area_key → areaId (UUID FK)
   let areaId: string | null = null;
@@ -194,7 +202,7 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
         slug, name, ownerId: user.id, ownerName, areaId, areaLabel,
         address, houseNo, street, subdistrict, district, province, postalCode,
         lineUrl, instagram, facebook, twitter, tiktok, tag, story, sinceYear, coverColor, deliveryInfo,
-        promptpayId, bankName, bankAccountNumber, bankAccountName,
+        promptpayId, bankName, bankAccountNumber, bankAccountName, bankbookImagePath,
         status: "pending", kycStatus: "none",
       },
       select: { slug: true },
@@ -219,7 +227,7 @@ export async function updateShop(shopId: string, formData: FormData): Promise<{ 
 
   const updates: Record<string, unknown> = {};
   // area_key handled separately (UUID FK resolution); exclude from generic camelCase loop
-  const scalarFields = ["name","area_label","instagram","facebook","twitter","tiktok","tag","story","delivery_info","owner_name","address","hours","cover_color","promptpay_id","bank_name","bank_account_number","bank_account_name"] as const;
+  const scalarFields = ["name","area_label","instagram","facebook","twitter","tiktok","tag","story","delivery_info","owner_name","address","hours","cover_color","logo_url","promptpay_id","bank_name","bank_account_number","bank_account_name","bankbook_image_path"] as const;
   for (const f of scalarFields) {
     const v = formData.get(f);
     if (v !== null) {
@@ -308,6 +316,26 @@ export async function updateShop(shopId: string, formData: FormData): Promise<{ 
           .map((x) => ({ date: x.date as string, note: typeof x.note === "string" ? x.note : undefined }));
       }
     } catch { /* ignore malformed */ }
+  }
+
+  // HARD-BLOCK: bank account number provided but no bankbook image attached
+  const bankAcctNum = String(formData.get("bank_account_number") ?? "").trim();
+  const bankbookPath = String(formData.get("bankbook_image_path") ?? "").trim();
+  if (bankAcctNum && !bankbookPath) {
+    return { ok: false, error: "กรุณาแนบรูปหน้าสมุดบัญชีเพื่อยืนยันเลขบัญชี" };
+  }
+
+  // SOFT WARNING (non-blocking): no payment channel at all — save succeeds
+  // The UI already shows the warning; the action just allows it through.
+
+  // Default payment channel: only meaningful when BOTH channels are configured.
+  // Otherwise force null so the picker never defaults to an unconfigured channel.
+  const finalPromptpay = String(formData.get("promptpay_id") ?? "").trim();
+  const dpmRaw = String(formData.get("default_payment_method") ?? "").trim();
+  if (finalPromptpay && bankAcctNum) {
+    updates.defaultPaymentMethod = dpmRaw === "promptpay" || dpmRaw === "bank" ? dpmRaw : null;
+  } else {
+    updates.defaultPaymentMethod = null;
   }
 
   return withActor(user.id, async () => {
@@ -410,11 +438,15 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
 
   const shop = await db.shop.findUnique({
     where: { id: shopId },
-    select: { ownerId: true, name: true, lineUrl: true, kycStatus: true, adsTier: true },
+    select: { ownerId: true, name: true, lineUrl: true, kycStatus: true, adsTier: true, promptpayId: true, bankAccountNumber: true },
   });
   if (!shop || shop.ownerId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์เพิ่มสินค้าในร้านนี้" };
   if (shop.kycStatus === "none" || shop.kycStatus === "rejected") {
     return { ok: false, error: "ต้องส่งเอกสาร KYC ก่อนถึงจะเพิ่มสินค้าได้" };
+  }
+  // HARD-BLOCK: shop must have at least one payment channel before listing products
+  if (!shop.promptpayId && !shop.bankAccountNumber) {
+    return { ok: false, error: "กรุณาตั้งค่าช่องทางรับชำระเงิน (PromptPay หรือบัญชีธนาคาร) ก่อนลงขายสินค้า" };
   }
 
   // Enforce per-plan listing quota.
@@ -477,8 +509,14 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
     if (occasionKeys.length > 0) selectionsByGroup = { occasion: occasionKeys };
   }
 
-  // Resolve productTypeId (seller UI is dress-only today)
-  const productType = await db.productType.findUnique({ where: { key: "dress" }, select: { id: true } });
+  // Resolve productTypeId from form data; fall back to "dress" for backward compat
+  const submittedTypeId = String(formData.get("productTypeId") ?? "").trim();
+  let productType: { id: string } | null;
+  if (submittedTypeId) {
+    productType = await db.productType.findFirst({ where: { id: submittedTypeId, isActive: true }, select: { id: true } });
+  } else {
+    productType = await db.productType.findUnique({ where: { key: "dress" }, select: { id: true } });
+  }
   if (!productType) return { ok: false, error: "product type ไม่พบ — กรุณาแจ้ง admin" };
 
   // Resolve tags via binding-aware validator

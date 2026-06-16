@@ -463,10 +463,16 @@ model Shop {
   bankAccountNumber   String?   @map("bank_account_number")
   /// ชื่อบัญชีธนาคาร
   bankAccountName     String?   @map("bank_account_name")
+  /// คีย์รูปหน้าสมุดบัญชี (PRIVATE bucket) — แนบเมื่อกรอกเลขบัญชี, admin ตรวจผ่าน signedUrl
+  bankbookImagePath   String?   @map("bankbook_image_path")
+  /// ช่องทางรับเงินเริ่มต้นของร้าน (ใช้เป็น default ตอนยอมรับการจอง เมื่อกรอกทั้ง PromptPay + บัญชี)
+  defaultPaymentMethod PaymentMethod? @map("default_payment_method")
   /// ปีที่เปิดร้าน
   sinceYear        Int?      @map("since_year")
   /// โทนสี cover การ์ดร้าน
   coverColor       Color     @default(rose) @map("cover_color")
+  /// URL รูป logo ร้าน (PUBLIC bucket — แสดงบนการ์ดร้าน; null = ใช้ gradient cover_color)
+  logoUrl          String?   @map("logo_url")
   /// ป้าย tag การตลาดสั้น ๆ
   tag              String?
   /// เรื่องราว/คำแนะนำร้าน
@@ -1057,6 +1063,8 @@ model Booking {
   status           BookingStatus  @default(booking_pending)
   /// path ไฟล์สลิปโอนเงิน (private bucket)
   slipPath         String?        @map("slip_path")
+  /// ช่องทางที่ร้านเลือกเก็บเงินสำหรับการจองนี้ (snapshot ณ ตอนยอมรับการจอง)
+  paymentMethod    PaymentMethod? @map("payment_method")
   /// FK → addresses.id ที่อยู่ที่เลือกตอนจอง (SetNull — ใช้ snapshot ด้านล่างแสดงผล)
   addressId        String?        @map("address_id") @db.Uuid
   /// snapshot ชื่อผู้รับ
@@ -1071,6 +1079,24 @@ model Booking {
   cancelReason     String?        @map("cancel_reason")
   /// สถานะก่อนยกเลิก (เดิมเป็น String → ใช้ enum เดียวกับ status)
   cancelFromStatus BookingStatus? @map("cancel_from_status")
+
+  /// สถานะคำขอแก้ที่อยู่หลังชำระเงิน (post-payment): null/none → requested → approved → paid_review → done | rejected.
+  /// ไม่กระทบ booking.status หลัก (sub-flow คุมด้วยคอลัมน์ชุดนี้ล้วน ๆ)
+  addrChangeStatus     String? @map("addr_change_status")
+  /// ที่อยู่ใหม่ที่ผู้เช่าขอเปลี่ยน — snapshot ชื่อผู้รับ (รอร้านอนุมัติ)
+  pendingRecipientName String? @map("pending_recipient_name")
+  /// ที่อยู่ใหม่ — snapshot เบอร์โทร
+  pendingPhone         String? @map("pending_phone")
+  /// ที่อยู่ใหม่ — snapshot ที่อยู่เต็ม
+  pendingAddressText   String? @map("pending_address_text")
+  /// ค่าจัดส่งใหม่ที่ร้านคำนวณสำหรับที่อยู่ใหม่ (บาท)
+  pendingShippingFee   Int?    @map("pending_shipping_fee")
+  /// ส่วนต่างค่าจัดส่งที่ผู้เช่าต้องจ่ายเพิ่ม = max(0, pendingShippingFee − shippingFee) (บาท)
+  addrChangeDiff       Int?    @map("addr_change_diff")
+  /// path สลิปจ่ายส่วนต่าง (private bucket)
+  addrChangeSlipPath   String? @map("addr_change_slip_path")
+  /// เหตุผลที่ร้านปฏิเสธคำขอแก้ที่อยู่ (ถ้ามี)
+  addrChangeReason     String? @map("addr_change_reason")
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1356,11 +1382,17 @@ enum Color {
 
 /// ไซซ์สินค้า
 enum Size {
+  XXXS
+  XXS
   XS
   S
   M
   L
   XL
+  XXL
+  XL3      @map("3XL")
+  XL4      @map("4XL")
+  FreeSize @map("Free size")
 
   @@map("size")
 }
@@ -1449,4 +1481,12 @@ enum BillingCycle {
   yearly
 
   @@map("billing_cycle")
+}
+
+/// ช่องทางการรับชำระเงิน (PromptPay หรือ โอนเข้าบัญชีธนาคาร)
+enum PaymentMethod {
+  promptpay
+  bank
+
+  @@map("payment_method")
 }

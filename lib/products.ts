@@ -17,6 +17,9 @@ const FALLBACK_OCCASIONS: Occasion[] = [
   { key: "party",      th: "ปาร์ตี้",  en: "Party",      color_token: "purple",sort_order: 6 },
   { key: "work",       th: "ทำงาน",   en: "Work",       color_token: "black", sort_order: 7 },
   { key: "casual",     th: "ลำลอง",   en: "Casual",     color_token: "blue",  sort_order: 8 },
+  { key: "thai",       th: "ชุดไทย",  en: "Thai",       color_token: "rose",  sort_order: 9 },
+  { key: "graduation", th: "รับปริญญา", en: "Graduation", color_token: "navy", sort_order: 10 },
+  { key: "costume",    th: "คอสตูม/แฟนซี", en: "Costume",  color_token: "purple", sort_order: 11 },
 ];
 
 /** Default catalog product type — preserves today's dress-only browse behavior. */
@@ -47,6 +50,8 @@ export type ProductFilters = {
   lengthMax?: number;
   search?: string;
   sort?: "featured" | "price-asc" | "price-desc" | "name" | "rating-desc";
+  /** Filter by product type key (e.g. "suit"). Defaults to "dress" when absent. */
+  productTypeKey?: string;
   dateFrom?: string; // YYYY-MM-DD
   dateTo?: string;   // YYYY-MM-DD
   page?: number;
@@ -145,6 +150,7 @@ function mapShop(b: PrismaShop, coverImage?: string | null): Shop {
     since_year: b.sinceYear,
     cover_color: b.coverColor as Color,
     cover_image: coverImage ?? null,
+    logo_url: b.logoUrl ?? null,
     tag: b.tag,
     story: b.story,
     delivery_info: b.deliveryInfo,
@@ -231,7 +237,10 @@ function mapShopWithCards(r: ShopWithPreviews, index: number): Shop {
  * Returns null when no candidates exceed the threshold — caller falls back
  * to the existing substring AND search so nothing regresses.
  */
-async function getTrigamRankedIds(q: string): Promise<string[] | null> {
+async function getTrigamRankedIds(
+  q: string,
+  productTypeKey: string = DEFAULT_PRODUCT_TYPE_KEY,
+): Promise<string[] | null> {
   type Row = { id: string; score: number };
 
   // All params are positional placeholders via Prisma tagged template —
@@ -242,17 +251,22 @@ async function getTrigamRankedIds(q: string): Promise<string[] | null> {
       SELECT
         p.id,
         GREATEST(
-          similarity(p.name,        ${q}),
-          COALESCE(similarity(p.designer,    ${q}), 0::real),
-          COALESCE(similarity(p.description, ${q}), 0::real),
-          similarity(s.name,        ${q})
+          MAX(similarity(p.name,        ${q})),
+          MAX(COALESCE(similarity(p.designer,    ${q}), 0::real)),
+          MAX(COALESCE(similarity(p.description, ${q}), 0::real)),
+          MAX(similarity(s.name,        ${q})),
+          COALESCE(MAX(similarity(t.label, ${q})), 0::real),
+          COALESCE(MAX(similarity(t.key,   ${q})), 0::real)
         ) AS score
       FROM products p
-      JOIN shops s         ON s.id  = p.shop_id
-      JOIN product_types pt ON pt.id = p.product_type_id
+      JOIN shops s           ON s.id  = p.shop_id
+      JOIN product_types pt  ON pt.id = p.product_type_id
+      LEFT JOIN product_tags ptg ON ptg.product_id = p.id
+      LEFT JOIN tags t           ON t.id = ptg.tag_id
       WHERE p.status    = 'live'
         AND p.available = true
-        AND pt.key      = ${DEFAULT_PRODUCT_TYPE_KEY}
+        AND pt.key      = ${productTypeKey}
+      GROUP BY p.id
     ) sub
     WHERE sub.score > 0.15
     ORDER BY sub.score DESC
@@ -273,12 +287,12 @@ export async function listProducts(
   const PAGE_SIZE = 25;
   const page = Math.max(1, opts.page ?? 1);
 
-  // Build where clause — catalog default: dress-type products only
-  // (preserves today's behavior until multi-type browse ships).
+  // Build where clause — default to dress when no productTypeKey provided.
+  const effectiveTypeKey = opts.productTypeKey ?? DEFAULT_PRODUCT_TYPE_KEY;
   const where: Prisma.ProductWhereInput = {
     status: "live",
     available: true,
-    productType: { key: DEFAULT_PRODUCT_TYPE_KEY },
+    productType: { key: effectiveTypeKey },
   };
 
   if (opts.sizes?.length) where.size = { in: opts.sizes as unknown as Prisma.EnumSizeFilter<"Product">["in"] };
@@ -381,7 +395,7 @@ export async function listProducts(
     const q = opts.search.trim();
     // pg_trgm requires at least 2 characters to form meaningful trigrams.
     if (q.length >= 2) {
-      trigramRankedIds = await getTrigamRankedIds(q);
+      trigramRankedIds = await getTrigamRankedIds(q, effectiveTypeKey);
     }
 
     if (trigramRankedIds !== null) {
@@ -541,6 +555,94 @@ export async function listShops(opts: { limit?: number; featuredFirst?: boolean;
     take: opts.limit,
   });
   return rows.map((r, index) => mapShopWithCards(r, index));
+}
+
+/** Default page size for the public /shops "load more" feed. */
+export const SHOPS_PAGE_SIZE = 24;
+
+/** Minimal shop row for the /shops finder grid (no product join — the finder
+ *  doesn't render previews, so we keep this query light enough for thousands of
+ *  shops with offset pagination + a free-text DB filter). */
+export type ShopListItem = {
+  id: string;
+  slug: string;
+  name: string;
+  areaKey: string | null;
+  areaLabel: string;
+  coverColor: Color;
+  /** Shop logo URL, else null (card falls back to the gradient cover). */
+  coverImage: string | null;
+  featured: boolean;
+  verified: boolean;
+  tag: string | null;
+  sinceYear: number | null;
+  instagram: string | null;
+};
+
+/**
+ * Paginated, DB-filtered list of live shops for the public finder.
+ * Search (`q`) matches name / area / IG / tag case-insensitively at the DB.
+ * Returns the rows for this page plus the total matching count (for "hasMore").
+ */
+export async function listShopsPage(opts: {
+  q?: string;
+  skip?: number;
+  take?: number;
+} = {}): Promise<{ rows: ShopListItem[]; total: number }> {
+  const q = (opts.q ?? "").trim();
+  const where: Prisma.ShopWhereInput = {
+    status: "live",
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { areaLabel: { contains: q, mode: "insensitive" } },
+            { instagram: { contains: q, mode: "insensitive" } },
+            { tag: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+  const [rows, total] = await Promise.all([
+    db.shop.findMany({
+      where,
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        areaLabel: true,
+        coverColor: true,
+        featured: true,
+        verified: true,
+        tag: true,
+        sinceYear: true,
+        instagram: true,
+        logoUrl: true,
+        area: { select: { key: true } },
+      },
+      orderBy: [{ featured: "desc" }, { name: "asc" }],
+      skip: opts.skip ?? 0,
+      take: opts.take ?? SHOPS_PAGE_SIZE,
+    }),
+    db.shop.count({ where }),
+  ]);
+  return {
+    rows: rows.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      name: r.name,
+      areaKey: r.area?.key ?? null,
+      areaLabel: r.areaLabel,
+      coverColor: r.coverColor as Color,
+      coverImage: r.logoUrl ?? null,
+      featured: r.featured,
+      verified: r.verified,
+      tag: r.tag,
+      sinceYear: r.sinceYear,
+      instagram: r.instagram,
+    })),
+    total,
+  };
 }
 
 export async function getShopBySlug(slug: string): Promise<Shop | null> {

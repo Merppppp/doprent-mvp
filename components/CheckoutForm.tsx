@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addAddress, createBooking } from "@/app/actions/bookings";
+import { addAddress, updateAddress, createBooking } from "@/app/actions/bookings";
 import { priceForNights } from "@/lib/pricing";
 import type { Address, PriceTier } from "@/lib/types";
 
@@ -41,6 +41,7 @@ export default function CheckoutForm({
     initialAddresses.find((a) => a.is_default)?.id ?? initialAddresses[0]?.id ?? ""
   );
   const [showAdd, setShowAdd] = useState(initialAddresses.length === 0);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -71,6 +72,33 @@ export default function CheckoutForm({
     setShowAdd(false);
   }
 
+  async function onEditAddress(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError("");
+    setBusy(true);
+    const fd = new FormData(e.currentTarget);
+    const res = await updateAddress(fd);
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    const id = String(fd.get("id") ?? "");
+    setAddresses((prev) =>
+      prev.map((a) =>
+        a.id === id
+          ? {
+              ...a,
+              recipient_name: String(fd.get("recipient_name") ?? ""),
+              phone: String(fd.get("phone") ?? ""),
+              address_text: String(fd.get("address_text") ?? ""),
+            }
+          : a
+      )
+    );
+    setEditingId(null);
+  }
+
   async function onConfirm() {
     if (!selectedId) {
       setError("กรุณาเลือกที่อยู่จัดส่ง");
@@ -99,36 +127,88 @@ export default function CheckoutForm({
       <section>
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>ที่อยู่จัดส่ง</h2>
         <div style={{ display: "grid", gap: 8 }}>
-          {addresses.map((a) => (
-            <label
-              key={a.id}
-              style={{
-                display: "flex",
-                gap: 10,
-                padding: 14,
-                border: `1px solid ${selectedId === a.id ? "var(--accent)" : "var(--line)"}`,
-                borderRadius: 10,
-                cursor: "pointer",
-                background: selectedId === a.id ? "var(--accent-soft)" : "var(--surface)",
-              }}
-            >
-              <input
-                type="radio"
-                name="addr"
-                checked={selectedId === a.id}
-                onChange={() => setSelectedId(a.id)}
-                style={{ marginTop: 3 }}
-              />
-              <span style={{ fontSize: 14, lineHeight: 1.5 }}>
-                <b>{a.recipient_name}</b> · {a.phone}
-                {a.is_default ? (
-                  <span style={{ color: "var(--accent-2)", fontSize: 12 }}> (ค่าเริ่มต้น)</span>
-                ) : null}
-                <br />
-                <span style={{ color: "var(--ink-2)" }}>{a.address_text}</span>
-              </span>
-            </label>
-          ))}
+          {addresses.map((a) =>
+            editingId === a.id ? (
+              <form
+                key={a.id}
+                onSubmit={onEditAddress}
+                style={{
+                  padding: 16,
+                  border: "1px solid var(--accent)",
+                  borderRadius: 10,
+                  display: "grid",
+                  gap: 10,
+                  background: "var(--surface)",
+                }}
+              >
+                <input type="hidden" name="id" value={a.id} />
+                <input name="recipient_name" defaultValue={a.recipient_name} placeholder="ชื่อผู้รับ" style={inp} required />
+                <input name="phone" defaultValue={a.phone} placeholder="เบอร์โทร" style={inp} required />
+                <textarea
+                  name="address_text"
+                  defaultValue={a.address_text}
+                  placeholder="ที่อยู่จัดส่ง (บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์)"
+                  style={{ ...inp, minHeight: 72, resize: "vertical" }}
+                  required
+                />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button type="submit" className="btn btn-dark" disabled={busy}>
+                    บันทึกการแก้ไข
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => setEditingId(null)}
+                    disabled={busy}
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div key={a.id} style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+                <label
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    gap: 10,
+                    padding: 14,
+                    border: `1px solid ${selectedId === a.id ? "var(--accent)" : "var(--line)"}`,
+                    borderRadius: 10,
+                    cursor: "pointer",
+                    background: selectedId === a.id ? "var(--accent-soft)" : "var(--surface)",
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="addr"
+                    checked={selectedId === a.id}
+                    onChange={() => setSelectedId(a.id)}
+                    style={{ marginTop: 3 }}
+                  />
+                  <span style={{ fontSize: 14, lineHeight: 1.5 }}>
+                    <b>{a.recipient_name}</b> · {a.phone}
+                    {a.is_default ? (
+                      <span style={{ color: "var(--accent-2)", fontSize: 12 }}> (ค่าเริ่มต้น)</span>
+                    ) : null}
+                    <br />
+                    <span style={{ color: "var(--ink-2)" }}>{a.address_text}</span>
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    setEditingId(a.id);
+                    setShowAdd(false);
+                  }}
+                  style={{ fontSize: 12.5, padding: "0 14px", whiteSpace: "nowrap" }}
+                >
+                  แก้ไข
+                </button>
+              </div>
+            )
+          )}
         </div>
 
         {showAdd ? (

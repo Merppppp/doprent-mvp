@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getProductBySlug } from "@/lib/products";
+import { sizeLabel } from "@/lib/types";
 
 // nodejs runtime required: lib/products → lib/db uses Prisma + AsyncLocalStorage (not edge-compatible)
 export const runtime = "nodejs";
@@ -33,7 +34,7 @@ export default async function OG({ params }: { params: { id: string } }) {
   const designer = dress?.designer ?? "Bangkok boutique rentals";
   // NB: use "บาท" not "฿" — the Noto Thai subset lacks the U+0E3F baht glyph (renders as tofu in the OG card).
   const price = dress ? `${dress.price_per_day.toLocaleString()} บาท / วัน` : "เช่าชุดดีไซเนอร์ในกรุงเทพฯ";
-  const tag = dress ? `${dress.shop_name} · ไซส์ ${dress.size}` : "ติดต่อจองผ่าน LINE";
+  const tag = dress ? `${dress.shop_name} · ไซส์ ${sizeLabel(dress.size)}` : "ติดต่อจองผ่าน LINE";
   // NB: product photos are stored as .webp, which satori (next/og) cannot decode,
   // so we render a clean branded text card instead of compositing the image.
 

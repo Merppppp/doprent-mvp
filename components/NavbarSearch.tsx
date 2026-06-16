@@ -1,12 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { t, type Locale } from "@/lib/i18n";
 
 export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
-  const [q, setQ] = useState("");
+  const searchParams = useSearchParams();
+  const urlQ = searchParams.get("q") ?? "";
+  const [q, setQ] = useState(urlQ);
   const router = useRouter();
+
+  // Keep the box in sync with the URL ?q= so it survives a refresh and reflects
+  // back/forward navigation. While typing, urlQ is unchanged so this won't fight
+  // the user's input.
+  useEffect(() => {
+    setQ(urlQ);
+  }, [urlQ]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

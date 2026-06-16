@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createShop } from "@/app/actions/seller";
 import RequiredMark from "@/components/RequiredMark";
 import { BANGKOK_DISTRICTS, findDistrict, PROVINCE_TH } from "@/lib/bangkok-districts";
+import { prepareImageFileForUpload } from "@/lib/image";
 
 const COLORS = [
   { key: "rose", label: "กุหลาบ" },
@@ -34,10 +35,39 @@ export default function SignupForm(_props: Props) {
   const [subdistrict, setSubdistrict] = useState("");
   const [postal, setPostal] = useState("");
 
+  // Payment / bankbook state
+  const [promptpayId, setPromptpayId] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankbookKey, setBankbookKey] = useState("");
+  const [bankbookUploading, setBankbookUploading] = useState(false);
+  const [bankbookError, setBankbookError] = useState<string | null>(null);
+  const bankbookInputRef = useRef<HTMLInputElement>(null);
+
   const subdistricts = useMemo(() => {
     const d = findDistrict(district);
     return d?.subdistricts ?? [];
   }, [district]);
+
+  async function handleBankbookFile(file: File) {
+    setBankbookError(null);
+    setBankbookUploading(true);
+    try {
+      const prepared = await prepareImageFileForUpload(file);
+      const fd = new FormData();
+      fd.append("file", prepared);
+      const res = await fetch("/api/upload/bankbook", { method: "POST", body: fd });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error((j as { error?: string }).error ?? "อัปโหลดไม่สำเร็จ");
+      }
+      const j = (await res.json()) as { key: string };
+      setBankbookKey(j.key);
+    } catch (e) {
+      setBankbookError((e as Error).message);
+    } finally {
+      setBankbookUploading(false);
+    }
+  }
 
   function onDistrictChange(v: string) {
     setDistrict(v);
@@ -64,6 +94,11 @@ export default function SignupForm(_props: Props) {
       setError("กรุณาเลือกแขวง/ตำบล");
       return;
     }
+    // HARD-BLOCK: bank account filled but no bankbook
+    if (bankAccountNumber.trim() && !bankbookKey) {
+      setError("กรุณาแนบรูปหน้าสมุดบัญชีเพื่อยืนยันเลขบัญชี");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -79,6 +114,9 @@ export default function SignupForm(_props: Props) {
         formData.set("area_key", d.en);
         formData.set("area_label", `เขต${d.th} · กรุงเทพ`);
       }
+
+      // Pass bankbook key (private R2 object key, never a public URL)
+      formData.set("bankbook_image_path", bankbookKey);
 
       const res = await createShop(formData);
       if (!res.ok) {
@@ -285,10 +323,28 @@ export default function SignupForm(_props: Props) {
           borderRadius: 8,
         }}
       >
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>วิธีรับเงิน (ไม่บังคับ)</div>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>ช่องทางรับชำระเงิน</div>
         <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 14, lineHeight: 1.5 }}>
-          ลูกค้าจะโอนเงินให้ร้านโดยตรง DopRent ไม่เก็บเงินแทน
+          ต้องมีอย่างน้อยหนึ่งช่องทาง (PromptPay หรือบัญชีธนาคาร) ก่อนลงขายสินค้าได้
+          — ลูกค้าจะโอนเงินให้ร้านโดยตรง DopRent ไม่เก็บเงินแทน
         </div>
+
+        {/* Soft warning: no channel selected yet */}
+        {!promptpayId.trim() && !bankAccountNumber.trim() && (
+          <div
+            style={{
+              padding: "10px 14px",
+              background: "#FFFBEB",
+              border: "1px solid #F59E0B",
+              borderRadius: 6,
+              fontSize: 13,
+              color: "#92400E",
+              marginBottom: 14,
+            }}
+          >
+            ⚠️ ยังไม่มีช่องทางรับชำระเงิน — ต้องเพิ่มก่อนจึงจะลงขายสินค้าได้
+          </div>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <Field
@@ -300,9 +356,23 @@ export default function SignupForm(_props: Props) {
               name="promptpay_id"
               maxLength={20}
               placeholder="เช่น 0812345678"
+              value={promptpayId}
+              onChange={(e) => setPromptpayId(e.target.value)}
               style={inputStyle}
             />
           </Field>
+          {/* Bold PromptPay remark */}
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--ink)",
+              marginTop: -8,
+              lineHeight: 1.5,
+            }}
+          >
+            ชื่อบัญชี PromptPay ต้องตรงกับชื่อในบัตรประชาชน/เอกสารนิติบุคคลที่ใช้ยืนยันร้าน (KYC)
+          </div>
 
           <Field label="ธนาคาร (ไม่บังคับ)">
             <select name="bank_name" style={inputStyle} defaultValue="">
@@ -325,6 +395,8 @@ export default function SignupForm(_props: Props) {
               inputMode="numeric"
               maxLength={20}
               placeholder="เช่น 123-4-56789-0"
+              value={bankAccountNumber}
+              onChange={(e) => setBankAccountNumber(e.target.value)}
               style={inputStyle}
             />
           </Field>
@@ -338,6 +410,87 @@ export default function SignupForm(_props: Props) {
               style={inputStyle}
             />
           </Field>
+
+          {/* Bankbook upload */}
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
+              รูปหน้าสมุดบัญชี{bankAccountNumber.trim() ? <RequiredMark /> : " (ไม่บังคับ)"}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8, lineHeight: 1.5 }}>
+              จำเป็นต้องแนบเมื่อระบุเลขบัญชี — เก็บเป็นความลับ ผู้ดูแลระบบเท่านั้นที่เห็นได้
+            </div>
+
+            {/* Hidden key — set programmatically */}
+            <input type="hidden" name="bankbook_image_path" value={bankbookKey} readOnly />
+
+            {bankbookKey ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "8px 12px",
+                  background: "var(--success-soft, #F0FDF4)",
+                  border: "1px solid var(--success, #22C55E)",
+                  borderRadius: 6,
+                  fontSize: 13,
+                  marginBottom: 8,
+                }}
+              >
+                <span style={{ color: "var(--success, #16A34A)", fontWeight: 600 }}>✓ แนบแล้ว</span>
+                <button
+                  type="button"
+                  style={{
+                    marginLeft: "auto",
+                    border: 0,
+                    background: "none",
+                    color: "var(--ink-3)",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                    textDecoration: "underline",
+                  }}
+                  onClick={() => {
+                    setBankbookKey("");
+                    if (bankbookInputRef.current) bankbookInputRef.current.value = "";
+                  }}
+                >
+                  เปลี่ยนรูป
+                </button>
+              </div>
+            ) : null}
+
+            <label
+              style={{
+                display: "inline-block",
+                padding: "9px 14px",
+                border: "1px solid var(--line)",
+                borderRadius: 6,
+                fontSize: 13,
+                background: "var(--surface)",
+                cursor: bankbookUploading ? "wait" : "pointer",
+                color: "var(--ink)",
+              }}
+            >
+              {bankbookUploading ? "กำลังอัปโหลด…" : bankbookKey ? "เปลี่ยนรูปสมุดบัญชี" : "เลือกรูปสมุดบัญชี"}
+              <input
+                ref={bankbookInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display: "none" }}
+                disabled={bankbookUploading}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (f) await handleBankbookFile(f);
+                }}
+              />
+            </label>
+
+            {bankbookError ? (
+              <div style={{ color: "var(--danger)", fontSize: 12, marginTop: 6 }}>{bankbookError}</div>
+            ) : null}
+          </div>
         </div>
       </div>
 
