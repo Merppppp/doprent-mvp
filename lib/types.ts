@@ -155,6 +155,8 @@ export type Shop = {
   bank_account_number?: string | null;
   /** ชื่อบัญชีธนาคาร */
   bank_account_name?: string | null;
+  /** PRIVATE bucket key ของรูปหน้าสมุดบัญชี (แนบเมื่อกรอกเลขบัญชี) */
+  bankbook_image_path?: string | null;
   since_year: number | null;
   cover_color: Color;
   cover_image: string | null;

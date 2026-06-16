@@ -463,6 +463,8 @@ model Shop {
   bankAccountNumber   String?   @map("bank_account_number")
   /// ชื่อบัญชีธนาคาร
   bankAccountName     String?   @map("bank_account_name")
+  /// คีย์รูปหน้าสมุดบัญชี (PRIVATE bucket) — แนบเมื่อกรอกเลขบัญชี, admin ตรวจผ่าน signedUrl
+  bankbookImagePath   String?   @map("bankbook_image_path")
   /// ปีที่เปิดร้าน
   sinceYear        Int?      @map("since_year")
   /// โทนสี cover การ์ดร้าน
