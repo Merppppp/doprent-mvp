@@ -276,12 +276,12 @@ const PRODUCT_CATEGORIES = [
   {
     key: "clothing", th: "เสื้อผ้า / ชุด", en: "Clothing", icon: "👗", href: "/", active: true,
     subs: [
-      { key: "evening", th: "ชุดราตรี", en: "Evening Dress", href: "/?cat=evening" },
-      { key: "thai", th: "ชุดไทย", en: "Thai Dress", href: "/?cat=thai" },
-      { key: "wedding", th: "ชุดแต่งงาน", en: "Wedding Dress", href: "/?cat=wedding" },
-      { key: "casual", th: "ชุดลำลอง", en: "Casual", href: "/?cat=casual" },
-      { key: "costume", th: "ชุดคอสตูม / แฟนซี", en: "Costume / Fancy", href: "/?cat=costume" },
-      { key: "graduation", th: "ชุดรับปริญญา", en: "Graduation", href: "/?cat=graduation" },
+      { key: "evening", th: "ชุดราตรี", en: "Evening Dress", href: "/?occasion=evening" },
+      { key: "thai", th: "ชุดไทย", en: "Thai Dress", href: "/?occasion=thai" },
+      { key: "wedding", th: "ชุดแต่งงาน", en: "Wedding Dress", href: "/?occasion=wedding" },
+      { key: "casual", th: "ชุดลำลอง", en: "Casual", href: "/?occasion=casual" },
+      { key: "costume", th: "ชุดคอสตูม / แฟนซี", en: "Costume / Fancy", href: "/?occasion=costume" },
+      { key: "graduation", th: "ชุดรับปริญญา", en: "Graduation", href: "/?occasion=graduation" },
     ],
   },
   { key: "bags", th: "กระเป๋า", en: "Bags", icon: "👜", href: "#", active: false, subs: [] },

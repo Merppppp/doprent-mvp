@@ -32,7 +32,10 @@ export type OccasionKey =
   | "gala"
   | "party"
   | "work"
-  | "casual";
+  | "casual"
+  | "thai"
+  | "costume"
+  | "graduation";
 
 export type AdsTier = "free" | "boost" | "featured" | "full";
 export type Status = "pending" | "live" | "rejected" | "draft";

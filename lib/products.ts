@@ -17,6 +17,9 @@ const FALLBACK_OCCASIONS: Occasion[] = [
   { key: "party",      th: "ปาร์ตี้",  en: "Party",      color_token: "purple",sort_order: 6 },
   { key: "work",       th: "ทำงาน",   en: "Work",       color_token: "black", sort_order: 7 },
   { key: "casual",     th: "ลำลอง",   en: "Casual",     color_token: "blue",  sort_order: 8 },
+  { key: "thai",       th: "ชุดไทย",  en: "Thai",       color_token: "rose",  sort_order: 9 },
+  { key: "graduation", th: "รับปริญญา", en: "Graduation", color_token: "navy", sort_order: 10 },
+  { key: "costume",    th: "คอสตูม/แฟนซี", en: "Costume",  color_token: "purple", sort_order: 11 },
 ];
 
 /** Default catalog product type — preserves today's dress-only browse behavior. */
@@ -242,17 +245,22 @@ async function getTrigamRankedIds(q: string): Promise<string[] | null> {
       SELECT
         p.id,
         GREATEST(
-          similarity(p.name,        ${q}),
-          COALESCE(similarity(p.designer,    ${q}), 0::real),
-          COALESCE(similarity(p.description, ${q}), 0::real),
-          similarity(s.name,        ${q})
+          MAX(similarity(p.name,        ${q})),
+          MAX(COALESCE(similarity(p.designer,    ${q}), 0::real)),
+          MAX(COALESCE(similarity(p.description, ${q}), 0::real)),
+          MAX(similarity(s.name,        ${q})),
+          COALESCE(MAX(similarity(t.label, ${q})), 0::real),
+          COALESCE(MAX(similarity(t.key,   ${q})), 0::real)
         ) AS score
       FROM products p
-      JOIN shops s         ON s.id  = p.shop_id
-      JOIN product_types pt ON pt.id = p.product_type_id
+      JOIN shops s           ON s.id  = p.shop_id
+      JOIN product_types pt  ON pt.id = p.product_type_id
+      LEFT JOIN product_tags ptg ON ptg.product_id = p.id
+      LEFT JOIN tags t           ON t.id = ptg.tag_id
       WHERE p.status    = 'live'
         AND p.available = true
         AND pt.key      = ${DEFAULT_PRODUCT_TYPE_KEY}
+      GROUP BY p.id
     ) sub
     WHERE sub.score > 0.15
     ORDER BY sub.score DESC
