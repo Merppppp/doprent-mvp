@@ -12,6 +12,12 @@ import "./globals.css";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 
+// Default OG image for pages without their own (home, browse, etc.). Product &
+// shop pages override openGraph.images with their own item/shop photo. Served
+// from object storage (MinIO dev / R2 prod) via the public asset base URL.
+const ASSET_BASE = process.env.NEXT_PUBLIC_ASSET_BASE_URL ?? "";
+const OG_DEFAULT = ASSET_BASE ? `${ASSET_BASE}/banners/banner-1.png` : undefined;
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
   title: {
@@ -37,12 +43,14 @@ export const metadata: Metadata = {
       "แคตตาล็อกชุดเช่าจากร้านในกรุงเทพฯ ติดต่อจองผ่าน LINE โดยตรงกับร้าน",
     url: SITE,
     locale: "th_TH",
+    images: OG_DEFAULT ? [{ url: OG_DEFAULT, alt: "DopRent" }] : undefined,
   },
   twitter: {
     card: "summary_large_image",
     title: "DopRent · เช่าชุดดีไซเนอร์ในกรุงเทพฯ",
     description:
       "แคตตาล็อกชุดเช่าจากร้านในกรุงเทพฯ ติดต่อจองผ่าน LINE โดยตรงกับร้าน",
+    images: OG_DEFAULT ? [OG_DEFAULT] : undefined,
   },
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],

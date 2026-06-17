@@ -37,10 +37,30 @@ function decodeSlug(raw: string): string {
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const b = await getShopBySlug(decodeSlug(params.slug));
   if (!b) return { title: "ไม่พบร้าน", robots: { index: false } };
+  const url = `${SITE}/shop/${b.slug}`;
+  const description = b.tag ?? `${b.name} · ${b.area_label}`;
+  // og:image — shop logo first, then a product cover so a pasted shop link shows
+  // the shop visually. URLs are already absolute (R2/MinIO public URL).
+  const ogImage = b.logo_url ?? b.cover_image ?? undefined;
   return {
     title: b.name,
-    description: b.tag ?? `${b.name} · ${b.area_label}`,
-    alternates: { canonical: `${SITE}/shop/${b.slug}` },
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title: b.name,
+      description,
+      url,
+      type: "website",
+      siteName: "DopRent",
+      locale: "th_TH",
+      images: ogImage ? [{ url: ogImage, alt: b.name }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: b.name,
+      description,
+      images: ogImage ? [ogImage] : undefined,
+    },
   };
 }
 
