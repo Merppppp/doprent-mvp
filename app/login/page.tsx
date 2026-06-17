@@ -153,12 +153,6 @@ export default function LoginPage() {
           สมัครสมาชิก
         </Link>
       </div>
-
-      <div style={{ textAlign: "center", marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
-        <Link href="/staff/login" style={{ fontSize: 13, color: "var(--ink-3)" }}>
-          เข้าสู่ระบบสำหรับพนักงานร้าน
-        </Link>
-      </div>
     </div>
   );
 }

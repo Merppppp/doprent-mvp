@@ -40,11 +40,28 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const title = dress.designer ? `${dress.name} · ${dress.designer}` : dress.name;
   const description = `${dress.description ?? dress.name} ค่าเช่า ฿${dress.price_per_day.toLocaleString()}/วัน · จองผ่าน LINE กับ ${dress.shop_name}`;
   const url = `${SITE}/product/${dress.slug}`;
+  // og:image — the product's first photo so link previews (Discord/LINE/FB/X)
+  // show the actual item. Image URLs are already absolute (R2/MinIO public URL).
+  const ogImage = dress.images?.[0];
   return {
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, type: "website", siteName: "DopRent", locale: "th_TH" },
+    openGraph: {
+      title,
+      description,
+      url,
+      type: "website",
+      siteName: "DopRent",
+      locale: "th_TH",
+      images: ogImage ? [{ url: ogImage, alt: dress.name }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ogImage ? [ogImage] : undefined,
+    },
   };
 }
 
