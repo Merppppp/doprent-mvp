@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { addAddress, updateAddress, deleteAddress, setDefaultAddress } from "@/app/actions/bookings";
 import type { Address } from "@/lib/types";
+import { inputStyle as inp } from "@/lib/ui-styles";
 
 type Props = { addresses: Address[] };
 
@@ -250,18 +251,6 @@ function AddressForm({
     </form>
   );
 }
-
-const inp: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  border: "1px solid var(--line)",
-  borderRadius: 8,
-  fontSize: 15,
-  fontFamily: "inherit",
-  background: "var(--bg)",
-  color: "var(--ink)",
-  boxSizing: "border-box",
-};
 
 const btnSm: React.CSSProperties = {
   fontSize: 13,
