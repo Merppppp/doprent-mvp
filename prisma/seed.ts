@@ -33,7 +33,7 @@ export async function seedBase() {
   const dressRoot = await db.productCategory.upsert({
     where: { key: "dress-all" },
     update: {},
-    create: { key: "dress-all", label: "ชุดเดรสทั้งหมด", productTypeId: dressType.id, sortOrder: 0 },
+    create: { key: "dress-all", label: "ชุดเสื้อผ้าทั้งหมด", productTypeId: dressType.id, sortOrder: 0 },
   });
   await db.productCategory.upsert({
     where: { key: "suit-all" },
