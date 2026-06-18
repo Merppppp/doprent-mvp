@@ -31,6 +31,7 @@ import {
   notifySlipDisputed,
 } from "@/lib/notifications";
 import { FIRST_TOUCH_COOKIE, decodeAttribution } from "@/lib/attribution";
+import { BOOKING_SLIP_MAX_BYTES } from "@/lib/config";
 
 type Result<T = unknown> =
   | ({ ok: true } & T)
@@ -699,7 +700,7 @@ async function sellerSimpleMove(
 /* ------------------------------ renter ------------------------------- */
 
 // Slip upload validation (magic bytes + size), mirrors /api/upload.
-const MAX_SLIP_SIZE = 5 * 1024 * 1024;
+const MAX_SLIP_SIZE = BOOKING_SLIP_MAX_BYTES;
 const SLIP_SIGNATURES: Array<{ mime: string; bytes: number[] }> = [
   { mime: "image/jpeg", bytes: [0xff, 0xd8, 0xff] },
   { mime: "image/png", bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },

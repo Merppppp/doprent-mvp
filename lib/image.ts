@@ -1,5 +1,6 @@
+import { UPLOAD_MAX_BYTES as MAX_UPLOAD_BYTES } from "@/lib/config";
+export { MAX_UPLOAD_BYTES };
 export const MAX_UPLOAD_SIDE = 1920;
-export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 
 const WEBP_OUTPUT_TYPE = "image/webp";
 const JPEG_OUTPUT_TYPE = "image/jpeg";

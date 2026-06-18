@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
+import { ADMIN_PAGE_SIZE as PAGE_SIZE } from "@/lib/config";
 import ProductRow from "./ProductRow";
 
 export const dynamic = "force-dynamic";
@@ -20,8 +21,6 @@ const SORT_OPTS = [
   "price-low",
 ] as const;
 type SortOpt = (typeof SORT_OPTS)[number];
-
-const PAGE_SIZE = 20;
 
 function getOrderBy(sort: SortOpt) {
   if (sort === "oldest") return { createdAt: "asc" as const };
