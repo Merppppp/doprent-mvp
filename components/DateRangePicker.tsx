@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { priceForNights } from "@/lib/pricing";
 import { type PriceTier, sizeLabel } from "@/lib/types";
+import { fmtThai, MONTHS_TH_FULL } from "@/lib/date-th";
 /** A size variant available for booking on the product. */
 export type VariantOption = {
   id: string;
@@ -62,14 +63,6 @@ type Props = {
   variants?: VariantOption[];
 };
 
-/** Convert YYYY-MM-DD → "DD/MM/YYYY" Thai display format. */
-function fmtThai(dateStr: string): string {
-  if (!dateStr) return "";
-  const [y, m, d] = dateStr.split("-");
-  if (!y || !m || !d) return dateStr;
-  return `${d}/${m}/${y}`;
-}
-
 /** Days between two YYYY-MM-DD dates, inclusive. Returns 0 if either is empty/invalid or end < start. */
 function nightsBetween(start: string, end: string): number {
   if (!start || !end) return 0;
@@ -107,11 +100,8 @@ const TODAY = (() => {
   return isoOf(d);
 })();
 
-const TH_MONTHS = [
-  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
-];
-const TH_DOW = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"]; // Monday-first
+const TH_MONTHS = MONTHS_TH_FULL; // alias for local readability
+const TH_DOW = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"]; // Monday-first (intentionally different from DAYS_TH)
 
 /**
  * Renter-side date range picker. Blocks dates the seller has marked as unavailable

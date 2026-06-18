@@ -10,31 +10,9 @@ type Props = {
   initialBlackouts: string[];
 };
 
-const DAYS_TH = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
-const MONTHS_TH = [
-  "ม.ค.",
-  "ก.พ.",
-  "มี.ค.",
-  "เม.ย.",
-  "พ.ค.",
-  "มิ.ย.",
-  "ก.ค.",
-  "ส.ค.",
-  "ก.ย.",
-  "ต.ค.",
-  "พ.ย.",
-  "ธ.ค.",
-];
+import { DAYS_TH, MONTHS_TH, toLocalYmd } from "@/lib/date-th";
 
-/** Format Date object → "YYYY-MM-DD" using LOCAL time (avoids UTC offset bug). */
-function toLocalDateString(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-const TODAY_STR = toLocalDateString(new Date());
+const TODAY_STR = toLocalYmd(new Date());
 
 export default function AvailabilityCalendar({ productId, initialBlackouts }: Props) {
   const router = useRouter();
@@ -77,7 +55,7 @@ export default function AvailabilityCalendar({ productId, initialBlackouts }: Pr
   }
 
   function onDateClick(date: Date) {
-    const dateStr = toLocalDateString(date);
+    const dateStr = toLocalYmd(date);
     // Don't allow past dates
     if (dateStr < TODAY_STR) return;
     setError(null);
@@ -178,7 +156,7 @@ export default function AvailabilityCalendar({ productId, initialBlackouts }: Pr
       >
         {cells.map((cell, i) => {
           if (!cell) return <div key={i} />;
-          const dateStr = toLocalDateString(cell.date);
+          const dateStr = toLocalYmd(cell.date);
           const isToday = dateStr === TODAY_STR;
           const isPast = dateStr < TODAY_STR;
           const isBlocked = blackouts.has(dateStr);

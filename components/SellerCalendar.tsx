@@ -26,32 +26,7 @@ import Link from "next/link";
 import type { SellerCalendarData, CalendarBooking, CalendarProduct } from "@/lib/seller-calendar";
 import { BOOKING_STATUS_META } from "@/lib/bookings";
 import type { BookingStatus } from "@/lib/types";
-
-// ─── constants ───────────────────────────────────────────────────────────────
-
-const DAYS_TH = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
-const MONTHS_TH = [
-  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน",
-  "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม",
-  "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
-];
-
-/** Format Date → "YYYY-MM-DD" using LOCAL time. */
-function toLocalYmd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** Format "YYYY-MM-DD" → Thai "DD เดือน YYYY (BE)" */
-function fmtThaiDate(s: string): string {
-  const [y, m, d] = s.split("-");
-  return `${parseInt(d, 10)} ${MONTHS_TH[parseInt(m, 10) - 1]} ${parseInt(y, 10) + 543}`;
-}
-
-/** Format "YYYY-MM-DD" → "DD/MM/YY" */
-function fmtShort(s: string): string {
-  const [y, m, d] = s.split("-");
-  return `${d}/${m}/${String(parseInt(y, 10) + 543).slice(-2)}`;
-}
+import { DAYS_TH, MONTHS_TH_FULL, toLocalYmd, fmtThaiLong, fmtThaiShort } from "@/lib/date-th";
 
 const STATUS_TONE: Record<string, { bg: string; fg: string }> = {
   neutral: { bg: "var(--surface)", fg: "var(--ink-2)" },
@@ -341,7 +316,7 @@ export default function SellerCalendar({ data }: Props) {
           ←
         </button>
         <div style={{ fontWeight: 700, fontSize: 18 }}>
-          {MONTHS_TH[viewMonth]} {viewYear + 543}
+          {MONTHS_TH_FULL[viewMonth]} {viewYear + 543}
         </div>
         <button type="button" onClick={nextMonth} style={navBtnStyle} aria-label="เดือนถัดไป">
           →
@@ -420,7 +395,7 @@ export default function SellerCalendar({ data }: Props) {
               type="button"
               onClick={() => setSelectedDay(isSelected ? null : dateStr)}
               aria-pressed={isSelected}
-              aria-label={`${parseInt(dateStr.slice(8), 10)} ${MONTHS_TH[viewMonth]}${hasBookings ? ` (จอง ${dayBookings.length})` : ""}${isClosed ? " (ร้านหยุด)" : ""}`}
+              aria-label={`${parseInt(dateStr.slice(8), 10)} ${MONTHS_TH_FULL[viewMonth]}${hasBookings ? ` (จอง ${dayBookings.length})` : ""}${isClosed ? " (ร้านหยุด)" : ""}`}
               style={{
                 aspectRatio: "1/1",
                 position: "relative",
@@ -606,7 +581,7 @@ function DayDetailPanel({
           gap: 8,
         }}
       >
-        <div style={{ fontWeight: 700, fontSize: 16 }}>{fmtThaiDate(dateStr)}</div>
+        <div style={{ fontWeight: 700, fontSize: 16 }}>{fmtThaiLong(dateStr)}</div>
         <button
           type="button"
           onClick={onClose}
@@ -856,7 +831,7 @@ function DayDetailPanel({
                     </div>
                   )}
                   <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 3 }}>
-                    {fmtShort(b.startDate)} – {fmtShort(b.endDate)}
+                    {fmtThaiShort(b.startDate)} – {fmtThaiShort(b.endDate)}
                   </div>
                 </div>
 

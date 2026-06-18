@@ -15,11 +15,7 @@ import {
   fetchSellerBookingsPage,
   type SellerBookingCardWithTrust,
 } from "@/app/actions/seller-bookings";
-
-const fmtThai = (s: string) => {
-  const [y, m, d] = s.split("-");
-  return y ? `${d}/${m}/${y}` : s;
-};
+import { fmtThai } from "@/lib/date-th";
 
 type Props = {
   /** Server-rendered first page for the default tab ("all", all time). */
