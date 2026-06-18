@@ -166,13 +166,13 @@ export default function CheckoutForm({
                 </div>
               </form>
             ) : (
-              <div key={a.id} style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+              <div key={a.id} style={{ position: "relative" }}>
                 <label
                   style={{
-                    flex: 1,
                     display: "flex",
                     gap: 10,
                     padding: 14,
+                    paddingRight: 48,
                     border: `1px solid ${selectedId === a.id ? "var(--accent)" : "var(--line)"}`,
                     borderRadius: 10,
                     cursor: "pointer",
@@ -197,14 +197,44 @@ export default function CheckoutForm({
                 </label>
                 <button
                   type="button"
-                  className="btn btn-outline"
-                  onClick={() => {
+                  aria-label="แก้ไขที่อยู่"
+                  title="แก้ไขที่อยู่"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setEditingId(a.id);
                     setShowAdd(false);
                   }}
-                  style={{ fontSize: 12.5, padding: "0 14px", whiteSpace: "nowrap" }}
+                  style={{
+                    position: "absolute",
+                    top: 10,
+                    right: 10,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 30,
+                    height: 30,
+                    borderRadius: 8,
+                    border: "1px solid var(--line)",
+                    background: "var(--surface)",
+                    color: "var(--ink-2)",
+                    cursor: "pointer",
+                  }}
                 >
-                  แก้ไข
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                  </svg>
                 </button>
               </div>
             )
