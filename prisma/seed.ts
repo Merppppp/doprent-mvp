@@ -16,7 +16,7 @@ export async function seedBase() {
   // 1. Product types
   // ---------------------------------------------------------------------------
   const productTypes = [
-    { key: "dress", label: "ชุดเดรส" },
+    { key: "dress", label: "ชุดเสื้อผ้า" },
     { key: "suit", label: "สูท" },
   ];
   for (const t of productTypes) {
