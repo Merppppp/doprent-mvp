@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@/auth";
+import { STAFF_PAGE_SIZE as PAGE_SIZE } from "@/lib/config";
 import {
   getStaffLoginInfo,
   listShopStaff,
@@ -19,8 +20,6 @@ export const metadata: Metadata = {
   title: "จัดการพนักงาน",
   robots: { index: false, follow: false },
 };
-
-const PAGE_SIZE = 10;
 
 const thStyle: React.CSSProperties = {
   textAlign: "left",

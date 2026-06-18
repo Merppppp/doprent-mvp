@@ -3,9 +3,10 @@ import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { auth } from "@/auth";
 import { uploadToR2 } from "@/lib/r2";
+import { UPLOAD_MAX_BYTES } from "@/lib/config";
 
 // BE-02: 2MB hard limit at server level
-const MAX_SIZE = 2 * 1024 * 1024;
+const MAX_SIZE = UPLOAD_MAX_BYTES;
 
 // BE-01: magic bytes signatures for allowed image types
 const MAGIC_SIGNATURES = [
