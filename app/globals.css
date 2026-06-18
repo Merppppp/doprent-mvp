@@ -104,10 +104,11 @@ body {
   overflow-x: hidden;
   background: var(--bg);
   color: var(--ink);
-  /* Anuphan is the body face (crisp Thai + Latin). IBM Plex Sans Thai Looped
-     and Inter remain as fallbacks if the webfont hasn't loaded yet. */
-  font-family: "Anuphan", "IBM Plex Sans Thai Looped", "Inter", system-ui,
-    -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  /* Anuphan is the body face (crisp Thai + Latin), self-hosted via next/font
+     (--font-anuphan already bundles a metric-matched fallback). The remaining
+     names are last-resort system fallbacks. */
+  font-family: var(--font-anuphan), "IBM Plex Sans Thai Looped", "Inter",
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -128,15 +129,15 @@ body {
    Sans Thai Looped body, so they share metrics and OpenType features.
    Use for hero headlines and page titles where editorial weight matters. */
 .display-serif {
-  font-family: "Bai Jamjuree", "IBM Plex Serif Thai", "Georgia", "Charter",
-    "Times New Roman", serif;
+  font-family: var(--font-bai-jamjuree), "IBM Plex Serif Thai", "Georgia",
+    "Charter", "Times New Roman", serif;
   font-feature-settings: "kern", "liga", "calt";
 }
 
 /* Display/heading face — Bai Jamjuree carries headings site-wide.
    (Body stays Anuphan.) Keeps the editorial weight of the refresh. */
 h1, h2, h3 {
-  font-family: "Bai Jamjuree", "IBM Plex Serif Thai", "Georgia", serif;
+  font-family: var(--font-bai-jamjuree), "IBM Plex Serif Thai", "Georgia", serif;
   letter-spacing: -0.01em;
 }
 

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Anuphan, Bai_Jamjuree, Bricolage_Grotesque } from "next/font/google";
 import { Suspense } from "react";
 import RouteProgress from "@/components/RouteProgress";
 import Header from "@/components/Header";
@@ -9,6 +10,28 @@ import ClarityAnalytics from "@/components/ClarityAnalytics";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 import LocationProvider from "@/components/LocationProvider";
 import "./globals.css";
+
+// Self-hosted fonts via next/font (downloaded at build time, served from our own
+// origin). This guarantees identical rendering on every device/network — the old
+// external <link> to fonts.googleapis.com would silently fall back to system
+// fonts (different per OS) whenever Google Fonts was slow/blocked.
+const anuphan = Anuphan({
+  subsets: ["thai", "latin"],
+  display: "swap",
+  variable: "--font-anuphan",
+});
+const baiJamjuree = Bai_Jamjuree({
+  subsets: ["thai", "latin"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  display: "swap",
+  variable: "--font-bai-jamjuree",
+});
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-bricolage",
+});
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 
@@ -73,15 +96,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="th">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600&family=Bai+Jamjuree:ital,wght@0,400;0,500;0,600;0,700;1,500;1,600&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Sans+Thai+Looped:wght@400;500;600&family=IBM+Plex+Serif+Thai:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html
+      lang="th"
+      className={`${anuphan.variable} ${baiJamjuree.variable} ${bricolage.variable}`}
+    >
       <body style={{ overflow: "hidden", height: "100vh", display: "flex", flexDirection: "column" }}>
         <a
           href="#main"
