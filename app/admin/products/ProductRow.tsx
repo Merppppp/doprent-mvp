@@ -80,7 +80,7 @@ export default function ProductRow({ d }: { d: D }) {
             </div>
             <div style={{ minWidth: 0 }}>
               <Link
-                href={`/dress/${d.slug}`}
+                href={`/product/${d.slug}`}
                 target="_blank"
                 style={{ fontWeight: 600, fontSize: 13 }}
               >

@@ -38,11 +38,11 @@ export async function toggleBlackout(
   return withActor(owner.userId, async () => {
     if (existing) {
       await db.productBlackoutDate.delete({ where: { productId_date: { productId, date: dateObj } } });
-      revalidatePath(`/dress/${productId}`);
+      revalidatePath(`/product/${productId}`);
       return { ok: true, blocked: false };
     } else {
       await db.productBlackoutDate.create({ data: { productId, date: dateObj } });
-      revalidatePath(`/dress/${productId}`);
+      revalidatePath(`/product/${productId}`);
       return { ok: true, blocked: true };
     }
   });
@@ -69,7 +69,7 @@ export async function setBlackouts(
       });
     }
 
-    revalidatePath(`/dress/${productId}`);
+    revalidatePath(`/product/${productId}`);
     return { ok: true };
   });
 }
