@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { fmtThai } from "@/lib/date-th";
 
 type Props = {
   dressName: string;
@@ -11,12 +12,6 @@ type Props = {
   dateTo?: string;
   tagCode?: string;
 };
-
-function fmtThai(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-");
-  if (!y || !m || !d) return dateStr;
-  return `${d}/${m}/${y}`;
-}
 
 export default function LineMessageCopyBox({
   dressName,

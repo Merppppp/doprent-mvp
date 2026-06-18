@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import type { Address, BookingDetail, BookingStatus } from "@/lib/types";
+import { ymdUtc } from "@/lib/date-th";
 
 /** Prisma include that hydrates the product + shop fields a BookingDetail needs. */
 const BOOKING_INCLUDE = {
@@ -64,7 +65,7 @@ type PrismaBookingWithJoins = {
   } | null;
 };
 
-const ymd = (d: Date) => d.toISOString().slice(0, 10);
+const ymd = ymdUtc;
 
 /** Map a Prisma booking (camelCase + joins) to the snake_case BookingDetail UI shape. */
 export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {

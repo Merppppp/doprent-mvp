@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { addAddress, updateAddress, createBooking } from "@/app/actions/bookings";
 import { priceForNights } from "@/lib/pricing";
 import type { Address, PriceTier } from "@/lib/types";
+import { fmtThai } from "@/lib/date-th";
 
 type Props = {
   productId: string;
@@ -17,11 +18,6 @@ type Props = {
   addresses: Address[];
   /** Optional variant (size) chosen by the renter on the product detail page. */
   variantId?: string | null;
-};
-
-const fmtThai = (s: string) => {
-  const [y, m, d] = s.split("-");
-  return y ? `${d}/${m}/${y}` : s;
 };
 
 export default function CheckoutForm({

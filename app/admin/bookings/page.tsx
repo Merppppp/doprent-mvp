@@ -5,6 +5,7 @@ import { amountDue } from "@/lib/bookings";
 import { expireOverdueBookings } from "@/lib/booking-expiry";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import type { BookingStatus } from "@/lib/types";
+import { fmtThai as _fmtThai, ymdUtc } from "@/lib/date-th";
 
 export const dynamic = "force-dynamic";
 
@@ -27,11 +28,8 @@ const FILTERS = [
 ] as const;
 type FilterKey = (typeof FILTERS)[number]["key"];
 
-const fmtThai = (d: Date) => {
-  const s = d.toISOString().slice(0, 10);
-  const [y, m, day] = s.split("-");
-  return `${day}/${m}/${y}`;
-};
+/** UTC-based Date → "DD/MM/YYYY". Preserves admin's existing UTC-midnight semantics. */
+const fmtThai = (d: Date) => _fmtThai(ymdUtc(d));
 
 const fmtDateTime = (d: Date) =>
   d.toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Bangkok" });
