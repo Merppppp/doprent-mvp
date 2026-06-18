@@ -79,14 +79,8 @@ export default function BindingRow({ binding }: { binding: BindingRowData }) {
           onBlur={() => {
             if (sortOrder !== binding.sortOrder) onUpdate({ sortOrder });
           }}
-          style={{
-            width: 52,
-            padding: "4px 6px",
-            border: "1px solid var(--line)",
-            borderRadius: 4,
-            fontSize: 13,
-            textAlign: "center",
-          }}
+          className="input"
+          style={{ width: 52, textAlign: "center" }}
         />
       </div>
 
@@ -101,13 +95,7 @@ export default function BindingRow({ binding }: { binding: BindingRowData }) {
             setSelectionMode(v);
             onUpdate({ selectionMode: v });
           }}
-          style={{
-            padding: "4px 6px",
-            border: "1px solid var(--line)",
-            borderRadius: 4,
-            fontSize: 13,
-            background: "var(--surface)",
-          }}
+          className="input input-surface"
         >
           <option value="multi">หลายตัว</option>
           <option value="single">ตัวเดียว</option>

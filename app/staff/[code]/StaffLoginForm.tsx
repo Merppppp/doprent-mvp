@@ -93,7 +93,7 @@ export default function StaffLoginForm({ shopName, loginCode }: Props) {
             onChange={(e) => setUsername(e.target.value)}
             required
             autoComplete="username"
-            style={{ width: "100%", padding: "11px 14px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 14 }}
+            className="input"
           />
         </div>
         <div style={{ marginBottom: 14 }}>
@@ -109,7 +109,8 @@ export default function StaffLoginForm({ shopName, loginCode }: Props) {
             maxLength={8}
             inputMode="numeric"
             autoComplete="current-password"
-            style={{ width: "100%", padding: "11px 14px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 14, letterSpacing: "0.3em" }}
+            className="input"
+            style={{ letterSpacing: "0.3em" }}
           />
         </div>
         <button

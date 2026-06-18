@@ -58,13 +58,7 @@ export default function AddBinding({
         value={selectedGroupId}
         disabled={working}
         onChange={(e) => setSelectedGroupId(e.target.value)}
-        style={{
-          padding: "5px 8px",
-          border: "1px solid var(--line)",
-          borderRadius: 4,
-          fontSize: 13,
-          background: "var(--surface)",
-        }}
+        className="input input-surface"
       >
         {availableGroups.map((g) => (
           <option key={g.id} value={g.id}>

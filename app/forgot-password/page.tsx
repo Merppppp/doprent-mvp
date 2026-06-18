@@ -67,7 +67,7 @@ export default function ForgotPasswordPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            style={{ width: "100%", padding: "11px 14px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 14 }}
+            className="input"
           />
         </div>
         <button type="submit" disabled={loading} className="btn btn-dark btn-block btn-lg"
