@@ -8,7 +8,22 @@ import { base, db } from "@/lib/db";
 import type { Role } from "@prisma/client";
 import { TERMS_VERSION } from "@/lib/consent";
 
-const ADMIN_EMAILS = ["admin@doprent.com", "prem@doprent.com", "hgcovuf@gmail.com"];
+/**
+ * Returns the admin email whitelist.
+ * Reads from ADMIN_EMAILS env var (comma-separated, trimmed, lowercased).
+ * Falls back to the original three addresses when the var is unset so that
+ * environments without the new variable keep working unchanged.
+ */
+function getAdminEmails(): string[] {
+  const raw = process.env.ADMIN_EMAILS;
+  if (!raw?.trim()) {
+    return ["admin@doprent.com", "prem@doprent.com", "hgcovuf@gmail.com"];
+  }
+  return raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
 
 class InvalidCredentialsError extends CredentialsSignin {
   code = "invalid_credentials";
@@ -149,12 +164,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider === "google" && user.email) {
-        const isAdmin = ADMIN_EMAILS.includes(user.email.toLowerCase());
+        const isAdmin = getAdminEmails().includes(user.email.toLowerCase());
         if (isAdmin) {
-          await db.user.update({
-            where: { email: user.email },
-            data: { role: "admin" },
-          });
+          try {
+            await db.user.update({
+              where: { email: user.email },
+              data: { role: "admin" },
+            });
+          } catch (err) {
+            // Non-fatal — DB write failure should not block sign-in
+            console.error("[auth] Failed to promote admin role:", err);
+          }
         }
       }
       return true;
