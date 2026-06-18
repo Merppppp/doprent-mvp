@@ -84,22 +84,22 @@ export function fmtThai(s: string): string {
 }
 
 /**
- * "YYYY-MM-DD" → "DD/MM/YY" with Buddhist Era year (2-digit).
- * Example: 2024-03-15 → "15/03/67".
+ * "YYYY-MM-DD" → "DD/MM/YY" with Gregorian (CE) year (2-digit).
+ * Example: 2024-03-15 → "15/03/24".
  */
 export function fmtThaiShort(s: string): string {
   const [y, m, d] = s.split("-");
   if (!y || !m || !d) return s;
-  return `${d}/${m}/${String(parseInt(y, 10) + 543).slice(-2)}`;
+  return `${d}/${m}/${String(parseInt(y, 10)).slice(-2)}`;
 }
 
 /**
- * "YYYY-MM-DD" → "D <full Thai month> <BE year>".
- * Example: 2024-03-15 → "15 มีนาคม 2567".
+ * "YYYY-MM-DD" → "D <full Thai month> <CE year>".
+ * Example: 2024-03-15 → "15 มีนาคม 2024".
  * Uses `MONTHS_TH_FULL` (full month names).
  */
 export function fmtThaiLong(s: string): string {
   const [y, m, d] = s.split("-");
   if (!y || !m || !d) return s;
-  return `${parseInt(d, 10)} ${MONTHS_TH_FULL[parseInt(m, 10) - 1]} ${parseInt(y, 10) + 543}`;
+  return `${parseInt(d, 10)} ${MONTHS_TH_FULL[parseInt(m, 10) - 1]} ${parseInt(y, 10)}`;
 }

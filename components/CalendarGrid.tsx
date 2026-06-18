@@ -16,7 +16,7 @@ export type CalendarGridProps = {
   months?: string[];
   /**
    * Year offset added to Gregorian year for display.
-   * Default: 543 (Buddhist Era). Pass 0 for Gregorian (CE).
+   * Default: 0 (Gregorian / CE). Pass 543 for Buddhist Era.
    */
   yearOffset?: number;
   /** Style applied to both ← and → nav buttons. */
@@ -73,7 +73,7 @@ export default function CalendarGrid({
   initialYear,
   initialMonth,
   months = MONTHS_TH,
-  yearOffset = 543,
+  yearOffset = 0,
   navBtnStyle = defaultNavBtnStyle,
   prevLabel = "←",
   nextLabel = "→",
