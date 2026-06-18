@@ -6,6 +6,7 @@ import { addAddress, updateAddress, createBooking } from "@/app/actions/bookings
 import { priceForNights } from "@/lib/pricing";
 import type { Address, PriceTier } from "@/lib/types";
 import { fmtThai } from "@/lib/date-th";
+import { inputStyle as inp } from "@/lib/ui-styles";
 
 type Props = {
   productId: string;
@@ -359,14 +360,3 @@ function Row({
   );
 }
 
-const inp: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  border: "1px solid var(--line)",
-  borderRadius: 8,
-  fontSize: 15,
-  fontFamily: "inherit",
-  background: "var(--bg)",
-  color: "var(--ink)",
-  boxSizing: "border-box",
-};
