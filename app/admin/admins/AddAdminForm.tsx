@@ -60,14 +60,8 @@ export default function AddAdminForm() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="อีเมลผู้ใช้ที่ต้องการเลื่อนสิทธิ์"
           required
-          style={{
-            flex: 1,
-            minWidth: 220,
-            padding: "9px 12px",
-            border: "1px solid var(--line)",
-            borderRadius: 6,
-            fontSize: 14,
-          }}
+          className="input"
+          style={{ flex: 1, minWidth: 220 }}
         />
         <button
           type="submit"

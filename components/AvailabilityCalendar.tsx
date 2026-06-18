@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toggleBlackout } from "@/app/actions/availability";
 import { Spinner } from "@/components/Loading";
@@ -11,31 +11,10 @@ type Props = {
   initialBlackouts: string[];
 };
 
-const DAYS_TH = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
-const MONTHS_TH = [
-  "ม.ค.",
-  "ก.พ.",
-  "มี.ค.",
-  "เม.ย.",
-  "พ.ค.",
-  "มิ.ย.",
-  "ก.ค.",
-  "ส.ค.",
-  "ก.ย.",
-  "ต.ค.",
-  "พ.ย.",
-  "ธ.ค.",
-];
+import { MONTHS_TH, toLocalYmd } from "@/lib/date-th";
+import CalendarGrid from "@/components/CalendarGrid";
 
-/** Format Date object → "YYYY-MM-DD" using LOCAL time (avoids UTC offset bug). */
-function toLocalDateString(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-const TODAY_STR = toLocalDateString(new Date());
+const TODAY_STR = toLocalYmd(new Date());
 
 export default function AvailabilityCalendar({ productId, initialBlackouts }: Props) {
   const router = useRouter();
@@ -43,42 +22,8 @@ export default function AvailabilityCalendar({ productId, initialBlackouts }: Pr
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  // Calendar view state (which month is displayed)
-  const today = new Date();
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-11
-
-  const firstDay = new Date(viewYear, viewMonth, 1);
-  const startWeekday = firstDay.getDay(); // 0 (Sun) - 6 (Sat)
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-
-  // Build a 6-row × 7-col grid (42 cells)
-  const cells: Array<{ date: Date; inMonth: boolean } | null> = [];
-  for (let i = 0; i < startWeekday; i++) cells.push(null); // leading blanks
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ date: new Date(viewYear, viewMonth, d), inMonth: true });
-  }
-  while (cells.length < 42) cells.push(null);
-
-  function prevMonth() {
-    if (viewMonth === 0) {
-      setViewYear(viewYear - 1);
-      setViewMonth(11);
-    } else {
-      setViewMonth(viewMonth - 1);
-    }
-  }
-  function nextMonth() {
-    if (viewMonth === 11) {
-      setViewYear(viewYear + 1);
-      setViewMonth(0);
-    } else {
-      setViewMonth(viewMonth + 1);
-    }
-  }
-
   function onDateClick(date: Date) {
-    const dateStr = toLocalDateString(date);
+    const dateStr = toLocalYmd(date);
     // Don't allow past dates
     if (dateStr < TODAY_STR) return;
     setError(null);
@@ -107,91 +52,39 @@ export default function AvailabilityCalendar({ productId, initialBlackouts }: Pr
     });
   }
 
-  // Days from this month that are blocked
-  const blockedThisMonth = Array.from(blackouts)
-    .filter((d) => {
-      const [y, m] = d.split("-");
-      return parseInt(y) === viewYear && parseInt(m) - 1 === viewMonth;
-    })
-    .sort();
+  // Track which month CalendarGrid is showing so we can compute per-month stats.
+  const today = new Date();
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+
   const blockedFutureCount = Array.from(blackouts).filter((d) => d >= TODAY_STR).length;
+
+  const blockedThisMonth = useMemo(() => {
+    return Array.from(blackouts)
+      .filter((d) => {
+        const [y, m] = d.split("-");
+        return parseInt(y) === viewYear && parseInt(m) - 1 === viewMonth;
+      })
+      .sort();
+  }, [blackouts, viewYear, viewMonth]);
 
   return (
     <div>
-      {/* Month navigation header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 14,
-          gap: 12,
-        }}
-      >
-        <button
-          type="button"
-          onClick={prevMonth}
-          style={navBtnStyle}
-          aria-label="เดือนก่อนหน้า"
-        >
-          ←
-        </button>
-        <div style={{ fontWeight: 600, fontSize: 17 }}>
-          {MONTHS_TH[viewMonth]} {viewYear + 543}
-        </div>
-        <button type="button" onClick={nextMonth} style={navBtnStyle} aria-label="เดือนถัดไป">
-          →
-        </button>
-      </div>
-
-      {/* Weekday header */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          gap: 4,
-          marginBottom: 8,
-        }}
-      >
-        {DAYS_TH.map((d) => (
-          <div
-            key={d}
-            style={{
-              textAlign: "center",
-              fontSize: 11,
-              fontWeight: 600,
-              color: "var(--ink-3)",
-              padding: "4px 0",
-            }}
-          >
-            {d}
-          </div>
-        ))}
-      </div>
-
-      {/* Date grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          gap: 4,
-        }}
-      >
-        {cells.map((cell, i) => {
-          if (!cell) return <div key={i} />;
-          const dateStr = toLocalDateString(cell.date);
+      <CalendarGrid
+        navBtnStyle={navBtnStyle}
+        onViewChange={(y, m) => { setViewYear(y); setViewMonth(m); }}
+        renderDay={({ date, dateStr }) => {
           const isToday = dateStr === TODAY_STR;
           const isPast = dateStr < TODAY_STR;
           const isBlocked = blackouts.has(dateStr);
 
           return (
             <button
-              key={i}
               type="button"
-              onClick={() => onDateClick(cell.date)}
+              onClick={() => onDateClick(date)}
               disabled={isPast || pending}
               aria-pressed={isBlocked}
-              aria-label={`${cell.date.getDate()} ${MONTHS_TH[viewMonth]}${isBlocked ? " (ไม่ว่าง)" : " (ว่าง)"}`}
+              aria-label={`${date.getDate()} ${MONTHS_TH[date.getMonth()]}${isBlocked ? " (ไม่ว่าง)" : " (ว่าง)"}`}
               style={{
                 aspectRatio: "1/1",
                 border: `1px solid ${isBlocked ? "var(--danger)" : isToday ? "var(--ink)" : "var(--line)"}`,
@@ -210,56 +103,56 @@ export default function AvailabilityCalendar({ productId, initialBlackouts }: Pr
                 transition: "background 0.15s, border-color 0.15s",
               }}
             >
-              {cell.date.getDate()}
+              {date.getDate()}
             </button>
           );
-        })}
-      </div>
-
-      {/* Legend + summary */}
-      <div
-        style={{
-          marginTop: 18,
-          padding: 12,
-          background: "var(--bg)",
-          border: "1px solid var(--line)",
-          borderRadius: 8,
-          fontSize: 13,
         }}
       >
-        <div style={{ display: "flex", gap: 14, marginBottom: 10, flexWrap: "wrap" }}>
-          <Legend color="#DC2626" label="ไม่ว่าง" />
-          <Legend color="var(--surface)" border="var(--line)" label="ว่าง" />
-          <Legend color="var(--bg)" border="var(--line)" label="ผ่านมาแล้ว" />
-        </div>
-        <div style={{ color: "var(--ink-2)" }}>
-          {blockedThisMonth.length > 0
-            ? `เดือนนี้: ปิด ${blockedThisMonth.length} วัน`
-            : "เดือนนี้: ยังไม่ปิดวันไหน"}
-          {" · "}
-          ปิดล่วงหน้าทั้งหมด {blockedFutureCount} วัน
-        </div>
-      </div>
-
-      {error ? (
+        {/* Legend + summary */}
         <div
           style={{
-            marginTop: 12,
-            padding: 10,
-            background: "rgba(220,38,38,0.08)",
-            border: "1px solid rgba(220,38,38,0.3)",
-            borderRadius: 6,
-            color: "var(--danger)",
+            marginTop: 18,
+            padding: 12,
+            background: "var(--bg)",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
             fontSize: 13,
           }}
         >
-          {error}
+          <div style={{ display: "flex", gap: 14, marginBottom: 10, flexWrap: "wrap" }}>
+            <Legend color="#DC2626" label="ไม่ว่าง" />
+            <Legend color="var(--surface)" border="var(--line)" label="ว่าง" />
+            <Legend color="var(--bg)" border="var(--line)" label="ผ่านมาแล้ว" />
+          </div>
+          <div style={{ color: "var(--ink-2)" }}>
+            {blockedThisMonth.length > 0
+              ? `เดือนนี้: ปิด ${blockedThisMonth.length} วัน`
+              : "เดือนนี้: ยังไม่ปิดวันไหน"}
+            {" · "}
+            ปิดล่วงหน้าทั้งหมด {blockedFutureCount} วัน
+          </div>
         </div>
-      ) : null}
 
-      {pending ? (
-        <div style={{ marginTop: 10, fontSize: 12, color: "var(--ink-3)" }}>กำลังบันทึก…</div>
-      ) : null}
+        {error ? (
+          <div
+            style={{
+              marginTop: 12,
+              padding: 10,
+              background: "rgba(220,38,38,0.08)",
+              border: "1px solid rgba(220,38,38,0.3)",
+              borderRadius: 6,
+              color: "var(--danger)",
+              fontSize: 13,
+            }}
+          >
+            {error}
+          </div>
+        ) : null}
+
+        {pending ? (
+          <div style={{ marginTop: 10, fontSize: 12, color: "var(--ink-3)" }}>กำลังบันทึก…</div>
+        ) : null}
+      </CalendarGrid>
     </div>
   );
 }

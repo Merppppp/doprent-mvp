@@ -12,17 +12,13 @@ import ReviewForm from "@/components/ReviewForm";
 import EditAddressForm from "@/components/EditAddressForm";
 import ShopSocialLinks from "@/components/ShopSocialLinks";
 import RenterAddressChange from "@/components/RenterAddressChange";
+import { fmtThai } from "@/lib/date-th";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "รายละเอียดการจอง",
   robots: { index: false, follow: false },
-};
-
-const fmtThai = (s: string) => {
-  const [y, m, d] = s.split("-");
-  return y ? `${d}/${m}/${y}` : s;
 };
 
 export default async function RenterBookingDetail({ params }: { params: { id: string } }) {

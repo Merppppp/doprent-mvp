@@ -72,6 +72,13 @@
   --info: var(--cobalt);              /* teal family — was blue */
   --info-soft: var(--cobalt-soft);
 
+  /* Alias tokens — referenced by many components with fallbacks; defined here
+     so the fallback never wins. These are pure aliases of the tokens above. */
+  --primary: var(--accent);            /* consumers: var(--primary, #2e9c65) */
+  --accent-dark: var(--accent-2);      /* consumers: var(--accent-dark, #065f46) */
+  --surface-2: var(--warm);            /* consumers: var(--surface-2, #f5f5f5) */
+  --bg-hover: oklch(0.235 0.018 70 / 0.04); /* subtle warm-ink hover tint */
+
   /* Motion — exponential ease-out, no bounce. Durations tuned for
      "refined", not flashy. prefers-reduced-motion neutralises all. */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -407,18 +414,21 @@ select:focus-visible {
   gap: 32px;
 }
 
-/* Browse results grid — more columns on large screens.
-   Scoped to .browse-grid .grid-3 so other .grid-3 usages are unaffected.
+/* Product results grid — more columns on large screens.
+   Shared by the marketplace (.browse-grid .grid-3) and the shop detail page
+   (.products-grid-wide.grid-3) so product cards are the same size on both.
    Existing tablet/phone media queries use plain .grid-3 (lower specificity)
    and only fire at ≤900px / ≤600px — well below these min-width thresholds,
    so there is no conflict. */
 @media (min-width: 1280px) {
-  .browse-grid .grid-3 {
+  .browse-grid .grid-3,
+  .products-grid-wide.grid-3 {
     grid-template-columns: repeat(4, 1fr);
   }
 }
 @media (min-width: 1536px) {
-  .browse-grid .grid-3 {
+  .browse-grid .grid-3,
+  .products-grid-wide.grid-3 {
     grid-template-columns: repeat(5, 1fr);
   }
 }
@@ -463,17 +473,29 @@ select:focus-visible {
   gap: 32px;
 }
 
-/* Featured boutique cards (horizontal layout) */
+/* Boutique cards (horizontal layout). Border lives on the class (not inline)
+   so :hover can turn it brand-green like the marketplace product cards. */
 .boutique-card {
   display: flex;
   overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  transition: transform var(--dur-2) var(--ease),
+    box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+.boutique-card--featured {
+  border-color: var(--gold);
+}
+.boutique-card:hover {
+  border-color: var(--accent);
 }
 .boutique-card .cover {
   width: 180px;
   flex-shrink: 0;
 }
 .boutiques-list .boutique-card .cover {
-  width: 160px;
+  width: 130px;
 }
 
 /* Footer columns */
@@ -705,6 +727,17 @@ select:focus-visible {
   inset: 0;
   background: rgba(0, 0, 0, 0.35);
   z-index: 50;
+}
+
+@layer components {
+  .input {
+    @apply w-full px-3 py-2.5 rounded-lg border border-line bg-bg text-ink box-border;
+    font-size: 15px;
+    font-family: inherit;
+  }
+  .input-surface {
+    @apply bg-surface;
+  }
 }
 
 /* Buttons */

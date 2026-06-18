@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { auth } from "@/auth";
 import { uploadPrivateToR2 } from "@/lib/r2";
+import { UPLOAD_MAX_BYTES } from "@/lib/config";
 
 /**
  * KYC document upload — PRIVATE bucket.
@@ -15,7 +16,7 @@ import { uploadPrivateToR2 } from "@/lib/r2";
  */
 
 // 2MB hard limit at server level (same as /api/upload)
-const MAX_SIZE = 2 * 1024 * 1024;
+const MAX_SIZE = UPLOAD_MAX_BYTES;
 
 // magic bytes signatures for allowed KYC document types (images + PDF)
 const MAGIC_SIGNATURES = [

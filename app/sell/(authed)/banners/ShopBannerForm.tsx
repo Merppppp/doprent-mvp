@@ -34,16 +34,6 @@ const labelStyle: React.CSSProperties = {
   fontWeight: 500,
   color: "var(--ink-2)",
 };
-const inputStyle: React.CSSProperties = {
-  padding: "7px 10px",
-  fontSize: 14,
-  border: "1px solid var(--line)",
-  borderRadius: 6,
-  background: "var(--bg)",
-  color: "var(--ink)",
-  width: "100%",
-  boxSizing: "border-box" as const,
-};
 const gridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
@@ -136,7 +126,7 @@ export default function ShopBannerForm(props: Props) {
           aria-required="true"
           defaultValue={banner?.title ?? ""}
           placeholder="เช่น โปรโมชั่นเดือนมิถุนายน"
-          style={inputStyle}
+          className="input"
         />
       </div>
 
@@ -152,7 +142,7 @@ export default function ShopBannerForm(props: Props) {
           type="url"
           defaultValue={banner?.imageUrl ?? ""}
           placeholder="https://example.com/banner.jpg"
-          style={inputStyle}
+          className="input"
         />
       </div>
 
@@ -167,7 +157,7 @@ export default function ShopBannerForm(props: Props) {
             (props.mode === "create" ? (props.defaultLinkUrl ?? "") : "")
           }
           placeholder="https://doprent.com/shop/my-shop"
-          style={inputStyle}
+          className="input"
         />
       </div>
 
@@ -179,7 +169,7 @@ export default function ShopBannerForm(props: Props) {
             name="startsAt"
             type="datetime-local"
             defaultValue={banner?.startsAt ?? ""}
-            style={inputStyle}
+            className="input"
           />
         </div>
         {/* Ends at */}
@@ -189,7 +179,7 @@ export default function ShopBannerForm(props: Props) {
             name="endsAt"
             type="datetime-local"
             defaultValue={banner?.endsAt ?? ""}
-            style={inputStyle}
+            className="input"
           />
         </div>
       </div>

@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { Spinner } from "@/components/Loading";
 import AvailabilityCalendar from "./AvailabilityCalendar";
 import { sizeLabel } from "@/lib/types";
+import { MONTHS_TH } from "@/lib/date-th";
 
 type DressOption = {
   id: string;
@@ -13,21 +14,6 @@ type DressOption = {
   size: string;
   price_per_day: number;
 };
-
-const MONTHS_TH = [
-  "ม.ค.",
-  "ก.พ.",
-  "มี.ค.",
-  "เม.ย.",
-  "พ.ค.",
-  "มิ.ย.",
-  "ก.ค.",
-  "ส.ค.",
-  "ก.ย.",
-  "ต.ค.",
-  "พ.ย.",
-  "ธ.ค.",
-];
 
 function getMonthKey(year: number, month: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}`;

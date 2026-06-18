@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, BookingStatus } from "@prisma/client";
 import type { Blackout, Color, Occasion, OccasionKey, PriceTier, Product, ProductCard, AdsTier, Shop, Status, KycStatus, Size } from "./types";
 
 /**
@@ -373,18 +373,92 @@ export async function listProducts(
 
   // Date range: compute blocked product IDs first — needed before the search
   // section so the trigram path can pre-filter the ranked candidate list.
+  //
+  // Two sources of blocked IDs:
+  //   1. ProductBlackoutDate rows falling in the requested date range.
+  //   2. Products FULLY BOOKED for the range: the total count of overlapping
+  //      active bookings meets or exceeds total variant capacity.
+  //
+  // Active statuses — mirrors ACTIVE_BOOKING_STATUSES in app/actions/bookings.ts:183
+  // and ACTIVE_STATUSES in lib/bookings.ts. Must stay in sync with both.
+  // Typed as BookingStatus[] so Prisma's Exact<> enum filter accepts it.
+  const ACTIVE_BOOKING_STATUSES_CATALOG: BookingStatus[] = [
+    "booking_pending",
+    "waiting_for_payment",
+    "payment_review",
+    "confirmed",
+  ];
+  //
+  // Capacity approximation: we compare the TOTAL count of overlapping active
+  // bookings (across the whole requested range) against total unit capacity
+  // (sum of available ProductVariant.quantity; 1 for products with no variants).
+  // This is conservative — it may over-block products whose bookings don't all
+  // occupy the same day — but it NEVER surfaces a genuinely fully-booked product
+  // as available.  Tradeoff: a product with N units where N separate bookings
+  // each cover a different non-overlapping sub-range inside [dateFrom,dateTo]
+  // will appear blocked even though it has spare units every day.  Acceptable
+  // for a list-page pre-filter; the product detail page runs the exact per-day
+  // check via computeUnavailableDates().
   let blockedIds: string[] = [];
   if (opts.dateFrom || opts.dateTo) {
-    const blocked = await db.productBlackoutDate.findMany({
-      where: {
-        date: {
-          gte: opts.dateFrom ? new Date(opts.dateFrom) : undefined,
-          lte: opts.dateTo ? new Date(opts.dateTo) : undefined,
+    // Open-ended queries get sentinel dates so the overlap predicate is correct.
+    const dateFromDate = opts.dateFrom ? new Date(opts.dateFrom) : new Date("2000-01-01");
+    const dateToDate   = opts.dateTo   ? new Date(opts.dateTo)   : new Date("2100-12-31");
+
+    // Run both pre-filter queries in parallel.
+    // Overlap predicate: booking.startDate ≤ dateTo AND booking.endDate ≥ dateFrom.
+    // Using findMany+select (not groupBy) for stable Prisma type inference;
+    // in-memory grouping is trivial at list-page volumes.
+    const [blackoutRows, overlappingBookings] = await Promise.all([
+      db.productBlackoutDate.findMany({
+        where: {
+          date: {
+            gte: opts.dateFrom ? new Date(opts.dateFrom) : undefined,
+            lte: opts.dateTo   ? new Date(opts.dateTo)   : undefined,
+          },
         },
-      },
-      select: { productId: true },
-    });
-    blockedIds = [...new Set(blocked.map((b) => b.productId))];
+        select: { productId: true },
+      }),
+      db.booking.findMany({
+        where: {
+          status: { in: ACTIVE_BOOKING_STATUSES_CATALOG },
+          startDate: { lte: dateToDate },
+          endDate:   { gte: dateFromDate },
+        },
+        select: { productId: true },
+      }),
+    ]);
+
+    const blockedSet = new Set(blackoutRows.map((b) => b.productId));
+
+    if (overlappingBookings.length > 0) {
+      // Count overlapping active bookings per product (in memory, no N+1).
+      const bookingCountMap = new Map<string, number>();
+      for (const b of overlappingBookings) {
+        bookingCountMap.set(b.productId, (bookingCountMap.get(b.productId) ?? 0) + 1);
+      }
+
+      // Fetch total available capacity: sum of variant quantities per product.
+      // Products with no variants default to capacity = 1 (single-unit product).
+      const affectedIds = [...bookingCountMap.keys()];
+      const variantRows = await db.productVariant.findMany({
+        where: { productId: { in: affectedIds }, available: true },
+        select: { productId: true, quantity: true },
+      });
+      const capacityMap = new Map<string, number>();
+      for (const v of variantRows) {
+        capacityMap.set(v.productId, (capacityMap.get(v.productId) ?? 0) + v.quantity);
+      }
+
+      for (const [productId, count] of bookingCountMap) {
+        const capacity = capacityMap.get(productId) ?? 1; // no variants → single-unit
+        if (count >= capacity) {
+          blockedSet.add(productId);
+        }
+      }
+    }
+
+    blockedIds = [...blockedSet];
   }
 
   // Search — try trigram similarity first; fall back to substring AND when no

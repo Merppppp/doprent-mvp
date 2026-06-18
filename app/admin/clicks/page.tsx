@@ -177,7 +177,7 @@ export default async function ClicksAdmin({
           <Table
             rows={topShops.map((b) => ({
               label: (
-                <Link href={`/boutique/${b.slug}`} target="_blank" style={{ fontWeight: 500 }}>
+                <Link href={`/shop/${b.slug}`} target="_blank" style={{ fontWeight: 500 }}>
                   {b.name}
                 </Link>
               ),
@@ -191,7 +191,7 @@ export default async function ClicksAdmin({
           <Table
             rows={topProducts.map((d) => ({
               label: (
-                <Link href={`/dress/${d.slug}`} target="_blank" style={{ fontWeight: 500 }}>
+                <Link href={`/product/${d.slug}`} target="_blank" style={{ fontWeight: 500 }}>
                   {d.name}
                   {d.shop_name ? <span style={{ fontSize: 11, color: "var(--ink-3)", marginLeft: 6 }}>· {d.shop_name}</span> : null}
                 </Link>

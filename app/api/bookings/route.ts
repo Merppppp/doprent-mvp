@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { withActor } from "@/lib/db-context";
+import { createBooking } from "@/app/actions/bookings";
 
 const BOOKING_INCLUDE = {
   product: {
@@ -49,56 +49,30 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   // `dressId` accepted as a legacy alias during the rename deploy window.
   const productId = body.productId ?? body.dressId;
-  const { addressId, startDate, endDate } = body;
+  const { addressId, startDate, endDate, variantId } = body;
 
-  if (!productId || !startDate || !endDate) {
-    return NextResponse.json({ error: "กรุณากรอกข้อมูลให้ครบ" }, { status: 400 });
+  // Build FormData and delegate to server action, which enforces ALL policy checks:
+  // availability, oversell prevention, variant validation, lead-time, status guards,
+  // anti-spam, price-tier calculation, staff-account block, etc.
+  const fd = new FormData();
+  if (productId) fd.set("product_id", productId);
+  // Preserve legacy alias so the server action back-compat path is also exercised.
+  if (body.dressId) fd.set("dress_id", body.dressId);
+  if (addressId) fd.set("address_id", addressId);
+  if (startDate) fd.set("start_date", startDate);
+  if (endDate) fd.set("end_date", endDate);
+  if (variantId) fd.set("variant_id", variantId);
+
+  const result = await createBooking(fd);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  const pendingCount = await db.booking.count({
-    where: { renterId: session.user.id, status: "booking_pending" },
+  // Load the full booking for a backward-compatible response shape.
+  const booking = await db.booking.findUnique({
+    where: { id: result.id },
+    include: BOOKING_INCLUDE,
   });
-  if (pendingCount >= 3) {
-    return NextResponse.json({ error: "มี booking รอดำเนินการอยู่แล้ว 3 รายการ" }, { status: 400 });
-  }
-
-  const product = await db.product.findUnique({
-    where: { id: productId },
-    include: { shop: true },
-  });
-  if (!product) return NextResponse.json({ error: "ไม่พบชุดนี้" }, { status: 404 });
-
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-  const rentalTotal = product.pricePerDay * days;
-  const commissionRate = parseFloat(process.env.PLATFORM_COMMISSION_RATE || "0.10");
-  const commissionAmount = Math.round(rentalTotal * commissionRate);
-
-  const addr = addressId
-    ? await db.address.findUnique({ where: { id: addressId }, select: { recipientName: true, phone: true, addressLine: true } })
-    : null;
-
-  const booking = await withActor(session.user.id, () =>
-    db.booking.create({
-      data: {
-        renterId: session.user.id,
-        shopId: product.shopId,
-        productId,
-        startDate: start,
-        endDate: end,
-        rentalTotal,
-        deposit: product.deposit,
-        commissionRate,
-        commissionAmount,
-        addressId: addressId ?? null,
-        recipientName: addr?.recipientName ?? null,
-        phone: addr?.phone ?? null,
-        addressText: addr?.addressLine ?? null,
-      },
-      include: BOOKING_INCLUDE,
-    }),
-  );
 
   return NextResponse.json(booking, { status: 201 });
 }

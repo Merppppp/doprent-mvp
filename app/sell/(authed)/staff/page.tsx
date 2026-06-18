@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@/auth";
+import { STAFF_PAGE_SIZE as PAGE_SIZE } from "@/lib/config";
 import {
   getStaffLoginInfo,
   listShopStaff,
@@ -19,8 +20,6 @@ export const metadata: Metadata = {
   title: "จัดการพนักงาน",
   robots: { index: false, follow: false },
 };
-
-const PAGE_SIZE = 10;
 
 const thStyle: React.CSSProperties = {
   textAlign: "left",
@@ -91,7 +90,7 @@ export default async function StaffManagementPage({
                 name="display_name"
                 required
                 placeholder="เช่น สมหญิง"
-                style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 14 }}
+                className="input"
               />
             </div>
             <div>
@@ -102,7 +101,7 @@ export default async function StaffManagementPage({
                 placeholder="เช่น staff01"
                 pattern="[a-z0-9._\-]{3,32}"
                 title="ตัวอักษรภาษาอังกฤษ/ตัวเลข 3-32 ตัว"
-                style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 14 }}
+                className="input"
               />
             </div>
           </div>
@@ -116,7 +115,7 @@ export default async function StaffManagementPage({
               maxLength={8}
               inputMode="numeric"
               placeholder="••••••"
-              style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 14 }}
+              className="input"
             />
           </div>
           <div style={{ display: "flex", gap: 20, marginBottom: 14 }}>
@@ -261,7 +260,7 @@ export default async function StaffManagementPage({
                                 maxLength={8}
                                 inputMode="numeric"
                                 placeholder="••••••"
-                                style={{ width: "100%", padding: "7px 10px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 13 }}
+                                className="input"
                               />
                             </div>
                             <button type="submit" className="btn btn-dark" style={{ padding: "7px 14px", fontSize: 12 }}>

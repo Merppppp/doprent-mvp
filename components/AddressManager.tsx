@@ -215,21 +215,21 @@ function AddressForm({
         name="recipient_name"
         placeholder="ชื่อผู้รับ"
         defaultValue={initial?.recipient_name ?? ""}
-        style={inp}
+        className="input"
         required
       />
       <input
         name="phone"
         placeholder="เบอร์โทร"
         defaultValue={initial?.phone ?? ""}
-        style={inp}
+        className="input"
         required
       />
       <textarea
         name="address_text"
         placeholder="ที่อยู่จัดส่ง (บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์)"
         defaultValue={initial?.address_text ?? ""}
-        style={{ ...inp, minHeight: 72, resize: "vertical" }}
+        className="input" style={{ minHeight: 72, resize: "vertical" }}
         required
       />
       {!initial ? (
@@ -250,18 +250,6 @@ function AddressForm({
     </form>
   );
 }
-
-const inp: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  border: "1px solid var(--line)",
-  borderRadius: 8,
-  fontSize: 15,
-  fontFamily: "inherit",
-  background: "var(--bg)",
-  color: "var(--ink)",
-  boxSizing: "border-box",
-};
 
 const btnSm: React.CSSProperties = {
   fontSize: 13,

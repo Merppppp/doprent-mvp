@@ -58,7 +58,7 @@ export default function ShopRow({ b }: { b: Shop }) {
         {/* ร้าน */}
         <td style={tdStyle}>
           <Link
-            href={`/boutique/${b.slug}`}
+            href={`/shop/${b.slug}`}
             target="_blank"
             style={{ fontWeight: 600, fontSize: 14 }}
           >
@@ -192,7 +192,7 @@ export default function ShopRow({ b }: { b: Shop }) {
             </button>
 
             <Link
-              href={`/boutique/${b.slug}`}
+              href={`/shop/${b.slug}`}
               target="_blank"
               className="btn btn-outline"
               style={btnSm}
@@ -230,14 +230,8 @@ export default function ShopRow({ b }: { b: Shop }) {
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="เหตุผลที่ปฏิเสธ"
-                style={{
-                  flex: 1,
-                  padding: "9px 12px",
-                  border: "1px solid var(--line)",
-                  borderRadius: 6,
-                  fontSize: 13,
-                  minWidth: 250,
-                }}
+                className="input"
+                style={{ flex: 1, minWidth: 250 }}
               />
               <button
                 type="button"
