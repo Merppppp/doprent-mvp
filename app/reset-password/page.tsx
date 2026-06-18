@@ -113,7 +113,8 @@ function PasswordField({ label, value, onChange, showPassword, onToggle }: {
       <div style={{ position: "relative" }}>
         <input type={showPassword ? "text" : "password"} value={value}
           onChange={(e) => onChange(e.target.value)} required minLength={6}
-          style={{ width: "100%", padding: "11px 44px 11px 14px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 14 }} />
+          className="input"
+          style={{ padding: "11px 44px 11px 14px" }} />
         <button type="button" onClick={onToggle}
           style={{ position: "absolute", top: "50%", right: 10, transform: "translateY(-50%)", background: "none", border: "none", color: "var(--ink-3)", fontSize: 13, cursor: "pointer", padding: 0 }}>
           {showPassword ? "ซ่อน" : "แสดง"}
