@@ -37,17 +37,6 @@ export default function BillingForm({ initial }: { initial: BillingValues }) {
     });
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "9px 12px",
-    border: "1px solid var(--line)",
-    borderRadius: 6,
-    fontSize: 14,
-    background: "var(--bg)",
-    color: "var(--ink)",
-    boxSizing: "border-box",
-  };
-
   const labelStyle: React.CSSProperties = {
     display: "block",
     fontSize: 13,
@@ -86,7 +75,7 @@ export default function BillingForm({ initial }: { initial: BillingValues }) {
           type="text"
           defaultValue={initial.billingCompanyName ?? ""}
           placeholder="เช่น บริษัท ดอปเรนท์ จำกัด"
-          style={inputStyle}
+          className="input"
           autoComplete="organization"
         />
       </div>
@@ -106,7 +95,7 @@ export default function BillingForm({ initial }: { initial: BillingValues }) {
           placeholder="เช่น 0105565123456"
           inputMode="numeric"
           maxLength={13}
-          style={inputStyle}
+          className="input"
           autoComplete="off"
         />
       </div>
@@ -121,7 +110,7 @@ export default function BillingForm({ initial }: { initial: BillingValues }) {
           defaultValue={initial.billingAddress ?? ""}
           placeholder="เช่น 123/4 ถ.สุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110"
           rows={3}
-          style={{ ...inputStyle, resize: "vertical" }}
+          className="input" style={{ resize: "vertical" }}
           autoComplete="street-address"
         />
       </div>
@@ -139,7 +128,7 @@ export default function BillingForm({ initial }: { initial: BillingValues }) {
           type="text"
           defaultValue={initial.billingBranch ?? ""}
           placeholder="เช่น สำนักงานใหญ่ หรือ สาขา 00001"
-          style={inputStyle}
+          className="input"
           autoComplete="off"
         />
       </div>

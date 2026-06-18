@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { priceForNights } from "@/lib/pricing";
 import { type PriceTier, sizeLabel } from "@/lib/types";
+import { fmtThai, MONTHS_TH_FULL, DAYS_TH } from "@/lib/date-th";
 /** A size variant available for booking on the product. */
 export type VariantOption = {
   id: string;
@@ -62,14 +63,6 @@ type Props = {
   variants?: VariantOption[];
 };
 
-/** Convert YYYY-MM-DD → "DD/MM/YYYY" Thai display format. */
-function fmtThai(dateStr: string): string {
-  if (!dateStr) return "";
-  const [y, m, d] = dateStr.split("-");
-  if (!y || !m || !d) return dateStr;
-  return `${d}/${m}/${y}`;
-}
-
 /** Days between two YYYY-MM-DD dates, inclusive. Returns 0 if either is empty/invalid or end < start. */
 function nightsBetween(start: string, end: string): number {
   if (!start || !end) return 0;
@@ -107,11 +100,6 @@ const TODAY = (() => {
   return isoOf(d);
 })();
 
-const TH_MONTHS = [
-  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
-];
-const TH_DOW = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"]; // Monday-first
 
 /**
  * Renter-side date range picker. Blocks dates the seller has marked as unavailable
@@ -399,7 +387,7 @@ function Calendar({
 
   const rangeEnd = end || (preview && start && preview >= start ? preview : "");
 
-  const firstDow = (new Date(view.y, view.m, 1).getDay() + 6) % 7; // Monday-first
+  const firstDow = new Date(view.y, view.m, 1).getDay(); // Sunday-first
   const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
 
   const isDisabled = (iso: string) => iso < minISO || blackoutSet.has(iso);
@@ -444,14 +432,14 @@ function Calendar({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
         <NavBtn dir="prev" disabled={!canPrev} onClick={() => canPrev && shiftMonth(-1)} />
         <div style={{ fontSize: 14, fontWeight: 600 }}>
-          {TH_MONTHS[view.m]} {view.y}
+          {MONTHS_TH_FULL[view.m]} {view.y}
         </div>
         <NavBtn dir="next" onClick={() => shiftMonth(1)} />
       </div>
 
       {/* Weekday row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", marginBottom: 2 }}>
-        {TH_DOW.map((d) => (
+        {DAYS_TH.map((d) => (
           <div key={d} style={{ textAlign: "center", fontSize: 11, color: "var(--ink-3)", padding: "4px 0" }}>
             {d}
           </div>

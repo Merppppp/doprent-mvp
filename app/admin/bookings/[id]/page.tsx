@@ -6,6 +6,7 @@ import { getSignedPrivateUrl } from "@/lib/r2";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import AdminBookingActions from "./AdminBookingActions";
 import type { BookingStatus } from "@/lib/types";
+import { fmtThai as _fmtThai, ymdUtc } from "@/lib/date-th";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +15,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const fmtThai = (d: Date) => {
-  const s = d.toISOString().slice(0, 10);
-  const [y, m, day] = s.split("-");
-  return `${day}/${m}/${y}`;
-};
+/** UTC-based Date → "DD/MM/YYYY". Preserves admin's existing UTC-midnight semantics. */
+const fmtThai = (d: Date) => _fmtThai(ymdUtc(d));
 
 const fmtDateTime = (d: Date) =>
   d.toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" });

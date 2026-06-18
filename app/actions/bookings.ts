@@ -31,6 +31,9 @@ import {
   notifySlipDisputed,
 } from "@/lib/notifications";
 import { FIRST_TOUCH_COOKIE, decodeAttribution } from "@/lib/attribution";
+import { BOOKING_SLIP_MAX_BYTES } from "@/lib/config";
+import { addDaysLocal, dateRangeLocal } from "@/lib/booking-dates";
+import { detectSlipMime } from "@/lib/file-mime";
 
 type Result<T = unknown> =
   | ({ ok: true } & T)
@@ -181,24 +184,6 @@ export async function setDefaultAddress(formData: FormData): Promise<Result> {
 
 /** Active booking statuses for overlap counting — must stay in sync with ACTIVE_STATUSES in lib/booking-policy.ts */
 const ACTIVE_BOOKING_STATUSES = ["booking_pending", "waiting_for_payment", "payment_review", "confirmed"] as const;
-
-/** Add `days` calendar days to a YYYY-MM-DD string (UTC). Mirrors the helper in booking-policy.ts. */
-function addDaysLocal(dateStr: string, days: number): string {
-  const d = new Date(dateStr + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Enumerate all YYYY-MM-DD strings in [start, end] inclusive (UTC). */
-function dateRangeLocal(start: string, end: string): string[] {
-  const result: string[] = [];
-  let cur = start;
-  while (cur <= end) {
-    result.push(cur);
-    cur = addDaysLocal(cur, 1);
-  }
-  return result;
-}
 
 export async function createBooking(formData: FormData): Promise<Result<{ id: string }>> {
   // Staff accounts are shop-management logins only — they must NEVER be able to
@@ -699,25 +684,7 @@ async function sellerSimpleMove(
 /* ------------------------------ renter ------------------------------- */
 
 // Slip upload validation (magic bytes + size), mirrors /api/upload.
-const MAX_SLIP_SIZE = 5 * 1024 * 1024;
-const SLIP_SIGNATURES: Array<{ mime: string; bytes: number[] }> = [
-  { mime: "image/jpeg", bytes: [0xff, 0xd8, 0xff] },
-  { mime: "image/png", bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
-  { mime: "image/webp", bytes: [0x52, 0x49, 0x46, 0x46] },
-];
-
-function detectSlipMime(buf: Buffer): string | null {
-  for (const sig of SLIP_SIGNATURES) {
-    if (sig.bytes.every((b, i) => buf[i] === b)) {
-      if (sig.mime === "image/webp") {
-        const webp = buf.subarray(8, 12);
-        if (![0x57, 0x45, 0x42, 0x50].every((b, i) => webp[i] === b)) continue;
-      }
-      return sig.mime;
-    }
-  }
-  return null;
-}
+const MAX_SLIP_SIZE = BOOKING_SLIP_MAX_BYTES;
 
 /**
  * Uploads the PromptPay slip to R2 and flips the booking to payment_review.

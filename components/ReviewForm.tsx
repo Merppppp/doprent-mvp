@@ -46,14 +46,8 @@ export default function ReviewForm({ bookingId, onDone }: Props) {
           maxLength={1000}
           rows={3}
           placeholder="แบ่งปันประสบการณ์การเช่ากับร้านนี้..."
-          style={{
-            width: "100%",
-            border: "1px solid var(--line)",
-            borderRadius: 6,
-            padding: "8px 10px",
-            fontSize: 14,
-            resize: "vertical",
-          }}
+          className="input"
+          style={{ resize: "vertical" }}
         />
       </div>
       {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}

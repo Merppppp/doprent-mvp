@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { withActor } from "@/lib/db-context";
-import { r2, R2_PRIVATE_BUCKET } from "@/lib/r2";
-
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB — slip อาจเป็น screenshot ใหญ่กว่ารูปชุด
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+import { uploadSlip } from "@/app/actions/bookings";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth();
@@ -17,45 +11,27 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // อ่าน formData ก่อน DB query เพื่อหลีกเลี่ยง Next.js body parsing issue
   const formData = await req.formData();
-  const file = formData.get("file");
 
-  const booking = await db.booking.findUnique({ where: { id: params.id } });
-
-  if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (booking.renterId !== session.user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-  if (booking.status !== "waiting_for_payment") {
-    return NextResponse.json({ error: "ไม่สามารถอัปโหลดสลิปในสถานะนี้" }, { status: 400 });
-  }
-
-  if (!file || typeof file === "string") {
-    return NextResponse.json({ error: "กรุณาแนบไฟล์สลิป" }, { status: 400 });
-  }
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    return NextResponse.json({ error: "รองรับเฉพาะ jpg, png, webp" }, { status: 400 });
-  }
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "ไฟล์ใหญ่เกิน 5MB" }, { status: 400 });
+  // Re-key "file" → "slip" to match the server action's expected field name,
+  // then delegate entirely. The server action enforces: ownership, status-transition
+  // validity (waiting_for_payment → payment_review), magic-byte file validation
+  // (JPG/PNG/WebP), 5 MB size cap, R2 upload, and atomic status guard.
+  const uploadFd = new FormData();
+  const slipFile = formData.get("file");
+  if (slipFile && typeof slipFile !== "string") {
+    uploadFd.set("slip", slipFile);
   }
 
-  const ext = file.type === "image/jpeg" ? "jpg" : file.type.split("/")[1];
-  const key = `slips/${params.id}_${randomUUID()}.${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const result = await uploadSlip(params.id, uploadFd);
+  if (!result.ok) {
+    const status = result.error.includes("ไม่มีสิทธิ์")
+      ? 403
+      : result.error.includes("ไม่พบ")
+        ? 404
+        : 400;
+    return NextResponse.json({ error: result.error }, { status });
+  }
 
-  await r2.send(new PutObjectCommand({
-    Bucket: R2_PRIVATE_BUCKET,
-    Key: key,
-    Body: buffer,
-    ContentType: file.type,
-  }));
-
-  const updated = await withActor(session.user.id, () =>
-    db.booking.update({
-      where: { id: params.id },
-      data: { status: "payment_review", slipPath: key },
-    }),
-  );
-
+  const updated = await db.booking.findUnique({ where: { id: params.id } });
   return NextResponse.json(updated);
 }

@@ -149,8 +149,8 @@ export default function RouteProgress() {
         style={{
           height: "100%",
           width: `${progress}%`,
-          background: "var(--accent, #7c3aed)",
-          boxShadow: "0 0 8px var(--accent, #7c3aed)",
+          background: "var(--accent, #2e9c65)",
+          boxShadow: "0 0 8px var(--accent, #2e9c65)",
           borderRadius: "0 2px 2px 0",
           transition: "width 0.22s ease",
         }}

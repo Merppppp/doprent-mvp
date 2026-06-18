@@ -134,11 +134,11 @@ export default function SignupForm(_props: Props) {
   return (
     <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       <Field label="ชื่อร้าน" hint="แสดงบนหน้าเว็บ ใช้ได้ทั้งไทย/อังกฤษ" required>
-        <input type="text" name="name" required aria-required={true} maxLength={60} style={inputStyle} />
+        <input type="text" name="name" required aria-required={true} maxLength={60} className="input input-surface" />
       </Field>
 
       <Field label="ผู้ดูแล (ไม่บังคับ)" hint='เช่น "คุณนิด" — จะแสดงใต้ชื่อร้านในหน้าโปรไฟล์'>
-        <input type="text" name="owner_name" maxLength={50} style={inputStyle} />
+        <input type="text" name="owner_name" maxLength={50} className="input input-surface" />
       </Field>
 
       {/* ==== ADDRESS SECTION ==== */}
@@ -164,7 +164,7 @@ export default function SignupForm(_props: Props) {
               aria-required={true}
               maxLength={80}
               placeholder="เช่น 88/8 ชั้น 2"
-              style={inputStyle}
+              className="input input-surface"
             />
           </Field>
 
@@ -174,7 +174,7 @@ export default function SignupForm(_props: Props) {
               name="street"
               maxLength={80}
               placeholder="เช่น ซ.ทองหล่อ 9, ถ.สุขุมวิท 55"
-              style={inputStyle}
+              className="input input-surface"
             />
           </Field>
 
@@ -185,7 +185,7 @@ export default function SignupForm(_props: Props) {
                 onChange={(e) => onDistrictChange(e.target.value)}
                 required
                 aria-required={true}
-                style={inputStyle}
+                className="input input-surface"
               >
                 <option value="">— เลือกเขต —</option>
                 {BANGKOK_DISTRICTS.map((d) => (
@@ -203,7 +203,7 @@ export default function SignupForm(_props: Props) {
                 required
                 aria-required={true}
                 disabled={!district}
-                style={{ ...inputStyle, opacity: !district ? 0.5 : 1 }}
+                className="input input-surface" style={{ opacity: !district ? 0.5 : 1 }}
               >
                 <option value="">
                   {district ? "— เลือกแขวง —" : "เลือกเขตก่อน"}
@@ -223,7 +223,7 @@ export default function SignupForm(_props: Props) {
                 type="text"
                 value={PROVINCE_TH}
                 disabled
-                style={{ ...inputStyle, background: "var(--bg)", color: "var(--ink-3)" }}
+                className="input" style={{ background: "var(--bg)", color: "var(--ink-3)" }}
               />
             </Field>
             <Field label="รหัสไปรษณีย์">
@@ -234,7 +234,7 @@ export default function SignupForm(_props: Props) {
                 maxLength={5}
                 placeholder="—"
                 inputMode="numeric"
-                style={inputStyle}
+                className="input input-surface"
               />
             </Field>
           </div>
@@ -257,24 +257,24 @@ export default function SignupForm(_props: Props) {
           required
           aria-required={true}
           placeholder="@yourshop, https://line.me/..., หรือ https://lin.ee/..."
-          style={inputStyle}
+          className="input input-surface"
         />
       </Field>
 
       <Field label="Instagram (ไม่บังคับ)" hint="เช่น @yourshop">
-        <input type="text" name="instagram" maxLength={40} style={inputStyle} placeholder="@..." />
+        <input type="text" name="instagram" maxLength={40} className="input input-surface" placeholder="@..." />
       </Field>
 
       <Field label="Facebook (ไม่บังคับ)" hint="ลิงก์เพจ หรือชื่อเพจ เช่น facebook.com/yourshop">
-        <input type="text" name="facebook" maxLength={120} style={inputStyle} placeholder="facebook.com/..." />
+        <input type="text" name="facebook" maxLength={120} className="input input-surface" placeholder="facebook.com/..." />
       </Field>
 
       <Field label="X / Twitter (ไม่บังคับ)" hint="เช่น @yourshop">
-        <input type="text" name="twitter" maxLength={40} style={inputStyle} placeholder="@..." />
+        <input type="text" name="twitter" maxLength={40} className="input input-surface" placeholder="@..." />
       </Field>
 
       <Field label="TikTok (ไม่บังคับ)" hint="เช่น @yourshop">
-        <input type="text" name="tiktok" maxLength={40} style={inputStyle} placeholder="@..." />
+        <input type="text" name="tiktok" maxLength={40} className="input input-surface" placeholder="@..." />
       </Field>
 
       <Field label="ปีที่เปิดบริการ (ไม่บังคับ)">
@@ -284,7 +284,7 @@ export default function SignupForm(_props: Props) {
           min={1980}
           max={new Date().getFullYear()}
           placeholder="2018"
-          style={{ ...inputStyle, width: 140 }}
+          className="input input-surface" style={{ width: 140 }}
         />
       </Field>
 
@@ -292,7 +292,7 @@ export default function SignupForm(_props: Props) {
         label="Tagline (ไม่บังคับ)"
         hint='ประโยคสั้นๆ ใต้ชื่อร้าน ไม่เกิน 80 ตัว เช่น "เดรสงานหมั้น handcrafted lace"'
       >
-        <input type="text" name="tag" maxLength={80} style={inputStyle} />
+        <input type="text" name="tag" maxLength={80} className="input input-surface" />
       </Field>
 
       <Field label="เกี่ยวกับร้าน (ไม่บังคับ)" hint="แนะนำตัวร้าน 2-3 ประโยค ใช้ได้ทั้งไทย/อังกฤษ">
@@ -300,12 +300,12 @@ export default function SignupForm(_props: Props) {
           name="story"
           maxLength={500}
           rows={3}
-          style={{ ...inputStyle, resize: "vertical" }}
+          className="input input-surface" style={{ resize: "vertical" }}
         />
       </Field>
 
       <Field label="สีหลักของร้าน" hint="ใช้กับ cover ตอนยังไม่มีรูป">
-        <select name="cover_color" style={inputStyle} defaultValue="rose">
+        <select name="cover_color" className="input input-surface" defaultValue="rose">
           {COLORS.map((c) => (
             <option key={c.key} value={c.key}>
               {c.label}
@@ -358,7 +358,7 @@ export default function SignupForm(_props: Props) {
               placeholder="เช่น 0812345678"
               value={promptpayId}
               onChange={(e) => setPromptpayId(e.target.value)}
-              style={inputStyle}
+              className="input input-surface"
             />
           </Field>
           {/* Bold PromptPay remark */}
@@ -375,7 +375,7 @@ export default function SignupForm(_props: Props) {
           </div>
 
           <Field label="ธนาคาร (ไม่บังคับ)">
-            <select name="bank_name" style={inputStyle} defaultValue="">
+            <select name="bank_name" className="input input-surface" defaultValue="">
               <option value="">— ไม่ระบุ —</option>
               <option value="ธ.กสิกรไทย">ธ.กสิกรไทย</option>
               <option value="ธ.ไทยพาณิชย์">ธ.ไทยพาณิชย์</option>
@@ -397,7 +397,7 @@ export default function SignupForm(_props: Props) {
               placeholder="เช่น 123-4-56789-0"
               value={bankAccountNumber}
               onChange={(e) => setBankAccountNumber(e.target.value)}
-              style={inputStyle}
+              className="input input-surface"
             />
           </Field>
 
@@ -407,7 +407,7 @@ export default function SignupForm(_props: Props) {
               name="bank_account_name"
               maxLength={100}
               placeholder="เช่น นางสาว วรรณิษา ใจดี"
-              style={inputStyle}
+              className="input input-surface"
             />
           </Field>
 
@@ -553,12 +553,3 @@ function Field({
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  border: "1px solid var(--line)",
-  borderRadius: 6,
-  background: "var(--surface)",
-  fontSize: 14,
-  fontFamily: "inherit",
-};

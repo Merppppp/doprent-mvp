@@ -6,17 +6,13 @@ import { getRenterBookings } from "@/lib/booking-queries";
 import { expireOverdueBookings } from "@/lib/booking-expiry";
 import { amountDue } from "@/lib/bookings";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
+import { fmtThai } from "@/lib/date-th";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "การจองของฉัน",
   robots: { index: false, follow: false },
-};
-
-const fmtThai = (s: string) => {
-  const [y, m, d] = s.split("-");
-  return y ? `${d}/${m}/${y}` : s;
 };
 
 export default async function MyBookingsPage() {

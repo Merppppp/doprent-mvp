@@ -65,7 +65,7 @@ export default function ToggleSwitch({
     }
   }
 
-  const trackOn = "var(--accent, #7c3aed)";
+  const trackOn = "var(--accent, #2e9c65)";
   const trackOff = "var(--line, #d1d5db)";
 
   return (

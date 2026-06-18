@@ -244,7 +244,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
           ยังไม่มีชุดในร้านนี้ ทักร้านสอบถามได้
         </div>
       ) : (
-        <div className="grid-3" style={{ gap: 20 }}>
+        <div className="grid-3 products-grid-wide" style={{ gap: 20 }}>
           {dresses.map((d, i) => (
             <ProductCard key={d.id} product={d} variant={i} savedSet={savedSet} isLoggedIn={isLoggedIn} />
           ))}
