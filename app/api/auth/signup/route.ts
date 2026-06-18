@@ -5,7 +5,23 @@ import { db } from "@/lib/db";
 import { sendVerificationEmail } from "@/lib/email";
 import { TERMS_VERSION } from "@/lib/consent";
 
-const ADMIN_EMAILS = ["admin@doprent.com", "prem@doprent.com", "hgcovuf@gmail.com"];
+/**
+ * Returns the admin email whitelist.
+ * Reads from ADMIN_EMAILS env var (comma-separated, trimmed, lowercased).
+ * Falls back to the original three addresses when the var is unset so that
+ * environments without the new variable keep working unchanged.
+ */
+function getAdminEmails(): string[] {
+  const raw = process.env.ADMIN_EMAILS;
+  if (!raw?.trim()) {
+    return ["admin@doprent.com", "prem@doprent.com", "hgcovuf@gmail.com"];
+  }
+  return raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 const TOKEN_EXPIRY_HOURS = 24;
 
 export async function POST(req: NextRequest) {
@@ -24,7 +40,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const role = ADMIN_EMAILS.includes(email.toLowerCase()) ? "admin" : "customer";
+  const role = getAdminEmails().includes(email.toLowerCase()) ? "admin" : "customer";
   const passwordHash = await bcrypt.hash(password, 12);
 
   await db.user.create({
