@@ -72,6 +72,13 @@
   --info: var(--cobalt);              /* teal family — was blue */
   --info-soft: var(--cobalt-soft);
 
+  /* Alias tokens — referenced by many components with fallbacks; defined here
+     so the fallback never wins. These are pure aliases of the tokens above. */
+  --primary: var(--accent);            /* consumers: var(--primary, #2e9c65) */
+  --accent-dark: var(--accent-2);      /* consumers: var(--accent-dark, #065f46) */
+  --surface-2: var(--warm);            /* consumers: var(--surface-2, #f5f5f5) */
+  --bg-hover: oklch(0.235 0.018 70 / 0.04); /* subtle warm-ink hover tint */
+
   /* Motion — exponential ease-out, no bounce. Durations tuned for
      "refined", not flashy. prefers-reduced-motion neutralises all. */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
