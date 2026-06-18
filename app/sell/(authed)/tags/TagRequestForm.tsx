@@ -11,16 +11,6 @@ interface Props {
   tagGroups: TagGroupOption[];
 }
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  border: "1px solid var(--line)",
-  borderRadius: 6,
-  background: "var(--surface)",
-  fontSize: 14,
-  fontFamily: "inherit",
-};
-
 const labelStyle: React.CSSProperties = {
   display: "block",
   fontSize: 14,
@@ -93,7 +83,7 @@ export default function TagRequestForm({ shopId, tagGroups }: Props) {
           onChange={(e) => setGroupId(e.target.value)}
           required
           aria-required={true}
-          style={inputStyle}
+          className="input input-surface"
         >
           {tagGroups.map((g) => (
             <option key={g.id} value={g.id}>{g.label}</option>
@@ -115,7 +105,7 @@ export default function TagRequestForm({ shopId, tagGroups }: Props) {
           aria-required={true}
           maxLength={80}
           placeholder="เช่น งานกีฬาสี, วันวาเลนไทน์"
-          style={inputStyle}
+          className="input input-surface"
         />
       </div>
 
@@ -133,7 +123,7 @@ export default function TagRequestForm({ shopId, tagGroups }: Props) {
           onChange={(e) => setKey(e.target.value)}
           maxLength={48}
           placeholder="เช่น sport-event"
-          style={inputStyle}
+          className="input input-surface"
         />
       </div>
 

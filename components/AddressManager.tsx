@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { addAddress, updateAddress, deleteAddress, setDefaultAddress } from "@/app/actions/bookings";
 import type { Address } from "@/lib/types";
-import { inputStyle as inp } from "@/lib/ui-styles";
 
 type Props = { addresses: Address[] };
 
@@ -216,21 +215,21 @@ function AddressForm({
         name="recipient_name"
         placeholder="ชื่อผู้รับ"
         defaultValue={initial?.recipient_name ?? ""}
-        style={inp}
+        className="input"
         required
       />
       <input
         name="phone"
         placeholder="เบอร์โทร"
         defaultValue={initial?.phone ?? ""}
-        style={inp}
+        className="input"
         required
       />
       <textarea
         name="address_text"
         placeholder="ที่อยู่จัดส่ง (บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์)"
         defaultValue={initial?.address_text ?? ""}
-        style={{ ...inp, minHeight: 72, resize: "vertical" }}
+        className="input" style={{ minHeight: 72, resize: "vertical" }}
         required
       />
       {!initial ? (

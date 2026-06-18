@@ -6,7 +6,6 @@ import { addAddress, updateAddress, createBooking } from "@/app/actions/bookings
 import { priceForNights } from "@/lib/pricing";
 import type { Address, PriceTier } from "@/lib/types";
 import { fmtThai } from "@/lib/date-th";
-import { inputStyle as inp } from "@/lib/ui-styles";
 
 type Props = {
   productId: string;
@@ -139,13 +138,13 @@ export default function CheckoutForm({
                 }}
               >
                 <input type="hidden" name="id" value={a.id} />
-                <input name="recipient_name" defaultValue={a.recipient_name} placeholder="ชื่อผู้รับ" style={inp} required />
-                <input name="phone" defaultValue={a.phone} placeholder="เบอร์โทร" style={inp} required />
+                <input name="recipient_name" defaultValue={a.recipient_name} placeholder="ชื่อผู้รับ" className="input" required />
+                <input name="phone" defaultValue={a.phone} placeholder="เบอร์โทร" className="input" required />
                 <textarea
                   name="address_text"
                   defaultValue={a.address_text}
                   placeholder="ที่อยู่จัดส่ง (บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์)"
-                  style={{ ...inp, minHeight: 72, resize: "vertical" }}
+                  className="input" style={{ minHeight: 72, resize: "vertical" }}
                   required
                 />
                 <div style={{ display: "flex", gap: 8 }}>
@@ -252,12 +251,12 @@ export default function CheckoutForm({
               background: "var(--surface)",
             }}
           >
-            <input name="recipient_name" placeholder="ชื่อผู้รับ" style={inp} required />
-            <input name="phone" placeholder="เบอร์โทร" style={inp} required />
+            <input name="recipient_name" placeholder="ชื่อผู้รับ" className="input" required />
+            <input name="phone" placeholder="เบอร์โทร" className="input" required />
             <textarea
               name="address_text"
               placeholder="ที่อยู่จัดส่ง (บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์)"
-              style={{ ...inp, minHeight: 72, resize: "vertical" }}
+              className="input" style={{ minHeight: 72, resize: "vertical" }}
               required
             />
             <label style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center" }}>

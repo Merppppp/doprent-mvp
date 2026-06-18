@@ -137,11 +137,6 @@ const labelStyle: React.CSSProperties = {
   color: "var(--ink-2)", marginBottom: 6,
 };
 
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "10px 12px", fontSize: 14, borderRadius: 7,
-  border: "1px solid var(--line)", background: "var(--surface)",
-  color: "var(--ink)", outline: "none", boxSizing: "border-box",
-};
 
 function Labeled({
   label, hint, required, children,
@@ -552,7 +547,7 @@ export default function ProductForm(props: Props) {
                         onChange(next);
                       }}
                       aria-label="วันเริ่มต้นของช่วงราคา"
-                      style={{ ...inputStyle, width: 60, textAlign: "center" }}
+                      className="input input-surface" style={{ width: 60, textAlign: "center" }}
                     />
                   </div>
                 )}
@@ -569,7 +564,7 @@ export default function ProductForm(props: Props) {
                     next[i] = { ...next[i], pricePerDay: parseInt(e.target.value) || 0 };
                     onChange(next);
                   }}
-                  placeholder="฿/วัน" style={{ ...inputStyle, flex: 1 }}
+                  placeholder="฿/วัน" className="input input-surface" style={{ flex: 1 }}
                 />
                 <span style={{ fontSize: 12, color: "var(--ink-3)", whiteSpace: "nowrap" }}>/วัน</span>
               </div>
@@ -695,7 +690,7 @@ export default function ProductForm(props: Props) {
               <textarea
                 value={urlInput} onChange={(e) => setUrlInput(e.target.value)}
                 placeholder={"https://images.unsplash.com/photo-...\nhttps://..."}
-                rows={3} style={{ ...inputStyle, flex: 1, resize: "vertical", fontSize: 12 }}
+                rows={3} className="input input-surface" style={{ flex: 1, resize: "vertical", fontSize: 12 }}
               />
               <button type="button" onClick={addUrlImage} className="btn btn-outline" style={{ padding: "10px 14px", fontSize: 12, whiteSpace: "nowrap" }}>
                 + เพิ่ม
@@ -707,13 +702,13 @@ export default function ProductForm(props: Props) {
         {/* ชื่อชุด */}
         <div style={{ marginBottom: 14 }}>
           <Labeled label="ชื่อชุด" required>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required aria-required={true} maxLength={80} style={inputStyle} />
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required aria-required={true} maxLength={80} className="input input-surface" />
           </Labeled>
         </div>
 
         {/* แบรนด์ */}
         <Labeled label="แบรนด์ (ไม่บังคับ)">
-          <input type="text" value={designer} onChange={(e) => setDesigner(e.target.value)} maxLength={60} style={inputStyle} />
+          <input type="text" value={designer} onChange={(e) => setDesigner(e.target.value)} maxLength={60} className="input input-surface" />
         </Labeled>
       </div>
 
@@ -735,7 +730,7 @@ export default function ProductForm(props: Props) {
                   <select
                     value={row.size}
                     onChange={(e) => updateVariantRow(i, { size: e.target.value as Size })}
-                    style={{ ...inputStyle, width: 90, padding: "8px 6px", fontSize: 13 }}
+                    className="input input-surface" style={{ width: 90, padding: "8px 6px", fontSize: 13 }}
                   >
                     {SIZES.map((s) => (
                       <option key={s} value={s} disabled={usedSizes.has(s) && s !== row.size}>{sizeLabel(s)}</option>
@@ -793,7 +788,7 @@ export default function ProductForm(props: Props) {
                             const v = e.target.value.trim();
                             updateVariantRow(i, { [field]: v === "" ? null : (parseInt(v) || null) });
                           }}
-                          style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }}
+                          className="input input-surface" style={{ padding: "6px 8px", fontSize: 12 }}
                         />
                       </div>
                     ))}
@@ -878,7 +873,7 @@ export default function ProductForm(props: Props) {
             <input
               type="number" min={0} step={1} value={deposit}
               onChange={(e) => setDeposit(parseInt(e.target.value) || 0)}
-              style={inputStyle}
+              className="input input-surface"
             />
           </Labeled>
         </div>
@@ -905,7 +900,7 @@ export default function ProductForm(props: Props) {
                 value={description} onChange={(e) => setDescription(e.target.value)}
                 rows={4} maxLength={500}
                 placeholder="เช่น ผ้าซาตินสีกุหลาบ ปักลูกไม้ตรงคอ จับจีบที่เอว ใส่กับเข็มขัดได้"
-                style={{ ...inputStyle, resize: "vertical" }}
+                className="input input-surface" style={{ resize: "vertical" }}
               />
             </Labeled>
 
@@ -991,7 +986,7 @@ export default function ProductForm(props: Props) {
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingLeft: 8, borderLeft: "2px solid var(--line)" }}>
                     <div>
                       <label style={{ ...labelStyle, fontSize: 13 }}>กลุ่มแท็ก</label>
-                      <select value={tagReqGroupId} onChange={(e) => setTagReqGroupId(e.target.value)} style={inputStyle}>
+                      <select value={tagReqGroupId} onChange={(e) => setTagReqGroupId(e.target.value)} className="input input-surface">
                         {tagReqGroupOptions.map((g) => (
                           <option key={g.id} value={g.id}>{g.label}</option>
                         ))}
@@ -999,11 +994,11 @@ export default function ProductForm(props: Props) {
                     </div>
                     <div>
                       <label style={{ ...labelStyle, fontSize: 13 }}>ชื่อแท็กที่ต้องการ (ภาษาไทย) <RequiredMark /></label>
-                      <input type="text" value={tagReqLabel} onChange={(e) => setTagReqLabel(e.target.value)} maxLength={80} placeholder="เช่น งานกีฬาสี" style={inputStyle} />
+                      <input type="text" value={tagReqLabel} onChange={(e) => setTagReqLabel(e.target.value)} maxLength={80} placeholder="เช่น งานกีฬาสี" className="input input-surface" />
                     </div>
                     <div>
                       <label style={{ ...labelStyle, fontSize: 13 }}>slug key (ไม่บังคับ)</label>
-                      <input type="text" value={tagReqKey} onChange={(e) => setTagReqKey(e.target.value)} maxLength={48} placeholder="เช่น sport-event" style={inputStyle} />
+                      <input type="text" value={tagReqKey} onChange={(e) => setTagReqKey(e.target.value)} maxLength={48} placeholder="เช่น sport-event" className="input input-surface" />
                     </div>
                     {tagReqError ? <div style={{ fontSize: 12, color: "var(--danger)" }}>{tagReqError}</div> : null}
                     <button type="button" onClick={onTagRequest} disabled={tagReqSubmitting}
@@ -1077,7 +1072,7 @@ export default function ProductForm(props: Props) {
 
             {/* LINE override */}
             <Labeled label="LINE สำหรับชุดนี้" hint="ปล่อยว่างถ้าใช้ LINE หลักของร้าน">
-              <input type="text" value={lineUrl} onChange={(e) => setLineUrl(e.target.value)} style={inputStyle} />
+              <input type="text" value={lineUrl} onChange={(e) => setLineUrl(e.target.value)} className="input input-surface" />
             </Labeled>
 
             {/* Policy override */}
@@ -1093,19 +1088,19 @@ export default function ProductForm(props: Props) {
               {policyOverride ? (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, paddingLeft: 8, borderLeft: "2px solid var(--line)" }}>
                   <Labeled label="จองล่วงหน้าขั้นต่ำ (วัน)" hint="ว่าง = ใช้ค่าร้าน">
-                    <input type="number" min={0} value={overrideLeadTime} onChange={(e) => setOverrideLeadTime(e.target.value)} placeholder="ใช้ค่าร้าน" style={inputStyle} />
+                    <input type="number" min={0} value={overrideLeadTime} onChange={(e) => setOverrideLeadTime(e.target.value)} placeholder="ใช้ค่าร้าน" className="input input-surface" />
                   </Labeled>
                   <Labeled label="เช่าขั้นต่ำ (วัน)" hint="ว่าง = ใช้ค่าร้าน">
-                    <input type="number" min={1} value={overrideMinRental} onChange={(e) => setOverrideMinRental(e.target.value)} placeholder="ใช้ค่าร้าน" style={inputStyle} />
+                    <input type="number" min={1} value={overrideMinRental} onChange={(e) => setOverrideMinRental(e.target.value)} placeholder="ใช้ค่าร้าน" className="input input-surface" />
                   </Labeled>
                   <Labeled label="เช่าสูงสุด (วัน)" hint="ว่าง = ไม่จำกัด (ใช้ค่าร้าน)">
-                    <input type="number" min={1} value={overrideMaxRental} onChange={(e) => setOverrideMaxRental(e.target.value)} placeholder="ไม่จำกัด" style={inputStyle} />
+                    <input type="number" min={1} value={overrideMaxRental} onChange={(e) => setOverrideMaxRental(e.target.value)} placeholder="ไม่จำกัด" className="input input-surface" />
                   </Labeled>
                   <Labeled label="คืนสินค้าภายใน (วัน)" hint="ว่าง = ใช้ค่าร้าน">
-                    <input type="number" min={0} value={overrideReturnWindow} onChange={(e) => setOverrideReturnWindow(e.target.value)} placeholder="ใช้ค่าร้าน" style={inputStyle} />
+                    <input type="number" min={0} value={overrideReturnWindow} onChange={(e) => setOverrideReturnWindow(e.target.value)} placeholder="ใช้ค่าร้าน" className="input input-surface" />
                   </Labeled>
                   <Labeled label="บัฟเฟอร์หลังเช่า (วัน)" hint="ว่าง = ใช้ค่าร้าน">
-                    <input type="number" min={0} value={overrideBuffer} onChange={(e) => setOverrideBuffer(e.target.value)} placeholder="ใช้ค่าร้าน" style={inputStyle} />
+                    <input type="number" min={0} value={overrideBuffer} onChange={(e) => setOverrideBuffer(e.target.value)} placeholder="ใช้ค่าร้าน" className="input input-surface" />
                   </Labeled>
                 </div>
               ) : null}
