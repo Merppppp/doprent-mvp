@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { withActor } from "@/lib/db-context";
+import { acceptBooking } from "@/app/actions/bookings";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth();
@@ -12,32 +12,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const body = await req.json();
   const shippingFee = Number(body.shippingFee ?? 0);
 
-  if (isNaN(shippingFee) || shippingFee < 0) {
-    return NextResponse.json({ error: "ค่าส่งไม่ถูกต้อง" }, { status: 400 });
+  // Delegate to server action — it enforces ownership, status-transition validity
+  // (findTransition), atomic updateMany guard, and payment-channel resolution.
+  const result = await acceptBooking(params.id, shippingFee);
+  if (!result.ok) {
+    const status = result.error.includes("ไม่มีสิทธิ์")
+      ? 403
+      : result.error.includes("ไม่พบ")
+        ? 404
+        : 400;
+    return NextResponse.json({ error: result.error }, { status });
   }
 
-  const booking = await db.booking.findUnique({
-    where: { id: params.id },
-    include: { shop: true },
-  });
-
-  if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (booking.shop.ownerId !== session.user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-  if (booking.status !== "booking_pending") {
-    return NextResponse.json({ error: "ไม่สามารถตอบรับได้ในสถานะนี้" }, { status: 400 });
-  }
-
-  const updated = await withActor(session.user.id, () =>
-    db.booking.update({
-      where: { id: params.id },
-      data: {
-        status: "waiting_for_payment",
-        shippingFee,
-      },
-    }),
-  );
-
+  const updated = await db.booking.findUnique({ where: { id: params.id } });
   return NextResponse.json(updated);
 }
