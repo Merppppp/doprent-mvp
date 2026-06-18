@@ -399,18 +399,21 @@ select:focus-visible {
   gap: 32px;
 }
 
-/* Browse results grid — more columns on large screens.
-   Scoped to .browse-grid .grid-3 so other .grid-3 usages are unaffected.
+/* Product results grid — more columns on large screens.
+   Shared by the marketplace (.browse-grid .grid-3) and the shop detail page
+   (.products-grid-wide.grid-3) so product cards are the same size on both.
    Existing tablet/phone media queries use plain .grid-3 (lower specificity)
    and only fire at ≤900px / ≤600px — well below these min-width thresholds,
    so there is no conflict. */
 @media (min-width: 1280px) {
-  .browse-grid .grid-3 {
+  .browse-grid .grid-3,
+  .products-grid-wide.grid-3 {
     grid-template-columns: repeat(4, 1fr);
   }
 }
 @media (min-width: 1536px) {
-  .browse-grid .grid-3 {
+  .browse-grid .grid-3,
+  .products-grid-wide.grid-3 {
     grid-template-columns: repeat(5, 1fr);
   }
 }
