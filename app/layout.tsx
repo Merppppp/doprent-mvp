@@ -63,9 +63,13 @@ export const viewport: Viewport = {
   themeColor: "#F7F3E8",
 };
 
-// Force dynamic rendering so the auth-aware Header always reads the latest cookie state.
-// (Per-page revalidate caching makes Header render with stale auth state.)
-export const dynamic = "force-dynamic";
+// NOTE: force-dynamic was previously set here to ensure the auth-aware Header
+// always reads the current cookie state. It has been removed because any route
+// that renders the Header already becomes dynamic automatically (Header is a
+// Server Component that calls auth() / getCurrentUser(), both of which read
+// cookies — Next.js opts those routes into dynamic rendering without a global
+// override). Keeping it caused ALL routes (including fully-static pages) to
+// skip the cache unnecessarily.
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

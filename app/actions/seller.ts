@@ -814,7 +814,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     }
 
     revalidatePath("/sell/dashboard");
-    revalidatePath(`/dress/${productId}`);
+    revalidatePath(`/product/${productId}`);
     return { ok: true };
   });
 }
@@ -843,7 +843,7 @@ export async function updateProductPriceTiers(productId: string, tiers: PriceTie
       data: tiers.map((t) => ({ productId, minDays: t.min, pricePerDay: t.per_day })),
     });
     revalidatePath("/sell/dashboard");
-    revalidatePath(`/dress/${productId}`);
+    revalidatePath(`/product/${productId}`);
     return { ok: true };
   });
 }

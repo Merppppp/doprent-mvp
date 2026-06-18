@@ -82,7 +82,7 @@ export default function KycRow({ kyc }: { kyc: Kyc }) {
             {kyc.shop.area_label} · ส่งเมื่อ {new Date(kyc.created_at).toLocaleString("th-TH")}
           </div>
           <Link
-            href={`/boutique/${kyc.shop.slug}`}
+            href={`/shop/${kyc.shop.slug}`}
             target="_blank"
             style={{ fontWeight: 600, fontSize: 17 }}
           >

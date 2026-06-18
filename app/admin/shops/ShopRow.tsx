@@ -58,7 +58,7 @@ export default function ShopRow({ b }: { b: Shop }) {
         {/* ร้าน */}
         <td style={tdStyle}>
           <Link
-            href={`/boutique/${b.slug}`}
+            href={`/shop/${b.slug}`}
             target="_blank"
             style={{ fontWeight: 600, fontSize: 14 }}
           >
@@ -192,7 +192,7 @@ export default function ShopRow({ b }: { b: Shop }) {
             </button>
 
             <Link
-              href={`/boutique/${b.slug}`}
+              href={`/shop/${b.slug}`}
               target="_blank"
               className="btn btn-outline"
               style={btnSm}
