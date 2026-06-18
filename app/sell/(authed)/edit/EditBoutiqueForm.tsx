@@ -217,13 +217,13 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
   return (
     <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <Labeled label="ชื่อร้าน" required>
-        <input type="text" name="name" defaultValue={boutique.name} required aria-required={true} style={inputStyle} />
+        <input type="text" name="name" defaultValue={boutique.name} required aria-required={true} className="input input-surface" />
       </Labeled>
       <Labeled label="ผู้ดูแล">
-        <input type="text" name="owner_name" defaultValue={boutique.owner_name ?? ""} style={inputStyle} />
+        <input type="text" name="owner_name" defaultValue={boutique.owner_name ?? ""} className="input input-surface" />
       </Labeled>
       <Labeled label="ย่าน">
-        <select name="area_key" defaultValue={boutique.area_key ?? ""} style={inputStyle}>
+        <select name="area_key" defaultValue={boutique.area_key ?? ""} className="input input-surface">
           <option value="">— เลือกย่าน —</option>
           {areas.map((a) => (
             <option key={a.key} value={a.key}>
@@ -234,23 +234,23 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
         <input type="hidden" name="area_label" defaultValue={boutique.area_label} />
       </Labeled>
       <Labeled label="LINE" required>
-        <input type="text" name="line_url" defaultValue={boutique.line_url} required aria-required={true} style={inputStyle} />
+        <input type="text" name="line_url" defaultValue={boutique.line_url} required aria-required={true} className="input input-surface" />
       </Labeled>
       <Labeled label="Instagram">
-        <input type="text" name="instagram" defaultValue={boutique.instagram ?? ""} style={inputStyle} />
+        <input type="text" name="instagram" defaultValue={boutique.instagram ?? ""} className="input input-surface" />
       </Labeled>
       <Labeled label="Facebook">
-        <input type="text" name="facebook" defaultValue={boutique.facebook ?? ""} placeholder="facebook.com/..." style={inputStyle} />
+        <input type="text" name="facebook" defaultValue={boutique.facebook ?? ""} placeholder="facebook.com/..." className="input input-surface" />
       </Labeled>
       <Labeled label="X / Twitter">
-        <input type="text" name="twitter" defaultValue={boutique.twitter ?? ""} placeholder="@..." style={inputStyle} />
+        <input type="text" name="twitter" defaultValue={boutique.twitter ?? ""} placeholder="@..." className="input input-surface" />
       </Labeled>
       <Labeled label="TikTok">
-        <input type="text" name="tiktok" defaultValue={boutique.tiktok ?? ""} placeholder="@..." style={inputStyle} />
+        <input type="text" name="tiktok" defaultValue={boutique.tiktok ?? ""} placeholder="@..." className="input input-surface" />
       </Labeled>
 
       <Labeled label="ที่อยู่ร้าน">
-        <input type="text" name="address" defaultValue={boutique.address ?? ""} style={inputStyle} />
+        <input type="text" name="address" defaultValue={boutique.address ?? ""} className="input input-surface" />
       </Labeled>
       <div>
         <label style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
@@ -340,14 +340,14 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
                       type="time"
                       value={day.from}
                       onChange={(e) => setDayTime(idx, "from", e.target.value)}
-                      style={{ ...inputStyle, width: 120, padding: "7px 10px" }}
+                      className="input input-surface" style={{ width: 120, padding: "7px 10px" }}
                     />
                     <span style={{ color: "var(--ink-3)" }}>–</span>
                     <input
                       type="time"
                       value={day.to}
                       onChange={(e) => setDayTime(idx, "to", e.target.value)}
-                      style={{ ...inputStyle, width: 120, padding: "7px 10px" }}
+                      className="input input-surface" style={{ width: 120, padding: "7px 10px" }}
                     />
                   </div>
                 ) : (
@@ -365,11 +365,11 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
           defaultValue={boutique.since_year ?? ""}
           min={1980}
           max={new Date().getFullYear()}
-          style={{ ...inputStyle, width: 140 }}
+          className="input input-surface" style={{ width: 140 }}
         />
       </Labeled>
       <Labeled label="Tagline">
-        <input type="text" name="tag" defaultValue={boutique.tag ?? ""} maxLength={80} style={inputStyle} />
+        <input type="text" name="tag" defaultValue={boutique.tag ?? ""} maxLength={80} className="input input-surface" />
       </Labeled>
       <Labeled label="เกี่ยวกับร้าน">
         <textarea
@@ -377,11 +377,11 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
           defaultValue={boutique.story ?? ""}
           rows={4}
           maxLength={500}
-          style={{ ...inputStyle, resize: "vertical" }}
+          className="input input-surface" style={{ resize: "vertical" }}
         />
       </Labeled>
       <Labeled label="สีหลักของร้าน">
-        <select name="cover_color" defaultValue={boutique.cover_color} style={inputStyle}>
+        <select name="cover_color" defaultValue={boutique.cover_color} className="input input-surface">
           {COLORS.map((c) => (
             <option key={c.key} value={c.key}>
               {c.label}
@@ -520,7 +520,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
             value={promptpayId}
             onChange={(e) => setPromptpayId(e.target.value)}
             placeholder="เช่น 0812345678"
-            style={inputStyle}
+            className="input input-surface"
           />
         </Labeled>
         {/* Bold PromptPay remark */}
@@ -538,7 +538,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
         </div>
 
         <Labeled label="ธนาคาร (ไม่บังคับ)">
-          <select name="bank_name" defaultValue={boutique.bank_name ?? ""} style={inputStyle}>
+          <select name="bank_name" defaultValue={boutique.bank_name ?? ""} className="input input-surface">
             <option value="">— ไม่ระบุ —</option>
             <option value="ธ.กสิกรไทย">ธ.กสิกรไทย</option>
             <option value="ธ.ไทยพาณิชย์">ธ.ไทยพาณิชย์</option>
@@ -560,7 +560,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
               inputMode="numeric"
               maxLength={20}
               placeholder="เช่น 123-4-56789-0"
-              style={inputStyle}
+              className="input input-surface"
             />
           </Labeled>
         </div>
@@ -572,7 +572,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
               defaultValue={boutique.bank_account_name ?? ""}
               maxLength={100}
               placeholder="เช่น นางสาว วรรณิษา ใจดี"
-              style={inputStyle}
+              className="input input-surface"
             />
           </Labeled>
         </div>
@@ -730,7 +730,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
               name="lead_time_days"
               min={0}
               defaultValue={boutique.lead_time_days ?? 0}
-              style={{ ...inputStyle, width: "100%" }}
+              className="input input-surface"
             />
           </Labeled>
           <Labeled label="เช่าขั้นต่ำ (วัน)">
@@ -739,7 +739,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
               name="min_rental_days"
               min={1}
               defaultValue={boutique.min_rental_days ?? 1}
-              style={{ ...inputStyle, width: "100%" }}
+              className="input input-surface"
             />
           </Labeled>
           <Labeled label="เช่าสูงสุด (วัน, ว่าง = ไม่จำกัด)">
@@ -749,7 +749,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
               min={1}
               defaultValue={boutique.max_rental_days ?? ""}
               placeholder="ไม่จำกัด"
-              style={{ ...inputStyle, width: "100%" }}
+              className="input input-surface"
             />
           </Labeled>
           <Labeled label="คืนสินค้าภายใน (วัน)">
@@ -758,7 +758,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
               name="return_window_days"
               min={0}
               defaultValue={boutique.return_window_days ?? 2}
-              style={{ ...inputStyle, width: "100%" }}
+              className="input input-surface"
             />
           </Labeled>
           <Labeled label="บัฟเฟอร์หลังเช่า (วัน)">
@@ -767,7 +767,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
               name="buffer_days_after"
               min={0}
               defaultValue={boutique.buffer_days_after ?? 2}
-              style={{ ...inputStyle, width: "100%" }}
+              className="input input-surface"
             />
           </Labeled>
         </div>
@@ -818,14 +818,14 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
               type="date"
               value={newDateInput}
               onChange={(e) => setNewDateInput(e.target.value)}
-              style={{ ...inputStyle, width: 160 }}
+              className="input input-surface" style={{ width: 160 }}
             />
             <input
               type="text"
               value={newNoteInput}
               onChange={(e) => setNewNoteInput(e.target.value)}
               placeholder="หมายเหตุ เช่น วันสงกรานต์"
-              style={{ ...inputStyle, flex: 1, minWidth: 160 }}
+              className="input input-surface" style={{ flex: 1, minWidth: 160 }}
             />
             <button
               type="button"
@@ -896,12 +896,3 @@ function Labeled({ label, required, children }: { label: string; required?: bool
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  border: "1px solid var(--line)",
-  borderRadius: 6,
-  background: "var(--surface)",
-  fontSize: 14,
-  fontFamily: "inherit",
-};
