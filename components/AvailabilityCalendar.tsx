@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toggleBlackout } from "@/app/actions/availability";
 
@@ -51,15 +51,27 @@ export default function AvailabilityCalendar({ productId, initialBlackouts }: Pr
     });
   }
 
-  // Days from this month that are blocked — computed from current view inside renderDay context
-  // We track view state via a ref approach: use a state lifted from CalendarGrid is not possible
-  // since CalendarGrid owns the view state. We compute blockedThisMonth from all blackouts.
+  // Track which month CalendarGrid is showing so we can compute per-month stats.
+  const today = new Date();
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+
   const blockedFutureCount = Array.from(blackouts).filter((d) => d >= TODAY_STR).length;
+
+  const blockedThisMonth = useMemo(() => {
+    return Array.from(blackouts)
+      .filter((d) => {
+        const [y, m] = d.split("-");
+        return parseInt(y) === viewYear && parseInt(m) - 1 === viewMonth;
+      })
+      .sort();
+  }, [blackouts, viewYear, viewMonth]);
 
   return (
     <div>
       <CalendarGrid
         navBtnStyle={navBtnStyle}
+        onViewChange={(y, m) => { setViewYear(y); setViewMonth(m); }}
         renderDay={({ date, dateStr }) => {
           const isToday = dateStr === TODAY_STR;
           const isPast = dateStr < TODAY_STR;
@@ -112,6 +124,10 @@ export default function AvailabilityCalendar({ productId, initialBlackouts }: Pr
             <Legend color="var(--bg)" border="var(--line)" label="ผ่านมาแล้ว" />
           </div>
           <div style={{ color: "var(--ink-2)" }}>
+            {blockedThisMonth.length > 0
+              ? `เดือนนี้: ปิด ${blockedThisMonth.length} วัน`
+              : "เดือนนี้: ยังไม่ปิดวันไหน"}
+            {" · "}
             ปิดล่วงหน้าทั้งหมด {blockedFutureCount} วัน
           </div>
         </div>

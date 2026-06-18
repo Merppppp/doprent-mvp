@@ -48,6 +48,12 @@ export type CalendarGridProps = {
    */
   renderDay: (args: { date: Date; dateStr: string; inMonth: boolean }) => React.ReactNode;
   /**
+   * Called whenever the displayed month changes (via prev/next navigation).
+   * Useful for consumers that need to track the current view month for
+   * per-month summary counts (e.g. "เดือนนี้: ปิด N วัน").
+   */
+  onViewChange?: (year: number, month: number) => void;
+  /**
    * Content rendered below the grid (legend, summary, error block, etc.).
    */
   children?: React.ReactNode;
@@ -76,6 +82,7 @@ export default function CalendarGrid({
   weekdayCellStyle,
   blankCellStyle,
   renderDay,
+  onViewChange,
   children,
 }: CalendarGridProps) {
   const today = new Date();
@@ -83,21 +90,19 @@ export default function CalendarGrid({
   const [viewMonth, setViewMonth] = useState(initialMonth ?? today.getMonth());
 
   function prevMonth() {
-    if (viewMonth === 0) {
-      setViewYear(viewYear - 1);
-      setViewMonth(11);
-    } else {
-      setViewMonth(viewMonth - 1);
-    }
+    const nextY = viewMonth === 0 ? viewYear - 1 : viewYear;
+    const nextM = viewMonth === 0 ? 11 : viewMonth - 1;
+    setViewYear(nextY);
+    setViewMonth(nextM);
+    onViewChange?.(nextY, nextM);
   }
 
   function nextMonth() {
-    if (viewMonth === 11) {
-      setViewYear(viewYear + 1);
-      setViewMonth(0);
-    } else {
-      setViewMonth(viewMonth + 1);
-    }
+    const nextY = viewMonth === 11 ? viewYear + 1 : viewYear;
+    const nextM = viewMonth === 11 ? 0 : viewMonth + 1;
+    setViewYear(nextY);
+    setViewMonth(nextM);
+    onViewChange?.(nextY, nextM);
   }
 
   const startWeekday = new Date(viewYear, viewMonth, 1).getDay();
