@@ -207,8 +207,9 @@ export default function CheckoutForm({
                   }}
                   style={{
                     position: "absolute",
-                    top: 10,
+                    top: "50%",
                     right: 10,
+                    transform: "translateY(-50%)",
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
