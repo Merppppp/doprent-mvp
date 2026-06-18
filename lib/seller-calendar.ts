@@ -16,6 +16,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { ACTIVE_STATUSES } from "@/lib/bookings";
 import type { BookingStatus } from "@/lib/types";
+import { ymdUtc } from "@/lib/date-th";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -66,7 +67,7 @@ export type SellerCalendarData = {
 
 /** Format a JS Date to "YYYY-MM-DD" using UTC (Prisma @db.Date comes back as
  *  UTC midnight, so UTC string avoids the off-by-one timezone bug). */
-const ymd = (d: Date): string => d.toISOString().slice(0, 10);
+const ymd = ymdUtc;
 
 // ---------------------------------------------------------------------------
 // Main fetch

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import { requireShopAccess } from "@/lib/shop-access";
+import { SELL_PRODUCTS_PAGE_SIZE as PAGE_SIZE } from "@/lib/config";
 import { ProductArt } from "@/components/ProductArt";
 import { toggleProductAvailable } from "@/app/actions/seller";
 import ToggleSwitch from "@/components/ToggleSwitch";
@@ -13,8 +14,6 @@ export const metadata: Metadata = {
   title: "สินค้าในร้าน",
   robots: { index: false, follow: false },
 };
-
-const PAGE_SIZE = 20;
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "รอตรวจ",

@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { auth } from "@/auth";
 import { uploadPrivateToR2 } from "@/lib/r2";
+import { UPLOAD_MAX_BYTES } from "@/lib/config";
 
 /**
  * Bankbook (passbook cover) upload — PRIVATE bucket.
@@ -16,7 +17,7 @@ import { uploadPrivateToR2 } from "@/lib/r2";
  */
 
 // 2MB hard limit
-const MAX_SIZE = 2 * 1024 * 1024;
+const MAX_SIZE = UPLOAD_MAX_BYTES;
 
 // Image-only magic byte signatures (no PDF)
 const MAGIC_SIGNATURES = [

@@ -11,17 +11,13 @@ import TrustBadge from "@/components/TrustBadge";
 import SellerBookingActions, { type ChannelOption } from "@/components/SellerBookingActions";
 import SellerAddressChange from "@/components/SellerAddressChange";
 import { PAYMENT_CHANNEL_LABEL } from "@/lib/payments";
+import { fmtThai } from "@/lib/date-th";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "รายละเอียดการจอง (ร้าน)",
   robots: { index: false, follow: false },
-};
-
-const fmtThai = (s: string) => {
-  const [y, m, d] = s.split("-");
-  return y ? `${d}/${m}/${y}` : s;
 };
 
 export default async function SellerBookingDetail({ params }: { params: { id: string } }) {

@@ -80,7 +80,7 @@ export default function ProductRow({ d }: { d: D }) {
             </div>
             <div style={{ minWidth: 0 }}>
               <Link
-                href={`/dress/${d.slug}`}
+                href={`/product/${d.slug}`}
                 target="_blank"
                 style={{ fontWeight: 600, fontSize: 13 }}
               >
@@ -236,14 +236,8 @@ export default function ProductRow({ d }: { d: D }) {
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="เหตุผลที่ปฏิเสธ"
-                style={{
-                  flex: 1,
-                  padding: "8px 12px",
-                  border: "1px solid var(--line)",
-                  borderRadius: 6,
-                  fontSize: 13,
-                  minWidth: 200,
-                }}
+                className="input"
+                style={{ flex: 1, minWidth: 200 }}
               />
               <button
                 type="button"

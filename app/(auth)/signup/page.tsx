@@ -189,7 +189,8 @@ function Field({ label, type, value, onChange, required, showToggle, showPasswor
       <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 6 }}>{label}</label>
       <div style={{ position: "relative" }}>
         <input type={actualType} value={value} onChange={e => onChange(e.target.value)} required={required}
-          style={{ width: "100%", padding: showToggle ? "11px 44px 11px 14px" : "11px 14px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 14 }} />
+          className="input"
+          style={showToggle ? { padding: "11px 44px 11px 14px" } : undefined} />
         {showToggle && (
           <button type="button" onClick={onToggleShowPassword}
             style={{ position: "absolute", top: "50%", right: 10, transform: "translateY(-50%)", background: "none", border: "none", color: "var(--ink-3)", fontSize: 13, cursor: "pointer", padding: 0 }}>

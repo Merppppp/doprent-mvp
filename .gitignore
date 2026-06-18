@@ -14,3 +14,5 @@ out
 # AI-generated product image cache (served from MinIO/R2 bucket; only hero stays tracked)
 public/products/*.png
 !public/products/suit-rental-hero.png
+
+.codex

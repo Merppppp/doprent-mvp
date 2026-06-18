@@ -161,18 +161,13 @@ export default function ShopFinder({ shops, total, query, pageSize }: Props) {
         )}
       </div>
 
-      <div className="grid-2" style={{ gap: 20 }}>
+      <div className="grid-3" style={{ gap: 16 }}>
         {withDist.map(({ shop: b, km }) => (
           <Link
             key={b.id}
             href={`/shop/${b.slug}`}
-            className="boutique-card"
-            style={{
-              background: "var(--surface)",
-              border: `1px solid ${b.featured ? "var(--gold)" : "var(--line)"}`,
-              borderRadius: 8,
-              cursor: "pointer",
-            }}
+            className={`boutique-card${b.featured ? " boutique-card--featured" : ""}`}
+            style={{ cursor: "pointer" }}
           >
             <div className="cover" style={{ position: "relative" }}>
               {/* Gradient brand backdrop always present; logo (if any) sits on top. */}
@@ -194,7 +189,7 @@ export default function ShopFinder({ shops, total, query, pageSize }: Props) {
                 />
               ) : null}
             </div>
-            <div style={{ padding: 22, flex: 1 }}>
+            <div style={{ padding: 16, flex: 1 }}>
               {b.featured ? (
                 <span className="ad-badge featured" style={{ position: "static", display: "inline-flex", marginBottom: 8 }}>
                   <span className="dot" />
@@ -217,11 +212,11 @@ export default function ShopFinder({ shops, total, query, pageSize }: Props) {
                   <span style={{ color: "var(--accent-2)", fontWeight: 600 }}>· ~{formatKm(km)}</span>
                 ) : null}
               </div>
-              <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                 {b.name}
                 {b.verified ? <VerifiedBadge size="sm" /> : null}
               </h3>
-              <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 14, lineHeight: 1.5 }}>{b.tag}</div>
+              <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 10, lineHeight: 1.5 }}>{b.tag}</div>
               <div style={{ fontSize: 12, color: "var(--ink-3)", display: "flex", gap: 12, flexWrap: "wrap" }}>
                 {b.sinceYear ? <span>ตั้งแต่ {b.sinceYear}</span> : null}
                 {b.instagram ? <span>· {b.instagram}</span> : null}
