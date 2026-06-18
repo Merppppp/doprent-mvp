@@ -458,17 +458,29 @@ select:focus-visible {
   gap: 32px;
 }
 
-/* Featured boutique cards (horizontal layout) */
+/* Boutique cards (horizontal layout). Border lives on the class (not inline)
+   so :hover can turn it brand-green like the marketplace product cards. */
 .boutique-card {
   display: flex;
   overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  transition: transform var(--dur-2) var(--ease),
+    box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+.boutique-card--featured {
+  border-color: var(--gold);
+}
+.boutique-card:hover {
+  border-color: var(--accent);
 }
 .boutique-card .cover {
   width: 180px;
   flex-shrink: 0;
 }
 .boutiques-list .boutique-card .cover {
-  width: 160px;
+  width: 130px;
 }
 
 /* Footer columns */
