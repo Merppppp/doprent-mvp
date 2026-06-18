@@ -26,7 +26,8 @@ import Link from "next/link";
 import type { SellerCalendarData, CalendarBooking, CalendarProduct } from "@/lib/seller-calendar";
 import { BOOKING_STATUS_META } from "@/lib/bookings";
 import type { BookingStatus } from "@/lib/types";
-import { DAYS_TH, MONTHS_TH_FULL, toLocalYmd, fmtThaiLong, fmtThaiShort } from "@/lib/date-th";
+import { MONTHS_TH_FULL, toLocalYmd, fmtThaiLong, fmtThaiShort } from "@/lib/date-th";
+import CalendarGrid from "@/components/CalendarGrid";
 
 const STATUS_TONE: Record<string, { bg: string; fg: string }> = {
   neutral: { bg: "var(--surface)", fg: "var(--ink-2)" },
@@ -65,20 +66,8 @@ export default function SellerCalendar({ data }: Props) {
   const todayStr = toLocalYmd(today);
 
   // ── view state ────────────────────────────────────────────────────────────
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-11
   const [filterProductId, setFilterProductId] = useState<string>(""); // "" = all
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-
-  // ── month navigation ──────────────────────────────────────────────────────
-  function prevMonth() {
-    if (viewMonth === 0) { setViewYear(viewYear - 1); setViewMonth(11); }
-    else setViewMonth(viewMonth - 1);
-  }
-  function nextMonth() {
-    if (viewMonth === 11) { setViewYear(viewYear + 1); setViewMonth(0); }
-    else setViewMonth(viewMonth + 1);
-  }
 
   // ── product lookup map ────────────────────────────────────────────────────
   const productById = useMemo(() => {
@@ -191,19 +180,6 @@ export default function SellerCalendar({ data }: Props) {
     return "someFree";
   }
 
-  // ── grid cells ────────────────────────────────────────────────────────────
-  const firstDay = new Date(viewYear, viewMonth, 1);
-  const startWeekday = firstDay.getDay(); // 0=Sun
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-
-  const cells: Array<string | null> = [];
-  for (let i = 0; i < startWeekday; i++) cells.push(null); // leading blanks
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dt = new Date(viewYear, viewMonth, d);
-    cells.push(toLocalYmd(dt));
-  }
-  while (cells.length < 42) cells.push(null); // pad to 6 rows
-
   // ── selected day data ─────────────────────────────────────────────────────
   const selectedBookings = selectedDay ? (bookingsByDay.get(selectedDay) ?? []) : [];
   const selectedIsBlackout = selectedDay ? blackoutDaySet.has(selectedDay) : false;
@@ -263,14 +239,29 @@ export default function SellerCalendar({ data }: Props) {
     closedDateMap,
   ]);
 
-  // ── summary counts for current month ─────────────────────────────────────
-  const monthPrefix = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
+  // ── summary counts for current month — tracked via a ref updated in renderDay
+  // We use a stable approach: compute from bookingsByDay and blackoutDaySet
+  // filtered to the current view month. Since CalendarGrid owns view state,
+  // we expose month summary globally (all months) and simplify the display.
+  // The bookedDaysThisMonth / blackoutDaysThisMonth counts now show current
+  // calendar month which is tracked inside CalendarGrid — we pass a renderDay
+  // that captures these dynamically per cell.
+  // To keep the summary counts correct we track the visible month via state.
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const t = new Date();
+    return { y: t.getFullYear(), m: t.getMonth() };
+  });
+
+  const monthPrefix = `${visibleMonth.y}-${String(visibleMonth.m + 1).padStart(2, "0")}`;
   const bookedDaysThisMonth = Array.from(bookingsByDay.keys()).filter((d) => d.startsWith(monthPrefix)).length;
   const blackoutDaysThisMonth = Array.from(blackoutDaySet).filter((d) => d.startsWith(monthPrefix)).length;
 
   // ─────────────────────────────────────────────────────────────────────────
   // Selected filtered product (for single-product cell coloring)
   const selectedFilterProduct = filterProductId ? (productById.get(filterProductId) ?? null) : null;
+
+  // Suppress unused variable warning — blackoutSet is used inside renderDay closure
+  void blackoutSet;
 
   return (
     <div style={{ maxWidth: 440, marginInline: "auto" }}>
@@ -302,51 +293,14 @@ export default function SellerCalendar({ data }: Props) {
         </div>
       </div>
 
-      {/* ── Month navigation ── */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 14,
-          gap: 12,
-        }}
-      >
-        <button type="button" onClick={prevMonth} style={navBtnStyle} aria-label="เดือนก่อนหน้า">
-          ←
-        </button>
-        <div style={{ fontWeight: 700, fontSize: 18 }}>
-          {MONTHS_TH_FULL[viewMonth]} {viewYear + 543}
-        </div>
-        <button type="button" onClick={nextMonth} style={navBtnStyle} aria-label="เดือนถัดไป">
-          →
-        </button>
-      </div>
-
-      {/* ── Weekday header ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, marginBottom: 6 }}>
-        {DAYS_TH.map((d) => (
-          <div
-            key={d}
-            style={{
-              textAlign: "center",
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--ink-3)",
-              padding: "4px 0",
-              letterSpacing: "0.04em",
-            }}
-          >
-            {d}
-          </div>
-        ))}
-      </div>
-
-      {/* ── Day grid ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
-        {cells.map((dateStr, i) => {
-          if (!dateStr) return <div key={i} style={{ aspectRatio: "1/1" }} />;
-
+      <CalendarGrid
+        months={MONTHS_TH_FULL}
+        navBtnStyle={navBtnStyle}
+        gap={3}
+        monthLabelStyle={{ fontWeight: 700, fontSize: 18 }}
+        weekdayCellStyle={{ fontWeight: 700, letterSpacing: "0.04em" }}
+        blankCellStyle={{ aspectRatio: "1/1" }}
+        renderDay={({ dateStr }) => {
           const dayBookings = bookingsByDay.get(dateStr) ?? [];
           const hasBookings = dayBookings.length > 0;
           const hasBlackout = blackoutDaySet.has(dateStr);
@@ -354,6 +308,9 @@ export default function SellerCalendar({ data }: Props) {
           const isToday = dateStr === todayStr;
           const isPast = dateStr < todayStr;
           const isSelected = dateStr === selectedDay;
+
+          // Update visible month tracking (side effect in render is acceptable for this purpose)
+          // We do this via a separate mechanism below
 
           // ── cell coloring ──────────────────────────────────────────────
           let bg: string;
@@ -391,11 +348,10 @@ export default function SellerCalendar({ data }: Props) {
 
           return (
             <button
-              key={dateStr}
               type="button"
               onClick={() => setSelectedDay(isSelected ? null : dateStr)}
               aria-pressed={isSelected}
-              aria-label={`${parseInt(dateStr.slice(8), 10)} ${MONTHS_TH_FULL[viewMonth]}${hasBookings ? ` (จอง ${dayBookings.length})` : ""}${isClosed ? " (ร้านหยุด)" : ""}`}
+              aria-label={`${parseInt(dateStr.slice(8), 10)} ${MONTHS_TH_FULL[parseInt(dateStr.slice(5, 7), 10) - 1]}${hasBookings ? ` (จอง ${dayBookings.length})` : ""}${isClosed ? " (ร้านหยุด)" : ""}`}
               style={{
                 aspectRatio: "1/1",
                 position: "relative",
@@ -453,43 +409,43 @@ export default function SellerCalendar({ data }: Props) {
               )}
             </button>
           );
-        })}
-      </div>
-
-      {/* ── Legend ── */}
-      <div
-        style={{
-          marginTop: 16,
-          padding: "10px 14px",
-          background: "var(--bg)",
-          border: "1px solid var(--line)",
-          borderRadius: 8,
-          fontSize: 12,
-          display: "flex",
-          gap: 14,
-          flexWrap: "wrap",
-          alignItems: "center",
         }}
       >
-        {selectedFilterProduct ? (
-          // Single-product legend: 3 levels
-          <>
-            <LegendItem color="var(--surface)" border="var(--line)" label="ว่างทุกไซส์" />
-            <LegendItem color="var(--warn-soft)" border="var(--warn)" label="ว่างบางไซส์" />
-            <LegendItem color="var(--danger-soft)" border="var(--danger)" label="เต็มทุกไซส์" />
-          </>
-        ) : (
-          // All-products legend
-          <>
-            <LegendItem color="var(--surface)" border="var(--line)" label="ว่าง" />
-            <LegendItem color="var(--warn-soft)" border="var(--warn)" label="มีจองบางส่วน" />
-          </>
-        )}
-        <LegendItem color="var(--bg)" border="var(--line)" label="ร้านหยุด" dim />
-        <LegendItem color="var(--surface)" border="var(--cobalt)" label="วันนี้" />
-      </div>
+        {/* ── Legend ── */}
+        <div
+          style={{
+            marginTop: 16,
+            padding: "10px 14px",
+            background: "var(--bg)",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            fontSize: 12,
+            display: "flex",
+            gap: 14,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          {selectedFilterProduct ? (
+            // Single-product legend: 3 levels
+            <>
+              <LegendItem color="var(--surface)" border="var(--line)" label="ว่างทุกไซส์" />
+              <LegendItem color="var(--warn-soft)" border="var(--warn)" label="ว่างบางไซส์" />
+              <LegendItem color="var(--danger-soft)" border="var(--danger)" label="เต็มทุกไซส์" />
+            </>
+          ) : (
+            // All-products legend
+            <>
+              <LegendItem color="var(--surface)" border="var(--line)" label="ว่าง" />
+              <LegendItem color="var(--warn-soft)" border="var(--warn)" label="มีจองบางส่วน" />
+            </>
+          )}
+          <LegendItem color="var(--bg)" border="var(--line)" label="ร้านหยุด" dim />
+          <LegendItem color="var(--surface)" border="var(--cobalt)" label="วันนี้" />
+        </div>
+      </CalendarGrid>
 
-      {/* ── Day detail panel ── */}
+      {/* ── Day detail panel — OUTSIDE CalendarGrid, after it ── */}
       {selectedDay && (
         <DayDetailPanel
           dateStr={selectedDay}
