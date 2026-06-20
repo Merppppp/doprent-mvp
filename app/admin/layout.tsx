@@ -10,13 +10,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (user.role !== "admin") redirect("/");
 
   return (
-    <div className="container" style={{ paddingTop: 24, paddingBottom: 60 }}>
-      <div className="dash-shell">
-        <aside className="dash-sidebar">
-          <AdminSidebar />
-        </aside>
-        <main className="dash-main">{children}</main>
-      </div>
+    <div className="seller-dashboard">
+      <AdminSidebar />
+      <main className="seller-main">{children}</main>
     </div>
   );
 }

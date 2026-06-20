@@ -80,10 +80,13 @@ export default async function HomePage({
     | "rating-desc";
 
   // Known non-tag-group params — excluded when building tagsByGroup from URL
+  const activeOpenOnly = searchParams?.openOnly === "1";
+
   const KNOWN_FILTER_PARAMS = new Set([
     "occasion", "size", "designer", "q", "sort",
     "dateFrom", "dateTo", "priceMin", "priceMax", "page", "type",
     "bustMin", "bustMax", "waistMin", "waistMax", "lengthMin", "lengthMax",
+    "openOnly",
   ]);
 
   // Build tagsByGroup from URL params (all params not in the known list)
@@ -119,6 +122,7 @@ export default async function HomePage({
       dateFrom: activeDateFrom,
       dateTo: activeDateTo,
       productTypeKey: activeTypeKey,
+      openOnly: activeOpenOnly || undefined,
     }),
     listOccasions(),
     listDesigners(),
@@ -178,102 +182,15 @@ export default async function HomePage({
   };
 
   return (
-    <div>
-      {/* ========== HERO ==========
-          Editorial cover composition: single column, centered, serif display.
-          No right-column "dress art" placeholder (real photos aren't ready,
-          and a colored gradient block earns nothing). Typography + negative
-          space do the work. Inspired by editorial fashion brands (Toteme,
-          The Row) where the brand IS the wordmark + a single phrase. */}
-      <section
-        className="section-pad hero-editorial"
-        style={{
-          background: "var(--warm)",
-          padding: "120px 0 80px",
-          position: "relative",
-        }}
-      >
-        {/* Tiny ornamental brand mark — a single rust dot to break the
-            symmetry without adding visual noise. */}
-        <div
-          aria-hidden
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: 999,
-            background: "var(--accent)",
-            margin: "0 auto 32px",
-          }}
-        />
+    <div className="home-revamp">
+      <Suspense fallback={null}>
+        <ScrollToResults />
+      </Suspense>
 
-        <div
-          className="shell"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 11,
-              color: "var(--ink-3)",
-              fontWeight: 500,
-              marginBottom: 28,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-            }}
-          >
-            Bangkok &nbsp;·&nbsp; Boutique Rental
-          </div>
-
-          <h1
-            className="hero-title display-serif"
-            style={{
-              marginBottom: 28,
-              maxWidth: "14ch",
-            }}
-          >
-            เช่าชุดจาก ร้านที่ไว้ใจได้
-          </h1>
-
-          <p
-            className="hero-sub"
-            style={{
-              fontSize: 17,
-              color: "var(--ink-2)",
-              maxWidth: 460,
-              marginBottom: 40,
-              lineHeight: 1.6,
-            }}
-          >
-            แคตตาล็อกชุดเช่าจากร้านในกรุงเทพ ทักร้านผ่าน LINE โดยตรง
-          </p>
-
-          <Link
-            href="/browse"
-            className="btn btn-dark btn-lg"
-            style={{ padding: "16px 28px", fontSize: 15 }}
-          >
-            เริ่มเลือกชุด
-            <span aria-hidden style={{ marginLeft: 4, fontSize: 16, lineHeight: 1 }}>
-              →
-            </span>
-          </Link>
-
-          <Link
-            href="/sell/signup"
-            style={{
-              marginTop: 18,
-              fontSize: 13,
-              color: "var(--ink-2)",
-              borderBottom: "1px solid var(--ink-3)",
-              paddingBottom: 1,
-            }}
-          >
-            เปิดร้านกับ Doprent
-          </Link>
+      {/* ======== BANNER CAROUSEL ======== */}
+      <section className="bg-bg pt-6">
+        <div className="container">
+          <BannerCarousel shops={bannerShops} slides={bannerSlides} locale={locale} />
         </div>
       </section>
 
@@ -354,6 +271,7 @@ export default async function HomePage({
                 waistMax={activeWaistMax}
                 lengthMin={activeLengthMin}
                 lengthMax={activeLengthMax}
+                openOnly={activeOpenOnly}
               />
             </aside>
 
@@ -387,6 +305,7 @@ export default async function HomePage({
                       waistMax={activeWaistMax}
                       lengthMin={activeLengthMin}
                       lengthMax={activeLengthMax}
+                      openOnly={activeOpenOnly}
                     />
                     <div className="text-sm text-[var(--ink-2)] whitespace-nowrap">
                       {t("results.found", locale)}{" "}
@@ -436,6 +355,7 @@ export default async function HomePage({
                     lengthMax: activeLengthMax !== undefined ? String(activeLengthMax) : undefined,
                     // Preserve type for infinite scroll (omit when default dress to keep URLs clean)
                     type: activeTypeKey !== "dress" ? activeTypeKey : undefined,
+                    openOnly: activeOpenOnly ? "1" : undefined,
                     ...tagParamsForResults,
                   }}
                 />

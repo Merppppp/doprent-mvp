@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { base, db } from "@/lib/db";
 import { withActor } from "@/lib/db-context";
 import { dueAt } from "@/lib/bookings";
+import type { BookingStatus } from "@/lib/types";
 
 async function requireAdmin(): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
   const user = await getCurrentUser();
@@ -205,7 +206,7 @@ export async function adminApproveCancel(bookingId: string, note?: string): Prom
   return withActor(auth.userId, async () => {
     const res = await db.booking.updateMany({
       where: { id: bookingId, status: "cancel_requested" },
-      data: { status: "cancelled" },
+      data: { status: "cancelled", cancelledBy: "shop" },
     });
     if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
 
@@ -295,6 +296,56 @@ export async function adminRejectSlip(bookingId: string, note?: string): Promise
 
     await logAdminAction(auth.userId, "reject_disputed_slip", "booking", bookingId, note ?? null, {
       rejectedSlipPath: booking.slipPath,
+    });
+    revalidateBookingPaths(bookingId);
+    return { ok: true };
+  });
+}
+
+/* ── Admin force-transition (any status → target) ── */
+
+const ADMIN_ALLOWED_TARGETS = new Set([
+  "booking_pending",
+  "waiting_for_payment",
+  "payment_review",
+  "confirmed",
+  "returned",
+  "completed",
+  "cancelled",
+  "rejected",
+]);
+
+export async function adminForceStatus(
+  bookingId: string,
+  targetStatus: string,
+  note?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth;
+
+  if (!ADMIN_ALLOWED_TARGETS.has(targetStatus))
+    return { ok: false, error: `สถานะ ${targetStatus} ไม่อนุญาต` };
+
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: { status: true },
+  });
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.status === targetStatus)
+    return { ok: false, error: "สถานะเดิมกับปลายทางเหมือนกัน" };
+
+  return withActor(auth.userId, async () => {
+    await db.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: targetStatus as BookingStatus,
+        ...(targetStatus === "waiting_for_payment" ? { currentDueAt: new Date(dueAt()) } : {}),
+      },
+    });
+
+    await logAdminAction(auth.userId, "force_status", "booking", bookingId, note ?? null, {
+      from: booking.status,
+      to: targetStatus,
     });
     revalidateBookingPaths(bookingId);
     return { ok: true };

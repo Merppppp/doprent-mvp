@@ -54,6 +54,8 @@ export type ProductFilters = {
   productTypeKey?: string;
   dateFrom?: string; // YYYY-MM-DD
   dateTo?: string;   // YYYY-MM-DD
+  /** Only show products from shops that are currently open (isOpen = true). */
+  openOnly?: boolean;
   page?: number;
 };
 
@@ -68,7 +70,7 @@ const PRODUCT_INCLUDE = {
   productTags: { select: { tag: { select: { key: true, tagGroup: { select: { key: true } } } } } },
   productType: { select: { key: true } },
   category: { select: { key: true } },
-  shop: { select: { name: true, verified: true, ratingAvg: true, ratingCount: true, area: { select: { key: true } } } },
+  shop: { select: { name: true, verified: true, ratingAvg: true, ratingCount: true, isOpen: true, area: { select: { key: true } } } },
 } satisfies Prisma.ProductInclude;
 
 type ProductRow = Prisma.ProductGetPayload<{ include: typeof PRODUCT_INCLUDE }>;
@@ -98,6 +100,7 @@ function mapProduct(d: ProductRow): Product {
     shop_rating_avg: d.shop.ratingAvg !== null && d.shop.ratingAvg !== undefined ? Number(d.shop.ratingAvg) : null,
     shop_rating_count: d.shop.ratingCount,
     area_key: d.shop.area?.key ?? null,
+    shop_is_open: d.shop.isOpen,
     product_type_key: d.productType.key,
     category_key: d.category?.key ?? null,
     size: d.size as Size,
@@ -340,6 +343,11 @@ export async function listProducts(
   // Shop slugs filter (DB level via relation)
   if (opts.shopSlugs?.length) {
     where.shop = { slug: { in: opts.shopSlugs } };
+  }
+
+  // Open shops only
+  if (opts.openOnly) {
+    where.shop = { ...where.shop as Prisma.ShopWhereInput, isOpen: true };
   }
 
   // Body-measurement filter — one variant must satisfy ALL active bounds simultaneously.
@@ -773,14 +781,42 @@ export async function listOccasions(): Promise<Occasion[]> {
     .sort((a, b) => a.sort_order - b.sort_order || a.key.localeCompare(b.key));
 }
 
-export async function listBlackouts(productId: string): Promise<string[]> {
+/**
+ * List blackout dates for a product.
+ * variantId = undefined → product-wide only (variantId IS NULL).
+ * variantId = string   → variant-specific only.
+ * variantId = "all"    → all blackouts (product-wide + all variants).
+ */
+export async function listBlackouts(
+  productId: string,
+  variantId?: string | null,
+): Promise<{ date: string; variantId: string | null }[]> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: Record<string, any> = { productId, date: { gte: today } };
+  if (variantId && variantId !== "all") {
+    where.OR = [{ variantId: null }, { variantId }];
+    delete where.variantId;
+  } else if (!variantId) {
+    where.variantId = null;
+  }
+  // variantId === "all" → no variantId filter
+
   const rows = await db.productBlackoutDate.findMany({
-    where: { productId, date: { gte: today } },
+    where: variantId && variantId !== "all"
+      ? { productId, date: { gte: today }, OR: [{ variantId: null }, { variantId }] }
+      : variantId === "all"
+        ? { productId, date: { gte: today } }
+        : { productId, date: { gte: today }, variantId: null },
     orderBy: { date: "asc" },
+    select: { date: true, variantId: true },
   });
-  return rows.map((r) => r.date.toISOString().slice(0, 10));
+  return rows.map((r) => ({
+    date: r.date.toISOString().slice(0, 10),
+    variantId: r.variantId,
+  }));
 }
 
 export async function getStats(): Promise<{ shops: number; products: number; minPrice: number }> {

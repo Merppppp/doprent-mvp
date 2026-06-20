@@ -5,6 +5,7 @@ import { getSellerBookingsPage, type SellerBookingCard } from "@/lib/booking-que
 import { getTrustScores, type TrustScore } from "@/lib/trust-score";
 import {
   statusesForTab,
+  cancelledByForTab,
   type BookingTabKey,
   SELLER_BOOKINGS_PAGE_SIZE,
 } from "@/lib/seller-booking-tabs";
@@ -32,6 +33,7 @@ export async function fetchSellerBookingsPage(
 
   const { rows, total } = await getSellerBookingsPage(shopId, {
     statuses: statusesForTab(tab),
+    cancelledBy: cancelledByForTab(tab),
     sinceDays,
     skip: Math.max(0, Math.trunc(skip)),
     take: SELLER_BOOKINGS_PAGE_SIZE,

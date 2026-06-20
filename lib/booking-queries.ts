@@ -38,6 +38,7 @@ type PrismaBookingWithJoins = {
   currentDueAt: Date | null;
   cancelReason: string | null;
   cancelFromStatus: string | null;
+  disputeNote: string | null;
   addrChangeStatus: string | null;
   pendingRecipientName: string | null;
   pendingPhone: string | null;
@@ -93,6 +94,7 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     current_due_at: b.currentDueAt ? b.currentDueAt.toISOString() : null,
     cancel_reason: b.cancelReason,
     cancel_from_status: b.cancelFromStatus,
+    dispute_note: b.disputeNote,
     addr_change_status: b.addrChangeStatus,
     pending_recipient_name: b.pendingRecipientName,
     pending_phone: b.pendingPhone,
@@ -189,6 +191,7 @@ export type SellerBookingCard = {
   end_date: string;
   amount_due: number;
   status: BookingStatus;
+  source: string | null;
   created_at: string;
 };
 
@@ -202,6 +205,7 @@ export async function getSellerBookingsPage(
   shopId: string,
   opts: {
     statuses?: BookingStatus[] | null;
+    cancelledBy?: string[] | null;
     sinceDays?: number | null;
     skip?: number;
     take?: number;
@@ -210,13 +214,13 @@ export async function getSellerBookingsPage(
   const take = opts.take ?? 20;
   const skip = opts.skip ?? 0;
 
-  const where: {
-    shopId: string;
-    status?: { in: BookingStatus[] };
-    createdAt?: { gte: Date };
-  } = { shopId };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: Record<string, any> = { shopId };
   if (opts.statuses && opts.statuses.length > 0) {
     where.status = { in: opts.statuses };
+  }
+  if (opts.cancelledBy && opts.cancelledBy.length > 0) {
+    where.cancelledBy = { in: opts.cancelledBy };
   }
   if (opts.sinceDays && opts.sinceDays > 0) {
     where.createdAt = { gte: new Date(Date.now() - opts.sinceDays * 86400 * 1000) };
@@ -238,6 +242,7 @@ export async function getSellerBookingsPage(
         deposit: true,
         shippingFee: true,
         status: true,
+        source: true,
         recipientName: true,
         createdAt: true,
         product: {
@@ -262,6 +267,7 @@ export async function getSellerBookingsPage(
       end_date: ymd(b.endDate),
       amount_due: b.rentalTotal + b.deposit + (b.shippingFee ?? 0),
       status: b.status as BookingStatus,
+      source: b.source,
       created_at: b.createdAt.toISOString(),
     })),
   };
@@ -326,6 +332,142 @@ export async function getBookingBadges(): Promise<{ renter: number; seller: numb
 }
 
 /** Is the current user the owner of this booking's shop? (for view role) */
+/** Count bookings grouped by status for a given shop. */
+export async function countBookingsByStatus(shopId: string): Promise<Record<string, number>> {
+  const groups = await db.booking.groupBy({
+    by: ["status", "cancelledBy"],
+    where: { shopId },
+    _count: true,
+  });
+  const map: Record<string, number> = {};
+  const shopCancelStatuses = new Set(["rejected", "cancel_requested"]);
+  const renterCancelStatuses = new Set(["payment_expired"]);
+  let cancelledShop = 0;
+  let cancelledRenter = 0;
+  for (const g of groups) {
+    map[g.status] = (map[g.status] || 0) + g._count;
+    if (shopCancelStatuses.has(g.status)) {
+      cancelledShop += g._count;
+    } else if (renterCancelStatuses.has(g.status)) {
+      cancelledRenter += g._count;
+    } else if (g.status === "cancelled") {
+      if (g.cancelledBy === "shop" || g.cancelledBy === "admin") cancelledShop += g._count;
+      else cancelledRenter += g._count;
+    }
+  }
+  map["_cancelled_shop"] = cancelledShop;
+  map["_cancelled_renter"] = cancelledRenter;
+  return map;
+}
+
+/** Lightweight card row for the renter bookings list (tabbed + paginated). */
+export type RenterBookingCard = {
+  id: string;
+  dress_name: string | null;
+  dress_image: string | null;
+  dress_slug: string | null;
+  shop_name: string | null;
+  shop_slug: string | null;
+  shop_line_url: string | null;
+  start_date: string;
+  end_date: string;
+  rental_total: number;
+  deposit: number;
+  shipping_fee: number | null;
+  status: BookingStatus;
+  created_at: string;
+};
+
+export async function getRenterBookingsPage(
+  userId: string,
+  opts: {
+    statuses?: BookingStatus[] | null;
+    search?: string | null;
+    skip?: number;
+    take?: number;
+  } = {},
+): Promise<{ rows: RenterBookingCard[]; total: number }> {
+  const take = opts.take ?? 20;
+  const skip = opts.skip ?? 0;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: Record<string, any> = { renterId: userId };
+  if (opts.statuses && opts.statuses.length > 0) {
+    where.status = { in: opts.statuses };
+  }
+  if (opts.search && opts.search.trim()) {
+    const q = opts.search.trim();
+    where.OR = [
+      { product: { name: { contains: q, mode: "insensitive" } } },
+      { shop: { name: { contains: q, mode: "insensitive" } } },
+    ];
+  }
+
+  const [total, rows] = await Promise.all([
+    db.booking.count({ where }),
+    db.booking.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take,
+      select: {
+        id: true,
+        startDate: true,
+        endDate: true,
+        rentalTotal: true,
+        deposit: true,
+        shippingFee: true,
+        status: true,
+        createdAt: true,
+        product: {
+          select: {
+            name: true,
+            slug: true,
+            images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+          },
+        },
+        shop: {
+          select: { name: true, slug: true, lineUrl: true },
+        },
+      },
+    }),
+  ]);
+
+  return {
+    total,
+    rows: rows.map((b) => ({
+      id: b.id,
+      dress_name: b.product?.name ?? null,
+      dress_image: b.product?.images[0]?.url ?? null,
+      dress_slug: b.product?.slug ?? null,
+      shop_name: b.shop?.name ?? null,
+      shop_slug: b.shop?.slug ?? null,
+      shop_line_url: b.shop?.lineUrl ?? null,
+      start_date: ymd(b.startDate),
+      end_date: ymd(b.endDate),
+      rental_total: b.rentalTotal,
+      deposit: b.deposit,
+      shipping_fee: b.shippingFee,
+      status: b.status as BookingStatus,
+      created_at: b.createdAt.toISOString(),
+    })),
+  };
+}
+
+/** Count renter bookings grouped by status for tab badges. */
+export async function countRenterBookingsByStatus(userId: string): Promise<Record<string, number>> {
+  const groups = await db.booking.groupBy({
+    by: ["status"],
+    where: { renterId: userId },
+    _count: true,
+  });
+  const map: Record<string, number> = {};
+  for (const g of groups) {
+    map[g.status] = (map[g.status] || 0) + g._count;
+  }
+  return map;
+}
+
 export async function currentUserIsSellerOf(shopId: string): Promise<boolean> {
   const user = await getCurrentUser();
   if (!user) return false;

@@ -138,10 +138,36 @@ export function notifySlipDisputed(opts: RenterNotifyOpts) {
       title: "สลิปการโอนมีปัญหา",
       bodyHtml: `
         <p>ร้านแจ้งว่าสลิปการโอนของการจองชุด <strong>${opts.dressName}</strong> มีปัญหา</p>
-        <p>กรุณาติดต่อร้านหรือรอแอดมินตรวจสอบ</p>
+        <p>คุณสามารถอัปโหลดสลิปใหม่ หรือโต้แย้งให้แอดมินตัดสินได้</p>
       `,
-      ctaLabel: "ดูรายละเอียด",
+      ctaLabel: "ดูรายละเอียดและดำเนินการ",
       ctaUrl: `${baseUrl()}/account/bookings/${opts.bookingId}`,
+    }),
+  );
+}
+
+/* --------------------------- admin notifications --------------------------- */
+
+export function notifyAdminDisputeEscalated(opts: {
+  adminEmail: string | null | undefined;
+  dressName: string;
+  bookingId: string;
+  renterNote: string;
+}) {
+  fireEmail(
+    opts.adminEmail,
+    "ผู้เช่าโต้แย้งสลิป รอตัดสิน — DopRent",
+    emailShell({
+      title: "ผู้เช่าโต้แย้งสลิป — รอแอดมินตัดสิน",
+      bodyHtml: `
+        <p>ผู้เช่าโต้แย้งกรณีสลิปมีปัญหาของการจองชุด <strong>${opts.dressName}</strong></p>
+        <p style="padding:8px 12px;background:#f5f5f5;border-radius:6px;color:#555">
+          "${opts.renterNote}"
+        </p>
+        <p>กรุณาเข้าไปตรวจสอบสลิปและตัดสินให้ทั้งสองฝ่าย</p>
+      `,
+      ctaLabel: "ดูรายการจอง",
+      ctaUrl: `${baseUrl()}/admin/bookings/${opts.bookingId}`,
     }),
   );
 }

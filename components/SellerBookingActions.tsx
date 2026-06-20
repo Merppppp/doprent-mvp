@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   acceptBooking,
   confirmSlip,
   disputeSlip,
+  markRenting,
   markCompleted,
   markReturned,
   rejectBooking,
@@ -34,6 +35,7 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
   const [fee, setFee] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
   // Only let the seller pick when BOTH channels are configured.
   const canChoose = channels.length >= 2;
   const [method, setMethod] = useState<PaymentChannel | null>(
@@ -169,14 +171,21 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
           type="button"
           className="btn btn-outline"
           disabled={busy}
-          onClick={() => {
-            const reason = prompt("เหตุผลที่สลิปไม่ถูกต้อง (ส่งให้แอดมินตรวจ)");
-            if (reason && reason.trim()) run(() => disputeSlip(bookingId, reason.trim()));
-          }}
+          onClick={() => setShowDisputeModal(true)}
         >
           สลิปไม่ถูกต้อง
         </button>
         {error ? <Err msg={error} /> : null}
+        {showDisputeModal && (
+          <DisputeModal
+            busy={busy}
+            onClose={() => setShowDisputeModal(false)}
+            onSubmit={(reason) => {
+              setShowDisputeModal(false);
+              run(() => disputeSlip(bookingId, reason));
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -188,10 +197,27 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
           type="button"
           className="btn btn-primary btn-lg"
           disabled={busy}
+          onClick={() => run(() => markRenting(bookingId))}
+          style={{ padding: "13px 18px" }}
+        >
+          ส่งชุดแล้ว · เริ่มเช่า
+        </button>
+        {error ? <Err msg={error} /> : null}
+      </div>
+    );
+  }
+
+  if (status === "renting") {
+    return (
+      <div style={{ display: "grid", gap: 12 }}>
+        <button
+          type="button"
+          className="btn btn-primary btn-lg"
+          disabled={busy}
           onClick={() => run(() => markReturned(bookingId))}
           style={{ padding: "13px 18px" }}
         >
-          ทำเครื่องหมายว่ารับคืนแล้ว
+          ลูกค้าคืนชุดแล้ว
         </button>
         {error ? <Err msg={error} /> : null}
       </div>
@@ -216,6 +242,95 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
   }
 
   return null;
+}
+
+function DisputeModal({
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          background: "var(--bg, #fff)",
+          borderRadius: 14,
+          width: "100%",
+          maxWidth: 420,
+          padding: "22px 20px 18px",
+          boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
+        }}
+      >
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+          สลิปไม่ถูกต้อง
+        </h3>
+        <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginBottom: 14 }}>
+          กรุณาระบุเหตุผล เพื่อส่งให้แอดมินตรวจสอบ
+        </p>
+        <textarea
+          ref={inputRef}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="เช่น ยอดไม่ตรง, สลิปเบลอ, ชื่อไม่ตรง..."
+          rows={3}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            fontSize: 14,
+            fontFamily: "inherit",
+            resize: "vertical",
+            background: "var(--surface)",
+            color: "var(--ink)",
+            boxSizing: "border-box",
+          }}
+        />
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={onClose}
+            style={{ flex: 1, padding: "10px 0" }}
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy || !reason.trim()}
+            onClick={() => onSubmit(reason.trim())}
+            style={{ flex: 1, padding: "10px 0", fontWeight: 600 }}
+          >
+            ยืนยันส่ง
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Err({ msg }: { msg: string }) {

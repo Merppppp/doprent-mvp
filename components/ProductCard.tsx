@@ -33,6 +33,40 @@ export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn
         >
           <ProductCardImage src={imgSrc} alt={product.name} color={product.color ?? "rose"} variant={variant} />
           <SaveButton productId={product.id} initialSaved={isSaved} isLoggedIn={isLoggedIn} />
+          {/* Shop open/close indicator */}
+          {product.shop_is_open != null && (
+            <span
+              style={{
+                position: "absolute",
+                top: 8,
+                left: 8,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                background: product.shop_is_open
+                  ? "rgba(0,0,0,0.55)"
+                  : "rgba(0,0,0,0.45)",
+                backdropFilter: "blur(6px)",
+                color: "#fff",
+                fontSize: 10,
+                fontWeight: 600,
+                padding: "3px 7px",
+                borderRadius: 6,
+                lineHeight: 1,
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: product.shop_is_open ? "#06c755" : "var(--ink-3)",
+                  flexShrink: 0,
+                }}
+              />
+              {product.shop_is_open ? "Online" : "Offline"}
+            </span>
+          )}
         </div>
         <div className="pc-body">
           {/* Top row: brand (left) + distance (right). */}

@@ -27,6 +27,11 @@ export default async function ProductCalendarPage({ params }: { params: { id: st
       select: {
         id: true, name: true, shopId: true,
         images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+        variants: {
+          where: { available: true },
+          orderBy: { size: "asc" },
+          select: { id: true, size: true },
+        },
       },
     }),
   ]);
@@ -37,7 +42,24 @@ export default async function ProductCalendarPage({ params }: { params: { id: st
   }
   if (!productRaw || productRaw.shopId !== shopRaw.id) notFound();
 
-  const blackouts = await listBlackouts(productRaw.id);
+  const allBlackouts = await listBlackouts(productRaw.id, "all");
+
+  const variants = productRaw.variants.map((v) => ({
+    id: v.id,
+    label: v.size,
+  }));
+
+  // Separate product-wide vs variant-specific blackouts
+  const productWideBlackouts = allBlackouts
+    .filter((b) => b.variantId === null)
+    .map((b) => b.date);
+
+  const variantBlackouts: Record<string, string[]> = {};
+  for (const v of variants) {
+    variantBlackouts[v.id] = allBlackouts
+      .filter((b) => b.variantId === v.id)
+      .map((b) => b.date);
+  }
 
   return (
     <div className="container" style={{ paddingTop: 32, paddingBottom: 80, maxWidth: 640 }}>
@@ -46,13 +68,19 @@ export default async function ProductCalendarPage({ params }: { params: { id: st
         ปฏิทินวันว่าง · {productRaw.name}
       </h1>
       <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
-        กดที่วันที่ที่สินค้านี้ <b>ไม่ว่าง</b> (เช่น มีลูกค้าจองอยู่แล้ว) ระบบจะบล็อกไม่ให้ลูกค้าเลือกวันนั้น
+        กดที่วันที่ที่สินค้านี้ <b>ไม่ว่าง</b> เพื่อบล็อกไม่ให้ลูกค้าเลือกวันนั้น เลือกแท็บไซซ์เพื่อปิดเป็นรายไซซ์
       </p>
       <div style={{ border: "1px solid var(--line)", borderRadius: 12, padding: 18, background: "var(--surface)" }}>
-        <AvailabilityCalendar productId={productRaw.id} initialBlackouts={blackouts} />
+        <AvailabilityCalendar
+          productId={productRaw.id}
+          variants={variants}
+          initialProductBlackouts={productWideBlackouts}
+          initialVariantBlackouts={variantBlackouts}
+        />
       </div>
       <div style={{ marginTop: 20, fontSize: 13, color: "var(--ink-3)", lineHeight: 1.6 }}>
-        เคล็ดลับ: อัปเดตปฏิทินทุกครั้งหลังจบงานลูกค้า ลูกค้าใหม่จะเห็นวันที่จองสินค้าได้ทันที
+        <b>ทุกไซซ์</b> = ปิดทั้งสินค้า (ลูกค้าเลือกไซซ์ไหนก็จองวันนี้ไม่ได้)<br />
+        <b>ไซซ์เฉพาะ</b> = ปิดเฉพาะไซซ์นั้น (ไซซ์อื่นยังจองได้)
       </div>
     </div>
   );

@@ -102,6 +102,12 @@ export default async function AdminBookingDetail({ params }: { params: { id: str
         </div>
       ) : null}
 
+      {b.disputeNote ? (
+        <div style={{ ...card, fontSize: 14, color: "var(--ink-2)", border: "1px solid var(--info)", background: "var(--info-soft)" }}>
+          <b>ข้อความโต้แย้งจากผู้เช่า:</b> {b.disputeNote}
+        </div>
+      ) : null}
+
       {slipUrl ? (
         <div style={card}>
           <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>สลิปการโอน</div>

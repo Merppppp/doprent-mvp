@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { priceForNights } from "@/lib/pricing";
 import { type PriceTier, sizeLabel } from "@/lib/types";
 import { fmtThai, MONTHS_TH_FULL, DAYS_TH } from "@/lib/date-th";
@@ -61,6 +61,10 @@ type Props = {
    * and unavailable dates override the product-level ones.
    */
   variants?: VariantOption[];
+  /** Today's shop closing time as "HH:MM" (e.g. "19:00"). Null when shop is closed today or hours unknown. */
+  shopClosingTime?: string | null;
+  /** Whether the shop is currently open (manual toggle). */
+  shopIsOpen?: boolean | null;
 };
 
 /** Days between two YYYY-MM-DD dates, inclusive. Returns 0 if either is empty/invalid or end < start. */
@@ -123,6 +127,8 @@ export default function DateRangePicker({
   dressTagCode,
   isLoggedIn,
   variants,
+  shopClosingTime,
+  shopIsOpen,
 }: Props) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
@@ -190,6 +196,23 @@ export default function DateRangePicker({
   }, [start, end, nights, minRentalDays, maxRentalDays, hasConflict]);
 
   const isInvalid = hasConflict || !!policyError;
+
+  // Shop closing-soon warning (within 1 hour of today's closing time)
+  const [closingSoon, setClosingSoon] = useState(false);
+  useEffect(() => {
+    if (!shopClosingTime) { setClosingSoon(false); return; }
+    function check() {
+      const now = new Date();
+      const [h, m] = shopClosingTime!.split(":").map(Number);
+      const closeMin = h * 60 + m;
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      const diff = closeMin - nowMin;
+      setClosingSoon(diff > 0 && diff <= 60);
+    }
+    check();
+    const iv = setInterval(check, 60_000);
+    return () => clearInterval(iv);
+  }, [shopClosingTime]);
 
   // Up to 6 nearest future blackouts to show as warning
   const nextBlackouts = useMemo(() => {
@@ -268,6 +291,19 @@ export default function DateRangePicker({
               ฿{selectedVariant.pricePerDay.toLocaleString()}/วัน · มัดจำ ฿{selectedVariant.deposit.toLocaleString()}
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* Shop closing-soon / offline warning */}
+      {shopIsOpen === false ? (
+        <div style={{ padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 6, fontSize: 13, color: "var(--ink-3)", marginBottom: 12, lineHeight: 1.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--ink-3)", flexShrink: 0 }} />
+          ร้านปิดอยู่ขณะนี้ — คำจองอาจได้รับการตอบกลับช้า
+        </div>
+      ) : closingSoon ? (
+        <div style={{ padding: "10px 12px", background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.4)", borderRadius: 6, fontSize: 13, color: "#92400E", marginBottom: 12, lineHeight: 1.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 15 }}>⏰</span>
+          ร้านใกล้จะปิด (ปิด {shopClosingTime} น.) — มีโอกาสที่จะถูกปฏิเสธการจอง
         </div>
       ) : null}
 

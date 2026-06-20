@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
       "color", "occasion", "size", "designer", "q", "sort",
       "dateFrom", "dateTo", "priceMin", "priceMax", "page", "type",
       "bustMin", "bustMax", "waistMin", "waistMax", "lengthMin", "lengthMax",
+      "openOnly",
     ]);
     const tagsByGroup: Record<string, string[]> = {};
     for (const [key, value] of sp.entries()) {
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest) {
     const KNOWN_TYPE_KEYS = ["dress", "suit"];
     const rawType = sp.get("type")?.trim();
     const productTypeKey = rawType && KNOWN_TYPE_KEYS.includes(rawType) ? rawType : undefined;
+    const openOnly = sp.get("openOnly") === "1";
 
     const result = await listProducts({
       color: color ?? undefined,
@@ -64,6 +66,7 @@ export async function GET(req: NextRequest) {
       dateFrom,
       dateTo,
       productTypeKey,
+      openOnly,
     });
 
     return NextResponse.json(result);

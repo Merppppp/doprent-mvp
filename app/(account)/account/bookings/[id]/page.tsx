@@ -170,13 +170,15 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
         </>
       ) : null}
 
-      {b.status === "confirmed" ? (
-        <div style={{ ...card, background: "var(--success-soft)" }}>
-          <div style={{ fontWeight: 600, color: "var(--success)", marginBottom: 4 }}>
-            จองเรียบร้อย ✓
+      {b.status === "confirmed" || b.status === "renting" ? (
+        <div style={{ ...card, background: b.status === "renting" ? "var(--info-soft, rgba(59,130,246,0.06))" : "var(--success-soft)" }}>
+          <div style={{ fontWeight: 600, color: b.status === "renting" ? "var(--info, #3b82f6)" : "var(--success)", marginBottom: 4 }}>
+            {b.status === "renting" ? "กำลังเช่าอยู่" : "จองเรียบร้อย ✓"}
           </div>
           <div style={{ fontSize: 14, color: "var(--ink-2)" }}>
-            ร้านยืนยันการชำระเงินแล้ว นัดรับ/ส่งชุดกับร้านได้เลย
+            {b.status === "renting"
+              ? "คุณกำลังเช่าชุดอยู่ กรุณาส่งคืนตามกำหนด"
+              : "ร้านยืนยันการชำระเงินแล้ว รอจัดส่งชุด"}
           </div>
           {b.boutique_line_url ? (
             <a
@@ -206,7 +208,13 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
         </div>
       ) : null}
 
-      <RenterBookingActions bookingId={b.id} status={b.status} canPay={!!qr} />
+      <RenterBookingActions
+        bookingId={b.id}
+        status={b.status}
+        canPay={b.status === "waiting_for_payment" && b.shipping_fee != null}
+        disputeReason={b.cancel_reason}
+        disputeNote={b.dispute_note}
+      />
 
       {/* Review section — shown for completed/returned bookings */}
       {isReviewable ? (

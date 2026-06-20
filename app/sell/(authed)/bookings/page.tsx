@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { requireShopAccess } from "@/lib/shop-access";
 import { expireOverdueBookings } from "@/lib/booking-expiry";
-import { getSellerBookingsPage } from "@/lib/booking-queries";
+import { getSellerBookingsPage, countBookingsByStatus } from "@/lib/booking-queries";
 import { getTrustScores } from "@/lib/trust-score";
 import { SELLER_BOOKINGS_PAGE_SIZE } from "@/lib/seller-booking-tabs";
 import SellerBookingsList from "@/components/SellerBookingsList";
@@ -15,12 +15,19 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function SellerBookingsPage() {
+export default async function SellerBookingsPage({
+  searchParams,
+}: {
+  searchParams: { status?: string };
+}) {
   const access = await requireShopAccess({ need: "bookings" }).catch(() => null);
   if (!access) redirect("/login?next=/sell/bookings");
 
   // Lazy payment-expiry sweep so stale waiting_for_payment rows never show.
   await expireOverdueBookings();
+
+  // Fetch booking counts per status for the block cards
+  const statusCounts = await countBookingsByStatus(access.shopId);
 
   // Server-render the first page for the default tab ("all", all time); the
   // client component takes over for tab switches, day filters and infinite scroll.
@@ -38,11 +45,16 @@ export default async function SellerBookingsPage() {
   }));
 
   return (
-    <div className="container" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 760 }}>
-      <h1 className="page-title" style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", marginBottom: 20 }}>
+    <div style={{ maxWidth: 900 }}>
+      <h1 className="seller-h1" style={{ marginBottom: 20 }}>
         การจองของร้าน
       </h1>
-      <SellerBookingsList initialRows={initialRows} initialTotal={total} />
+      <SellerBookingsList
+        initialRows={initialRows}
+        initialTotal={total}
+        statusCounts={statusCounts}
+        initialStatus={searchParams?.status}
+      />
     </div>
   );
 }

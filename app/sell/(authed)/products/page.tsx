@@ -49,17 +49,28 @@ const tdStyle: React.CSSProperties = {
 export default async function SellerProductsPage({
   searchParams,
 }: {
-  searchParams?: { page?: string };
+  searchParams?: { page?: string; q?: string };
 }) {
   const { shopId } = await requireShopAccess({ need: "products" });
 
-  const total = await db.product.count({ where: { shopId } });
+  const search = (searchParams?.q ?? "").trim();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: Record<string, any> = { shopId };
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { tagCode: { contains: search, mode: "insensitive" } },
+      { designer: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  const total = await db.product.count({ where });
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const requestedPage = Number(searchParams?.page ?? "1");
   const page = Number.isFinite(requestedPage) ? Math.min(Math.max(1, Math.trunc(requestedPage)), totalPages) : 1;
 
   const productRows = await db.product.findMany({
-    where: { shopId },
+    where,
     orderBy: { createdAt: "desc" },
     skip: (page - 1) * PAGE_SIZE,
     take: PAGE_SIZE,
@@ -98,6 +109,43 @@ export default async function SellerProductsPage({
           + เพิ่มสินค้าใหม่
         </Link>
       </div>
+
+      {/* Search */}
+      <form method="GET" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            type="text"
+            name="q"
+            defaultValue={search}
+            placeholder="ค้นหาชื่อสินค้า, รหัส, แบรนด์…"
+            style={{
+              flex: 1,
+              padding: "9px 14px",
+              borderRadius: 8,
+              border: "1px solid var(--line)",
+              background: "var(--surface)",
+              fontSize: 13,
+              color: "var(--ink)",
+            }}
+          />
+          <button
+            type="submit"
+            className="btn btn-outline"
+            style={{ padding: "9px 16px", fontSize: 13 }}
+          >
+            ค้นหา
+          </button>
+          {search && (
+            <Link
+              href="/sell/products"
+              className="btn btn-outline"
+              style={{ padding: "9px 14px", fontSize: 13, color: "var(--ink-3)" }}
+            >
+              ล้าง
+            </Link>
+          )}
+        </div>
+      </form>
 
       {total === 0 ? (
         <div
@@ -232,6 +280,23 @@ export default async function SellerProductsPage({
                           >
                             📅
                           </Link>
+                          {d.status === "live" && d.available && (
+                            <Link
+                              href={`/sell/products/${d.id}/manual-booking`}
+                              style={{
+                                padding: "5px 10px",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                borderRadius: 6,
+                                background: "var(--accent)",
+                                color: "var(--accent-ink, #fff)",
+                                textDecoration: "none",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              จองหน้าร้าน
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>

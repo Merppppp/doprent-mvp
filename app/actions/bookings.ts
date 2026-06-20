@@ -29,6 +29,7 @@ import {
   notifyBookingRejected,
   notifyNewBookingRequest,
   notifySlipDisputed,
+  notifyAdminDisputeEscalated,
 } from "@/lib/notifications";
 import { FIRST_TOUCH_COOKIE, decodeAttribution } from "@/lib/attribution";
 import { BOOKING_SLIP_MAX_BYTES } from "@/lib/config";
@@ -204,6 +205,10 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   const endDate = String(formData.get("end_date") ?? "");
   // variantId is optional — new bookings send it; legacy back-compat: null
   const variantIdRaw = String(formData.get("variant_id") ?? "").trim() || null;
+  // Delivery method + carrier + express slot
+  const deliveryMethod = String(formData.get("delivery_method") ?? "").trim() || null;
+  const deliveryCarrier = String(formData.get("delivery_carrier") ?? "").trim() || null;
+  const expressSlot = String(formData.get("express_slot") ?? "").trim() || null;
   if (!productId || !addressId || !startDate || !endDate)
     return { ok: false, error: "ข้อมูลการจองไม่ครบ" };
   if (endDate < startDate) return { ok: false, error: "วันคืนชุดต้องไม่ก่อนวันรับ" };
@@ -445,6 +450,9 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
               recipientName: addr.recipientName,
               phone: addr.phone,
               addressText: addr.addressLine,
+              deliveryMethod,
+              deliveryCarrier,
+              expressSlot,
             },
             select: { id: true },
           });
@@ -476,6 +484,9 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
           recipientName: addr.recipientName,
           phone: addr.phone,
           addressText: addr.addressLine,
+          deliveryMethod,
+          deliveryCarrier,
+          expressSlot,
         },
         select: { id: true },
       });
@@ -630,7 +641,12 @@ export async function disputeSlip(bookingId: string, reason: string): Promise<Re
   return sellerSimpleMove(bookingId, "slip_disputed", reason);
 }
 
-/** Seller marks the dress as received back — transitions confirmed → returned. */
+/** Seller marks as delivered/renting — transitions confirmed → renting. */
+export async function markRenting(bookingId: string): Promise<Result> {
+  return sellerSimpleMove(bookingId, "renting");
+}
+
+/** Seller marks the dress as received back — transitions renting → returned. */
 export async function markReturned(bookingId: string): Promise<Result> {
   return sellerSimpleMove(bookingId, "returned");
 }
@@ -655,15 +671,22 @@ async function sellerSimpleMove(
   if (!findTransition(from, to, "seller"))
     return { ok: false, error: "เปลี่ยนสถานะนี้ไม่ได้" };
 
-  const res = await withActor(user.id, () =>
-    db.booking.updateMany({
-      where: { id: bookingId, status: from },
-      data: {
-        status: to,
-        ...(reason !== undefined ? { cancelReason: reason, cancelFromStatus: from } : {}),
-      },
-    }),
-  );
+  let res;
+  try {
+    res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, status: from },
+        data: {
+          status: to,
+          ...(reason !== undefined ? { cancelReason: reason, cancelFromStatus: from } : {}),
+          ...(to === "rejected" || to === "cancel_requested" ? { cancelledBy: "shop" } : {}),
+        },
+      }),
+    );
+  } catch (e) {
+    console.error("[doprent] seller move error", e);
+    return { ok: false, error: "อัปเดตสถานะไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
   if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
 
   // Fire-and-forget renter notifications per transition.
@@ -719,13 +742,19 @@ export async function uploadSlip(bookingId: string, formData: FormData): Promise
     return { ok: false, error: "อัปโหลดสลิปไม่สำเร็จ ลองใหม่อีกครั้ง" };
   }
 
-  const res = await withActor(user.id, () =>
-    db.booking.updateMany({
-      where: { id: bookingId, status: "waiting_for_payment", renterId: user.id },
-      data: { slipPath: key, status: "payment_review" },
-    }),
-  );
-  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+  const from = booking.status as BookingStatus;
+  try {
+    const res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, status: from, renterId: user.id },
+        data: { slipPath: key, status: "payment_review", disputeNote: null },
+      }),
+    );
+    if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+  } catch (e) {
+    console.error("[doprent] slip status update error", e);
+    return { ok: false, error: "อัปเดตสถานะไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
   revalidatePath("/account/bookings");
   revalidatePath("/sell/bookings");
   return { ok: true };
@@ -741,13 +770,62 @@ export async function cancelBooking(bookingId: string): Promise<Result> {
   if (!findTransition(from, "cancelled", "renter"))
     return { ok: false, error: "ยกเลิกในขั้นตอนนี้ไม่ได้ ติดต่อร้านผ่านแอดมิน" };
 
-  const res = await withActor(user.id, () =>
-    db.booking.updateMany({
-      where: { id: bookingId, status: from, renterId: user.id },
-      data: { status: "cancelled" },
-    }),
-  );
+  let res;
+  try {
+    res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, status: from, renterId: user.id },
+        data: { status: "cancelled", cancelledBy: "renter" },
+      }),
+    );
+  } catch (e) {
+    console.error("[doprent] cancel booking error", e);
+    return { ok: false, error: "ยกเลิกไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
   if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+  revalidatePath("/account/bookings");
+  revalidatePath("/sell/bookings");
+  return { ok: true };
+}
+
+/** Renter escalates a slip dispute — sends counter-argument for admin to judge. */
+export async function escalateDispute(bookingId: string, note: string): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+  const booking = await loadBooking(bookingId);
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.renterId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
+  if (booking.status !== "slip_disputed")
+    return { ok: false, error: "สถานะไม่ถูกต้อง" };
+  if (!note.trim()) return { ok: false, error: "กรุณาใส่เหตุผลโต้แย้ง" };
+
+  let res;
+  try {
+    res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, status: "slip_disputed", renterId: user.id },
+        data: { disputeNote: note.trim() },
+      }),
+    );
+  } catch (e) {
+    console.error("[doprent] escalate dispute error", e);
+    return { ok: false, error: "ส่งข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  const admins = await db.user.findMany({
+    where: { role: "admin" },
+    select: { email: true },
+  });
+  for (const admin of admins) {
+    notifyAdminDisputeEscalated({
+      adminEmail: admin.email,
+      dressName: booking.product?.name ?? "ชุดที่จอง",
+      bookingId,
+      renterNote: note.trim(),
+    });
+  }
+
   revalidatePath("/account/bookings");
   revalidatePath("/sell/bookings");
   return { ok: true };

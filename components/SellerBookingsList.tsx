@@ -18,31 +18,70 @@ import {
 import { fmtThai } from "@/lib/date-th";
 
 type Props = {
-  /** Server-rendered first page for the default tab ("all", all time). */
   initialRows: SellerBookingCardWithTrust[];
   initialTotal: number;
+  statusCounts?: Record<string, number>;
+  initialStatus?: string;
 };
 
-export default function SellerBookingsList({ initialRows, initialTotal }: Props) {
-  const [tab, setTab] = useState<BookingTabKey>("all");
+function statusToTab(status: string | undefined): BookingTabKey {
+  if (!status) return "all";
+  for (const t of BOOKING_TABS) {
+    if (t.statuses?.includes(status as never)) return t.key;
+  }
+  return "all";
+}
+
+function countForTab(key: BookingTabKey, counts: Record<string, number>): number {
+  if (key === "cancelled_shop") return counts["_cancelled_shop"] || 0;
+  if (key === "cancelled_renter") return counts["_cancelled_renter"] || 0;
+  if (key === "all") {
+    const special = (counts["_cancelled_shop"] || 0) + (counts["_cancelled_renter"] || 0);
+    const raw = Object.entries(counts)
+      .filter(([k]) => !k.startsWith("_"))
+      .reduce((s, [, v]) => s + v, 0);
+    return raw;
+  }
+  const tab = BOOKING_TABS.find((t) => t.key === key);
+  if (!tab || !tab.statuses) return 0;
+  return tab.statuses.reduce((sum, s) => sum + (counts[s] || 0), 0);
+}
+
+export default function SellerBookingsList({
+  initialRows,
+  initialTotal,
+  statusCounts = {},
+  initialStatus,
+}: Props) {
+  const [tab, setTab] = useState<BookingTabKey>(() => statusToTab(initialStatus));
   const [sinceDays, setSinceDays] = useState<number | null>(null);
 
   const [items, setItems] = useState<SellerBookingCardWithTrust[]>(initialRows);
   const [total, setTotal] = useState(initialTotal);
   const [loading, setLoading] = useState(false);
-  // Tracks the filter combo the current `items` belong to, so a stale async
-  // response from a previous filter never appends into the new list.
   const reqRef = useRef(0);
+  const didInit = useRef(false);
 
   const hasMore = items.length < total;
 
-  // Re-fetch page 0 whenever the tab or days-back filter changes.
+  useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+    if (initialStatus) {
+      const t = statusToTab(initialStatus);
+      if (t !== "all") {
+        applyFilter(t, null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const applyFilter = useCallback(async (nextTab: BookingTabKey, nextDays: number | null) => {
     const reqId = ++reqRef.current;
     setLoading(true);
     try {
       const res = await fetchSellerBookingsPage(nextTab, nextDays, 0);
-      if (reqRef.current !== reqId) return; // superseded by a newer filter
+      if (reqRef.current !== reqId) return;
       setItems(res.rows);
       setTotal(res.total);
     } finally {
@@ -82,7 +121,6 @@ export default function SellerBookingsList({ initialRows, initialTotal }: Props)
     }
   }, [loading, items.length, total, tab, sinceDays]);
 
-  // Infinite scroll: auto-load when the sentinel scrolls into view.
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = sentinelRef.current;
@@ -99,13 +137,67 @@ export default function SellerBookingsList({ initialRows, initialTotal }: Props)
 
   return (
     <div>
-      {/* Status tabs */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-        {BOOKING_TABS.map((t) => (
-          <button key={t.key} type="button" onClick={() => onTab(t.key)} style={tabBtn(tab === t.key)}>
-            {t.label}
-          </button>
-        ))}
+      {/* ── Tabs — horizontally scrollable, equal sizing ── */}
+      <div
+        style={{
+          display: "flex",
+          overflowX: "auto",
+          borderBottom: "2px solid var(--line)",
+          marginBottom: 16,
+          WebkitOverflowScrolling: "touch",
+          scrollbarWidth: "none",
+        }}
+      >
+        {BOOKING_TABS.map((t) => {
+          const active = tab === t.key;
+          const count = countForTab(t.key, statusCounts);
+          const isActionable = ["booking_pending", "payment_review", "returned"].includes(t.key) && count > 0;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => onTab(t.key)}
+              style={{
+                position: "relative",
+                padding: "12px 10px 10px",
+                background: "none",
+                border: "none",
+                borderBottom: `2px solid ${active ? "var(--accent)" : "transparent"}`,
+                marginBottom: -2,
+                cursor: "pointer",
+                textAlign: "center",
+                fontSize: 13,
+                fontWeight: active ? 700 : 500,
+                color: active ? "var(--accent)" : "var(--ink-2)",
+                transition: "color 0.15s, border-color 0.15s",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+            >
+              {t.label}
+              {count > 0 ? (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginLeft: 5,
+                    minWidth: 18,
+                    height: 18,
+                    padding: "0 5px",
+                    borderRadius: 999,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    background: isActionable ? "var(--danger, #e53e3e)" : active ? "var(--accent)" : "var(--line)",
+                    color: isActionable || active ? "#fff" : "var(--ink-2)",
+                  }}
+                >
+                  {count}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
 
       {/* Days-back filter + count */}
@@ -142,55 +234,89 @@ export default function SellerBookingsList({ initialRows, initialTotal }: Props)
         </div>
       ) : (
         <div style={{ display: "grid", gap: 12 }}>
-          {items.map((b, i) => (
-            <Link
-              key={b.id}
-              href={`/sell/bookings/${b.id}`}
-              className="hover-lift"
-              style={{
-                display: "flex",
-                gap: 14,
-                padding: 14,
-                border: "1px solid var(--line)",
-                borderRadius: 12,
-                background: "var(--surface)",
-                alignItems: "center",
-              }}
-            >
-              <div
+          {items.map((b, i) => {
+            const startUrgency = daysUntil(b.start_date);
+            return (
+              <Link
+                key={b.id}
+                href={`/sell/bookings/${b.id}`}
+                className="hover-lift"
                 style={{
-                  width: 52,
-                  height: 66,
-                  borderRadius: 8,
-                  overflow: "hidden",
-                  flexShrink: 0,
-                  background: "var(--accent-soft)",
+                  display: "flex",
+                  gap: 14,
+                  padding: 14,
+                  border: "1px solid var(--line)",
+                  borderRadius: 12,
+                  background: "var(--surface)",
+                  alignItems: "center",
                 }}
               >
-                {b.dress_image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={b.dress_image} alt={b.dress_name ?? ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <ProductArt color="rose" variant={i} />
-                )}
-              </div>
-              <div style={{ flex: 1, fontSize: 14, minWidth: 0 }}>
-                <div style={{ fontWeight: 600 }}>{b.dress_name ?? "ชุด"}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", color: "var(--ink-2)" }}>
-                  <span>{b.recipient_name ?? ""}</span>
-                  {b.trust_score ? <TrustBadge score={b.trust_score} /> : null}
+                <div
+                  style={{
+                    width: 52,
+                    height: 66,
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    flexShrink: 0,
+                    background: "var(--accent-soft)",
+                  }}
+                >
+                  {b.dress_image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={b.dress_image} alt={b.dress_name ?? ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <ProductArt color="rose" variant={i} />
+                  )}
                 </div>
-                <div style={{ color: "var(--ink-3)", fontSize: 12.5, marginTop: 2 }}>
-                  {fmtThai(b.start_date)} – {fmtThai(b.end_date)} · ฿{b.amount_due.toLocaleString()}
+                <div style={{ flex: 1, fontSize: 14, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 600 }}>{b.dress_name ?? "ชุด"}</span>
+                    <BookingStatusBadge status={b.status} />
+                    {b.source === "walk_in" && (
+                      <span
+                        style={{
+                          padding: "1px 6px",
+                          borderRadius: 4,
+                          background: "var(--accent-soft, rgba(99,102,241,0.1))",
+                          color: "var(--accent)",
+                          fontSize: 11,
+                          fontWeight: 600,
+                        }}
+                      >
+                        หน้าร้าน
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", color: "var(--ink-2)", marginTop: 2 }}>
+                    <span>{b.recipient_name ?? ""}</span>
+                    {b.trust_score ? <TrustBadge score={b.trust_score} /> : null}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4, fontSize: 12.5, flexWrap: "wrap" }}>
+                    <span style={{ color: startUrgency !== null && startUrgency <= 2 ? "var(--danger, #e53e3e)" : startUrgency !== null && startUrgency <= 5 ? "var(--warn)" : "var(--ink-2)", fontWeight: startUrgency !== null && startUrgency <= 2 ? 700 : 500 }}>
+                      เริ่มเช่า {fmtThai(b.start_date)}
+                      {startUrgency !== null && startUrgency <= 0
+                        ? " (วันนี้!)"
+                        : startUrgency !== null && startUrgency === 1
+                          ? " (พรุ่งนี้)"
+                          : startUrgency !== null && startUrgency <= 5
+                            ? ` (อีก ${startUrgency} วัน)`
+                            : ""}
+                    </span>
+                    <span style={{ color: "var(--line)" }}>|</span>
+                    <span style={{ color: "var(--ink-3)" }}>
+                      สั่งเมื่อ {relativeTime(b.created_at)}
+                    </span>
+                  </div>
+                  <div style={{ color: "var(--ink-3)", fontSize: 12, marginTop: 2 }}>
+                    ช่วงเช่า {fmtThai(b.start_date)} – {fmtThai(b.end_date)} · ฿{b.amount_due.toLocaleString()}
+                  </div>
                 </div>
-              </div>
-              <BookingStatusBadge status={b.status} />
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       )}
 
-      {/* Load-more zone: sentinel auto-loads on scroll; button is the fallback. */}
       {hasMore ? (
         <div ref={sentinelRef} style={{ marginTop: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
           <button type="button" onClick={loadMore} disabled={loading} style={loadBtn(loading)}>
@@ -209,17 +335,27 @@ export default function SellerBookingsList({ initialRows, initialTotal }: Props)
   );
 }
 
-function tabBtn(active: boolean): React.CSSProperties {
-  return {
-    padding: "8px 14px",
-    borderRadius: 999,
-    border: `1px solid ${active ? "var(--accent)" : "var(--line)"}`,
-    background: active ? "var(--accent)" : "var(--surface)",
-    color: active ? "var(--accent-ink)" : "var(--ink-2)",
-    fontSize: 13.5,
-    fontWeight: active ? 700 : 500,
-    cursor: "pointer",
-  };
+function daysUntil(ymd: string): number | null {
+  const d = new Date(ymd + "T00:00:00+07:00");
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  const todayBkk = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+  todayBkk.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - todayBkk.getTime()) / 86400000);
+}
+
+function relativeTime(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "-";
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "เมื่อสักครู่";
+  if (mins < 60) return `${mins} นาทีที่แล้ว`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} ชม.ที่แล้ว`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} วันที่แล้ว`;
+  return fmtThai(iso.slice(0, 10));
 }
 
 function chipBtn(active: boolean): React.CSSProperties {

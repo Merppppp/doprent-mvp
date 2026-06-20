@@ -98,6 +98,7 @@ export type BookingStatus =
   | "waiting_for_payment"
   | "payment_review"
   | "confirmed"
+  | "renting"
   | "cancel_requested"
   | "slip_disputed"
   | "rejected"
@@ -254,6 +255,8 @@ export type Product = {
   shop_rating_count?: number;
   /** Denormalized from the product's shop area key — populated by listProducts(). Used for distance display. */
   area_key?: string | null;
+  /** Whether the product's shop is currently open (seller-toggled). */
+  shop_is_open?: boolean;
   /** Business key of the product type (e.g. "dress") — joined from product_types. */
   product_type_key: string;
   /** Business key of the product's category (nullable — uncategorized allowed). */
@@ -332,6 +335,7 @@ export type Booking = {
   current_due_at: string | null;
   cancel_reason: string | null;
   cancel_from_status: string | null;
+  dispute_note: string | null;
   /** Post-payment address-change sub-flow (see lib/bookings.ts ADDR_CHANGE_*).
    *  null/"none" → "requested" → "approved" → "paid_review" → "done" | "rejected". */
   addr_change_status: string | null;

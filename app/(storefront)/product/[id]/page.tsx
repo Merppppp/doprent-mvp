@@ -25,6 +25,7 @@ import {
   resolveEffectivePolicy,
   computeUnavailableDates,
 } from "@/lib/booking-policy";
+import { parseBusinessHours } from "@/lib/hours";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +75,7 @@ export default async function DressPage({ params }: { params: Params }) {
     getShopBySlug(slugify(dress.shop_name)).catch(() => null),
     listSimilarProducts(dress, 4),
     getCurrentUser().catch(() => null),
-    listBlackouts(dress.id),
+    listBlackouts(dress.id, "all"),
   ]);
   const savedSet = new Set<string>(user?.savedProductIds ?? []);
   const isLoggedIn = !!user;
@@ -85,6 +86,7 @@ export default async function DressPage({ params }: { params: Params }) {
   const shopWithPolicy = await db.shop.findUnique({
     where: { id: dress.shop_id },
     select: {
+      hours: true,
       leadTimeDays: true,
       minRentalDays: true,
       maxRentalDays: true,
@@ -168,9 +170,26 @@ export default async function DressPage({ params }: { params: Params }) {
         closedWeekdays: [] as number[],
       };
 
+  // Parse business hours to pass today's closing time to the date picker for the closing-soon warning.
+  const businessHours = shopWithPolicy ? parseBusinessHours(shopWithPolicy.hours) : null;
+  const todayDow = new Date().getDay(); // 0=Sun
+  const todayHours = businessHours?.[todayDow] ?? null;
+  const shopClosingTime = todayHours?.open ? todayHours.to : null;
+
+  // Separate product-wide blackouts (variantId null) from variant-specific ones
+  const productWideBlackouts = blackouts.filter((b) => b.variantId === null).map((b) => b.date);
+  const variantBlackoutMap = new Map<string, string[]>();
+  for (const b of blackouts) {
+    if (b.variantId) {
+      const arr = variantBlackoutMap.get(b.variantId) ?? [];
+      arr.push(b.date);
+      variantBlackoutMap.set(b.variantId, arr);
+    }
+  }
+
   const unavailableSet = shopWithPolicy
     ? computeUnavailableDates({
-        blackouts,
+        blackouts: productWideBlackouts,
         shopClosedDates: shopWithPolicy.closedDates.map((d) => d.date.toISOString().slice(0, 10)),
         bookings: activeBookings.map((b) => ({
           startDate: b.startDate,
@@ -186,18 +205,22 @@ export default async function DressPage({ params }: { params: Params }) {
   const unavailable = Array.from(unavailableSet).sort();
 
   // Build per-variant unavailable date sets (variant-aware stock check).
-  // The product-level unavailableSet (blackouts + closed days) is common to all variants.
+  // Product-wide blackouts + variant-specific blackouts + closed days are common base.
   // Per-variant: additionally block dates where that variant's booking count >= quantity.
-  const ACTIVE_STATUSES_DETAIL = new Set(["booking_pending", "waiting_for_payment", "payment_review", "confirmed"]);
+  const ACTIVE_STATUSES_DETAIL = new Set(["booking_pending", "waiting_for_payment", "payment_review", "confirmed", "renting"]);
 
   const variantOptions: VariantOption[] = productVariants.map((v) => {
-    // Bookings for this specific variant (+ legacy null-variant bookings as conservative estimate)
     const variantBookings = activeBookings.filter(
       (b) => ACTIVE_STATUSES_DETAIL.has(b.status) && (b.variantId === v.id || b.variantId === null),
     );
 
+    const variantSpecificBlackouts = [
+      ...productWideBlackouts,
+      ...(variantBlackoutMap.get(v.id) ?? []),
+    ];
+
     const variantUnavailableSet = computeUnavailableDates({
-      blackouts,
+      blackouts: variantSpecificBlackouts,
       shopClosedDates: shopWithPolicy?.closedDates.map((d) => d.date.toISOString().slice(0, 10)) ?? [],
       bookings: variantBookings.map((b) => ({ startDate: b.startDate, endDate: b.endDate, status: b.status })),
       effectivePolicy,
@@ -375,6 +398,31 @@ export default async function DressPage({ params }: { params: Params }) {
                 <div style={{ fontWeight: 600, fontSize: 14, display: "inline-flex", alignItems: "center", gap: 5 }}>
                   {dress.shop_name}
                   {boutique?.verified ? <VerifiedBadge size="sm" /> : null}
+                  {boutique && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: 10.5,
+                        fontWeight: 600,
+                        padding: "2px 7px",
+                        borderRadius: 6,
+                        background: boutique.is_open ? "var(--success-soft)" : "var(--surface)",
+                        color: boutique.is_open ? "var(--success)" : "var(--ink-3)",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: boutique.is_open ? "var(--success)" : "var(--ink-3)",
+                        }}
+                      />
+                      {boutique.is_open ? "Online" : "Offline"}
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 1, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span>
@@ -426,7 +474,7 @@ export default async function DressPage({ params }: { params: Params }) {
             pricePerDay={dress.price_per_day}
             priceTiers={dress.price_tiers}
             deposit={dress.deposit}
-            blackouts={blackouts}
+            blackouts={productWideBlackouts}
             unavailable={unavailable}
             leadTimeDays={effectivePolicy.leadTimeDays}
             minRentalDays={effectivePolicy.minRentalDays}
@@ -437,6 +485,8 @@ export default async function DressPage({ params }: { params: Params }) {
             isLoggedIn={isLoggedIn}
             loginNext={`/product/${dress.slug}`}
             variants={variantOptions.length > 0 ? variantOptions : undefined}
+            shopClosingTime={shopClosingTime}
+            shopIsOpen={boutique?.is_open ?? null}
           />
         </div>
       </div>

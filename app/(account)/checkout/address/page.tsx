@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { getMyAddresses } from "@/lib/booking-queries";
 import { rentalDays } from "@/lib/bookings";
 import { hasMultipleRates, normalizeTiers, startingPerDay } from "@/lib/pricing";
+import { parseBusinessHours } from "@/lib/hours";
 import CheckoutForm from "@/components/CheckoutForm";
 
 export const dynamic = "force-dynamic";
@@ -49,9 +50,10 @@ export default async function CheckoutAddressPage({
       deposit: true,
       status: true,
       available: true,
-      shop: { select: { name: true } },
+      shop: { select: { name: true, hours: true, isOpen: true } },
     },
   });
+  const shopHours = row ? parseBusinessHours(row.shop.hours) : null;
   const dress = row
     ? {
         id: row.id,
@@ -68,6 +70,7 @@ export default async function CheckoutAddressPage({
         status: row.status,
         available: row.available,
         boutique_name: row.shop.name,
+        shop_is_open: row.shop.isOpen,
       }
     : null;
 
@@ -140,6 +143,8 @@ export default async function CheckoutAddressPage({
         deposit={Number(dress.deposit) || 0}
         addresses={addresses}
         variantId={variantId}
+        shopHours={shopHours}
+        shopIsOpen={dress.shop_is_open}
       />
     </div>
   );
