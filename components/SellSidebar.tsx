@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ToggleSwitch from "@/components/ToggleSwitch";
@@ -107,6 +108,13 @@ export default function SellSidebar({
   backLabel = "สำรวจ DopRent",
 }: SellSidebarProps) {
   const pathname = usePathname();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => { setDrawerOpen(false); }, [pathname]);
+  useEffect(() => {
+    document.body.style.overflow = drawerOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [drawerOpen]);
 
   // Build nav items
   let nav: NavItem[];
@@ -130,124 +138,118 @@ export default function SellSidebar({
   }
 
   return (
-    <aside className="seller-side">
-      {/* ── Brand ── */}
-      <div className="seller-brand">
-        <div className="seller-brand-logo">D</div>
-        <div>
-          <b>DopRent</b>
-          <small>แดชบอร์ดร้าน</small>
+    <>
+      {/* ── Mobile top bar ── */}
+      <div className="seller-mobile-bar">
+        <button className="seller-hamburger" onClick={() => setDrawerOpen(true)} aria-label="เปิดเมนู">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+        </button>
+        <div className="seller-brand">
+          <div className="seller-brand-logo">D</div>
+          <div><b>DopRent</b></div>
         </div>
       </div>
 
-      {/* ── Shop chip ── */}
-      {shop && (
-        <>
-          <div className="seller-shop-chip">
-            <div className="av" />
-            <div>
-              <div className="nm">{shop.name}</div>
-              {shop.verified && (
-                <div className="vf">✓ ยืนยันตัวตนแล้ว</div>
-              )}
-            </div>
-          </div>
+      {/* ── Backdrop ── */}
+      {drawerOpen && <div className="seller-drawer-backdrop is-visible" onClick={() => setDrawerOpen(false)} />}
 
-          {/* ── Open/close pill ── */}
-          <div className={`seller-open-pill${shop.isOpen ? "" : " is-closed"}`}>
-            <span className="led" />
-            <span style={{ flex: 1 }}>
-              {shop.isOpen ? "ร้านเปิดอยู่" : "ปิดร้านชั่วคราว"}
-            </span>
-            <form action={toggleShopOpen.bind(null, shop.id)} style={{ display: "inline-flex" }}>
-              <ToggleSwitch
-                checked={shop.isOpen}
-                label={shop.isOpen ? "ปิดร้าน" : "เปิดร้าน"}
-              />
-            </form>
-          </div>
-        </>
-      )}
-
-      {/* ── Navigation ── */}
-      <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {nav.map((item) => {
-          const active = isActive(pathname, item);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`seller-nav-item${active ? " is-active" : ""}`}
-              aria-current={active ? "page" : undefined}
-            >
-              <span className="ic">{item.icon}</span>
-              {item.label}
-              {item.badge ? (
-                <span className="badge">{item.badge}</span>
-              ) : null}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* ── Spacer pushes back-link to bottom ── */}
-      <div className="seller-nav-spacer" />
-
-      {/* ── Back to marketplace ── */}
-      <Link href="/" className="seller-nav-back">
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-        </svg>
-        {backLabel}
-      </Link>
-
-      {/* ── Logout ── */}
-      <form action="/auth/signout" method="POST" style={{ padding: "0 8px 4px" }}>
-        <button
-          type="submit"
-          className="seller-nav-back"
-          style={{ width: "100%", background: "none", border: "none", cursor: "pointer", font: "inherit" }}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
-          </svg>
-          ออกจากระบบ
+      {/* ── Sidebar / Drawer ── */}
+      <aside className={`seller-side${drawerOpen ? " is-open" : ""}`}>
+        <button className="seller-drawer-close" onClick={() => setDrawerOpen(false)} aria-label="ปิดเมนู">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
         </button>
-      </form>
 
-      {isStaff && (
-        <div
-          style={{
-            fontSize: 10.5,
-            color: "var(--ink-3)",
-            padding: "8px 11px 0",
-            borderTop: "1px solid var(--line-2)",
-            marginTop: 8,
-          }}
-        >
-          เข้าสู่ระบบในฐานะพนักงาน
+        <div className="seller-brand">
+          <div className="seller-brand-logo">D</div>
+          <div>
+            <b>DopRent</b>
+            <small>แดชบอร์ดร้าน</small>
+          </div>
         </div>
-      )}
-    </aside>
+
+        {shop && (
+          <>
+            <div className="seller-shop-chip">
+              <div className="av" />
+              <div>
+                <div className="nm">{shop.name}</div>
+                {shop.verified && (
+                  <div className="vf">✓ ยืนยันตัวตนแล้ว</div>
+                )}
+              </div>
+            </div>
+
+            <div className={`seller-open-pill${shop.isOpen ? "" : " is-closed"}`}>
+              <span className="led" />
+              <span style={{ flex: 1 }}>
+                {shop.isOpen ? "ร้านเปิดอยู่" : "ปิดร้านชั่วคราว"}
+              </span>
+              <form action={toggleShopOpen.bind(null, shop.id)} style={{ display: "inline-flex" }}>
+                <ToggleSwitch
+                  checked={shop.isOpen}
+                  label={shop.isOpen ? "ปิดร้าน" : "เปิดร้าน"}
+                />
+              </form>
+            </div>
+          </>
+        )}
+
+        <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {nav.map((item) => {
+            const active = isActive(pathname, item);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`seller-nav-item${active ? " is-active" : ""}`}
+                aria-current={active ? "page" : undefined}
+              >
+                <span className="ic">{item.icon}</span>
+                {item.label}
+                {item.badge ? (
+                  <span className="badge">{item.badge}</span>
+                ) : null}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="seller-nav-spacer" />
+
+        <Link href="/" className="seller-nav-back">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+          </svg>
+          {backLabel}
+        </Link>
+
+        <form action="/auth/signout" method="POST" style={{ padding: "0 8px 4px" }}>
+          <button
+            type="submit"
+            className="seller-nav-back"
+            style={{ width: "100%", background: "none", border: "none", cursor: "pointer", font: "inherit" }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+            </svg>
+            ออกจากระบบ
+          </button>
+        </form>
+
+        {isStaff && (
+          <div
+            style={{
+              fontSize: 10.5,
+              color: "var(--ink-3)",
+              padding: "8px 11px 0",
+              borderTop: "1px solid var(--line-2)",
+              marginTop: 8,
+            }}
+          >
+            เข้าสู่ระบบในฐานะพนักงาน
+          </div>
+        )}
+      </aside>
+    </>
   );
 }

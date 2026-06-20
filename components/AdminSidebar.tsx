@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -94,80 +95,83 @@ const NAV: NavItem[] = [
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => { setDrawerOpen(false); }, [pathname]);
+  useEffect(() => {
+    document.body.style.overflow = drawerOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [drawerOpen]);
 
   return (
-    <aside className="seller-side">
-      {/* ── Brand ── */}
-      <div className="seller-brand">
-        <div className="seller-brand-logo" style={{ background: "var(--cobalt, #3b82f6)" }}>A</div>
-        <div>
-          <b>DopRent</b>
-          <small>Admin Console</small>
+    <>
+      {/* ── Mobile top bar ── */}
+      <div className="seller-mobile-bar">
+        <button className="seller-hamburger" onClick={() => setDrawerOpen(true)} aria-label="เปิดเมนู">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+        </button>
+        <div className="seller-brand">
+          <div className="seller-brand-logo" style={{ background: "var(--cobalt, #3b82f6)" }}>A</div>
+          <div><b>DopRent</b></div>
         </div>
       </div>
 
-      {/* ── Navigation ── */}
-      <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {NAV.map((item) => {
-          const active = isActive(pathname, item);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`seller-nav-item${active ? " is-active" : ""}`}
-              aria-current={active ? "page" : undefined}
-            >
-              <span className="ic">{item.icon}</span>
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {/* ── Backdrop ── */}
+      {drawerOpen && <div className="seller-drawer-backdrop is-visible" onClick={() => setDrawerOpen(false)} />}
 
-      {/* ── Spacer pushes bottom links down ── */}
-      <div className="seller-nav-spacer" />
-
-      {/* ── Back to marketplace ── */}
-      <Link href="/" className="seller-nav-back">
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-        </svg>
-        สำรวจ DopRent
-      </Link>
-
-      {/* ── Logout ── */}
-      <form action="/auth/signout" method="POST" style={{ padding: "0 8px 4px" }}>
-        <button
-          type="submit"
-          className="seller-nav-back"
-          style={{ width: "100%", background: "none", border: "none", cursor: "pointer", font: "inherit" }}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
-          </svg>
-          ออกจากระบบ
+      {/* ── Sidebar / Drawer ── */}
+      <aside className={`seller-side${drawerOpen ? " is-open" : ""}`}>
+        <button className="seller-drawer-close" onClick={() => setDrawerOpen(false)} aria-label="ปิดเมนู">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
         </button>
-      </form>
-    </aside>
+
+        <div className="seller-brand">
+          <div className="seller-brand-logo" style={{ background: "var(--cobalt, #3b82f6)" }}>A</div>
+          <div>
+            <b>DopRent</b>
+            <small>Admin Console</small>
+          </div>
+        </div>
+
+        <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {NAV.map((item) => {
+            const active = isActive(pathname, item);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`seller-nav-item${active ? " is-active" : ""}`}
+                aria-current={active ? "page" : undefined}
+              >
+                <span className="ic">{item.icon}</span>
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="seller-nav-spacer" />
+
+        <Link href="/" className="seller-nav-back">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+          </svg>
+          สำรวจ DopRent
+        </Link>
+
+        <form action="/auth/signout" method="POST" style={{ padding: "0 8px 4px" }}>
+          <button
+            type="submit"
+            className="seller-nav-back"
+            style={{ width: "100%", background: "none", border: "none", cursor: "pointer", font: "inherit" }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+            </svg>
+            ออกจากระบบ
+          </button>
+        </form>
+      </aside>
+    </>
   );
 }
