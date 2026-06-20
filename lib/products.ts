@@ -54,6 +54,7 @@ export type ProductFilters = {
   productTypeKey?: string;
   dateFrom?: string; // YYYY-MM-DD
   dateTo?: string;   // YYYY-MM-DD
+  openOnly?: boolean;
   page?: number;
 };
 
@@ -343,8 +344,10 @@ export async function listProducts(
     where.shop = { slug: { in: opts.shopSlugs } };
   }
 
-  // Always exclude products from offline shops in marketplace
-  where.shop = { ...where.shop as Prisma.ShopWhereInput, isOpen: true };
+  // Open shops only (optional filter)
+  if (opts.openOnly) {
+    where.shop = { ...where.shop as Prisma.ShopWhereInput, isOpen: true };
+  }
 
   // Body-measurement filter — one variant must satisfy ALL active bounds simultaneously.
   // Placed on the Prisma `where` object so it applies to both the standard path and the

@@ -398,7 +398,7 @@ export default async function DressPage({ params }: { params: Params }) {
                 <div style={{ fontWeight: 600, fontSize: 14, display: "inline-flex", alignItems: "center", gap: 5 }}>
                   {dress.shop_name}
                   {boutique?.verified ? <VerifiedBadge size="sm" /> : null}
-                  {boutique && (
+                  {boutique?.is_open && (
                     <span
                       style={{
                         display: "inline-flex",
@@ -408,8 +408,8 @@ export default async function DressPage({ params }: { params: Params }) {
                         fontWeight: 600,
                         padding: "2px 7px",
                         borderRadius: 6,
-                        background: boutique.is_open ? "var(--success-soft)" : "var(--surface)",
-                        color: boutique.is_open ? "var(--success)" : "var(--ink-3)",
+                        background: "var(--success-soft)",
+                        color: "var(--success)",
                       }}
                     >
                       <span
@@ -417,10 +417,10 @@ export default async function DressPage({ params }: { params: Params }) {
                           width: 6,
                           height: 6,
                           borderRadius: "50%",
-                          background: boutique.is_open ? "var(--success)" : "var(--ink-3)",
+                          background: "var(--success)",
                         }}
                       />
-                      {boutique.is_open ? "Online" : "Offline"}
+                      Online
                     </span>
                   )}
                 </div>

@@ -79,10 +79,13 @@ export default async function HomePage({
     | "name"
     | "rating-desc";
 
+  const activeOpenOnly = searchParams?.openOnly === "1";
+
   const KNOWN_FILTER_PARAMS = new Set([
     "occasion", "size", "designer", "q", "sort",
     "dateFrom", "dateTo", "priceMin", "priceMax", "page", "type",
     "bustMin", "bustMax", "waistMin", "waistMax", "lengthMin", "lengthMax",
+    "openOnly",
   ]);
 
   // Build tagsByGroup from URL params (all params not in the known list)
@@ -118,6 +121,7 @@ export default async function HomePage({
       dateFrom: activeDateFrom,
       dateTo: activeDateTo,
       productTypeKey: activeTypeKey,
+      openOnly: activeOpenOnly || undefined,
     }),
     listOccasions(),
     listDesigners(),
@@ -266,7 +270,7 @@ export default async function HomePage({
                 waistMax={activeWaistMax}
                 lengthMin={activeLengthMin}
                 lengthMax={activeLengthMax}
-
+                openOnly={activeOpenOnly}
               />
             </aside>
 
@@ -300,7 +304,7 @@ export default async function HomePage({
                       waistMax={activeWaistMax}
                       lengthMin={activeLengthMin}
                       lengthMax={activeLengthMax}
-      
+                      openOnly={activeOpenOnly}
                     />
                     <div className="text-sm text-[var(--ink-2)] whitespace-nowrap">
                       {t("results.found", locale)}{" "}
@@ -350,6 +354,7 @@ export default async function HomePage({
                     lengthMax: activeLengthMax !== undefined ? String(activeLengthMax) : undefined,
                     // Preserve type for infinite scroll (omit when default dress to keep URLs clean)
                     type: activeTypeKey !== "dress" ? activeTypeKey : undefined,
+                    openOnly: activeOpenOnly ? "1" : undefined,
                     ...tagParamsForResults,
                   }}
                 />

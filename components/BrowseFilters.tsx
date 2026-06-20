@@ -39,6 +39,7 @@ export type BrowseFiltersProps = {
   waistMax?: number;
   lengthMin?: number;
   lengthMax?: number;
+  openOnly?: boolean;
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -104,6 +105,7 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
     !!props.size ||
     !!props.designer ||
     !!props.q ||
+    !!props.openOnly ||
     Object.values(props.activeTags ?? {}).some((arr) => arr.length > 0) ||
     props.priceMin > props.priceBounds.min ||
     props.priceMax < props.priceBounds.max ||
@@ -126,6 +128,9 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
   const selectedBadges: { key: string; label: string; onRemove: () => void }[] = [];
   if (props.q) {
     selectedBadges.push({ key: "q", label: `"${props.q}"`, onRemove: () => setParam("q", null) });
+  }
+  if (props.openOnly) {
+    selectedBadges.push({ key: "openOnly", label: "ร้านเปิดอยู่", onRemove: () => setParam("openOnly", null) });
   }
   // Dynamic tag group badges (when tagGroups provided, replace hardcoded occasion badge)
   if (props.tagGroups?.length) {
@@ -237,6 +242,46 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
           </div>
         </div>
       )}
+
+      {/* ════ Open shops toggle ════ */}
+      <div className="py-3 border-b border-[var(--line)]/50">
+        <label className="flex items-center justify-between gap-3 cursor-pointer">
+          <span className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success)", flexShrink: 0 }} />
+            {t("filter.openOnly", locale)}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!props.openOnly}
+            onClick={() => setParam("openOnly", props.openOnly ? null : "1")}
+            className="relative shrink-0"
+            style={{
+              width: 40,
+              height: 22,
+              borderRadius: 999,
+              border: "none",
+              background: props.openOnly ? "var(--accent)" : "var(--line)",
+              cursor: "pointer",
+              transition: "background 0.2s",
+            }}
+          >
+            <span
+              style={{
+                position: "absolute",
+                top: 2,
+                left: props.openOnly ? 20 : 2,
+                width: 18,
+                height: 18,
+                borderRadius: 999,
+                background: "#fff",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                transition: "left 0.2s",
+              }}
+            />
+          </button>
+        </label>
+      </div>
 
       {/* ════ Dynamic tag group sections (data-driven from bound tag groups) ════ */}
       {props.tagGroups?.length ? (
