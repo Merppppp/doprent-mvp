@@ -3,6 +3,7 @@
 import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toggleBlackout } from "@/app/actions/availability";
+import { Spinner } from "@/components/Loading";
 
 type Props = {
   productId: string;

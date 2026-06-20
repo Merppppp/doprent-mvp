@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import { Spinner } from "@/components/Loading";
 
 export default function SignupPage() {
   const sp = useSearchParams();
@@ -71,7 +72,7 @@ export default function SignupPage() {
         </p>
         <button type="button" onClick={resendVerification} disabled={resendStatus !== "idle"}
           className="btn btn-outline btn-block" style={{ marginBottom: 10 }}>
-          {resendStatus === "sending" ? "กำลังส่ง..." : resendStatus === "sent" ? "✓ ส่งอีเมลใหม่แล้ว" : "ส่งอีเมลยืนยันใหม่"}
+          {resendStatus === "sending" ? <Spinner size={14} label="กำลังส่ง..." /> : resendStatus === "sent" ? "✓ ส่งอีเมลใหม่แล้ว" : "ส่งอีเมลยืนยันใหม่"}
         </button>
         <Link href={`/login?next=${encodeURIComponent(next)}`} className="btn btn-dark btn-block">
           กลับไปเข้าสู่ระบบ
