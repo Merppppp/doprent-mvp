@@ -214,7 +214,6 @@ export async function getSellerBookingsPage(
   const take = opts.take ?? 20;
   const skip = opts.skip ?? 0;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: Record<string, any> = { shopId };
   if (opts.statuses && opts.statuses.length > 0) {
     where.status = { in: opts.statuses };
@@ -390,7 +389,6 @@ export async function getRenterBookingsPage(
   const take = opts.take ?? 20;
   const skip = opts.skip ?? 0;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: Record<string, any> = { renterId: userId };
   if (opts.statuses && opts.statuses.length > 0) {
     where.status = { in: opts.statuses };

@@ -54,7 +54,6 @@ export default async function SellerProductsPage({
   const { shopId } = await requireShopAccess({ need: "products" });
 
   const search = (searchParams?.q ?? "").trim();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: Record<string, any> = { shopId };
   if (search) {
     where.OR = [

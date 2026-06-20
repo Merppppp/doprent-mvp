@@ -166,7 +166,9 @@ export default function SellerAvailabilityPicker({ dresses }: { dresses: DressOp
         >
           <AvailabilityCalendar
             productId={selectedDressId}
-            initialBlackouts={blackouts}
+            variants={[]}
+            initialProductBlackouts={blackouts}
+            initialVariantBlackouts={{}}
           />
         </div>
       ) : null}

@@ -794,7 +794,6 @@ export async function listBlackouts(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: Record<string, any> = { productId, date: { gte: today } };
   if (variantId && variantId !== "all") {
     where.OR = [{ variantId: null }, { variantId }];
