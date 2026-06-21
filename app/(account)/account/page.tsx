@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import ProductCard from "@/components/ProductCard";
+import SavedProductsGrid from "@/components/SavedProductsGrid";
 import { getCurrentUser } from "@/lib/auth";
 import { listProductsByIds } from "@/lib/products";
 
-export const metadata: Metadata = { title: "บัญชีของฉัน", robots: { index: false } };
+export const metadata: Metadata = { title: "สินค้าที่ถูกใจ", robots: { index: false } };
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,7 @@ export default async function AccountPage() {
   return (
     <div className="container" style={{ padding: "28px 0 80px" }}>
       <div className="account-grid">
-        <aside>
+        <aside className="account-sidebar">
           <div
             style={{
               background: "var(--surface)",
@@ -80,107 +80,50 @@ export default async function AccountPage() {
           {user.role === "admin" ? (
             <Link
               href="/admin"
-              style={{
-                display: "block",
-                padding: "10px 12px",
-                borderRadius: 6,
-                fontSize: 14,
-                background: "var(--info)",
-                color: "var(--on-dark)",
-                fontWeight: 500,
-                textAlign: "center",
-                marginBottom: 8,
-              }}
+              className="account-nav-item account-nav-admin"
             >
               Admin Dashboard
             </Link>
           ) : null}
 
-          <Link
-            href="/account/addresses"
-            style={{
-              display: "block",
-              padding: "10px 12px",
-              borderRadius: 6,
-              fontSize: 14,
-              color: "var(--ink-2)",
-              border: "1px solid var(--line)",
-              textAlign: "center",
-              marginBottom: 8,
-              textDecoration: "none",
-            }}
-          >
-            ที่อยู่จัดส่ง
-          </Link>
+          <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Link href="/account" className="account-nav-item account-nav-active">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              สินค้าที่ถูกใจ
+            </Link>
+            <Link href="/account/bookings" className="account-nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+              การจองของฉัน
+            </Link>
+            <Link href="/account/addresses" className="account-nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              ที่อยู่จัดส่ง
+            </Link>
+            <Link href="/account/billing" className="account-nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+              ข้อมูลใบกำกับภาษี
+            </Link>
+          </nav>
 
-          <Link
-            href="/account/billing"
-            style={{
-              display: "block",
-              padding: "10px 12px",
-              borderRadius: 6,
-              fontSize: 14,
-              color: "var(--ink-2)",
-              border: "1px solid var(--line)",
-              textAlign: "center",
-              marginBottom: 8,
-              textDecoration: "none",
-            }}
-          >
-            ข้อมูลใบกำกับภาษี
-          </Link>
+          <div style={{ height: 1, background: "var(--line)", margin: "8px 0" }} />
 
           <form action="/auth/signout" method="POST">
             <button
               type="submit"
-              className="btn btn-outline btn-block"
-              style={{ marginTop: 4 }}
+              className="account-nav-item"
+              style={{ width: "100%", textAlign: "left", color: "var(--danger)", border: "none", background: "none", cursor: "pointer" }}
             >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               ออกจากระบบ
             </button>
           </form>
         </aside>
 
         <main>
-          <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 6 }}>
-            ชุดที่บันทึก
+          <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 16 }}>
+            สินค้าที่ถูกใจ
           </h2>
-          <div style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
-            {saved.length === 0 ? "ยังไม่มีชุดที่บันทึก" : `${saved.length} ชุด`}
-          </div>
-
-          {saved.length === 0 ? (
-            <div
-              style={{
-                padding: "60px 20px",
-                textAlign: "center",
-                color: "var(--ink-3)",
-                background: "var(--surface)",
-                border: "1px solid var(--line)",
-                borderRadius: 8,
-              }}
-            >
-              <h3 style={{ fontSize: 16, color: "var(--ink)", marginBottom: 6, fontWeight: 600 }}>
-                ยังไม่มีชุดที่บันทึก
-              </h3>
-              <p style={{ fontSize: 14, marginBottom: 18 }}>กดปุ่ม ❤️ ที่ชุดที่ชอบเพื่อบันทึก</p>
-              <Link href="/" className="btn btn-dark">
-                เลือกชุด
-              </Link>
-            </div>
-          ) : (
-            <div className="grid-3" style={{ gap: 20 }}>
-              {saved.map((d, i) => (
-                <ProductCard
-                  key={d.id}
-                  product={d}
-                  variant={i}
-                  savedSet={new Set(user.savedProductIds)}
-                  isLoggedIn={true}
-                />
-              ))}
-            </div>
-          )}
+          <SavedProductsGrid products={saved} savedIds={user.savedProductIds} />
         </main>
       </div>
     </div>

@@ -180,17 +180,8 @@ export default function UserMenu({
             {t("menu.myBookings", locale)}
             <Pill n={renterBadge} />
           </Link>
-          <Link
-            href="/account"
-            style={{
-              ...menuItemStyle,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
+          <Link href="/account" style={menuItemStyle}>
             {t("menu.savedItems", locale)}
-            {savedCount > 0 && <Pill n={savedCount} />}
           </Link>
           <Link href="/shops" style={menuItemStyle}>
             {t("menu.likedShops", locale)}
