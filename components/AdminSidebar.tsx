@@ -87,6 +87,11 @@ const NAV: NavItem[] = [
     icon: <Icon d="M4 12a8 8 0 1116 0 8 8 0 01-16 0zM12 8v4l3 2" />,
   },
   {
+    href: "/admin/email-monitor",
+    label: "Email Monitor",
+    icon: <Icon d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zM22 6l-10 7L2 6" />,
+  },
+  {
     href: "/admin/admins",
     label: "จัดการ Admin",
     icon: <Icon d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />,

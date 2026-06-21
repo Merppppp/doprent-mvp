@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { base } from "@/lib/db";
 
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_SERVER_HOST,
@@ -11,13 +12,25 @@ const transporter = nodemailer.createTransport({
 });
 
 /** Generic mail sender — reuse for any transactional email (notifications, reset, ...). */
-export async function sendEmail(opts: { to: string; subject: string; html: string }) {
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM ?? "noreply@doprent.com",
-    to: opts.to,
-    subject: opts.subject,
-    html: opts.html,
-  });
+export async function sendEmail(opts: { to: string; subject: string; html: string; category?: string }) {
+  let success = true;
+  let error: string | undefined;
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM ?? "noreply@doprent.com",
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+    });
+  } catch (e: any) {
+    success = false;
+    error = e?.message ?? String(e);
+    throw e;
+  } finally {
+    base.emailLog
+      .create({ data: { to: opts.to, subject: opts.subject, category: opts.category ?? "other", success, error } })
+      .catch(() => {});
+  }
 }
 
 export async function sendPasswordResetEmail(email: string, token: string) {
@@ -27,6 +40,7 @@ export async function sendPasswordResetEmail(email: string, token: string) {
   await sendEmail({
     to: email,
     subject: "ตั้งรหัสผ่านใหม่ — DopRent",
+    category: "password-reset",
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 20px">
         <h2 style="font-size:22px;margin-bottom:8px">ตั้งรหัสผ่านใหม่</h2>
@@ -50,10 +64,10 @@ export async function sendVerificationEmail(email: string, token: string) {
   const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const url = `${baseUrl}/api/auth/verify-email?token=${token}`;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM ?? "noreply@doprent.com",
+  await sendEmail({
     to: email,
     subject: "ยืนยันอีเมลของคุณ — DopRent",
+    category: "verification",
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 20px">
         <h2 style="font-size:22px;margin-bottom:8px">ยืนยันอีเมลของคุณ</h2>

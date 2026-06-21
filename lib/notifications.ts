@@ -42,9 +42,9 @@ function emailShell(opts: {
 }
 
 /** Fire-and-forget send: never throws, logs failures. */
-function fireEmail(to: string | null | undefined, subject: string, html: string) {
+function fireEmail(to: string | null | undefined, subject: string, html: string, category = "notification") {
   if (!to) return;
-  void sendEmail({ to, subject, html }).catch((e) => {
+  void sendEmail({ to, subject, html, category }).catch((e) => {
     console.error("[doprent] notification email error", e);
   });
 }

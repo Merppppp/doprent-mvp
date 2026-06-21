@@ -7,6 +7,7 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [oauthProviders, setOauthProviders] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
@@ -20,12 +21,38 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email }),
       });
       if (!res.ok) throw new Error("request failed");
-      setSent(true);
+      const data = await res.json();
+      if (data.oauth) {
+        setOauthProviders(data.providers ?? []);
+      } else {
+        setSent(true);
+      }
     } catch {
       setError("ส่งอีเมลไม่สำเร็จ กรุณาลองใหม่");
     } finally {
       setLoading(false);
     }
+  }
+
+  const PROVIDER_NAMES: Record<string, string> = { google: "Google", line: "LINE", facebook: "Facebook" };
+
+  if (oauthProviders) {
+    const names = oauthProviders.map((p) => PROVIDER_NAMES[p] ?? p).join(", ");
+    return (
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "64px 20px 80px", width: "100%", textAlign: "center" }}>
+        <div aria-hidden style={{ width: 64, height: 64, borderRadius: 999, background: "var(--warm)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 28, marginBottom: 20 }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        </div>
+        <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 10 }}>บัญชีนี้ใช้ {names} เข้าสู่ระบบ</h1>
+        <p style={{ fontSize: 15, color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 24 }}>
+          อีเมล <strong style={{ color: "var(--ink)" }}>{email}</strong> สมัครสมาชิกผ่าน {names}
+          ไม่จำเป็นต้องตั้งรหัสผ่าน — กดปุ่มด้านล่างเพื่อเข้าสู่ระบบด้วย {names} ได้เลย
+        </p>
+        <Link href="/login" className="btn btn-dark btn-block btn-lg">
+          เข้าสู่ระบบด้วย {names}
+        </Link>
+      </div>
+    );
   }
 
   if (sent) {

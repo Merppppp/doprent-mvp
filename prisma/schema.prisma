@@ -1230,6 +1230,21 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+/// Email sending log — ใช้ monitor quota / debug delivery
+model EmailLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  to        String
+  subject   String
+  category  String   @default("other")
+  success   Boolean  @default(true)
+  error     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([category])
+  @@map("email_logs")
+}
+
 /// ชนิด operation ใน audit_logs
 enum AuditAction {
   CREATE

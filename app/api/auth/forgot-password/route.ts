@@ -15,14 +15,16 @@ export async function POST(req: NextRequest) {
   try {
     const user = await db.user.findUnique({
       where: { email },
-      select: { id: true, passwordHash: true },
+      select: { id: true, passwordHash: true, accounts: { select: { provider: true } } },
     });
 
-    // Only users with password credentials can reset (OAuth-only accounts skip).
+    if (user && !user.passwordHash) {
+      const providers = user.accounts.map((a) => a.provider);
+      return NextResponse.json({ ok: true, oauth: true, providers });
+    }
+
     if (user?.passwordHash) {
       const identifier = `${RESET_PREFIX}${email}`;
-
-      // Single active reset link per account: drop previous reset tokens.
       await db.verificationToken.deleteMany({ where: { identifier } });
 
       const token = crypto.randomBytes(32).toString("hex");
@@ -34,10 +36,8 @@ export async function POST(req: NextRequest) {
       await sendPasswordResetEmail(email, token);
     }
   } catch (e) {
-    // Never leak failures (and never log the token) — same response either way.
     console.error("[doprent] forgot-password error", e);
   }
 
-  // Always respond success to avoid account enumeration.
   return NextResponse.json({ ok: true });
 }
