@@ -2,7 +2,7 @@ import { Skeleton, LoadingBar } from "@/components/Skeleton";
 
 export default function Loading() {
   return (
-    <div className="container" style={{ paddingTop: 36, paddingBottom: 80, maxWidth: 560 }}>
+    <div style={{ maxWidth: 560 }}>
       <LoadingBar />
       <Skeleton style={{ height: 14, width: 120, marginBottom: 14 }} />
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>

@@ -33,11 +33,8 @@ export default async function MyBookingsPage({
   ]);
 
   return (
-    <div className="container" style={{ paddingTop: 32, paddingBottom: 80, maxWidth: 720 }}>
-      <h1
-        className="page-title"
-        style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", marginBottom: 16 }}
-      >
+    <>
+      <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 16 }}>
         การจองของฉัน
       </h1>
       <RenterBookingsList
@@ -46,6 +43,6 @@ export default async function MyBookingsPage({
         statusCounts={statusCounts}
         initialTab={searchParams?.tab}
       />
-    </div>
+    </>
   );
 }

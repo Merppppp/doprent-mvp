@@ -2,19 +2,22 @@ import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
 import { getServerLocale } from "@/lib/i18n-server";
 import { version } from "@/package.json";
+import { getSiteSettings, SETTING_KEYS } from "@/lib/site-settings";
 import LocaleToggle from "./LocaleToggle";
 import FooterVariantSwitch from "./FooterVariantSwitch";
-
-const LINE_URL = process.env.NEXT_PUBLIC_DEFAULT_LINE_URL ?? "https://line.me/R/ti/p/@doprent";
 
 export default async function Footer() {
   const locale = getServerLocale();
   const year = new Date().getFullYear();
+  const settings = await getSiteSettings();
+  const lineUrl = settings[SETTING_KEYS.LINE_URL];
+  const lineDisplay = settings[SETTING_KEYS.LINE_DISPLAY];
+  const contactEmail = settings[SETTING_KEYS.CONTACT_EMAIL];
 
   return (
     <FooterVariantSwitch
-      defaultFooter={<DefaultFooter locale={locale} year={year} />}
-      sellerFooter={<SellerFooter locale={locale} year={year} />}
+      defaultFooter={<DefaultFooter locale={locale} year={year} lineUrl={lineUrl} lineDisplay={lineDisplay} contactEmail={contactEmail} />}
+      sellerFooter={<SellerFooter locale={locale} year={year} lineUrl={lineUrl} lineDisplay={lineDisplay} contactEmail={contactEmail} />}
       adminFooter={<AdminFooter year={year} />}
     />
   );
@@ -22,7 +25,7 @@ export default async function Footer() {
 
 /* ── Default: public / renter routes ─────────────────────────────── */
 
-function DefaultFooter({ locale, year }: { locale: Locale; year: number }) {
+function DefaultFooter({ locale, year, lineUrl, lineDisplay, contactEmail }: { locale: Locale; year: number; lineUrl: string; lineDisplay: string; contactEmail: string }) {
   return (
     <footer
       style={{
@@ -56,15 +59,15 @@ function DefaultFooter({ locale, year }: { locale: Locale; year: number }) {
         <div>
           <h5 style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>{t("footer.contact", locale)}</h5>
           <a
-            href={LINE_URL}
+            href={lineUrl}
             target="_blank"
             rel="noreferrer noopener"
             style={{ display: "block", fontSize: 13, color: "var(--ink-2)", padding: "4px 0" }}
           >
-            LINE @doprent
+            LINE {lineDisplay}
           </a>
-          <a href="mailto:hello@doprent.com" style={{ display: "block", fontSize: 13, color: "var(--ink-2)", padding: "4px 0" }}>
-            hello@doprent.com
+          <a href={`mailto:${contactEmail}`} style={{ display: "block", fontSize: 13, color: "var(--ink-2)", padding: "4px 0" }}>
+            {contactEmail}
           </a>
         </div>
       </div>
@@ -97,7 +100,7 @@ function DefaultFooter({ locale, year }: { locale: Locale; year: number }) {
 
 /* ── Seller: /sell/dashboard area ────────────────────────────────── */
 
-function SellerFooter({ locale, year }: { locale: Locale; year: number }) {
+function SellerFooter({ locale, year, lineUrl, lineDisplay, contactEmail }: { locale: Locale; year: number; lineUrl: string; lineDisplay: string; contactEmail: string }) {
   return (
     <footer
       style={{
@@ -124,11 +127,11 @@ function SellerFooter({ locale, year }: { locale: Locale; year: number }) {
         <Link href="/" style={{ color: "var(--ink-2)" }}>
           {t("footer.allDresses", locale)}
         </Link>
-        <a href={LINE_URL} target="_blank" rel="noreferrer noopener" style={{ color: "var(--ink-2)" }}>
-          LINE @doprent
+        <a href={lineUrl} target="_blank" rel="noreferrer noopener" style={{ color: "var(--ink-2)" }}>
+          LINE {lineDisplay}
         </a>
-        <a href="mailto:hello@doprent.com" style={{ color: "var(--ink-2)" }}>
-          hello@doprent.com
+        <a href={`mailto:${contactEmail}`} style={{ color: "var(--ink-2)" }}>
+          {contactEmail}
         </a>
         <Link href="/privacy" style={{ color: "var(--ink-2)" }}>
           {t("footer.privacy", locale)}

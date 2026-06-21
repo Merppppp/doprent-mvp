@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useEffect } from "react";
 
 export default function PasswordPage() {
@@ -65,15 +64,11 @@ export default function PasswordPage() {
     : "บัญชีของคุณเข้าสู่ระบบผ่าน Google — ตั้งรหัสผ่านเพื่อเข้าได้ทั้ง Google และอีเมล+รหัสผ่าน";
 
   return (
-    <div className="container" style={{ padding: "28px 0 80px", maxWidth: 760 }}>
-      <div style={{ fontSize: 13, color: "var(--ink-3)", marginBottom: 14 }}>
-        <Link href="/account">← บัญชีของฉัน</Link>
-      </div>
-
-      <h1 style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 4 }}>
+    <>
+      <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 4 }}>
         {title}
       </h1>
-      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 22 }}>
+      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 16 }}>
         {subtitle}
       </p>
 
@@ -148,7 +143,7 @@ export default function PasswordPage() {
           </form>
         )}
       </div>
-    </div>
+    </>
   );
 }
 

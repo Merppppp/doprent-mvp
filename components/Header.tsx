@@ -2,7 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-
+import { getSiteSettings, SETTING_KEYS } from "@/lib/site-settings";
 import { getBookingBadges } from "@/lib/booking-queries";
 import Logo from "./Logo";
 import NavbarSearch from "./NavbarSearch";
@@ -14,7 +14,11 @@ import { getServerLocale } from "@/lib/i18n-server";
 
 export default async function Header() {
   const locale = getServerLocale();
-  const user = await getCurrentUser().catch(() => null);
+  const [user, settings] = await Promise.all([
+    getCurrentUser().catch(() => null),
+    getSiteSettings(),
+  ]);
+  const siteLineUrl = settings[SETTING_KEYS.LINE_URL];
 
   // Staff principals have a synthetic session id ("staff:<id>") that getCurrentUser
   // can't resolve to a users row, so it returns null. Detect the staff session
@@ -91,7 +95,7 @@ export default async function Header() {
             <a href="https://instagram.com/doprent" target="_blank" rel="noreferrer" style={topIconLinkStyle} aria-label="Instagram">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
             </a>
-            <a href={process.env.NEXT_PUBLIC_DEFAULT_LINE_URL ?? "https://line.me/R/ti/p/@doprent"} target="_blank" rel="noreferrer" style={topIconLinkStyle} aria-label="LINE">
+            <a href={siteLineUrl} target="_blank" rel="noreferrer" style={topIconLinkStyle} aria-label="LINE">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M24 10.304c0-5.369-5.383-9.738-12-9.738S0 4.935 0 10.304c0 4.813 4.269 8.846 10.036 9.608.391.084.922.258 1.057.592.121.303.079.778.039 1.085l-.171 1.027c-.053.303-.242 1.186 1.039.647 1.281-.54 6.911-4.069 9.428-6.967C23.309 14.244 24 12.382 24 10.304zm-16.5 3.146a.348.348 0 01-.348.348H4.848a.348.348 0 01-.348-.348V8.196a.348.348 0 01.348-.348h.696a.348.348 0 01.348.348v4.558h1.609a.348.348 0 01.348.348v.348zm2.088-.348a.348.348 0 01-.348.348h-.696a.348.348 0 01-.348-.348V8.196a.348.348 0 01.348-.348h.696a.348.348 0 01.348.348v4.906zm6.26 0a.348.348 0 01-.348.348h-.696a.348.348 0 01-.272-.131l-1.992-2.692v2.475a.348.348 0 01-.348.348h-.696a.348.348 0 01-.348-.348V8.196a.348.348 0 01.348-.348h.696c.104 0 .2.046.265.127l1.996 2.697V8.196a.348.348 0 01.348-.348h.696a.348.348 0 01.348.348v4.906zm3.152-3.862a.348.348 0 01-.348.348h-1.609v.984h1.609a.348.348 0 01.348.348v.696a.348.348 0 01-.348.348h-2.304a.348.348 0 01-.348-.348V8.196a.348.348 0 01.348-.348h2.304a.348.348 0 01.348.348v.696a.348.348 0 01-.348.348h-1.609v.984h1.609a.348.348 0 01.348.348v.068z"/></svg>
             </a>
           </span>

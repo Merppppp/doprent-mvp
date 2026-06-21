@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import BillingForm, { type BillingValues } from "./BillingForm";
@@ -36,49 +35,31 @@ export default async function BillingPage() {
   };
 
   return (
-    <div className="container" style={{ padding: "28px 0 80px" }}>
-      <div style={{ marginBottom: 20 }}>
-        <Link
-          href="/account"
-          style={{ fontSize: 13, color: "var(--ink-3)", textDecoration: "none" }}
-        >
-          ← บัญชีของฉัน
-        </Link>
-      </div>
-
-      <div
+    <div
+      style={{
+        maxWidth: 560,
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
+        borderRadius: 8,
+        padding: "24px 28px",
+      }}
+    >
+      <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 4 }}>
+        ข้อมูลใบกำกับภาษี
+      </h1>
+      <p
         style={{
-          maxWidth: 560,
-          background: "var(--surface)",
-          border: "1px solid var(--line)",
-          borderRadius: 8,
-          padding: "24px 28px",
+          fontSize: 13,
+          color: "var(--ink-3)",
+          marginBottom: 24,
+          lineHeight: 1.5,
         }}
       >
-        <h1
-          style={{
-            fontSize: 20,
-            fontWeight: 700,
-            letterSpacing: "-0.01em",
-            marginBottom: 4,
-          }}
-        >
-          ข้อมูลสำหรับออกใบกำกับภาษี (ไม่บังคับ)
-        </h1>
-        <p
-          style={{
-            fontSize: 13,
-            color: "var(--ink-3)",
-            marginBottom: 24,
-            lineHeight: 1.5,
-          }}
-        >
-          กรอกข้อมูลด้านล่างหากต้องการใบกำกับภาษีในนามบริษัท / นิติบุคคล
-          — เว้นว่างไว้ได้ทั้งหมด
-        </p>
+        กรอกข้อมูลด้านล่างหากต้องการใบกำกับภาษีในนามบริษัท / นิติบุคคล
+        — เว้นว่างไว้ได้ทั้งหมด
+      </p>
 
-        <BillingForm initial={initial} />
-      </div>
+      <BillingForm initial={initial} />
     </div>
   );
 }

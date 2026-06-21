@@ -70,7 +70,7 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
       : null;
 
   return (
-    <div className="container" style={{ paddingTop: 36, paddingBottom: 80, maxWidth: 560 }}>
+    <div style={{ maxWidth: 560 }}>
       <Link href="/account/bookings" style={{ fontSize: 14, color: "var(--ink-3)" }}>
         ← การจองทั้งหมด
       </Link>
@@ -295,7 +295,7 @@ function Row({
 
 function Fallback() {
   return (
-    <div className="container" style={{ paddingTop: 80, paddingBottom: 100, maxWidth: 520, textAlign: "center" }}>
+    <div style={{ paddingTop: 40, textAlign: "center" }}>
       <p style={{ fontSize: 16, color: "var(--ink-2)", marginBottom: 22 }}>ไม่พบการจองนี้</p>
       <Link href="/account/bookings" className="btn btn-dark" style={{ padding: "12px 22px" }}>
         การจองของฉัน
