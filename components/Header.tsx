@@ -144,8 +144,42 @@ export default async function Header() {
           <NavbarSearch locale={locale} />
         </div>
 
-        {/* Right — profile / auth */}
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+        {/* Right — icons + profile / auth */}
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+          {user ? (
+            <>
+              {/* Bookings icon */}
+              <Link
+                href="/account/bookings"
+                aria-label={t("menu.myBookings", locale)}
+                title={t("menu.myBookings", locale)}
+                style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 8, color: "rgba(255,255,255,0.85)" }}
+                className="hdr-icon-btn"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                {badges.renter > 0 && (
+                  <span style={{ position: "absolute", top: 2, right: 2, minWidth: 16, height: 16, borderRadius: 999, background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 700, display: "grid", placeItems: "center", padding: "0 4px", lineHeight: 1 }}>
+                    {badges.renter > 9 ? "9+" : badges.renter}
+                  </span>
+                )}
+              </Link>
+              {/* Favorites icon */}
+              <Link
+                href="/account"
+                aria-label={t("menu.savedItems", locale)}
+                title={t("menu.savedItems", locale)}
+                style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 8, color: "rgba(255,255,255,0.85)" }}
+                className="hdr-icon-btn"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+                {savedCount > 0 && (
+                  <span style={{ position: "absolute", top: 2, right: 2, minWidth: 16, height: 16, borderRadius: 999, background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 700, display: "grid", placeItems: "center", padding: "0 4px", lineHeight: 1 }}>
+                    {savedCount > 9 ? "9+" : savedCount}
+                  </span>
+                )}
+              </Link>
+            </>
+          ) : null}
           {user ? (
             <UserMenu
               fullName={fullName}
@@ -342,6 +376,7 @@ export default async function Header() {
         .hdr-quick { scrollbar-width: none; }
         .hdr-quick::-webkit-scrollbar { display: none; }
         .hdr-shops-link:hover { background: rgba(255,255,255,0.12); }
+        .hdr-icon-btn:hover { background: rgba(255,255,255,0.12); }
         @media(max-width:768px) {
           .hdr-top-row { display: none !important; }
           .hdr-quick { -webkit-overflow-scrolling: touch; }

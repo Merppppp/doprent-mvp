@@ -34,7 +34,7 @@ type Params = { id: string }; // route param is actually slug (folder name kept 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doprent.com";
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const dress = await getProductBySlug(params.id);
+  const dress = await getProductBySlug(decodeURIComponent(params.id));
   if (!dress) {
     return { title: "ไม่พบชุด", robots: { index: false, follow: true } };
   }
@@ -67,7 +67,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 export default async function DressPage({ params }: { params: Params }) {
-  const dress = await getProductBySlug(params.id);
+  const dress = await getProductBySlug(decodeURIComponent(params.id));
   if (!dress) notFound();
 
   const [occasions, boutique, related, user, blackouts] = await Promise.all([

@@ -209,51 +209,65 @@ export default function CheckoutForm({
       {/* ═══ 1. Delivery method (FIRST) ═══ */}
       <section>
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
-          <StepNum n={1} /> วิธีจัดส่ง
+          <StepNum n={1} /> วิธีจัดส่ง <Req />
         </h2>
         <div style={{ display: "grid", gap: 8 }}>
           {/* Express option */}
-          <button
-            type="button"
-            disabled={!canExpress}
-            onClick={() => { setDeliveryMethod("express"); setCarrier(null); }}
-            style={optionBtn(deliveryMethod === "express", !canExpress)}
+          <label
+            style={{ ...optionBtn(deliveryMethod === "express", !canExpress), cursor: canExpress ? "pointer" : "not-allowed" }}
           >
-            <span style={{ fontSize: 18, lineHeight: 1 }}>⚡</span>
-            <div style={{ flex: 1, textAlign: "left" }}>
+            <input
+              type="radio"
+              name="delivery"
+              checked={deliveryMethod === "express"}
+              disabled={!canExpress}
+              onChange={() => { setDeliveryMethod("express"); setCarrier(null); }}
+              style={{ accentColor: "var(--accent)", width: 18, height: 18, flexShrink: 0 }}
+            />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: canExpress ? "var(--accent)" : "var(--ink-3)" }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>ส่งด่วน</div>
-              <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-                {canExpress
-                  ? "ได้รับภายในวัน — เลือกช่วงเวลารับของ"
-                  : shopIsOpen === false
-                    ? "ร้านปิดอยู่ — ไม่สามารถส่งด่วนได้"
-                    : "ไม่มีช่วงเวลาว่างสำหรับวันนี้"}
-              </div>
+              {canExpress ? (
+                <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
+                  ได้รับภายในวัน — เลือกช่วงเวลารับของ
+                </div>
+              ) : shopIsOpen === false ? (
+                <div style={{ fontSize: 12, color: "var(--danger)", fontWeight: 500, marginTop: 2 }}>
+                  ร้านปิดอยู่ — ไม่สามารถส่งด่วนได้
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
+                  ไม่มีช่วงเวลาว่างสำหรับวันนี้
+                </div>
+              )}
             </div>
-            {deliveryMethod === "express" && <Check />}
-          </button>
+          </label>
 
           {/* Standard option */}
-          <button
-            type="button"
-            onClick={() => { setDeliveryMethod("standard"); setExpressSlot(null); }}
-            style={optionBtn(deliveryMethod === "standard", false)}
+          <label
+            style={{ ...optionBtn(deliveryMethod === "standard", false), cursor: "pointer" }}
           >
-            <span style={{ fontSize: 18, lineHeight: 1 }}>📦</span>
-            <div style={{ flex: 1, textAlign: "left" }}>
+            <input
+              type="radio"
+              name="delivery"
+              checked={deliveryMethod === "standard"}
+              onChange={() => { setDeliveryMethod("standard"); setExpressSlot(null); }}
+              style={{ accentColor: "var(--accent)", width: 18, height: 18, flexShrink: 0 }}
+            />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: deliveryMethod === "standard" ? "var(--accent)" : "var(--ink-2)" }}><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>ส่งพัสดุ</div>
               <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-                ไปรษณีย์ / Flash / Kerry / J&T — ใช้เวลา 1-3 วัน
+                ไปรษณีย์ / Flash / Kerry / J&T — ใช้เวลา 1–3 วัน
               </div>
             </div>
-            {deliveryMethod === "standard" && <Check />}
-          </button>
+          </label>
         </div>
 
         {/* Express: time slot picker */}
         {deliveryMethod === "express" && (
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>เลือกช่วงเวลารับของ</div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>เลือกช่วงเวลารับของ <Req /></div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 6 }}>
               {currentSlots.map((slot) => (
                 <button
@@ -287,7 +301,7 @@ export default function CheckoutForm({
         {/* Standard: carrier picker */}
         {deliveryMethod === "standard" && (
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>เลือกผู้ให้บริการขนส่ง</div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>เลือกผู้ให้บริการขนส่ง <Req /></div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
               {CARRIERS.map((c) => (
                 <button
@@ -317,7 +331,7 @@ export default function CheckoutForm({
       {/* ═══ 2. Address selection ═══ */}
       <section style={{ opacity: deliveryComplete ? 1 : 0.5, pointerEvents: deliveryComplete ? "auto" : "none" }}>
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
-          <StepNum n={2} /> ที่อยู่จัดส่ง
+          <StepNum n={2} /> ที่อยู่จัดส่ง <Req />
         </h2>
         <div style={{ display: "grid", gap: 8 }}>
           {addresses.map((a) =>
@@ -340,7 +354,7 @@ export default function CheckoutForm({
                 <textarea
                   name="address_text"
                   defaultValue={a.address_text}
-                  placeholder="ที่อยู่จัดส่ง (บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์)"
+                  placeholder="ที่อยู่จัดส่ง (บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์) *"
                   className="input" style={{ minHeight: 72, resize: "vertical" }}
                   required
                 />
@@ -448,11 +462,11 @@ export default function CheckoutForm({
               background: "var(--surface)",
             }}
           >
-            <input name="recipient_name" placeholder="ชื่อผู้รับ" className="input" required />
-            <input name="phone" placeholder="เบอร์โทร" className="input" required />
+            <input name="recipient_name" placeholder="ชื่อผู้รับ *" className="input" required />
+            <input name="phone" placeholder="เบอร์โทร *" className="input" required />
             <textarea
               name="address_text"
-              placeholder="ที่อยู่จัดส่ง (บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์)"
+              placeholder="ที่อยู่จัดส่ง (บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์) *"
               className="input" style={{ minHeight: 72, resize: "vertical" }}
               required
             />
@@ -511,8 +525,8 @@ export default function CheckoutForm({
         {deliveryMethod && (
           <div style={{ fontSize: 12, color: "var(--ink-2)", marginTop: 6, padding: "6px 10px", background: "var(--bg)", borderRadius: 6 }}>
             {deliveryMethod === "express"
-              ? `⚡ ส่งด่วน · ช่วงเวลา ${expressSlot?.replace("-", " – ") ?? "—"}`
-              : `📦 ${CARRIERS.find((c) => c.key === carrier)?.label ?? "ส่งพัสดุ"}`}
+              ? `ส่งด่วน · ช่วงเวลา ${expressSlot?.replace("-", " – ") ?? "—"}`
+              : `${CARRIERS.find((c) => c.key === carrier)?.label ?? "ส่งพัสดุ"}`}
           </div>
         )}
       </section>
@@ -530,6 +544,32 @@ export default function CheckoutForm({
           {error}
         </div>
       ) : null}
+
+      {/* Validation hints */}
+      {!deliveryMethod && (
+        <div style={{ fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          กรุณาเลือกวิธีจัดส่ง
+        </div>
+      )}
+      {deliveryMethod === "express" && !expressSlot && (
+        <div style={{ fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          กรุณาเลือกช่วงเวลารับของ
+        </div>
+      )}
+      {deliveryMethod === "standard" && !carrier && (
+        <div style={{ fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          กรุณาเลือกผู้ให้บริการขนส่ง
+        </div>
+      )}
+      {deliveryComplete && !selectedId && (
+        <div style={{ fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          กรุณาเลือกหรือเพิ่มที่อยู่จัดส่ง
+        </div>
+      )}
 
       <button
         type="button"
@@ -588,6 +628,10 @@ function optionBtn(active: boolean, disabled: boolean): React.CSSProperties {
     opacity: disabled ? 0.5 : 1,
     textAlign: "left",
   };
+}
+
+function Req() {
+  return <span style={{ color: "var(--danger)", fontWeight: 400, fontSize: 13 }}>*</span>;
 }
 
 function Row({
