@@ -137,12 +137,11 @@ export default function AccountSidebar({
 
   return (
     <>
-      {/* Mobile top bar */}
+      {/* Mobile menu trigger is positioned beside the page title. */}
       <div className="account-mobile-bar">
         <button className="account-hamburger" onClick={() => setDrawerOpen(true)} aria-label="เปิดเมนู">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
         </button>
-        <span style={{ fontSize: 15, fontWeight: 600 }}>{currentLabel}</span>
       </div>
 
       {/* Mobile backdrop */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { updateBillingProfile } from "@/app/actions/account";
 
 export type BillingValues = {
@@ -11,7 +11,6 @@ export type BillingValues = {
 };
 
 export default function BillingForm({ initial }: { initial: BillingValues }) {
-  const formRef = useRef<HTMLFormElement>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -37,110 +36,95 @@ export default function BillingForm({ initial }: { initial: BillingValues }) {
     });
   }
 
-  const labelStyle: React.CSSProperties = {
-    display: "block",
-    fontSize: 13,
-    fontWeight: 500,
-    color: "var(--ink-2)",
-    marginBottom: 5,
-  };
-
-  const fieldStyle: React.CSSProperties = { marginBottom: 18 };
+  const inputClassName = "w-full rounded-lg border border-line bg-bg px-3 py-2.5 text-[15px] text-ink outline-none transition placeholder:text-ink-3 focus:border-accent focus:ring-2 focus:ring-accent-soft";
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} noValidate>
+    <form onSubmit={handleSubmit} noValidate className="px-5 py-5">
       {message && (
         <div
-          style={{
-            padding: "10px 14px",
-            borderRadius: 6,
-            fontSize: 14,
-            marginBottom: 18,
-            background: message.ok ? "#f0fdf4" : "#fef2f2",
-            color: message.ok ? "#15803d" : "#dc2626",
-            border: `1px solid ${message.ok ? "#bbf7d0" : "#fecaca"}`,
-          }}
+          role="status"
+          className={`mb-5 rounded-lg border px-3.5 py-2.5 text-sm ${message.ok ? "border-success/25 bg-success-soft text-success" : "border-danger/25 bg-danger-soft text-danger"}`}
         >
           {message.text}
         </div>
       )}
 
-      <div style={fieldStyle}>
-        <label htmlFor="billing_company_name" style={labelStyle}>
-          ชื่อบริษัท / นิติบุคคล
-        </label>
-        <input
-          id="billing_company_name"
-          name="billing_company_name"
-          type="text"
-          defaultValue={initial.billingCompanyName ?? ""}
-          placeholder="เช่น บริษัท ดอปเรนท์ จำกัด"
-          className="input"
-          autoComplete="organization"
-        />
+      <div className="space-y-5">
+        <div>
+          <label htmlFor="billing_company_name" className="mb-1.5 block text-[13px] font-medium text-ink-2">
+            ชื่อบริษัท / นิติบุคคล
+          </label>
+          <input
+            id="billing_company_name"
+            name="billing_company_name"
+            type="text"
+            defaultValue={initial.billingCompanyName ?? ""}
+            placeholder="เช่น บริษัท ดอปเรนท์ จำกัด"
+            className={inputClassName}
+            autoComplete="organization"
+          />
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
+          <div>
+            <label htmlFor="billing_tax_id" className="mb-1.5 block text-[13px] font-medium text-ink-2">
+              เลขประจำตัวผู้เสียภาษี <span className="font-normal text-ink-3">(13 หลัก)</span>
+            </label>
+            <input
+              id="billing_tax_id"
+              name="billing_tax_id"
+              type="text"
+              defaultValue={initial.billingTaxId ?? ""}
+              placeholder="เช่น 0105565123456"
+              inputMode="numeric"
+              maxLength={13}
+              className={inputClassName}
+              autoComplete="off"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="billing_branch" className="mb-1.5 block text-[13px] font-medium text-ink-2">
+              สาขา <span className="font-normal text-ink-3">(ไม่บังคับ)</span>
+            </label>
+            <input
+              id="billing_branch"
+              name="billing_branch"
+              type="text"
+              defaultValue={initial.billingBranch ?? ""}
+              placeholder="สำนักงานใหญ่"
+              className={inputClassName}
+              autoComplete="off"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="billing_address" className="mb-1.5 block text-[13px] font-medium text-ink-2">
+            ที่อยู่สำหรับออกใบกำกับภาษี
+          </label>
+          <textarea
+            id="billing_address"
+            name="billing_address"
+            defaultValue={initial.billingAddress ?? ""}
+            placeholder="เช่น 123/4 ถ.สุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110"
+            rows={3}
+            className={`${inputClassName} resize-y leading-6`}
+            autoComplete="street-address"
+          />
+        </div>
       </div>
 
-      <div style={fieldStyle}>
-        <label htmlFor="billing_tax_id" style={labelStyle}>
-          เลขประจำตัวผู้เสียภาษี{" "}
-          <span style={{ fontWeight: 400, color: "var(--ink-3)", fontSize: 12 }}>
-            (13 หลัก)
-          </span>
-        </label>
-        <input
-          id="billing_tax_id"
-          name="billing_tax_id"
-          type="text"
-          defaultValue={initial.billingTaxId ?? ""}
-          placeholder="เช่น 0105565123456"
-          inputMode="numeric"
-          maxLength={13}
-          className="input"
-          autoComplete="off"
-        />
+      <div className="mt-6 flex items-center justify-between gap-3 border-t border-line pt-4">
+        <p className="text-xs text-ink-3">คุณสามารถแก้ไขข้อมูลนี้ได้ทุกเมื่อ</p>
+        <button
+          type="submit"
+          disabled={isPending}
+          className="inline-flex min-w-[120px] items-center justify-center rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-on-dark transition hover:-translate-y-px hover:bg-[oklch(0.32_0.014_85)] hover:shadow-[var(--shadow-2)] disabled:cursor-wait disabled:opacity-60"
+        >
+          {isPending ? "กำลังบันทึก…" : "บันทึกข้อมูล"}
+        </button>
       </div>
-
-      <div style={fieldStyle}>
-        <label htmlFor="billing_address" style={labelStyle}>
-          ที่อยู่สำหรับออกใบกำกับภาษี
-        </label>
-        <textarea
-          id="billing_address"
-          name="billing_address"
-          defaultValue={initial.billingAddress ?? ""}
-          placeholder="เช่น 123/4 ถ.สุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110"
-          rows={3}
-          className="input" style={{ resize: "vertical" }}
-          autoComplete="street-address"
-        />
-      </div>
-
-      <div style={fieldStyle}>
-        <label htmlFor="billing_branch" style={labelStyle}>
-          สาขา{" "}
-          <span style={{ fontWeight: 400, color: "var(--ink-3)", fontSize: 12 }}>
-            (ไม่บังคับ)
-          </span>
-        </label>
-        <input
-          id="billing_branch"
-          name="billing_branch"
-          type="text"
-          defaultValue={initial.billingBranch ?? ""}
-          placeholder="เช่น สำนักงานใหญ่ หรือ สาขา 00001"
-          className="input"
-          autoComplete="off"
-        />
-      </div>
-
-      <button
-        type="submit"
-        disabled={isPending}
-        className="btn btn-dark"
-        style={{ minWidth: 120 }}
-      >
-        {isPending ? "กำลังบันทึก…" : "บันทึก"}
-      </button>
     </form>
   );
 }

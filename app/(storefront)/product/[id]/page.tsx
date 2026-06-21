@@ -528,14 +528,8 @@ export default async function DressPage({ params }: { params: Params }) {
         {/* Specs */}
         <section>
           <div className="detail-section-title">ข้อมูลชุด</div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              rowGap: 14,
-              columnGap: 24,
-            }}
-          >
+          <div className="detail-specs-grid">
+
             <Spec lbl="ขนาด" val={formatVariantSizes(productVariants, dress.size)} />
             <Spec lbl="สี" val={dress.color ? COLOR_LABELS_TH[dress.color] : "—"} />
             <Spec lbl="ร้านเช่า" val={dress.shop_name} />
@@ -620,23 +614,6 @@ export default async function DressPage({ params }: { params: Params }) {
           </section>
         )}
 
-        {/* How to rent */}
-        <section>
-          <div className="detail-section-title">วิธีเช่า</div>
-          <div
-            style={{
-              padding: 14,
-              background: "var(--bg)",
-              borderRadius: 6,
-              fontSize: 13,
-              color: "var(--ink-2)",
-              lineHeight: 1.6,
-              maxWidth: 640,
-            }}
-          >
-            คุยกับร้านทาง LINE เพื่อตกลงวัน ราคา และการส่งเลยค่ะ จากนั้นจ่ายผ่าน PromptPay หรือโอนตรงให้ร้าน DopRent ไม่เก็บเงินคุณ
-          </div>
-        </section>
       </div>
 
       {/* RELATED — content-based similarity: occasion overlap, color, size,

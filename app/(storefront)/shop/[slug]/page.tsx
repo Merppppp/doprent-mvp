@@ -88,6 +88,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
 
       {/* Head */}
       <div
+        className="shop-head"
         style={{
           padding: "24px 0 12px",
           display: "flex",
@@ -112,7 +113,7 @@ export default async function BoutiquePage({ params }: { params: Params }) {
             </div>
           ) : null}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+        <div className="shop-head-actions" style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
           {!b.is_open ? (
             <div
               style={{

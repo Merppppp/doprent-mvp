@@ -207,11 +207,17 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   const variantIdRaw = String(formData.get("variant_id") ?? "").trim() || null;
   // Delivery method + carrier + express slot
   const deliveryMethod = String(formData.get("delivery_method") ?? "").trim() || null;
-  const deliveryCarrier = String(formData.get("delivery_carrier") ?? "").trim() || null;
+  let deliveryCarrier = String(formData.get("delivery_carrier") ?? "").trim() || null;
   const expressSlot = String(formData.get("express_slot") ?? "").trim() || null;
   if (!productId || !addressId || !startDate || !endDate)
     return { ok: false, error: "ข้อมูลการจองไม่ครบ" };
   if (endDate < startDate) return { ok: false, error: "วันคืนชุดต้องไม่ก่อนวันรับ" };
+  if (deliveryCarrier?.startsWith("other:")) {
+    const provider = deliveryCarrier.slice("other:".length).trim();
+    if (!provider || provider.length > 80)
+      return { ok: false, error: "กรุณาระบุผู้ให้บริการขนส่งให้ถูกต้อง" };
+    deliveryCarrier = `other:${provider}`;
+  }
 
   return withActor(user.id, async () => {
     // anti-spam: cap pending requests per renter

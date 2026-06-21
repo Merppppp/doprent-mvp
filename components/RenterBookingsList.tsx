@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useTransition, useRef } from "react";
+import { useState, useCallback, useEffect, useTransition, useRef } from "react";
 import Link from "next/link";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import { fmtThaiShort } from "@/lib/date-th";
@@ -47,11 +47,34 @@ export default function RenterBookingsList({ initialRows, initialTotal, statusCo
     [],
   );
 
-  const switchTab = (key: RenterTabKey) => {
+  const revealTab = useCallback((tab: HTMLButtonElement, behavior: ScrollBehavior = "auto") => {
+    const tabList = tabsRef.current;
+    if (!tabList) return;
+
+    const gutter = 16;
+    const visibleStart = tabList.scrollLeft + gutter;
+    const visibleEnd = tabList.scrollLeft + tabList.clientWidth - gutter;
+    const tabStart = tab.offsetLeft;
+    const tabEnd = tabStart + tab.offsetWidth;
+
+    if (tabStart < visibleStart) {
+      tabList.scrollTo({ left: Math.max(0, tabStart - gutter), behavior });
+    } else if (tabEnd > visibleEnd) {
+      tabList.scrollTo({ left: tabEnd - tabList.clientWidth + gutter, behavior });
+    }
+  }, []);
+
+  const switchTab = (key: RenterTabKey, tab: HTMLButtonElement) => {
     setActiveTab(key);
     setSearch("");
     load(key, 0, "", false);
+    revealTab(tab, "smooth");
   };
+
+  useEffect(() => {
+    const activeTabButton = tabsRef.current?.querySelector<HTMLButtonElement>("button[aria-selected='true']");
+    if (activeTabButton) revealTab(activeTabButton);
+  }, [activeTab, revealTab]);
 
   const handleSearch = (val: string) => {
     setSearch(val);
@@ -65,134 +88,79 @@ export default function RenterBookingsList({ initialRows, initialTotal, statusCo
     load(activeTab, rows.length, search, true);
   };
 
-  // Group rows by shop
   const grouped = groupByShop(rows);
   const hasMore = rows.length < total;
 
   return (
-    <div>
-      {/* ── Tabs (Shopee-style horizontal scroll) ── */}
-      <div
-        ref={tabsRef}
-        style={{
-          display: "flex",
-          gap: 0,
-          borderBottom: "2px solid var(--line)",
-          overflowX: "auto",
-          WebkitOverflowScrolling: "touch",
-          scrollbarWidth: "none",
-          marginBottom: 16,
-        }}
-      >
-        {RENTER_TABS.map((tab) => {
-          const active = activeTab === tab.key;
-          const count = tabCount(tab, statusCounts);
-          return (
-            <button
-              key={tab.key}
-              onClick={() => switchTab(tab.key)}
-              style={{
-                flex: "0 0 auto",
-                padding: "12px 18px",
-                fontSize: 13.5,
-                fontWeight: active ? 600 : 400,
-                color: active ? "var(--accent)" : "var(--ink-2)",
-                background: "none",
-                border: "none",
-                borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent",
-                marginBottom: -2,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                transition: "0.15s",
-                position: "relative",
-              }}
-            >
-              {tab.label}
-              {count > 0 && (
-                <span
-                  style={{
-                    marginLeft: 5,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: active ? "var(--accent)" : "var(--ink-3)",
-                  }}
-                >
-                  ({count})
-                </span>
-              )}
-            </button>
-          );
-        })}
+    <div className="max-w-full min-w-0">
+      {/* ── Tabs ── */}
+      <div className="relative mb-4 max-[900px]:sticky max-[900px]:top-0 max-[900px]:z-20 max-[900px]:-mx-4 max-[900px]:mb-0 max-[900px]:bg-bg max-[900px]:px-4 max-[900px]:after:pointer-events-none max-[900px]:after:absolute max-[900px]:after:inset-y-0 max-[900px]:after:right-0 max-[900px]:after:z-[1] max-[900px]:after:w-7 max-[900px]:after:bg-gradient-to-r max-[900px]:after:from-transparent max-[900px]:after:to-bg max-[900px]:after:content-['']">
+        <div ref={tabsRef} role="tablist" className="flex overflow-x-auto border-b-2 border-line [-webkit-overflow-scrolling:touch] [scrollbar-width:none] overscroll-x-contain [&::-webkit-scrollbar]:hidden max-[900px]:snap-x max-[900px]:snap-mandatory max-[900px]:scroll-px-4 max-[900px]:pr-7">
+          {RENTER_TABS.map((tab) => {
+            const active = activeTab === tab.key;
+            const count = tabCount(tab, statusCounts);
+            return (
+              <button
+                key={tab.key}
+                role="tab"
+                aria-selected={active}
+                onClick={(event) => switchTab(tab.key, event.currentTarget)}
+                className={`-mb-0.5 shrink-0 cursor-pointer whitespace-nowrap border-b-2 border-transparent bg-transparent px-[18px] py-3 text-[13.5px] font-normal text-ink-2 transition-colors duration-150 hover:text-ink max-[900px]:snap-start max-[900px]:px-3.5 max-[900px]:py-2.5 max-[900px]:text-[13px]${active ? " border-accent font-semibold text-accent" : ""}`}
+              >
+                {tab.label}
+                {count > 0 && (
+                  <span className={`ml-1 text-[11px] font-semibold${active ? " text-accent" : " text-ink-3"}`}>({count})</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Search ── */}
-      <div style={{ marginBottom: 16 }}>
+      <div className="mb-4 pt-2">
         <input
           type="search"
           placeholder="ค้นหาชื่อสินค้าหรือร้าน..."
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "10px 14px",
-            border: "1px solid var(--line)",
-            borderRadius: 8,
-            fontSize: 13.5,
-            background: "var(--surface)",
-            outline: "none",
-          }}
+          className="w-full px-3.5 py-2.5 border border-[var(--line)] rounded-lg text-[13.5px] bg-[var(--surface)] outline-none"
         />
       </div>
 
-      {/* ── Loading indicator ── */}
+      {/* ── Loading ── */}
       {isPending && rows.length === 0 && (
-        <div style={{ textAlign: "center", padding: "40px 0", color: "var(--ink-3)", fontSize: 13 }}>
-          กำลังโหลด...
-        </div>
+        <div className="text-center py-10 text-[var(--ink-3)] text-[13px]">กำลังโหลด...</div>
       )}
 
-      {/* ── Empty state ── */}
+      {/* ── Empty ── */}
       {!isPending && rows.length === 0 && (
-        <div style={{ textAlign: "center", padding: "60px 0", color: "var(--ink-2)" }}>
-          <p style={{ marginBottom: 16, fontSize: 14 }}>ไม่มีรายการจอง</p>
-          <Link href="/" className="btn btn-dark" style={{ padding: "10px 22px", fontSize: 13 }}>
+        <div className="text-center py-16 text-[var(--ink-2)]">
+          <p className="mb-4 text-sm">ไม่มีรายการจอง</p>
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-transparent bg-ink px-5 py-2.5 text-[13px] font-medium leading-none text-on-dark transition-[background,border-color,transform,box-shadow,color] duration-[var(--dur-1)] ease-[var(--ease)] will-change-transform hover:-translate-y-px hover:bg-[oklch(0.32_0.014_85)] hover:shadow-[var(--shadow-2)] active:translate-y-px active:scale-[.985]"
+          >
             เริ่มเลือกชุด
           </Link>
         </div>
       )}
 
       {/* ── Booking cards grouped by shop ── */}
-      <div style={{ display: "grid", gap: 14 }}>
+      <div className="grid gap-3.5">
         {grouped.map((group) => (
           <div
             key={group.shopSlug ?? group.shopName}
-            style={{
-              border: "1px solid var(--line)",
-              borderRadius: 12,
-              background: "var(--surface)",
-              overflow: "hidden",
-            }}
+            className="border border-[var(--line)] rounded-xl bg-[var(--surface)] overflow-hidden"
           >
             {/* Shop header */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "10px 14px",
-                borderBottom: "1px solid var(--line)",
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+            <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-[var(--line)] text-[13px] font-semibold">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
                 <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                 <path d="M9 22V12h6v10" />
               </svg>
               {group.shopSlug ? (
-                <Link href={`/shop/${group.shopSlug}`} style={{ color: "inherit", textDecoration: "none" }}>
-                  {group.shopName}
-                </Link>
+                <Link href={`/shop/${group.shopSlug}`} className="text-inherit no-underline">{group.shopName}</Link>
               ) : (
                 <span>{group.shopName}</span>
               )}
@@ -203,95 +171,46 @@ export default function RenterBookingsList({ initialRows, initialTotal, statusCo
               <Link
                 key={b.id}
                 href={`/account/bookings/${b.id}`}
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  padding: "12px 14px",
-                  borderBottom: "1px solid var(--line-2, var(--line))",
-                  textDecoration: "none",
-                  color: "inherit",
-                  alignItems: "flex-start",
-                  transition: "background 0.12s",
-                }}
-                className="hover-lift-subtle"
+                className="flex gap-3 px-3.5 py-3 border-b border-[var(--line-2,var(--line))] no-underline text-inherit items-start transition-colors duration-100"
               >
                 {/* Product image */}
-                <div
-                  style={{
-                    width: 72,
-                    height: 90,
-                    borderRadius: 8,
-                    overflow: "hidden",
-                    flexShrink: 0,
-                    background: "var(--accent-soft)",
-                  }}
-                >
+                <div className="w-[72px] h-[90px] rounded-lg overflow-hidden shrink-0 bg-[var(--accent-soft)]">
                   {b.dress_image && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={b.dress_image}
-                      alt={b.dress_name ?? ""}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
+                    <img src={b.dress_image} alt={b.dress_name ?? ""} className="w-full h-full object-cover" />
                   )}
                 </div>
 
                 {/* Details */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {b.dress_name ?? "ชุด"}
-                    </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="font-semibold text-sm truncate">{b.dress_name ?? "ชุด"}</div>
                     <BookingStatusBadge status={b.status} />
                   </div>
-                  <div style={{ color: "var(--ink-3)", fontSize: 12, marginTop: 4 }}>
+                  <div className="text-[var(--ink-3)] text-xs mt-1">
                     {fmtThaiShort(b.start_date)} – {fmtThaiShort(b.end_date)}
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, marginTop: 6 }}>
+                  <div className="text-sm font-semibold mt-1.5">
                     ฿{(b.rental_total + b.deposit + (b.shipping_fee ?? 0)).toLocaleString()}
                     {b.shipping_fee == null && (
-                      <span style={{ fontWeight: 400, fontSize: 11, color: "var(--ink-3)", marginLeft: 4 }}>
-                        (ยังไม่รวมค่าส่ง)
-                      </span>
+                      <span className="font-normal text-[11px] text-[var(--ink-3)] ml-1">(ยังไม่รวมค่าส่ง)</span>
                     )}
                   </div>
 
                   {/* Action buttons */}
-                  <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  <div className="flex gap-2 mt-2 flex-wrap">
                     {b.shop_line_url && (
                       <span
-                        onClick={(e) => {
-                          e.preventDefault();
-                          window.open(b.shop_line_url!, "_blank");
-                        }}
-                        style={{
-                          padding: "5px 12px",
-                          border: "1px solid var(--line)",
-                          borderRadius: 6,
-                          fontSize: 12,
-                          cursor: "pointer",
-                          background: "var(--bg)",
-                        }}
+                        onClick={(e) => { e.preventDefault(); window.open(b.shop_line_url!, "_blank"); }}
+                        className="px-3 py-1 border border-[var(--line)] rounded-md text-xs cursor-pointer bg-[var(--bg)]"
                       >
                         ติดต่อร้าน
                       </span>
                     )}
                     {(b.status === "completed" || b.status === "returned") && b.dress_slug && (
                       <span
-                        onClick={(e) => {
-                          e.preventDefault();
-                          window.location.href = `/product/${b.dress_slug}`;
-                        }}
-                        style={{
-                          padding: "5px 12px",
-                          border: "1px solid var(--accent)",
-                          borderRadius: 6,
-                          fontSize: 12,
-                          color: "var(--accent)",
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          background: "var(--bg)",
-                        }}
+                        onClick={(e) => { e.preventDefault(); window.location.href = `/product/${b.dress_slug}`; }}
+                        className="px-3 py-1 border border-[var(--accent)] rounded-md text-xs cursor-pointer bg-[var(--bg)] text-[var(--accent)] font-semibold"
                       >
                         จองอีกครั้ง
                       </span>
@@ -306,28 +225,20 @@ export default function RenterBookingsList({ initialRows, initialTotal, statusCo
 
       {/* ── Load more ── */}
       {hasMore && (
-        <div style={{ textAlign: "center", marginTop: 20 }}>
+        <div className="text-center mt-5">
           <button
             onClick={loadMore}
             disabled={isPending}
-            className="btn"
-            style={{
-              padding: "10px 28px",
-              fontSize: 13,
-              border: "1px solid var(--line)",
-              borderRadius: 8,
-              background: "var(--surface)",
-              cursor: isPending ? "wait" : "pointer",
-            }}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-surface px-7 py-2.5 text-[13px] font-medium leading-none transition-[background,border-color,transform,box-shadow,color] duration-[var(--dur-1)] ease-[var(--ease)] will-change-transform hover:-translate-y-px hover:border-ink disabled:cursor-wait active:translate-y-px active:scale-[.985]"
           >
             {isPending ? "กำลังโหลด..." : "ดูเพิ่มเติม"}
           </button>
         </div>
       )}
 
-      {/* ── Count summary ── */}
+      {/* ── Count ── */}
       {rows.length > 0 && (
-        <div style={{ textAlign: "center", marginTop: 12, fontSize: 12, color: "var(--ink-3)" }}>
+        <div className="text-center mt-3 text-xs text-[var(--ink-3)]">
           แสดง {rows.length} จาก {total} รายการ
         </div>
       )}

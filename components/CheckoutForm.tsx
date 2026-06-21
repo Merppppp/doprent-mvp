@@ -13,6 +13,7 @@ const CARRIERS = [
   { key: "kerry", label: "Kerry Express" },
   { key: "jt", label: "J&T Express" },
   { key: "thaipost", label: "ไปรษณีย์ไทย" },
+  { key: "other", label: "อื่นๆ" },
 ] as const;
 
 type Props = {
@@ -88,6 +89,7 @@ export default function CheckoutForm({
   // Delivery state
   const [deliveryMethod, setDeliveryMethod] = useState<"express" | "standard" | null>(null);
   const [carrier, setCarrier] = useState<string | null>(null);
+  const [otherCarrier, setOtherCarrier] = useState("");
   const [expressSlot, setExpressSlot] = useState<string | null>(null);
 
   const expressSlots = useMemo(() => buildExpressSlots(shopHours), [shopHours]);
@@ -110,8 +112,9 @@ export default function CheckoutForm({
 
   const { perDay: effPerDay, total: rental } = priceForNights(priceTiers ?? null, pricePerDay, days);
 
+  const resolvedCarrier = carrier === "other" ? `other:${otherCarrier.trim()}` : carrier;
   const deliveryComplete =
-    deliveryMethod === "standard" ? !!carrier :
+    deliveryMethod === "standard" ? !!resolvedCarrier && (carrier !== "other" || !!otherCarrier.trim()) :
     deliveryMethod === "express" ? !!expressSlot :
     false;
 
@@ -172,8 +175,12 @@ export default function CheckoutForm({
       setError("กรุณาเลือกวิธีจัดส่ง");
       return;
     }
-    if (deliveryMethod === "standard" && !carrier) {
+    if (deliveryMethod === "standard" && !resolvedCarrier) {
       setError("กรุณาเลือกผู้ให้บริการขนส่ง");
+      return;
+    }
+    if (deliveryMethod === "standard" && carrier === "other" && !otherCarrier.trim()) {
+      setError("กรุณาระบุผู้ให้บริการขนส่ง");
       return;
     }
     if (deliveryMethod === "express" && !expressSlot) {
@@ -193,7 +200,7 @@ export default function CheckoutForm({
     fd.set("end_date", endDate);
     if (variantId) fd.set("variant_id", variantId);
     fd.set("delivery_method", deliveryMethod);
-    if (deliveryMethod === "standard" && carrier) fd.set("delivery_carrier", carrier);
+    if (deliveryMethod === "standard" && resolvedCarrier) fd.set("delivery_carrier", resolvedCarrier);
     if (deliveryMethod === "express" && expressSlot) fd.set("express_slot", expressSlot);
     const res = await createBooking(fd);
     if (!res.ok) {
@@ -258,7 +265,7 @@ export default function CheckoutForm({
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>ส่งพัสดุ</div>
               <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-                ไปรษณีย์ / Flash / Kerry / J&T — ใช้เวลา 1–3 วัน
+                เลือกผู้ให้บริการขนส่งที่ต้องการ — ใช้เวลา 1–3 วัน
               </div>
             </div>
           </label>
@@ -324,6 +331,22 @@ export default function CheckoutForm({
                 </button>
               ))}
             </div>
+            {carrier === "other" && (
+              <div style={{ marginTop: 8 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 5 }} htmlFor="other-carrier">
+                  ระบุผู้ให้บริการขนส่ง <Req />
+                </label>
+                <input
+                  id="other-carrier"
+                  type="text"
+                  value={otherCarrier}
+                  onChange={(e) => setOtherCarrier(e.target.value)}
+                  placeholder="เช่น Ninja Van, DHL หรือ Lalamove"
+                  className="input"
+                  maxLength={80}
+                />
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -349,15 +372,25 @@ export default function CheckoutForm({
                 }}
               >
                 <input type="hidden" name="id" value={a.id} />
-                <input name="recipient_name" defaultValue={a.recipient_name} placeholder="ชื่อผู้รับ" className="input" required />
-                <input name="phone" defaultValue={a.phone} placeholder="เบอร์โทร" className="input" required />
-                <textarea
-                  name="address_text"
-                  defaultValue={a.address_text}
-                  placeholder="ที่อยู่จัดส่ง (บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์) *"
-                  className="input" style={{ minHeight: 72, resize: "vertical" }}
-                  required
-                />
+                <div>
+                  <label htmlFor={`recipient-name-${a.id}`} style={addressLabelStyle}>ชื่อผู้รับ <Req /></label>
+                  <input id={`recipient-name-${a.id}`} name="recipient_name" defaultValue={a.recipient_name} placeholder="เช่น สมชาย ใจดี" className="input" required />
+                </div>
+                <div>
+                  <label htmlFor={`phone-${a.id}`} style={addressLabelStyle}>เบอร์โทร <Req /></label>
+                  <input id={`phone-${a.id}`} name="phone" type="tel" defaultValue={a.phone} placeholder="เช่น 0812345678" className="input" required />
+                </div>
+                <div>
+                  <label htmlFor={`address-${a.id}`} style={addressLabelStyle}>ที่อยู่จัดส่ง <Req /></label>
+                  <textarea
+                    id={`address-${a.id}`}
+                    name="address_text"
+                    defaultValue={a.address_text}
+                    placeholder="บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์"
+                    className="input" style={{ minHeight: 72, resize: "vertical" }}
+                    required
+                  />
+                </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button type="submit" className="btn btn-dark" disabled={busy}>
                     บันทึกการแก้ไข
@@ -462,14 +495,24 @@ export default function CheckoutForm({
               background: "var(--surface)",
             }}
           >
-            <input name="recipient_name" placeholder="ชื่อผู้รับ *" className="input" required />
-            <input name="phone" placeholder="เบอร์โทร *" className="input" required />
-            <textarea
-              name="address_text"
-              placeholder="ที่อยู่จัดส่ง (บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์) *"
-              className="input" style={{ minHeight: 72, resize: "vertical" }}
-              required
-            />
+            <div>
+              <label htmlFor="new-recipient-name" style={addressLabelStyle}>ชื่อผู้รับ <Req /></label>
+              <input id="new-recipient-name" name="recipient_name" placeholder="เช่น สมชาย ใจดี" className="input" required />
+            </div>
+            <div>
+              <label htmlFor="new-phone" style={addressLabelStyle}>เบอร์โทร <Req /></label>
+              <input id="new-phone" name="phone" type="tel" placeholder="เช่น 0812345678" className="input" required />
+            </div>
+            <div>
+              <label htmlFor="new-address" style={addressLabelStyle}>ที่อยู่จัดส่ง <Req /></label>
+              <textarea
+                id="new-address"
+                name="address_text"
+                placeholder="บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์"
+                className="input" style={{ minHeight: 72, resize: "vertical" }}
+                required
+              />
+            </div>
             <label style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center" }}>
               <input type="checkbox" name="is_default" /> ตั้งเป็นที่อยู่เริ่มต้น
             </label>
@@ -526,7 +569,9 @@ export default function CheckoutForm({
           <div style={{ fontSize: 12, color: "var(--ink-2)", marginTop: 6, padding: "6px 10px", background: "var(--bg)", borderRadius: 6 }}>
             {deliveryMethod === "express"
               ? `ส่งด่วน · ช่วงเวลา ${expressSlot?.replace("-", " – ") ?? "—"}`
-              : `${CARRIERS.find((c) => c.key === carrier)?.label ?? "ส่งพัสดุ"}`}
+              : carrier === "other"
+                ? `อื่นๆ · ${otherCarrier.trim() || "ยังไม่ระบุ"}`
+                : `${CARRIERS.find((c) => c.key === carrier)?.label ?? "ส่งพัสดุ"}`}
           </div>
         )}
       </section>
@@ -558,10 +603,10 @@ export default function CheckoutForm({
           กรุณาเลือกช่วงเวลารับของ
         </div>
       )}
-      {deliveryMethod === "standard" && !carrier && (
+      {deliveryMethod === "standard" && (!carrier || (carrier === "other" && !otherCarrier.trim())) && (
         <div style={{ fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-          กรุณาเลือกผู้ให้บริการขนส่ง
+          {carrier === "other" ? "กรุณาระบุผู้ให้บริการขนส่ง" : "กรุณาเลือกผู้ให้บริการขนส่ง"}
         </div>
       )}
       {deliveryComplete && !selectedId && (
@@ -583,6 +628,14 @@ export default function CheckoutForm({
     </div>
   );
 }
+
+const addressLabelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: 13,
+  fontWeight: 500,
+  color: "var(--ink-2)",
+  marginBottom: 5,
+};
 
 function StepNum({ n }: { n: number }) {
   return (

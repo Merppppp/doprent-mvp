@@ -466,9 +466,16 @@ select:focus-visible {
   font-weight: 600;
   margin-bottom: 14px;
 }
+.detail-specs-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  row-gap: 14px;
+  column-gap: 24px;
+}
 
 /* Account: sidebar + main */
 .account-grid {
+  position: relative;
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: 32px;
@@ -608,29 +615,36 @@ select:focus-visible {
     grid-template-columns: 1fr;
     gap: 0;
     padding: 0 16px;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  .account-grid > main {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
   }
   .account-sidebar-desktop {
     display: none;
   }
   .account-mobile-bar {
     display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 0;
-    margin-bottom: 12px;
-    border-bottom: 1px solid var(--line);
+    position: absolute;
+    top: -3px;
+    right: 16px;
+    z-index: 10;
   }
   .account-hamburger {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--surface);
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 6px;
+    background: none;
     cursor: pointer;
     flex-shrink: 0;
+    color: var(--ink-2);
   }
   .account-drawer-backdrop {
     display: block;
@@ -828,6 +842,19 @@ select:focus-visible {
   .boutique-info-grid {
     grid-template-columns: 1fr 1fr !important;
     gap: 16px !important;
+  }
+  /* Detail specs grid 4→2 on phone */
+  .detail-specs-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    column-gap: 16px !important;
+  }
+  /* Shop head: stack + align-start on phone */
+  .shop-head {
+    gap: 16px !important;
+  }
+  .shop-head-actions {
+    align-items: flex-start !important;
+    width: 100%;
   }
 }
 

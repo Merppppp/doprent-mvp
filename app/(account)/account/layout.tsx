@@ -9,7 +9,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
   if (!user) redirect(`/login?next=${encodeURIComponent("/account")}`);
 
   return (
-    <div className="container" style={{ padding: "28px 0 80px" }}>
+    <div className="container px-0 pt-7 pb-20">
       <div className="account-grid">
         <AccountSidebar user={{ fullName: user.fullName, email: user.email, role: user.role }} />
         <main>{children}</main>

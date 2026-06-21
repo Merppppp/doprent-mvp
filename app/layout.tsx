@@ -116,7 +116,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </Suspense>
         <LocationProvider>
           <Header />
-          <div id="main" style={{ flex: 1, overflowY: "auto" }}>
+          <div id="main" className="flex-1 overflow-y-auto">
             <main>{children}</main>
             <Footer />
           </div>

@@ -3,7 +3,26 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { SETTING_KEYS } from "@/lib/site-settings";
 
-const ALLOWED_KEYS = new Set(Object.values(SETTING_KEYS));
+type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];
+
+const ALLOWED_KEYS = new Set<SettingKey>(Object.values(SETTING_KEYS));
+
+function isSettingsPayload(value: unknown): value is Record<string, string> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every((item) => typeof item === "string")
+  );
+}
+
+function isAllowedSettingKey(key: string): key is SettingKey {
+  return ALLOWED_KEYS.has(key as SettingKey);
+}
+
+function isAllowedSettingEntry(entry: [string, string]): entry is [SettingKey, string] {
+  return isAllowedSettingKey(entry[0]);
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -20,17 +39,17 @@ export async function POST(req: NextRequest) {
   }
 
   const { settings } = await req.json().catch(() => ({}));
-  if (!settings || typeof settings !== "object") {
+  if (!isSettingsPayload(settings)) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
 
-  const ops = Object.entries(settings as Record<string, string>)
-    .filter(([key]) => ALLOWED_KEYS.has(key))
+  const ops = Object.entries(settings)
+    .filter(isAllowedSettingEntry)
     .map(([key, value]) =>
       db.siteSetting.upsert({
         where: { key },
-        update: { value: String(value).trim() },
-        create: { key, value: String(value).trim() },
+        update: { value: value.trim() },
+        create: { key, value: value.trim() },
       }),
     );
 

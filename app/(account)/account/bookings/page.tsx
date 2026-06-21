@@ -34,7 +34,7 @@ export default async function MyBookingsPage({
 
   return (
     <>
-      <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 16 }}>
+      <h1 className="mb-4 text-[22px] font-semibold tracking-[-0.01em] max-[900px]:pr-12">
         การจองของฉัน
       </h1>
       <RenterBookingsList

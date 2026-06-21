@@ -1112,9 +1112,9 @@ model Booking {
   /// หมายเหตุภายในร้าน (ไม่แสดงต่อลูกค้า)
   internalNote         String? @map("internal_note")
 
-  /// วิธีจัดส่ง: "express" (ส่งด่วนภายในวัน) | "standard" (ไปรษณีย์/Flash/Kerry/J&T)
+  /// วิธีจัดส่ง: "express" (ส่งด่วนภายในวัน) | "standard" (ขนส่งพัสดุ)
   deliveryMethod       String? @map("delivery_method")
-  /// ผู้ให้บริการขนส่ง (standard): "flash" | "kerry" | "jt" | "thaipost"
+  /// ผู้ให้บริการขนส่ง (standard): "flash" | "kerry" | "jt" | "thaipost" | "other:<provider>"
   deliveryCarrier      String? @map("delivery_carrier")
   /// ช่วงเวลารับของสำหรับส่งด่วน เช่น "14:00-18:00"
   expressSlot          String? @map("express_slot")
