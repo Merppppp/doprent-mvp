@@ -71,12 +71,18 @@ This runs:
 2. `prisma migrate deploy` (all 29 migrations)
 3. `prisma/seed.ts` (reference data: product types, categories, tags, areas)
 
-### 3. Tag and push (triggers prod deploy)
+### 3. Release: bump version + tag + push (triggers prod deploy)
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+bash scripts/release.sh 1.0.0
 ```
+
+This script (must run on `main` branch):
+1. Bumps `package.json` version to match the tag
+2. Commits the version bump
+3. Creates annotated tag `v1.0.0`
+4. Confirms before pushing
+5. Pushes main + tag → triggers prod deploy
 
 The `sync-to-fork.yml` workflow syncs tags to `doprent/doprent-mvp`.
 
