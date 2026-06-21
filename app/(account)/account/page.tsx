@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import ProductCard from "@/components/ProductCard";
+import SavedProductsGrid from "@/components/SavedProductsGrid";
 import { getCurrentUser } from "@/lib/auth";
 import { listProductsByIds } from "@/lib/products";
 
@@ -26,7 +26,7 @@ export default async function AccountPage() {
   return (
     <div className="container" style={{ padding: "28px 0 80px" }}>
       <div className="account-grid">
-        <aside>
+        <aside className="account-sidebar">
           <div
             style={{
               background: "var(--surface)",
@@ -120,45 +120,10 @@ export default async function AccountPage() {
         </aside>
 
         <main>
-          <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 6 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 16 }}>
             สินค้าที่ถูกใจ
           </h2>
-          <div style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
-            {saved.length === 0 ? "ยังไม่มีสินค้าที่ถูกใจ" : `${saved.length} รายการ`}
-          </div>
-
-          {saved.length === 0 ? (
-            <div
-              style={{
-                padding: "60px 20px",
-                textAlign: "center",
-                color: "var(--ink-3)",
-                background: "var(--surface)",
-                border: "1px solid var(--line)",
-                borderRadius: 8,
-              }}
-            >
-              <h3 style={{ fontSize: 16, color: "var(--ink)", marginBottom: 6, fontWeight: 600 }}>
-                ยังไม่มีสินค้าที่ถูกใจ
-              </h3>
-              <p style={{ fontSize: 14, marginBottom: 18 }}>กดปุ่ม ❤️ ที่สินค้าที่ชอบเพื่อบันทึก</p>
-              <Link href="/" className="btn btn-dark">
-                เลือกสินค้า
-              </Link>
-            </div>
-          ) : (
-            <div className="grid-3" style={{ gap: 20 }}>
-              {saved.map((d, i) => (
-                <ProductCard
-                  key={d.id}
-                  product={d}
-                  variant={i}
-                  savedSet={new Set(user.savedProductIds)}
-                  isLoggedIn={true}
-                />
-              ))}
-            </div>
-          )}
+          <SavedProductsGrid products={saved} savedIds={user.savedProductIds} />
         </main>
       </div>
     </div>
