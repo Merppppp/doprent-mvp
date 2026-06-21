@@ -2,9 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
-import { getBookingForView } from "@/lib/booking-queries";
+import { getBookingForView, getBookingTimeline } from "@/lib/booking-queries";
 import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
 import { promptPayQrDataUrl } from "@/lib/payments";
+import { getSignedPrivateUrl } from "@/lib/r2";
 import { db } from "@/lib/db";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import RenterBookingActions from "@/components/RenterBookingActions";
@@ -40,6 +41,9 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
     where: { bookingId: b.id },
     select: { id: true, rating: true, comment: true, createdAt: true, sellerRepliedAt: true },
   });
+
+  const timeline = await getBookingTimeline(b.id);
+  const slipUrl = b.slip_path ? await getSignedPrivateUrl(b.slip_path) : null;
 
   const isReviewable = b.status === "returned" || b.status === "completed";
   const canEditAddress = b.status === "booking_pending" || b.status === "waiting_for_payment";
@@ -208,6 +212,15 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
         </div>
       ) : null}
 
+      {/* Slip image — shown after upload */}
+      {slipUrl && (b.status === "payment_review" || b.status === "confirmed" || b.status === "renting" || b.status === "returned" || b.status === "completed" || b.status === "slip_disputed") ? (
+        <div style={card}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>สลิปการโอน</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={slipUrl} alt="สลิป" style={{ width: "100%", maxHeight: 400, objectFit: "contain", borderRadius: 8, border: "1px solid var(--line)", background: "var(--bg)" }} />
+        </div>
+      ) : null}
+
       <RenterBookingActions
         bookingId={b.id}
         status={b.status}
@@ -215,6 +228,19 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
         disputeReason={b.cancel_reason}
         disputeNote={b.dispute_note}
       />
+
+      {/* Timeline — status change history */}
+      {timeline.length > 0 ? (
+        <div style={card}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>ประวัติการจอง</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            <TimelineRow label="สร้างการจอง" at={b.created_at} isFirst />
+            {timeline.map((ev, i) => (
+              <TimelineRow key={i} label={ev.label} at={ev.at} isLast={i === timeline.length - 1} />
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {/* Review section — shown for completed/returned bookings */}
       {isReviewable ? (
@@ -274,6 +300,45 @@ function Fallback() {
       <Link href="/account/bookings" className="btn btn-dark" style={{ padding: "12px 22px" }}>
         การจองของฉัน
       </Link>
+    </div>
+  );
+}
+
+function fmtThaiDateTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Bangkok",
+  });
+}
+
+function TimelineRow({ label, at, isFirst, isLast }: { label: string; at: string; isFirst?: boolean; isLast?: boolean }) {
+  return (
+    <div style={{ display: "flex", gap: 12, minHeight: 36 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 14 }}>
+        <div
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: 999,
+            background: isLast ? "var(--accent)" : "var(--ink-3)",
+            border: isLast ? "2px solid var(--accent)" : "2px solid var(--ink-3)",
+            flexShrink: 0,
+            marginTop: 4,
+          }}
+        />
+        {!isLast && (
+          <div style={{ width: 2, flex: 1, background: "var(--line)", marginTop: 2, marginBottom: 2 }} />
+        )}
+      </div>
+      <div style={{ paddingBottom: isLast ? 0 : 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: isLast ? "var(--ink)" : "var(--ink-2)" }}>{label}</div>
+        <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{fmtThaiDateTime(at)}</div>
+      </div>
     </div>
   );
 }

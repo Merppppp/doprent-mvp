@@ -1,7 +1,8 @@
-import { db } from "@/lib/db";
+import { db, base } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import type { Address, BookingDetail, BookingStatus } from "@/lib/types";
 import { ymdUtc } from "@/lib/date-th";
+import { BOOKING_STATUS_META } from "@/lib/bookings";
 
 /** Prisma include that hydrates the product + shop fields a BookingDetail needs. */
 const BOOKING_INCLUDE = {
@@ -474,4 +475,39 @@ export async function currentUserIsSellerOf(shopId: string): Promise<boolean> {
     select: { id: true },
   });
   return !!b;
+}
+
+export type BookingEvent = {
+  status: string;
+  label: string;
+  at: string;
+};
+
+export async function getBookingTimeline(bookingId: string): Promise<BookingEvent[]> {
+  const logs = await base.auditLog.findMany({
+    where: { entityType: "Booking", entityId: bookingId, action: "UPDATE" },
+    orderBy: { createdAt: "asc" },
+    select: { before: true, after: true, createdAt: true },
+  });
+
+  const events: BookingEvent[] = [];
+
+  for (const log of logs) {
+    const before = log.before as Record<string, unknown> | null;
+    const after = log.after as Record<string, unknown> | null;
+    if (!after) continue;
+
+    const oldStatus = before?.status as string | undefined;
+    const newStatus = after.status as string | undefined;
+    if (!newStatus || newStatus === oldStatus) continue;
+
+    const meta = BOOKING_STATUS_META[newStatus as BookingStatus];
+    events.push({
+      status: newStatus,
+      label: meta?.label ?? newStatus,
+      at: log.createdAt.toISOString(),
+    });
+  }
+
+  return events;
 }

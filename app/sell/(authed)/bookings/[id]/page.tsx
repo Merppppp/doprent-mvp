@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
-import { getBookingForView, currentUserIsSellerOf } from "@/lib/booking-queries";
+import { getBookingForView, currentUserIsSellerOf, getBookingTimeline } from "@/lib/booking-queries";
 import { getSignedPrivateUrl } from "@/lib/r2";
 import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
 import { getTrustScore } from "@/lib/trust-score";
@@ -40,8 +40,8 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
     ? await getSignedPrivateUrl(b.addr_change_slip_path)
     : null;
 
-  // Trust score for this renter (single query — only one renter on a detail page).
   const renterTrust = await getTrustScore(b.renter_id);
+  const timeline = await getBookingTimeline(b.id);
 
   // Channels the shop has configured — drives the accept-flow channel picker.
   const channels: ChannelOption[] = [];
@@ -145,6 +145,18 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
         channels={channels}
         defaultMethod={b.boutique_default_payment_method}
       />
+
+      {timeline.length > 0 ? (
+        <div style={card}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>ประวัติการจอง</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            <TimelineRow label="สร้างการจอง" at={b.created_at} isFirst />
+            {timeline.map((ev, i) => (
+              <TimelineRow key={i} label={ev.label} at={ev.at} isLast={i === timeline.length - 1} />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -177,6 +189,45 @@ function Fallback() {
       <Link href="/sell/bookings" className="btn btn-dark" style={{ padding: "12px 22px" }}>
         การจองของร้าน
       </Link>
+    </div>
+  );
+}
+
+function fmtThaiDateTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Bangkok",
+  });
+}
+
+function TimelineRow({ label, at, isFirst, isLast }: { label: string; at: string; isFirst?: boolean; isLast?: boolean }) {
+  return (
+    <div style={{ display: "flex", gap: 12, minHeight: 36 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 14 }}>
+        <div
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: 999,
+            background: isLast ? "var(--accent)" : "var(--ink-3)",
+            border: isLast ? "2px solid var(--accent)" : "2px solid var(--ink-3)",
+            flexShrink: 0,
+            marginTop: 4,
+          }}
+        />
+        {!isLast && (
+          <div style={{ width: 2, flex: 1, background: "var(--line)", marginTop: 2, marginBottom: 2 }} />
+        )}
+      </div>
+      <div style={{ paddingBottom: isLast ? 0 : 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: isLast ? "var(--ink)" : "var(--ink-2)" }}>{label}</div>
+        <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{fmtThaiDateTime(at)}</div>
+      </div>
     </div>
   );
 }
