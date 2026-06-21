@@ -33,8 +33,8 @@ export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn
         >
           <ProductCardImage src={imgSrc} alt={product.name} color={product.color ?? "rose"} variant={variant} />
           <SaveButton productId={product.id} initialSaved={isSaved} isLoggedIn={isLoggedIn} />
-          {/* Shop open/close indicator */}
-          {product.shop_is_open != null && (
+          {/* Online badge — only shown when shop is open */}
+          {product.shop_is_open && (
             <span
               style={{
                 position: "absolute",
@@ -43,9 +43,7 @@ export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 4,
-                background: product.shop_is_open
-                  ? "rgba(0,0,0,0.55)"
-                  : "rgba(0,0,0,0.45)",
+                background: "rgba(0,0,0,0.55)",
                 backdropFilter: "blur(6px)",
                 color: "#fff",
                 fontSize: 10,
@@ -60,11 +58,11 @@ export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn
                   width: 6,
                   height: 6,
                   borderRadius: "50%",
-                  background: product.shop_is_open ? "#06c755" : "var(--ink-3)",
+                  background: "#06c755",
                   flexShrink: 0,
                 }}
               />
-              {product.shop_is_open ? "Online" : "Offline"}
+              Online
             </span>
           )}
         </div>

@@ -296,9 +296,12 @@ export default function DateRangePicker({
 
       {/* Shop closing-soon / offline warning */}
       {shopIsOpen === false ? (
-        <div style={{ padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 6, fontSize: 13, color: "var(--ink-3)", marginBottom: 12, lineHeight: 1.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--ink-3)", flexShrink: 0 }} />
-          ร้านปิดอยู่ขณะนี้ — คำจองอาจได้รับการตอบกลับช้า
+        <div style={{ padding: "12px 14px", background: "rgba(220,38,38,0.06)", border: "1.5px solid rgba(220,38,38,0.35)", borderRadius: 8, fontSize: 13, color: "var(--danger)", marginBottom: 12, lineHeight: 1.5, fontWeight: 600, display: "flex", alignItems: "flex-start", gap: 10 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          <div>
+            <div>ร้านปิดให้บริการอยู่ขณะนี้</div>
+            <div style={{ fontWeight: 400, fontSize: 12, color: "var(--ink-2)", marginTop: 2 }}>คำจองอาจไม่ได้รับการตอบกลับ หรืออาจถูกปฏิเสธ</div>
+          </div>
         </div>
       ) : closingSoon ? (
         <div style={{ padding: "10px 12px", background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.4)", borderRadius: 6, fontSize: 13, color: "#92400E", marginBottom: 12, lineHeight: 1.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
