@@ -14,7 +14,7 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   "nav.followUs": { th: "ติดตามเราบน", en: "Follow us on" },
   "nav.login":    { th: "เข้าสู่ระบบ",          en: "Sign In" },
   "nav.signup":   { th: "สมัครสมาชิก",           en: "Sign Up" },
-  "nav.savedAria":{ th: "ชุดที่ถูกใจ",           en: "Liked dresses" },
+  "nav.savedAria":{ th: "สินค้าที่ถูกใจ",          en: "Liked items" },
 
   // ── Search ────────────────────────────────────────────────────────────────
   "search.placeholder": { th: "ค้นหาชุด...",             en: "Search dresses..." },
@@ -109,7 +109,7 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
 
   // ── User menu ────────────────────────────────────────────────────────────
   "menu.myBookings":   { th: "การจองของฉัน",        en: "My Bookings" },
-  "menu.savedItems":   { th: "สินค้าที่ชอบ",         en: "Saved Items" },
+  "menu.savedItems":   { th: "สินค้าที่ถูกใจ",        en: "Saved Items" },
   "menu.likedShops":   { th: "ร้านค้าที่ถูกใจ",     en: "Liked Shops" },
   "menu.myAccount":    { th: "บัญชีของฉัน",          en: "My Account" },
   "menu.manageShop":   { th: "จัดการร้านค้า",        en: "Manage Shop" },
