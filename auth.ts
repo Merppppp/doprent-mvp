@@ -16,9 +16,7 @@ import { TERMS_VERSION } from "@/lib/consent";
  */
 function getAdminEmails(): string[] {
   const raw = process.env.ADMIN_EMAILS;
-  if (!raw?.trim()) {
-    return ["admin@doprent.com", "prem@doprent.com", "hgcovuf@gmail.com"];
-  }
+  if (!raw?.trim()) return [];
   return raw
     .split(",")
     .map((e) => e.trim().toLowerCase())

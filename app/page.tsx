@@ -187,11 +187,13 @@ export default async function HomePage({
       </Suspense>
 
       {/* ======== BANNER CAROUSEL ======== */}
-      <section className="bg-bg pt-6">
-        <div className="container">
-          <BannerCarousel shops={bannerShops} slides={bannerSlides} locale={locale} />
-        </div>
-      </section>
+      {dbBanners.length > 0 && (
+        <section className="bg-bg pt-6">
+          <div className="container">
+            <BannerCarousel shops={bannerShops} slides={bannerSlides} locale={locale} />
+          </div>
+        </section>
+      )}
 
       {/* ======== OCCASIONS ROW ======== */}
       {occasions.length > 0 && (
