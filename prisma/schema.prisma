@@ -1020,6 +1020,8 @@ model Address {
   province      String? @default("กรุงเทพมหานคร")
   /// รหัสไปรษณีย์
   postalCode    String  @map("postal_code")
+  /// LINE ID ของผู้รับ (ใช้ประสานงานกับร้าน)
+  lineId        String? @map("line_id")
   /// ที่อยู่หลัก (default) ของผู้ใช้
   isDefault     Boolean @default(false) @map("is_default")
 

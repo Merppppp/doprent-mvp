@@ -24,7 +24,7 @@ export default function Logo({ size = 22 }: { size?: number }) {
         fontSize: size,
         letterSpacing: "-0.03em",
         lineHeight: 1,
-        color: "var(--ink)",
+        color: "inherit",
         userSelect: "none",
       }}
     >
@@ -33,10 +33,10 @@ export default function Logo({ size = 22 }: { size?: number }) {
         aria-hidden
         style={{
           display: "inline-block",
-          width: "0.82em",
-          height: "0.82em",
-          margin: "0 0.012em",
-          transform: "translateY(0.06em)",
+          width: "0.78em",
+          height: "0.78em",
+          margin: "0 0.02em",
+          transform: "translateY(0.07em)",
         }}
       >
         <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>

@@ -305,6 +305,7 @@ export type Address = {
   recipient_name: string;
   phone: string;
   address_text: string;
+  line_id?: string | null;
   is_default: boolean;
   created_at: string;
 };

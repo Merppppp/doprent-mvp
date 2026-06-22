@@ -135,6 +135,7 @@ export default function CheckoutForm({
       recipient_name: String(fd.get("recipient_name") ?? ""),
       phone: String(fd.get("phone") ?? ""),
       address_text: String(fd.get("address_text") ?? ""),
+      line_id: String(fd.get("line_id") ?? "").trim() || null,
       is_default: addresses.length === 0,
       created_at: new Date().toISOString(),
     };
@@ -163,6 +164,7 @@ export default function CheckoutForm({
               recipient_name: String(fd.get("recipient_name") ?? ""),
               phone: String(fd.get("phone") ?? ""),
               address_text: String(fd.get("address_text") ?? ""),
+              line_id: String(fd.get("line_id") ?? "").trim() || null,
             }
           : a
       )
@@ -391,6 +393,10 @@ export default function CheckoutForm({
                     required
                   />
                 </div>
+                <div>
+                  <label htmlFor={`line-${a.id}`} style={addressLabelStyle}>LINE ID (ไม่บังคับ)</label>
+                  <input id={`line-${a.id}`} name="line_id" defaultValue={a.line_id ?? ""} placeholder="@line_id หรือไม่ใส่ก็ได้" className="input" />
+                </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button type="submit" className="btn btn-dark" disabled={busy}>
                     บันทึกการแก้ไข
@@ -512,6 +518,10 @@ export default function CheckoutForm({
                 className="input" style={{ minHeight: 72, resize: "vertical" }}
                 required
               />
+            </div>
+            <div>
+              <label htmlFor="new-line-id" style={addressLabelStyle}>LINE ID (ไม่บังคับ)</label>
+              <input id="new-line-id" name="line_id" placeholder="@line_id หรือไม่ใส่ก็ได้" className="input" />
             </div>
             <label style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center" }}>
               <input type="checkbox" name="is_default" /> ตั้งเป็นที่อยู่เริ่มต้น

@@ -32,6 +32,7 @@ export default function AddressManager({ addresses: initial }: Props) {
         recipient_name: String(r.recipientName ?? ""),
         phone: String(r.phone ?? ""),
         address_text: String(r.addressLine ?? ""),
+        line_id: r.lineId != null ? String(r.lineId) : null,
         is_default: Boolean(r.isDefault),
         created_at: String(r.createdAt ?? ""),
       })),
@@ -231,6 +232,12 @@ function AddressForm({
         defaultValue={initial?.address_text ?? ""}
         className="input" style={{ minHeight: 72, resize: "vertical" }}
         required
+      />
+      <input
+        name="line_id"
+        placeholder="LINE ID (ไม่บังคับ)"
+        defaultValue={initial?.line_id ?? ""}
+        className="input"
       />
       {!initial ? (
         <label style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center" }}>

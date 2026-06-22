@@ -56,6 +56,7 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   "filter.bust":                { th: "รอบอก",                    en: "Bust" },
   "filter.waist":               { th: "รอบเอว",                   en: "Waist" },
   "filter.length":              { th: "ความยาว",                  en: "Length" },
+  "filter.openOnly":            { th: "เปิดอยู่เท่านั้น",          en: "Open only" },
   "unit.cm":                    { th: "ซม.",                       en: "cm" },
   // Dress-type sub-group headers
   "type.group.top":    { th: "เสื้อ",                  en: "Tops" },
