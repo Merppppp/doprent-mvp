@@ -6,7 +6,7 @@
 # =============================================================================
 
 # ── Stage 1: deps ─────────────────────────────────────────────────────────────
-FROM node:20-alpine AS deps
+FROM node:20.19-alpine AS deps
 
 RUN apk add --no-cache libc6-compat openssl
 
@@ -18,7 +18,7 @@ COPY prisma ./prisma/
 RUN npm ci --only=production=false
 
 # ── Stage 2: builder ──────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:20.19-alpine AS builder
 
 RUN apk add --no-cache libc6-compat openssl
 
@@ -48,7 +48,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # ── Stage 3: runner ───────────────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:20.19-alpine AS runner
 
 RUN apk add --no-cache libc6-compat openssl
 

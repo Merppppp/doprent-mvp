@@ -53,7 +53,7 @@ export default async function Header() {
 
   return (
     <header
-      className="sticky top-0 z-40 bg-[rgba(46,156,101,0.95)] backdrop-blur-[12px] border-b border-b-[rgba(23,92,58,0.3)] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.25),0_1px_3px_rgba(0,0,0,0.1)]"
+      className="sticky top-0 z-40 bg-[rgba(10,76,76,0.97)] backdrop-blur-[12px] border-b border-b-[rgba(10,76,76,0.5)] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.25),0_1px_3px_rgba(0,0,0,0.1)]"
     >
       {/* ═══ TOP ROW ═══ (28px — utility links) */}
       <div
@@ -64,7 +64,7 @@ export default async function Header() {
           justifyContent: "space-between",
           height: 28,
           fontSize: 12,
-          borderBottom: "1px solid rgba(255,255,255,0.1)",
+          borderBottom: "1px solid rgba(126,126,126,0.25)",
         }}
       >
         {/* Left */}
@@ -138,7 +138,7 @@ export default async function Header() {
         <Link
           href="/"
           aria-label="doprent"
-          style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}
+          style={{ display: "inline-flex", alignItems: "center", flexShrink: 0, color: "#fff" }}
         >
           <Logo size={26} />
         </Link>
@@ -199,7 +199,7 @@ export default async function Header() {
                 style={{
                   fontSize: 13,
                   fontWeight: 600,
-                  color: "#4A6B5A",
+                  color: "#0A4C4C",
                   background: "#fff",
                   padding: "0 16px",
                   height: 38,
@@ -242,7 +242,7 @@ export default async function Header() {
                 style={{
                   fontSize: 13,
                   fontWeight: 600,
-                  color: "#4A6B5A",
+                  color: "#0A4C4C",
                   background: "#fff",
                   padding: "0 16px",
                   height: 38,
@@ -333,7 +333,7 @@ export default async function Header() {
           </details>
           <DetailsAutoClose selector="details.hdr-cat-details" />
 
-          <span style={{ width: 1, height: 18, background: "rgba(255,255,255,0.18)", flexShrink: 0, margin: "0 2px" }} />
+          <span style={{ width: 1, height: 18, background: "#7E7E7E", flexShrink: 0, margin: "0 2px", opacity: 0.5 }} />
 
           {/* Occasion quick-links — scrollable, a different taxonomy from product type */}
           <nav className="hdr-quick" style={{ display: "flex", alignItems: "center", gap: 2, overflowX: "auto", flex: 1, minWidth: 0 }}>
@@ -410,12 +410,11 @@ const PRODUCT_CATEGORIES = [
 // Popular occasions surfaced inline in the category bar (different taxonomy from
 // product type — these filter by ?occasion=, while the dropdown picks dress/suit).
 const QUICK_OCCASIONS = [
-  { key: "wedding", th: "งานแต่ง", en: "Wedding", href: "/?occasion=wedding" },
-  { key: "engagement", th: "งานหมั้น", en: "Engagement", href: "/?occasion=engagement" },
-  { key: "evening", th: "ราตรี", en: "Evening", href: "/?occasion=evening" },
-  { key: "gala", th: "กาล่า", en: "Gala", href: "/?occasion=gala" },
-  { key: "cocktail", th: "ค็อกเทล", en: "Cocktail", href: "/?occasion=cocktail" },
-  { key: "thai", th: "ชุดไทย", en: "Thai", href: "/?occasion=thai" },
+  { key: "wedding",  th: "งานแต่ง",    en: "Wedding",  href: "/?occasion=wedding" },
+  { key: "evening",  th: "ราตรี",       en: "Evening",  href: "/?occasion=evening" },
+  { key: "thai",     th: "ชุดไทย",      en: "Thai",     href: "/?occasion=thai" },
+  { key: "suit",     th: "ชุดสูท",      en: "Suit",     href: "/?type=suit" },
+  { key: "swimwear", th: "ชุดว่ายน้ำ",  en: "Swimwear", href: "/?type=swimwear" },
 ];
 
 const catTriggerStyle: React.CSSProperties = {
@@ -477,7 +476,7 @@ const topLinkStyle: React.CSSProperties = {
 };
 
 const topDividerStyle: React.CSSProperties = {
-  color: "rgba(255,255,255,0.2)",
+  color: "#7E7E7E",
   fontSize: 11,
 };
 

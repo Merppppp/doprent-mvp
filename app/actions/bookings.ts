@@ -54,6 +54,7 @@ export async function addAddress(formData: FormData): Promise<Result<{ id: strin
   const district = String(formData.get("district") ?? "").trim() || null;
   const province = String(formData.get("province") ?? "กรุงเทพมหานคร").trim();
   const postalCode = String(formData.get("postal_code") ?? "").trim();
+  const lineId = String(formData.get("line_id") ?? "").trim() || null;
   const makeDefault = String(formData.get("is_default") ?? "") === "on";
   if (!recipient) return { ok: false, error: "กรุณาใส่ชื่อผู้รับ" };
   if (!phone) return { ok: false, error: "กรุณาใส่เบอร์โทร" };
@@ -82,6 +83,7 @@ export async function addAddress(formData: FormData): Promise<Result<{ id: strin
         district,
         province,
         postalCode,
+        lineId,
         isDefault,
       },
       select: { id: true },
@@ -101,6 +103,7 @@ export async function updateAddress(formData: FormData): Promise<Result<{ id: st
   const recipient = String(formData.get("recipient_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const addressLine = String(formData.get("address_line") ?? formData.get("address_text") ?? "").trim();
+  const lineId = String(formData.get("line_id") ?? "").trim() || null;
   if (!id) return { ok: false, error: "ไม่พบที่อยู่" };
   if (!recipient) return { ok: false, error: "กรุณาใส่ชื่อผู้รับ" };
   if (!phone) return { ok: false, error: "กรุณาใส่เบอร์โทร" };
@@ -115,7 +118,7 @@ export async function updateAddress(formData: FormData): Promise<Result<{ id: st
 
     await db.address.update({
       where: { id },
-      data: { recipientName: recipient, phone, addressLine },
+      data: { recipientName: recipient, phone, addressLine, lineId },
     });
 
     revalidatePath("/checkout/address");
