@@ -9,6 +9,10 @@ export type Color =
   | "blue"
   | "purple";
 
+// NOTE: these are the Prisma enum *member names* (not the raw DB labels). The
+// Postgres `size` enum stores "3XL"/"4XL"/"Free size", but Prisma maps those to
+// the identifiers XL3/XL4/FreeSize (@map in schema.prisma). Always use these
+// identifiers in code; use sizeLabel() for anything shown to a user.
 export type Size =
   | "XXXS"
   | "XXS"
@@ -18,11 +22,57 @@ export type Size =
   | "L"
   | "XL"
   | "XXL"
-  | "3XL"
-  | "4XL";
+  | "XL3"
+  | "XL4"
+  | "FreeSize";
 
 /** Canonical size order — single source for forms + filters. */
-export const SIZES: Size[] = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"];
+export const SIZES: Size[] = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "XL3", "XL4", "FreeSize"];
+
+/** Human-facing labels for sizes whose code identifier differs from the display text. */
+export const SIZE_LABELS: Record<Size, string> = {
+  XXXS: "XXXS",
+  XXS: "XXS",
+  XS: "XS",
+  S: "S",
+  M: "M",
+  L: "L",
+  XL: "XL",
+  XXL: "XXL",
+  XL3: "3XL",
+  XL4: "4XL",
+  FreeSize: "Free size",
+};
+
+/** Display label for a size value (falls back to the raw value for unknowns). */
+export const sizeLabel = (s: string | null | undefined): string =>
+  s == null ? "" : (SIZE_LABELS[s as Size] ?? s);
+
+/**
+ * Format a product's variant sizes into ONE consistent label, e.g. "S · M · L",
+ * so every surface (product detail, seller list, etc.) shows sizes the same way.
+ * Prefers available variants; if none available it still lists them. Sizes are
+ * de-duplicated and ordered by the canonical SIZES order. Falls back to the
+ * legacy single Product.size when there are no variants at all.
+ */
+export function formatVariantSizes(
+  variants: ReadonlyArray<{ size: Size | string; available?: boolean }>,
+  fallbackSize?: Size | string | null,
+): string {
+  const pool = variants.some((v) => v.available !== false)
+    ? variants.filter((v) => v.available !== false)
+    : variants;
+  const uniq = Array.from(new Set(pool.map((v) => v.size)));
+  if (uniq.length === 0) {
+    return fallbackSize ? sizeLabel(fallbackSize) : "—";
+  }
+  uniq.sort((a, b) => {
+    const ia = SIZES.indexOf(a as Size);
+    const ib = SIZES.indexOf(b as Size);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+  return uniq.map((s) => sizeLabel(s)).join(" · ");
+}
 
 export type OccasionKey =
   | "engagement"
@@ -32,7 +82,10 @@ export type OccasionKey =
   | "gala"
   | "party"
   | "work"
-  | "casual";
+  | "casual"
+  | "thai"
+  | "costume"
+  | "graduation";
 
 export type AdsTier = "free" | "boost" | "featured" | "full";
 export type Status = "pending" | "live" | "rejected" | "draft";
@@ -45,6 +98,7 @@ export type BookingStatus =
   | "waiting_for_payment"
   | "payment_review"
   | "confirmed"
+  | "renting"
   | "cancel_requested"
   | "slip_disputed"
   | "rejected"
@@ -152,9 +206,13 @@ export type Shop = {
   bank_account_number?: string | null;
   /** ชื่อบัญชีธนาคาร */
   bank_account_name?: string | null;
+  /** PRIVATE bucket key ของรูปหน้าสมุดบัญชี (แนบเมื่อกรอกเลขบัญชี) */
+  bankbook_image_path?: string | null;
   since_year: number | null;
   cover_color: Color;
   cover_image: string | null;
+  /** Shop logo (PUBLIC bucket URL); null = no logo uploaded. */
+  logo_url: string | null;
   tag: string | null;
   story: string | null;
   delivery_info: string | null;
@@ -197,6 +255,8 @@ export type Product = {
   shop_rating_count?: number;
   /** Denormalized from the product's shop area key — populated by listProducts(). Used for distance display. */
   area_key?: string | null;
+  /** Whether the product's shop is currently open (seller-toggled). */
+  shop_is_open?: boolean;
   /** Business key of the product type (e.g. "dress") — joined from product_types. */
   product_type_key: string;
   /** Business key of the product's category (nullable — uncategorized allowed). */
@@ -266,6 +326,8 @@ export type Booking = {
   channel: string | null;
   status: BookingStatus;
   slip_path: string | null;
+  /** Channel the shop chose to collect through (snapshot at accept). */
+  payment_method: "promptpay" | "bank" | null;
   address_id: string | null;
   recipient_name: string | null; // snapshot at booking time
   phone: string | null;
@@ -273,6 +335,22 @@ export type Booking = {
   current_due_at: string | null;
   cancel_reason: string | null;
   cancel_from_status: string | null;
+  dispute_note: string | null;
+  /** Post-payment address-change sub-flow (see lib/bookings.ts ADDR_CHANGE_*).
+   *  null/"none" → "requested" → "approved" → "paid_review" → "done" | "rejected". */
+  addr_change_status: string | null;
+  /** Proposed new delivery address (pending shop approval). */
+  pending_recipient_name: string | null;
+  pending_phone: string | null;
+  pending_address_text: string | null;
+  /** New shipping fee the shop set for the proposed address (THB). */
+  pending_shipping_fee: number | null;
+  /** Positive difference the renter must top-up = max(0, pending − current) (THB). */
+  addr_change_diff: number | null;
+  /** Private bucket key of the top-up payment slip. */
+  addr_change_slip_path: string | null;
+  /** Shop's reason when an address-change request is rejected. */
+  addr_change_reason: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -289,6 +367,12 @@ export type BookingDetail = Booking & {
   boutique_bank_name: string | null;
   boutique_bank_account_number: string | null;
   boutique_bank_account_name: string | null;
+  /** Shop's preferred default channel (used to default the accept-flow picker). */
+  boutique_default_payment_method: "promptpay" | "bank" | null;
+  boutique_instagram: string | null;
+  boutique_facebook: string | null;
+  boutique_twitter: string | null;
+  boutique_tiktok: string | null;
 };
 
 export type Profile = {

@@ -29,7 +29,6 @@ export async function toggleSavedProduct(productId: string): Promise<{
     }
 
     revalidatePath("/account");
-    revalidatePath("/", "layout");
     return { ok: true, saved };
   });
 }

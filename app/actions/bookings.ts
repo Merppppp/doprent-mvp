@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { randomUUID } from "node:crypto";
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { withActor } from "@/lib/db-context";
 import { getCurrentUser } from "@/lib/auth";
@@ -21,14 +22,19 @@ import {
   validateBookingRange,
 } from "@/lib/booking-policy";
 import { normalizeTiers, priceForNights } from "@/lib/pricing";
+import { resolvePaymentChannel, type PaymentChannel } from "@/lib/payments";
 import {
   notifyBookingAccepted,
   notifyBookingConfirmed,
   notifyBookingRejected,
   notifyNewBookingRequest,
   notifySlipDisputed,
+  notifyAdminDisputeEscalated,
 } from "@/lib/notifications";
 import { FIRST_TOUCH_COOKIE, decodeAttribution } from "@/lib/attribution";
+import { BOOKING_SLIP_MAX_BYTES } from "@/lib/config";
+import { addDaysLocal, dateRangeLocal } from "@/lib/booking-dates";
+import { detectSlipMime } from "@/lib/file-mime";
 
 type Result<T = unknown> =
   | ({ ok: true } & T)
@@ -180,25 +186,15 @@ export async function setDefaultAddress(formData: FormData): Promise<Result> {
 /** Active booking statuses for overlap counting — must stay in sync with ACTIVE_STATUSES in lib/booking-policy.ts */
 const ACTIVE_BOOKING_STATUSES = ["booking_pending", "waiting_for_payment", "payment_review", "confirmed"] as const;
 
-/** Add `days` calendar days to a YYYY-MM-DD string (UTC). Mirrors the helper in booking-policy.ts. */
-function addDaysLocal(dateStr: string, days: number): string {
-  const d = new Date(dateStr + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Enumerate all YYYY-MM-DD strings in [start, end] inclusive (UTC). */
-function dateRangeLocal(start: string, end: string): string[] {
-  const result: string[] = [];
-  let cur = start;
-  while (cur <= end) {
-    result.push(cur);
-    cur = addDaysLocal(cur, 1);
-  }
-  return result;
-}
-
 export async function createBooking(formData: FormData): Promise<Result<{ id: string }>> {
+  // Staff accounts are shop-management logins only — they must NEVER be able to
+  // place a rental order. Block them explicitly before any user resolution
+  // (a staff session id is "staff:<id>", not a real user, so getCurrentUser()
+  // would otherwise throw on the non-UUID id).
+  const session = await auth();
+  if (session?.user?.role === "staff")
+    return { ok: false, error: "บัญชีพนักงานไม่สามารถสั่งเช่าสินค้าได้" };
+
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
 
@@ -209,9 +205,19 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   const endDate = String(formData.get("end_date") ?? "");
   // variantId is optional — new bookings send it; legacy back-compat: null
   const variantIdRaw = String(formData.get("variant_id") ?? "").trim() || null;
+  // Delivery method + carrier + express slot
+  const deliveryMethod = String(formData.get("delivery_method") ?? "").trim() || null;
+  let deliveryCarrier = String(formData.get("delivery_carrier") ?? "").trim() || null;
+  const expressSlot = String(formData.get("express_slot") ?? "").trim() || null;
   if (!productId || !addressId || !startDate || !endDate)
     return { ok: false, error: "ข้อมูลการจองไม่ครบ" };
   if (endDate < startDate) return { ok: false, error: "วันคืนชุดต้องไม่ก่อนวันรับ" };
+  if (deliveryCarrier?.startsWith("other:")) {
+    const provider = deliveryCarrier.slice("other:".length).trim();
+    if (!provider || provider.length > 80)
+      return { ok: false, error: "กรุณาระบุผู้ให้บริการขนส่งให้ถูกต้อง" };
+    deliveryCarrier = `other:${provider}`;
+  }
 
   return withActor(user.id, async () => {
     // anti-spam: cap pending requests per renter
@@ -450,6 +456,9 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
               recipientName: addr.recipientName,
               phone: addr.phone,
               addressText: addr.addressLine,
+              deliveryMethod,
+              deliveryCarrier,
+              expressSlot,
             },
             select: { id: true },
           });
@@ -481,6 +490,9 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
           recipientName: addr.recipientName,
           phone: addr.phone,
           addressText: addr.addressLine,
+          deliveryMethod,
+          deliveryCarrier,
+          expressSlot,
         },
         select: { id: true },
       });
@@ -559,7 +571,16 @@ async function loadBooking(bookingId: string) {
       renterId: true,
       shopId: true,
       status: true,
-      shop: { select: { ownerId: true } },
+      shop: {
+        select: {
+          ownerId: true,
+          promptpayId: true,
+          bankName: true,
+          bankAccountNumber: true,
+          bankAccountName: true,
+          defaultPaymentMethod: true,
+        },
+      },
       renter: { select: { email: true } },
       product: { select: { name: true } },
     },
@@ -568,7 +589,11 @@ async function loadBooking(bookingId: string) {
 
 /* ------------------------------ seller ------------------------------- */
 
-export async function acceptBooking(bookingId: string, shippingFee: number): Promise<Result> {
+export async function acceptBooking(
+  bookingId: string,
+  shippingFee: number,
+  paymentMethod?: PaymentChannel | null,
+): Promise<Result> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
   const booking = await loadBooking(bookingId);
@@ -580,12 +605,18 @@ export async function acceptBooking(bookingId: string, shippingFee: number): Pro
   if (!findTransition(booking.status as BookingStatus, "waiting_for_payment", "seller"))
     return { ok: false, error: "สถานะไม่ถูกต้องสำหรับการรับจอง" };
 
+  // Snapshot which channel to collect through. With both channels configured we
+  // honour the seller's pick (or fall back to the shop default); with only one
+  // we force it; with none it stays null.
+  const channel = resolvePaymentChannel(booking.shop ?? {}, paymentMethod);
+
   // Atomic transition guard: only flips if still in the expected source status.
   const res = await withActor(user.id, () =>
     db.booking.updateMany({
       where: { id: bookingId, status: "booking_pending" },
       data: {
         shippingFee: Math.round(shippingFee),
+        paymentMethod: channel,
         status: "waiting_for_payment",
         currentDueAt: new Date(dueAt()),
       },
@@ -616,7 +647,12 @@ export async function disputeSlip(bookingId: string, reason: string): Promise<Re
   return sellerSimpleMove(bookingId, "slip_disputed", reason);
 }
 
-/** Seller marks the dress as received back — transitions confirmed → returned. */
+/** Seller marks as delivered/renting — transitions confirmed → renting. */
+export async function markRenting(bookingId: string): Promise<Result> {
+  return sellerSimpleMove(bookingId, "renting");
+}
+
+/** Seller marks the dress as received back — transitions renting → returned. */
 export async function markReturned(bookingId: string): Promise<Result> {
   return sellerSimpleMove(bookingId, "returned");
 }
@@ -641,15 +677,22 @@ async function sellerSimpleMove(
   if (!findTransition(from, to, "seller"))
     return { ok: false, error: "เปลี่ยนสถานะนี้ไม่ได้" };
 
-  const res = await withActor(user.id, () =>
-    db.booking.updateMany({
-      where: { id: bookingId, status: from },
-      data: {
-        status: to,
-        ...(reason !== undefined ? { cancelReason: reason, cancelFromStatus: from } : {}),
-      },
-    }),
-  );
+  let res;
+  try {
+    res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, status: from },
+        data: {
+          status: to,
+          ...(reason !== undefined ? { cancelReason: reason, cancelFromStatus: from } : {}),
+          ...(to === "rejected" || to === "cancel_requested" ? { cancelledBy: "shop" } : {}),
+        },
+      }),
+    );
+  } catch (e) {
+    console.error("[doprent] seller move error", e);
+    return { ok: false, error: "อัปเดตสถานะไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
   if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
 
   // Fire-and-forget renter notifications per transition.
@@ -670,25 +713,7 @@ async function sellerSimpleMove(
 /* ------------------------------ renter ------------------------------- */
 
 // Slip upload validation (magic bytes + size), mirrors /api/upload.
-const MAX_SLIP_SIZE = 5 * 1024 * 1024;
-const SLIP_SIGNATURES: Array<{ mime: string; bytes: number[] }> = [
-  { mime: "image/jpeg", bytes: [0xff, 0xd8, 0xff] },
-  { mime: "image/png", bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
-  { mime: "image/webp", bytes: [0x52, 0x49, 0x46, 0x46] },
-];
-
-function detectSlipMime(buf: Buffer): string | null {
-  for (const sig of SLIP_SIGNATURES) {
-    if (sig.bytes.every((b, i) => buf[i] === b)) {
-      if (sig.mime === "image/webp") {
-        const webp = buf.subarray(8, 12);
-        if (![0x57, 0x45, 0x42, 0x50].every((b, i) => webp[i] === b)) continue;
-      }
-      return sig.mime;
-    }
-  }
-  return null;
-}
+const MAX_SLIP_SIZE = BOOKING_SLIP_MAX_BYTES;
 
 /**
  * Uploads the PromptPay slip to R2 and flips the booking to payment_review.
@@ -723,13 +748,19 @@ export async function uploadSlip(bookingId: string, formData: FormData): Promise
     return { ok: false, error: "อัปโหลดสลิปไม่สำเร็จ ลองใหม่อีกครั้ง" };
   }
 
-  const res = await withActor(user.id, () =>
-    db.booking.updateMany({
-      where: { id: bookingId, status: "waiting_for_payment", renterId: user.id },
-      data: { slipPath: key, status: "payment_review" },
-    }),
-  );
-  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+  const from = booking.status as BookingStatus;
+  try {
+    const res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, status: from, renterId: user.id },
+        data: { slipPath: key, status: "payment_review", disputeNote: null },
+      }),
+    );
+    if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+  } catch (e) {
+    console.error("[doprent] slip status update error", e);
+    return { ok: false, error: "อัปเดตสถานะไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
   revalidatePath("/account/bookings");
   revalidatePath("/sell/bookings");
   return { ok: true };
@@ -745,13 +776,364 @@ export async function cancelBooking(bookingId: string): Promise<Result> {
   if (!findTransition(from, "cancelled", "renter"))
     return { ok: false, error: "ยกเลิกในขั้นตอนนี้ไม่ได้ ติดต่อร้านผ่านแอดมิน" };
 
+  let res;
+  try {
+    res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, status: from, renterId: user.id },
+        data: { status: "cancelled", cancelledBy: "renter" },
+      }),
+    );
+  } catch (e) {
+    console.error("[doprent] cancel booking error", e);
+    return { ok: false, error: "ยกเลิกไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+  revalidatePath("/account/bookings");
+  revalidatePath("/sell/bookings");
+  return { ok: true };
+}
+
+/** Renter escalates a slip dispute — sends counter-argument for admin to judge. */
+export async function escalateDispute(bookingId: string, note: string): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+  const booking = await loadBooking(bookingId);
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.renterId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
+  if (booking.status !== "slip_disputed")
+    return { ok: false, error: "สถานะไม่ถูกต้อง" };
+  if (!note.trim()) return { ok: false, error: "กรุณาใส่เหตุผลโต้แย้ง" };
+
+  let res;
+  try {
+    res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, status: "slip_disputed", renterId: user.id },
+        data: { disputeNote: note.trim() },
+      }),
+    );
+  } catch (e) {
+    console.error("[doprent] escalate dispute error", e);
+    return { ok: false, error: "ส่งข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  const admins = await db.user.findMany({
+    where: { role: "admin" },
+    select: { email: true },
+  });
+  for (const admin of admins) {
+    notifyAdminDisputeEscalated({
+      adminEmail: admin.email,
+      dressName: booking.product?.name ?? "ชุดที่จอง",
+      bookingId,
+      renterNote: note.trim(),
+    });
+  }
+
+  revalidatePath("/account/bookings");
+  revalidatePath("/sell/bookings");
+  return { ok: true };
+}
+
+/* -------------------- post-payment address change -------------------- */
+
+/** Load a booking with the extra addr-change fields needed for the sub-flow. */
+async function loadBookingForAddrChange(bookingId: string) {
+  return db.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      renterId: true,
+      shopId: true,
+      status: true,
+      shippingFee: true,
+      addrChangeStatus: true,
+      pendingRecipientName: true,
+      pendingPhone: true,
+      pendingAddressText: true,
+      pendingShippingFee: true,
+      addrChangeDiff: true,
+      addrChangeSlipPath: true,
+      addrChangeReason: true,
+      shop: { select: { ownerId: true } },
+    },
+  });
+}
+
+/** addr_change_status values that allow a new request from the renter. */
+const ADDR_CHANGE_REQUESTABLE = [null, "none", "rejected", "done"] as const;
+
+/**
+ * Renter requests a delivery-address change on a confirmed booking.
+ * Creates a pending sub-flow without touching booking.status.
+ */
+export async function requestAddressChange(
+  bookingId: string,
+  formData: FormData,
+): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const recipientName = String(formData.get("recipient_name") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const addressText = String(formData.get("address_text") ?? "").trim();
+
+  if (!recipientName) return { ok: false, error: "กรุณาใส่ชื่อผู้รับ" };
+  if (!phone) return { ok: false, error: "กรุณาใส่เบอร์โทร" };
+  if (!addressText) return { ok: false, error: "กรุณาใส่ที่อยู่จัดส่ง" };
+
+  const booking = await loadBookingForAddrChange(bookingId);
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.renterId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
+  if (booking.status !== "confirmed")
+    return { ok: false, error: "สามารถขอแก้ที่อยู่ได้เฉพาะการจองที่ยืนยันแล้วเท่านั้น" };
+  if (!(ADDR_CHANGE_REQUESTABLE as ReadonlyArray<string | null>).includes(booking.addrChangeStatus))
+    return { ok: false, error: "มีคำขอแก้ที่อยู่อยู่แล้ว ลองรีเฟรช" };
+
   const res = await withActor(user.id, () =>
     db.booking.updateMany({
-      where: { id: bookingId, status: from, renterId: user.id },
-      data: { status: "cancelled" },
+      where: {
+        id: bookingId,
+        renterId: user.id,
+        status: "confirmed",
+        OR: [
+          { addrChangeStatus: null },
+          { addrChangeStatus: "none" },
+          { addrChangeStatus: "rejected" },
+          { addrChangeStatus: "done" },
+        ],
+      },
+      data: {
+        addrChangeStatus: "requested",
+        pendingRecipientName: recipientName,
+        pendingPhone: phone,
+        pendingAddressText: addressText,
+        pendingShippingFee: null,
+        addrChangeDiff: null,
+        addrChangeSlipPath: null,
+        addrChangeReason: null,
+      },
     }),
   );
   if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  revalidatePath(`/account/bookings/${bookingId}`);
+  revalidatePath(`/sell/bookings/${bookingId}`);
+  revalidatePath("/account/bookings");
+  revalidatePath("/sell/bookings");
+  return { ok: true };
+}
+
+/**
+ * Seller reviews the address-change request: approve (with new shipping fee) or reject.
+ * Approval with diff==0 auto-applies the change immediately.
+ * Approval with diff>0 sets status="approved" and waits for renter top-up slip.
+ */
+export async function reviewAddressChange(
+  bookingId: string,
+  formData: FormData,
+): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const booking = await loadBookingForAddrChange(bookingId);
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.shop?.ownerId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
+  if (booking.addrChangeStatus !== "requested")
+    return { ok: false, error: "ไม่มีคำขอแก้ที่อยู่ที่รอการอนุมัติ" };
+
+  const action = String(formData.get("action") ?? "").trim();
+
+  if (action === "reject") {
+    const reason = String(formData.get("reason") ?? "").trim() || null;
+    const res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, shopId: booking.shopId, addrChangeStatus: "requested" },
+        data: {
+          addrChangeStatus: "rejected",
+          addrChangeReason: reason,
+          pendingRecipientName: null,
+          pendingPhone: null,
+          pendingAddressText: null,
+          pendingShippingFee: null,
+          addrChangeDiff: null,
+          addrChangeSlipPath: null,
+        },
+      }),
+    );
+    if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+  } else if (action === "approve") {
+    const newShippingFee = Math.round(Number(formData.get("new_shipping_fee")));
+    if (!Number.isFinite(newShippingFee) || newShippingFee < 0)
+      return { ok: false, error: "ค่าจัดส่งไม่ถูกต้อง" };
+
+    const diff = Math.max(0, newShippingFee - (booking.shippingFee ?? 0));
+
+    if (diff === 0) {
+      // Auto-apply: copy pending → live snapshot, mark done, clear pending
+      const res = await withActor(user.id, () =>
+        db.booking.updateMany({
+          where: { id: bookingId, shopId: booking.shopId, addrChangeStatus: "requested" },
+          data: {
+            recipientName: booking.pendingRecipientName,
+            phone: booking.pendingPhone,
+            addressText: booking.pendingAddressText,
+            shippingFee: newShippingFee,
+            addrChangeStatus: "done",
+            pendingRecipientName: null,
+            pendingPhone: null,
+            pendingAddressText: null,
+            pendingShippingFee: null,
+            addrChangeDiff: null,
+            addrChangeSlipPath: null,
+          },
+        }),
+      );
+      if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+    } else {
+      // diff > 0: require renter top-up
+      const res = await withActor(user.id, () =>
+        db.booking.updateMany({
+          where: { id: bookingId, shopId: booking.shopId, addrChangeStatus: "requested" },
+          data: {
+            pendingShippingFee: newShippingFee,
+            addrChangeDiff: diff,
+            addrChangeStatus: "approved",
+          },
+        }),
+      );
+      if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+    }
+  } else {
+    return { ok: false, error: "action ไม่ถูกต้อง" };
+  }
+
+  revalidatePath(`/account/bookings/${bookingId}`);
+  revalidatePath(`/sell/bookings/${bookingId}`);
+  revalidatePath("/account/bookings");
+  revalidatePath("/sell/bookings");
+  return { ok: true };
+}
+
+/**
+ * Renter uploads a top-up payment slip for the shipping-fee difference.
+ * Only valid when addrChangeStatus === "approved" and addrChangeDiff > 0.
+ */
+export async function payAddressChangeDiff(
+  bookingId: string,
+  formData: FormData,
+): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const booking = await loadBookingForAddrChange(bookingId);
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.renterId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
+  if (booking.addrChangeStatus !== "approved")
+    return { ok: false, error: "ไม่อยู่ในขั้นตอนอัปโหลดสลิปส่วนต่าง" };
+  if ((booking.addrChangeDiff ?? 0) <= 0)
+    return { ok: false, error: "ไม่มีส่วนต่างที่ต้องชำระ" };
+
+  const file = formData.get("slip");
+  if (!file || typeof file === "string") return { ok: false, error: "ยังไม่ได้เลือกไฟล์สลิป" };
+  if (file.size > MAX_SLIP_SIZE) return { ok: false, error: "ไฟล์ใหญ่เกิน 5MB" };
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const mime = detectSlipMime(buffer);
+  if (!mime) return { ok: false, error: "ไฟล์ต้องเป็นรูปภาพ (JPG/PNG/WebP)" };
+  const ext = mime === "image/jpeg" ? "jpg" : mime.split("/")[1];
+
+  const key = `addr-change-slips/${bookingId}/${randomUUID()}.${ext}`;
+  try {
+    await uploadPrivateToR2(key, buffer, mime);
+  } catch (e) {
+    console.error("[doprent] addr-change slip upload error", e);
+    return { ok: false, error: "อัปโหลดสลิปไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+
+  const res = await withActor(user.id, () =>
+    db.booking.updateMany({
+      where: {
+        id: bookingId,
+        renterId: user.id,
+        addrChangeStatus: "approved",
+      },
+      data: {
+        addrChangeSlipPath: key,
+        addrChangeStatus: "paid_review",
+      },
+    }),
+  );
+  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  revalidatePath(`/account/bookings/${bookingId}`);
+  revalidatePath(`/sell/bookings/${bookingId}`);
+  revalidatePath("/account/bookings");
+  revalidatePath("/sell/bookings");
+  return { ok: true };
+}
+
+/**
+ * Seller confirms or rejects the renter's top-up slip for the address-change diff.
+ * Confirm → apply the pending address change. Reject → back to "approved" for re-upload.
+ */
+export async function confirmAddressChange(
+  bookingId: string,
+  formData: FormData,
+): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const booking = await loadBookingForAddrChange(bookingId);
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.shop?.ownerId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
+  if (booking.addrChangeStatus !== "paid_review")
+    return { ok: false, error: "ไม่อยู่ในขั้นตอนตรวจสลิปส่วนต่าง" };
+
+  const action = String(formData.get("action") ?? "").trim();
+
+  if (action === "confirm") {
+    const res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, shopId: booking.shopId, addrChangeStatus: "paid_review" },
+        data: {
+          recipientName: booking.pendingRecipientName,
+          phone: booking.pendingPhone,
+          addressText: booking.pendingAddressText,
+          shippingFee: booking.pendingShippingFee,
+          addrChangeStatus: "done",
+          pendingRecipientName: null,
+          pendingPhone: null,
+          pendingAddressText: null,
+          pendingShippingFee: null,
+          addrChangeDiff: null,
+          addrChangeSlipPath: null,
+        },
+      }),
+    );
+    if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+  } else if (action === "reject") {
+    const reason = String(formData.get("reason") ?? "").trim() || null;
+    const res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, shopId: booking.shopId, addrChangeStatus: "paid_review" },
+        data: {
+          addrChangeStatus: "approved",
+          addrChangeReason: reason,
+          // Keep pendingShippingFee + addrChangeDiff intact so renter knows the amount
+          addrChangeSlipPath: null,
+        },
+      }),
+    );
+    if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+  } else {
+    return { ok: false, error: "action ไม่ถูกต้อง" };
+  }
+
+  revalidatePath(`/account/bookings/${bookingId}`);
+  revalidatePath(`/sell/bookings/${bookingId}`);
   revalidatePath("/account/bookings");
   revalidatePath("/sell/bookings");
   return { ok: true };

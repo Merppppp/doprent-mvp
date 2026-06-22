@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { priceForNights } from "@/lib/pricing";
-import type { PriceTier } from "@/lib/types";
+import { type PriceTier, sizeLabel } from "@/lib/types";
+import { fmtThai, MONTHS_TH_FULL, DAYS_TH } from "@/lib/date-th";
 /** A size variant available for booking on the product. */
 export type VariantOption = {
   id: string;
@@ -60,15 +61,11 @@ type Props = {
    * and unavailable dates override the product-level ones.
    */
   variants?: VariantOption[];
+  /** Today's shop closing time as "HH:MM" (e.g. "19:00"). Null when shop is closed today or hours unknown. */
+  shopClosingTime?: string | null;
+  /** Whether the shop is currently open (manual toggle). */
+  shopIsOpen?: boolean | null;
 };
-
-/** Convert YYYY-MM-DD → "DD/MM/YYYY" Thai display format. */
-function fmtThai(dateStr: string): string {
-  if (!dateStr) return "";
-  const [y, m, d] = dateStr.split("-");
-  if (!y || !m || !d) return dateStr;
-  return `${d}/${m}/${y}`;
-}
 
 /** Days between two YYYY-MM-DD dates, inclusive. Returns 0 if either is empty/invalid or end < start. */
 function nightsBetween(start: string, end: string): number {
@@ -107,11 +104,6 @@ const TODAY = (() => {
   return isoOf(d);
 })();
 
-const TH_MONTHS = [
-  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
-];
-const TH_DOW = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"]; // Monday-first
 
 /**
  * Renter-side date range picker. Blocks dates the seller has marked as unavailable
@@ -135,6 +127,8 @@ export default function DateRangePicker({
   dressTagCode,
   isLoggedIn,
   variants,
+  shopClosingTime,
+  shopIsOpen,
 }: Props) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
@@ -203,6 +197,23 @@ export default function DateRangePicker({
 
   const isInvalid = hasConflict || !!policyError;
 
+  // Shop closing-soon warning (within 1 hour of today's closing time)
+  const [closingSoon, setClosingSoon] = useState(false);
+  useEffect(() => {
+    if (!shopClosingTime) { setClosingSoon(false); return; }
+    function check() {
+      const now = new Date();
+      const [h, m] = shopClosingTime!.split(":").map(Number);
+      const closeMin = h * 60 + m;
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      const diff = closeMin - nowMin;
+      setClosingSoon(diff > 0 && diff <= 60);
+    }
+    check();
+    const iv = setInterval(check, 60_000);
+    return () => clearInterval(iv);
+  }, [shopClosingTime]);
+
   // Up to 6 nearest future blackouts to show as warning
   const nextBlackouts = useMemo(() => {
     return blackouts.filter((d) => d >= TODAY).sort().slice(0, 6);
@@ -269,7 +280,7 @@ export default function DateRangePicker({
                     textDecoration: isDisabled && !v.available ? "line-through" : "none",
                   }}
                 >
-                  {v.size}
+                  {sizeLabel(v.size)}
                   {isFullForRange ? " (เต็ม)" : ""}
                 </button>
               );
@@ -280,6 +291,22 @@ export default function DateRangePicker({
               ฿{selectedVariant.pricePerDay.toLocaleString()}/วัน · มัดจำ ฿{selectedVariant.deposit.toLocaleString()}
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* Shop closing-soon / offline warning */}
+      {shopIsOpen === false ? (
+        <div style={{ padding: "12px 14px", background: "rgba(220,38,38,0.06)", border: "1.5px solid rgba(220,38,38,0.35)", borderRadius: 8, fontSize: 13, color: "var(--danger)", marginBottom: 12, lineHeight: 1.5, fontWeight: 600, display: "flex", alignItems: "flex-start", gap: 10 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          <div>
+            <div>ร้านปิดให้บริการอยู่ขณะนี้</div>
+            <div style={{ fontWeight: 400, fontSize: 12, color: "var(--ink-2)", marginTop: 2 }}>คำจองอาจไม่ได้รับการตอบกลับ หรืออาจถูกปฏิเสธ</div>
+          </div>
+        </div>
+      ) : closingSoon ? (
+        <div style={{ padding: "10px 12px", background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.4)", borderRadius: 6, fontSize: 13, color: "#92400E", marginBottom: 12, lineHeight: 1.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 15 }}>⏰</span>
+          ร้านใกล้จะปิด (ปิด {shopClosingTime} น.) — มีโอกาสที่จะถูกปฏิเสธการจอง
         </div>
       ) : null}
 
@@ -399,7 +426,7 @@ function Calendar({
 
   const rangeEnd = end || (preview && start && preview >= start ? preview : "");
 
-  const firstDow = (new Date(view.y, view.m, 1).getDay() + 6) % 7; // Monday-first
+  const firstDow = new Date(view.y, view.m, 1).getDay(); // Sunday-first
   const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
 
   const isDisabled = (iso: string) => iso < minISO || blackoutSet.has(iso);
@@ -444,14 +471,14 @@ function Calendar({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
         <NavBtn dir="prev" disabled={!canPrev} onClick={() => canPrev && shiftMonth(-1)} />
         <div style={{ fontSize: 14, fontWeight: 600 }}>
-          {TH_MONTHS[view.m]} {view.y}
+          {MONTHS_TH_FULL[view.m]} {view.y}
         </div>
         <NavBtn dir="next" onClick={() => shiftMonth(1)} />
       </div>
 
       {/* Weekday row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", marginBottom: 2 }}>
-        {TH_DOW.map((d) => (
+        {DAYS_TH.map((d) => (
           <div key={d} style={{ textAlign: "center", fontSize: 11, color: "var(--ink-3)", padding: "4px 0" }}>
             {d}
           </div>

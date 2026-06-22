@@ -463,10 +463,16 @@ model Shop {
   bankAccountNumber   String?   @map("bank_account_number")
   /// ชื่อบัญชีธนาคาร
   bankAccountName     String?   @map("bank_account_name")
+  /// คีย์รูปหน้าสมุดบัญชี (PRIVATE bucket) — แนบเมื่อกรอกเลขบัญชี, admin ตรวจผ่าน signedUrl
+  bankbookImagePath   String?   @map("bankbook_image_path")
+  /// ช่องทางรับเงินเริ่มต้นของร้าน (ใช้เป็น default ตอนยอมรับการจอง เมื่อกรอกทั้ง PromptPay + บัญชี)
+  defaultPaymentMethod PaymentMethod? @map("default_payment_method")
   /// ปีที่เปิดร้าน
   sinceYear        Int?      @map("since_year")
   /// โทนสี cover การ์ดร้าน
   coverColor       Color     @default(rose) @map("cover_color")
+  /// URL รูป logo ร้าน (PUBLIC bucket — แสดงบนการ์ดร้าน; null = ใช้ gradient cover_color)
+  logoUrl          String?   @map("logo_url")
   /// ป้าย tag การตลาดสั้น ๆ
   tag              String?
   /// เรื่องราว/คำแนะนำร้าน
@@ -503,6 +509,8 @@ model Shop {
   ratingCount      Int       @default(0) @map("rating_count")
   /// เปิด/ปิดร้านชั่วคราว (seller-controlled toggle) — false = แสดง 'ปิดชั่วคราว' บนหน้าร้านสาธารณะ
   isOpen           Boolean   @default(true) @map("is_open")
+  /// opaque code ฝังใน QR สำหรับพนักงานเข้าระบบ — immutable หลัง allocate
+  staffLoginCode   String?   @unique @map("staff_login_code")
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -534,8 +542,8 @@ model Shop {
 model ShopStaff {
   id            String   @id @default(uuid()) @db.Uuid
   shopId        String   @map("shop_id") @db.Uuid
-  /// login handle — GLOBAL unique (ไม่ต้องเลือกร้านตอน login)
-  username      String   @unique
+  /// login handle — unique per shop (scoped via staffLoginCode at login)
+  username      String
   displayName   String   @map("display_name")
   /// bcrypt hash ของ PIN — ห้ามเก็บ plaintext
   pinHash       String   @map("pin_hash")
@@ -556,6 +564,7 @@ model ShopStaff {
   shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
   @@index([shopId])
+  @@unique([shopId, username])
   @@map("shop_staff")
 }
 
@@ -758,9 +767,10 @@ model ProductVariant {
   /// เวลาแก้ไขล่าสุด
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  product    Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product    Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
   bookings   Booking[]
   priceTiers ProductPriceTier[]
+  blackouts  ProductBlackoutDate[]
 
   @@unique([productId, size])
   @@index([productId])
@@ -1057,6 +1067,8 @@ model Booking {
   status           BookingStatus  @default(booking_pending)
   /// path ไฟล์สลิปโอนเงิน (private bucket)
   slipPath         String?        @map("slip_path")
+  /// ช่องทางที่ร้านเลือกเก็บเงินสำหรับการจองนี้ (snapshot ณ ตอนยอมรับการจอง)
+  paymentMethod    PaymentMethod? @map("payment_method")
   /// FK → addresses.id ที่อยู่ที่เลือกตอนจอง (SetNull — ใช้ snapshot ด้านล่างแสดงผล)
   addressId        String?        @map("address_id") @db.Uuid
   /// snapshot ชื่อผู้รับ
@@ -1071,6 +1083,41 @@ model Booking {
   cancelReason     String?        @map("cancel_reason")
   /// สถานะก่อนยกเลิก (เดิมเป็น String → ใช้ enum เดียวกับ status)
   cancelFromStatus BookingStatus? @map("cancel_from_status")
+  /// ใครเป็นคนยกเลิก — shop / renter / admin / system
+  cancelledBy      String?        @map("cancelled_by")
+
+  /// ข้อความโต้แย้งจากผู้เช่า (เมื่อร้านแจ้งสลิปไม่ถูกต้อง ผู้เช่าส่งเหตุผลกลับให้แอดมินตัดสิน)
+  disputeNote      String?        @map("dispute_note")
+
+  /// สถานะคำขอแก้ที่อยู่หลังชำระเงิน (post-payment): null/none → requested → approved → paid_review → done | rejected.
+  /// ไม่กระทบ booking.status หลัก (sub-flow คุมด้วยคอลัมน์ชุดนี้ล้วน ๆ)
+  addrChangeStatus     String? @map("addr_change_status")
+  /// ที่อยู่ใหม่ที่ผู้เช่าขอเปลี่ยน — snapshot ชื่อผู้รับ (รอร้านอนุมัติ)
+  pendingRecipientName String? @map("pending_recipient_name")
+  /// ที่อยู่ใหม่ — snapshot เบอร์โทร
+  pendingPhone         String? @map("pending_phone")
+  /// ที่อยู่ใหม่ — snapshot ที่อยู่เต็ม
+  pendingAddressText   String? @map("pending_address_text")
+  /// ค่าจัดส่งใหม่ที่ร้านคำนวณสำหรับที่อยู่ใหม่ (บาท)
+  pendingShippingFee   Int?    @map("pending_shipping_fee")
+  /// ส่วนต่างค่าจัดส่งที่ผู้เช่าต้องจ่ายเพิ่ม = max(0, pendingShippingFee − shippingFee) (บาท)
+  addrChangeDiff       Int?    @map("addr_change_diff")
+  /// path สลิปจ่ายส่วนต่าง (private bucket)
+  addrChangeSlipPath   String? @map("addr_change_slip_path")
+  /// เหตุผลที่ร้านปฏิเสธคำขอแก้ที่อยู่ (ถ้ามี)
+  addrChangeReason     String? @map("addr_change_reason")
+
+  /// แหล่งที่มาของการจอง: "online" = ลูกค้าจองผ่านเว็บ, "walk_in" = ร้านจองให้ลูกค้าหน้าร้าน
+  source               String? @map("source")
+  /// หมายเหตุภายในร้าน (ไม่แสดงต่อลูกค้า)
+  internalNote         String? @map("internal_note")
+
+  /// วิธีจัดส่ง: "express" (ส่งด่วนภายในวัน) | "standard" (ขนส่งพัสดุ)
+  deliveryMethod       String? @map("delivery_method")
+  /// ผู้ให้บริการขนส่ง (standard): "flash" | "kerry" | "jt" | "thaipost" | "other:<provider>"
+  deliveryCarrier      String? @map("delivery_carrier")
+  /// ช่วงเวลารับของสำหรับส่งด่วน เช่น "14:00-18:00"
+  expressSlot          String? @map("express_slot")
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1098,10 +1145,12 @@ model Booking {
 
 /// วันที่ร้านปิดไม่ให้จองสินค้า (blackout — เดิม dress_blackouts, composite PK (dress_id, date))
 model ProductBlackoutDate {
-  /// Primary key (uuid) — เพิ่มใหม่, คง UNIQUE(product_id, date)
+  /// Primary key (uuid) — เพิ่มใหม่
   id        String   @id @default(uuid()) @db.Uuid
   /// FK → products.id (Cascade)
   productId String   @map("product_id") @db.Uuid
+  /// FK → product_variants.id (nullable — null = ปิดทุก variant ของสินค้านี้)
+  variantId String?  @map("variant_id") @db.Uuid
   /// วันที่ปิดจอง
   date      DateTime @db.Date
 
@@ -1110,10 +1159,12 @@ model ProductBlackoutDate {
   updatedBy String?  @map("updated_by") @db.Uuid
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
-  @@unique([productId, date])
+  @@unique([productId, variantId, date])
   @@index([productId])
+  @@index([variantId])
   @@index([date])
   @@map("product_blackout_dates")
 }
@@ -1177,6 +1228,30 @@ model AuditLog {
   @@index([actorId])
   @@index([createdAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+/// Admin-editable key-value settings (LINE URL, contact email, etc.)
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("site_settings")
+}
+
+/// Email sending log — ใช้ monitor quota / debug delivery
+model EmailLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  to        String
+  subject   String
+  category  String   @default("other")
+  success   Boolean  @default(true)
+  error     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([category])
+  @@map("email_logs")
 }
 
 /// ชนิด operation ใน audit_logs
@@ -1356,11 +1431,17 @@ enum Color {
 
 /// ไซซ์สินค้า
 enum Size {
+  XXXS
+  XXS
   XS
   S
   M
   L
   XL
+  XXL
+  XL3      @map("3XL")
+  XL4      @map("4XL")
+  FreeSize @map("Free size")
 
   @@map("size")
 }
@@ -1420,6 +1501,7 @@ enum BookingStatus {
   waiting_for_payment
   payment_review
   confirmed
+  renting
   cancel_requested
   slip_disputed
   rejected
@@ -1449,4 +1531,12 @@ enum BillingCycle {
   yearly
 
   @@map("billing_cycle")
+}
+
+/// ช่องทางการรับชำระเงิน (PromptPay หรือ โอนเข้าบัญชีธนาคาร)
+enum PaymentMethod {
+  promptpay
+  bank
+
+  @@map("payment_method")
 }

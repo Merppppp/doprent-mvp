@@ -252,7 +252,7 @@ function StepDocuments(props: {
             onChange={(e) => props.setLegalName(e.target.value)}
             required
             aria-required={true}
-            style={inputStyle}
+            className="input input-surface"
           />
         </Labeled>
         <Labeled label="เลขบัตรประชาชน (13 หลัก)" required>
@@ -263,7 +263,7 @@ function StepDocuments(props: {
             inputMode="numeric"
             maxLength={13}
             aria-required={true}
-            style={inputStyle}
+            className="input input-surface"
           />
         </Labeled>
       </div>
@@ -481,12 +481,3 @@ const sectionTitle: React.CSSProperties = {
   letterSpacing: "-0.01em",
 };
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  border: "1px solid var(--line)",
-  borderRadius: 6,
-  background: "var(--surface)",
-  fontSize: 14,
-  fontFamily: "inherit",
-};

@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ShopCover } from "@/components/ProductArt";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { AREA_LIST, AREAS } from "@/lib/areas";
 import { formatKm, haversineKm } from "@/lib/geo";
 import { useUserLocation } from "./LocationProvider";
+import { fetchShopsPage } from "@/app/actions/shops";
 import type { Color } from "@/lib/types";
 
 export type FinderShop = {
@@ -16,6 +17,7 @@ export type FinderShop = {
   areaKey: string | null;
   areaLabel: string;
   coverColor: Color;
+  coverImage: string | null;
   featured: boolean;
   verified: boolean;
   tag: string | null;
@@ -25,12 +27,58 @@ export type FinderShop = {
 
 type SortMode = "near" | "default";
 
-export default function ShopFinder({ shops }: { shops: FinderShop[] }) {
+type Props = {
+  shops: FinderShop[];
+  /** Total live shops matching the current search (drives "load more"). */
+  total: number;
+  /** Active search query — forwarded to the load-more server action. */
+  query: string;
+  pageSize: number;
+};
+
+export default function ShopFinder({ shops, total, query, pageSize }: Props) {
   const { loc, label, source, status, requestGps, setArea, clear } = useUserLocation();
   const [sort, setSort] = useState<SortMode>("near");
 
+  // Items accumulate as the user loads more pages. The component is keyed by the
+  // search query on the server, so a new search remounts with a fresh first page.
+  const [items, setItems] = useState<FinderShop[]>(shops);
+  const [loading, setLoading] = useState(false);
+  const hasMore = items.length < total;
+
+  const loadMore = useCallback(async () => {
+    if (loading || items.length >= total) return;
+    setLoading(true);
+    try {
+      const res = await fetchShopsPage(query, items.length);
+      setItems((prev) => {
+        // Guard against duplicates if the action resolves twice for the same skip.
+        const seen = new Set(prev.map((p) => p.id));
+        const next = res.rows.filter((r) => !seen.has(r.id));
+        return next.length ? [...prev, ...next] : prev;
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [loading, items.length, total, query]);
+
+  // Infinite scroll: auto-load when the sentinel scrolls into view.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore();
+      },
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loadMore]);
+
   const withDist = useMemo(() => {
-    const rows = shops.map((s) => {
+    const rows = items.map((s) => {
       const a = s.areaKey ? AREAS[s.areaKey] : undefined;
       const km = loc && a ? haversineKm(loc.lat, loc.lng, a.lat, a.lng) : null;
       return { shop: s, km };
@@ -43,7 +91,7 @@ export default function ShopFinder({ shops }: { shops: FinderShop[] }) {
       });
     }
     return rows;
-  }, [shops, loc, sort]);
+  }, [items, loc, sort]);
 
   return (
     <div>
@@ -113,23 +161,35 @@ export default function ShopFinder({ shops }: { shops: FinderShop[] }) {
         )}
       </div>
 
-      <div className="grid-2" style={{ gap: 20 }}>
+      <div className="grid-3" style={{ gap: 16 }}>
         {withDist.map(({ shop: b, km }) => (
           <Link
             key={b.id}
             href={`/shop/${b.slug}`}
-            className="boutique-card"
-            style={{
-              background: "var(--surface)",
-              border: `1px solid ${b.featured ? "var(--gold)" : "var(--line)"}`,
-              borderRadius: 8,
-              cursor: "pointer",
-            }}
+            className={`boutique-card${b.featured ? " boutique-card--featured" : ""}`}
+            style={{ cursor: "pointer" }}
           >
-            <div className="cover">
+            <div className="cover" style={{ position: "relative" }}>
+              {/* Gradient brand backdrop always present; logo (if any) sits on top. */}
               <ShopCover color={b.coverColor} />
+              {b.coverImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={b.coverImage}
+                  alt={b.name}
+                  loading="lazy"
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              ) : null}
             </div>
-            <div style={{ padding: 22, flex: 1 }}>
+            <div style={{ padding: 16, flex: 1 }}>
               {b.featured ? (
                 <span className="ad-badge featured" style={{ position: "static", display: "inline-flex", marginBottom: 8 }}>
                   <span className="dot" />
@@ -152,11 +212,11 @@ export default function ShopFinder({ shops }: { shops: FinderShop[] }) {
                   <span style={{ color: "var(--accent-2)", fontWeight: 600 }}>· ~{formatKm(km)}</span>
                 ) : null}
               </div>
-              <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                 {b.name}
                 {b.verified ? <VerifiedBadge size="sm" /> : null}
               </h3>
-              <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 14, lineHeight: 1.5 }}>{b.tag}</div>
+              <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 10, lineHeight: 1.5 }}>{b.tag}</div>
               <div style={{ fontSize: 12, color: "var(--ink-3)", display: "flex", gap: 12, flexWrap: "wrap" }}>
                 {b.sinceYear ? <span>ตั้งแต่ {b.sinceYear}</span> : null}
                 {b.instagram ? <span>· {b.instagram}</span> : null}
@@ -165,6 +225,27 @@ export default function ShopFinder({ shops }: { shops: FinderShop[] }) {
           </Link>
         ))}
       </div>
+
+      {/* Load-more zone: sentinel auto-loads on scroll; button is the fallback. */}
+      {hasMore ? (
+        <div ref={sentinelRef} style={{ marginTop: 28, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={loading}
+            style={{ ...primaryBtn, background: loading ? "var(--line)" : "var(--accent)", cursor: loading ? "wait" : "pointer" }}
+          >
+            {loading ? "กำลังโหลด…" : "โหลดร้านเพิ่ม"}
+          </button>
+          <span style={{ fontSize: 12.5, color: "var(--ink-3)" }}>
+            แสดง {items.length} จาก {total} ร้าน
+          </span>
+        </div>
+      ) : items.length > pageSize ? (
+        <div style={{ marginTop: 24, textAlign: "center", fontSize: 12.5, color: "var(--ink-3)" }}>
+          แสดงครบทั้ง {total} ร้านแล้ว
+        </div>
+      ) : null}
     </div>
   );
 }

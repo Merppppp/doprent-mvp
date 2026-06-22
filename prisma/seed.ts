@@ -16,7 +16,7 @@ export async function seedBase() {
   // 1. Product types
   // ---------------------------------------------------------------------------
   const productTypes = [
-    { key: "dress", label: "ชุดเดรส" },
+    { key: "dress", label: "ชุดเสื้อผ้า" },
     { key: "suit", label: "สูท" },
   ];
   for (const t of productTypes) {
@@ -33,7 +33,7 @@ export async function seedBase() {
   const dressRoot = await db.productCategory.upsert({
     where: { key: "dress-all" },
     update: {},
-    create: { key: "dress-all", label: "ชุดเดรสทั้งหมด", productTypeId: dressType.id, sortOrder: 0 },
+    create: { key: "dress-all", label: "ชุดเสื้อผ้าทั้งหมด", productTypeId: dressType.id, sortOrder: 0 },
   });
   await db.productCategory.upsert({
     where: { key: "suit-all" },
@@ -73,6 +73,9 @@ export async function seedBase() {
     { key: "party", label: "ปาร์ตี้" },
     { key: "work", label: "ทำงาน" },
     { key: "casual", label: "ลำลอง" },
+    { key: "thai", label: "ชุดไทย" },
+    { key: "graduation", label: "รับปริญญา" },
+    { key: "costume", label: "คอสตูม/แฟนซี" },
   ];
   for (const t of occasionTags) {
     await db.tag.upsert({
@@ -252,7 +255,34 @@ export async function seedBase() {
     skipDuplicates: true,
   });
 
-  console.log("✅ Base seed complete (product_types + product_categories + tag_groups/tags [occasion + dress-type + color] + bindings + areas)");
+  // ---------------------------------------------------------------------------
+  // 5. Bootstrap admins — upsert by email so role is set before first login.
+  //    When these users sign in via Google/credentials, NextAuth Prisma adapter
+  //    finds the existing row by email and links the OAuth account to it,
+  //    preserving the admin role. update:{} leaves role untouched if already set.
+  // ---------------------------------------------------------------------------
+  const bootstrapAdmins = ["hgcovuf@gmail.com", "worawutspace@gmail.com"];
+  for (const email of bootstrapAdmins) {
+    await db.user.upsert({
+      where: { email },
+      update: { role: "admin" },
+      create: { email, role: "admin" },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 6. Site settings — default values so admin sees pre-filled fields on day 1
+  // ---------------------------------------------------------------------------
+  const defaultSettings = [
+    { key: "line_url",       value: "https://line.me/R/ti/p/@doprent" },
+    { key: "contact_email",  value: "hello@doprent.com" },
+    { key: "line_display",   value: "@doprent" },
+  ];
+  for (const s of defaultSettings) {
+    await db.siteSetting.upsert({ where: { key: s.key }, update: {}, create: s });
+  }
+
+  console.log("✅ Base seed complete (product_types + product_categories + tag_groups/tags [occasion + dress-type + color] + bindings + areas + site_settings)");
 }
 
 async function main() {

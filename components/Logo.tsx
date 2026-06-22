@@ -6,8 +6,8 @@
  * piece). The loop stroke + letters inherit `currentColor` so the mark adapts
  * to any surface; only the coral dot is fixed (#FF5232) for instant recall.
  *
- * Font: Bricolage Grotesque 800 (loaded in app/layout.tsx). Falls back to the
- * system sans if the webfont hasn't loaded yet.
+ * Font: Bricolage Grotesque 800 (self-hosted via next/font in app/layout.tsx,
+ * exposed as --font-bricolage). Falls back to the system sans.
  */
 const DOPAMINE = "#FF5232";
 
@@ -19,7 +19,7 @@ export default function Logo({ size = 22 }: { size?: number }) {
       style={{
         display: "inline-flex",
         alignItems: "center",
-        fontFamily: '"Bricolage Grotesque", system-ui, sans-serif',
+        fontFamily: "var(--font-bricolage), system-ui, sans-serif",
         fontWeight: 800,
         fontSize: size,
         letterSpacing: "-0.03em",

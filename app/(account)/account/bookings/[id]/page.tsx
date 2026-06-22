@@ -1,0 +1,352 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { getCurrentUser } from "@/lib/auth";
+import { getBookingForView, getBookingTimeline } from "@/lib/booking-queries";
+import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
+import { promptPayQrDataUrl } from "@/lib/payments";
+import { getSignedPrivateUrl } from "@/lib/r2";
+import { db } from "@/lib/db";
+import BookingStatusBadge from "@/components/BookingStatusBadge";
+import RenterBookingActions from "@/components/RenterBookingActions";
+import ReviewForm from "@/components/ReviewForm";
+import EditAddressForm from "@/components/EditAddressForm";
+import ShopSocialLinks from "@/components/ShopSocialLinks";
+import RenterAddressChange from "@/components/RenterAddressChange";
+import { fmtThai } from "@/lib/date-th";
+
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "รายละเอียดการจอง",
+  robots: { index: false, follow: false },
+};
+
+export default async function RenterBookingDetail({ params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?next=/account/bookings/${params.id}`);
+
+  const b = await getBookingForView(params.id);
+  if (!b) {
+    return <Fallback />;
+  }
+  // sellers viewing their own shop's booking belong on the seller page
+  if (b.renter_id !== user.id) redirect(`/sell/bookings/${b.id}`);
+
+  const total = amountDue(b);
+  const meta = BOOKING_STATUS_META[b.status];
+
+  // Fetch existing review for this booking
+  const existingReview = await db.review.findUnique({
+    where: { bookingId: b.id },
+    select: { id: true, rating: true, comment: true, createdAt: true, sellerRepliedAt: true },
+  });
+
+  const timeline = await getBookingTimeline(b.id);
+  const slipUrl = b.slip_path ? await getSignedPrivateUrl(b.slip_path) : null;
+
+  const isReviewable = b.status === "returned" || b.status === "completed";
+  const canEditAddress = b.status === "booking_pending" || b.status === "waiting_for_payment";
+
+  // Once the shop accepts, it picks ONE channel to collect through — show only
+  // that one. Legacy bookings (accepted before this feature, payment_method
+  // null) fall back to showing every channel the shop has configured.
+  const showPromptpay = b.payment_method ? b.payment_method === "promptpay" : true;
+  const showBank = b.payment_method ? b.payment_method === "bank" : true;
+
+  // QR only while waiting for payment + shop has PromptPay + fee set + chosen channel
+  const qr =
+    b.status === "waiting_for_payment" && b.shipping_fee != null && showPromptpay
+      ? await promptPayQrDataUrl(b.boutique_promptpay_id, total)
+      : null;
+
+  // QR for addr-change diff top-up (only when approved + diff > 0 + shop has PromptPay)
+  const diffQr =
+    b.status === "confirmed" &&
+    b.addr_change_status === "approved" &&
+    (b.addr_change_diff ?? 0) > 0 &&
+    showPromptpay
+      ? await promptPayQrDataUrl(b.boutique_promptpay_id, b.addr_change_diff!)
+      : null;
+
+  return (
+    <div style={{ maxWidth: 560 }}>
+      <Link href="/account/bookings" style={{ fontSize: 14, color: "var(--ink-3)" }}>
+        ← การจองทั้งหมด
+      </Link>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "14px 0 6px" }}>
+        <h1 className="page-title" style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em" }}>
+          {b.dress_name ?? "การจอง"}
+        </h1>
+        <BookingStatusBadge status={b.status} />
+      </div>
+      <p style={{ color: "var(--ink-2)", fontSize: 14, marginBottom: 20 }}>{meta.renterHint}</p>
+
+      {/* details */}
+      <div style={card}>
+        <Row label="ร้าน" value={b.boutique_name ?? "-"} />
+        <Row label="วันเช่า" value={`${fmtThai(b.start_date)} – ${fmtThai(b.end_date)}`} />
+        <Row label="ส่งถึง" value={`${b.recipient_name ?? ""} · ${b.phone ?? ""}`} />
+        <Row label="ที่อยู่" value={b.address_text ?? "-"} />
+        {canEditAddress ? (
+          <EditAddressForm
+            bookingId={b.id}
+            recipientName={b.recipient_name}
+            phone={b.phone}
+            addressText={b.address_text}
+          />
+        ) : null}
+        {b.status === "confirmed" ? (
+          <RenterAddressChange
+            bookingId={b.id}
+            status={b.addr_change_status}
+            pending={
+              b.pending_recipient_name || b.pending_phone || b.pending_address_text
+                ? {
+                    recipientName: b.pending_recipient_name,
+                    phone: b.pending_phone,
+                    addressText: b.pending_address_text,
+                  }
+                : null
+            }
+            diff={b.addr_change_diff}
+            diffQrDataUrl={diffQr}
+            reason={b.addr_change_reason}
+          />
+        ) : null}
+      </div>
+
+      <div style={card}>
+        <Row label="ค่าเช่า" value={`฿${b.rental_total.toLocaleString()}`} />
+        <Row label="ค่ามัดจำ" value={`฿${b.deposit.toLocaleString()}`} />
+        <Row
+          label="ค่าจัดส่ง"
+          value={b.shipping_fee == null ? "รอร้านคำนวณ" : `฿${b.shipping_fee.toLocaleString()}`}
+          muted={b.shipping_fee == null}
+        />
+        <div style={{ borderTop: "1px solid var(--line)", margin: "8px 0" }} />
+        <Row label="ยอดที่ต้องชำระ" value={`฿${total.toLocaleString()}`} bold />
+      </div>
+
+      {/* payment */}
+      {b.status === "waiting_for_payment" ? (
+        <>
+          {qr ? (
+            <div style={{ ...card, textAlign: "center" }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>สแกนจ่ายผ่าน PromptPay</div>
+              <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 12 }}>
+                ยอด ฿{total.toLocaleString()} → {b.boutique_name}
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {/* display:block + margin auto centers it — Tailwind preflight sets
+                  img{display:block}, so the parent textAlign:center alone won't. */}
+              <img src={qr} alt="PromptPay QR" width={240} height={240} style={{ borderRadius: 8, display: "block", margin: "0 auto" }} />
+              <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 10, lineHeight: 1.5 }}>
+                โอนแล้วกดปุ่มด้านล่างเพื่ออัปโหลดสลิป ร้านจะตรวจและยืนยันให้
+              </p>
+            </div>
+          ) : null}
+
+          {showBank && (b.boutique_bank_name || b.boutique_bank_account_number) ? (
+            <div style={card}>
+              <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>ช่องทางโอนเงินให้ร้าน</div>
+              {b.boutique_bank_name ? (
+                <Row label="ธนาคาร" value={b.boutique_bank_name} />
+              ) : null}
+              {b.boutique_bank_account_number ? (
+                <Row label="เลขบัญชี" value={b.boutique_bank_account_number} />
+              ) : null}
+              {b.boutique_bank_account_name ? (
+                <Row label="ชื่อบัญชี" value={b.boutique_bank_account_name} />
+              ) : null}
+              <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 8, lineHeight: 1.5 }}>
+                โอนแล้วกดปุ่มด้านล่างเพื่ออัปโหลดสลิป ร้านจะตรวจและยืนยันให้
+              </p>
+            </div>
+          ) : null}
+
+          {!qr && !b.boutique_bank_name && !b.boutique_bank_account_number ? (
+            <div style={{ ...card, color: "var(--warn)", fontSize: 14 }}>
+              ร้านยังไม่ได้ตั้งค่าช่องทางรับชำระเงิน กรุณาติดต่อร้าน{b.boutique_line_url ? " ผ่าน LINE" : ""}เพื่อชำระเงิน
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {b.status === "confirmed" || b.status === "renting" ? (
+        <div style={{ ...card, background: b.status === "renting" ? "var(--info-soft, rgba(59,130,246,0.06))" : "var(--success-soft)" }}>
+          <div style={{ fontWeight: 600, color: b.status === "renting" ? "var(--info, #3b82f6)" : "var(--success)", marginBottom: 4 }}>
+            {b.status === "renting" ? "กำลังเช่าอยู่" : "จองเรียบร้อย ✓"}
+          </div>
+          <div style={{ fontSize: 14, color: "var(--ink-2)" }}>
+            {b.status === "renting"
+              ? "คุณกำลังเช่าชุดอยู่ กรุณาส่งคืนตามกำหนด"
+              : "ร้านยืนยันการชำระเงินแล้ว รอจัดส่งชุด"}
+          </div>
+          {b.boutique_line_url ? (
+            <a
+              href={b.boutique_line_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-outline"
+              style={{ marginTop: 12, display: "inline-block" }}
+            >
+              มีคำถาม? ติดต่อร้าน (LINE)
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Contact shop — surface every channel the shop configured (LINE/IG/FB/X/TikTok) */}
+      {(b.boutique_line_url || b.boutique_instagram || b.boutique_facebook || b.boutique_twitter || b.boutique_tiktok) ? (
+        <div style={card}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>ติดต่อร้านค้า</div>
+          <ShopSocialLinks
+            lineUrl={b.boutique_line_url}
+            instagram={b.boutique_instagram}
+            facebook={b.boutique_facebook}
+            twitter={b.boutique_twitter}
+            tiktok={b.boutique_tiktok}
+          />
+        </div>
+      ) : null}
+
+      {/* Slip image — shown after upload */}
+      {slipUrl && (b.status === "payment_review" || b.status === "confirmed" || b.status === "renting" || b.status === "returned" || b.status === "completed" || b.status === "slip_disputed") ? (
+        <div style={card}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>สลิปการโอน</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={slipUrl} alt="สลิป" style={{ width: "100%", maxHeight: 400, objectFit: "contain", borderRadius: 8, border: "1px solid var(--line)", background: "var(--bg)" }} />
+        </div>
+      ) : null}
+
+      <RenterBookingActions
+        bookingId={b.id}
+        status={b.status}
+        canPay={b.status === "waiting_for_payment" && b.shipping_fee != null}
+        disputeReason={b.cancel_reason}
+        disputeNote={b.dispute_note}
+      />
+
+      {/* Timeline — status change history */}
+      {timeline.length > 0 ? (
+        <div style={card}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>ประวัติการจอง</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            <TimelineRow label="สร้างการจอง" at={b.created_at} isFirst />
+            {timeline.map((ev, i) => (
+              <TimelineRow key={i} label={ev.label} at={ev.at} isLast={i === timeline.length - 1} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Review section — shown for completed/returned bookings */}
+      {isReviewable ? (
+        <div style={{ ...card, marginTop: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>รีวิวร้าน</div>
+          {existingReview ? (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span>
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <span key={s} style={{ color: s <= existingReview.rating ? "#F5A623" : "var(--line)", fontSize: 16 }}>★</span>
+                  ))}
+                </span>
+                <span style={{ fontSize: 13, color: "var(--ink-3)" }}>
+                  {existingReview.createdAt.toLocaleDateString("th-TH")}
+                </span>
+              </div>
+              {existingReview.comment ? (
+                <p style={{ fontSize: 14, color: "var(--ink-2)", margin: "4px 0 0" }}>{existingReview.comment}</p>
+              ) : null}
+              <p style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 8 }}>รีวิวถูกส่งแล้ว</p>
+            </div>
+          ) : (
+            <ReviewForm bookingId={b.id} />
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Row({
+  label,
+  value,
+  bold,
+  muted,
+}: {
+  label: string;
+  value: string;
+  bold?: boolean;
+  muted?: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "4px 0", fontSize: 14 }}>
+      <span style={{ color: "var(--ink-3)", flexShrink: 0 }}>{label}</span>
+      <span style={{ fontWeight: bold ? 700 : 500, color: muted ? "var(--ink-3)" : "var(--ink)", textAlign: "right" }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function Fallback() {
+  return (
+    <div style={{ paddingTop: 40, textAlign: "center" }}>
+      <p style={{ fontSize: 16, color: "var(--ink-2)", marginBottom: 22 }}>ไม่พบการจองนี้</p>
+      <Link href="/account/bookings" className="btn btn-dark" style={{ padding: "12px 22px" }}>
+        การจองของฉัน
+      </Link>
+    </div>
+  );
+}
+
+function fmtThaiDateTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Bangkok",
+  });
+}
+
+function TimelineRow({ label, at, isFirst, isLast }: { label: string; at: string; isFirst?: boolean; isLast?: boolean }) {
+  return (
+    <div style={{ display: "flex", gap: 12, minHeight: 36 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 14 }}>
+        <div
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: 999,
+            background: isLast ? "var(--accent)" : "var(--ink-3)",
+            border: isLast ? "2px solid var(--accent)" : "2px solid var(--ink-3)",
+            flexShrink: 0,
+            marginTop: 4,
+          }}
+        />
+        {!isLast && (
+          <div style={{ width: 2, flex: 1, background: "var(--line)", marginTop: 2, marginBottom: 2 }} />
+        )}
+      </div>
+      <div style={{ paddingBottom: isLast ? 0 : 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: isLast ? "var(--ink)" : "var(--ink-2)" }}>{label}</div>
+        <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{fmtThaiDateTime(at)}</div>
+      </div>
+    </div>
+  );
+}
+
+const card: React.CSSProperties = {
+  padding: 16,
+  border: "1px solid var(--line)",
+  borderRadius: 12,
+  background: "var(--surface)",
+  marginBottom: 16,
+};

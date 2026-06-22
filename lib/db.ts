@@ -74,7 +74,14 @@ export const base =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+    datasourceUrl: appendConnectionLimit(process.env.DATABASE_URL ?? ""),
   });
+
+function appendConnectionLimit(url: string): string {
+  if (!url || url.includes("connection_limit")) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}connection_limit=5`;
+}
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = base;
 

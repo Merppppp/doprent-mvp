@@ -1,264 +1,366 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toggleBlackout } from "@/app/actions/availability";
+import { MONTHS_TH, toLocalYmd } from "@/lib/date-th";
+import CalendarGrid from "@/components/CalendarGrid";
+
+type Variant = { id: string; label: string };
 
 type Props = {
   productId: string;
-  /** Existing blackout dates as YYYY-MM-DD strings. */
-  initialBlackouts: string[];
+  variants: Variant[];
+  initialProductBlackouts: string[];
+  initialVariantBlackouts: Record<string, string[]>;
 };
 
-const DAYS_TH = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
-const MONTHS_TH = [
-  "ม.ค.",
-  "ก.พ.",
-  "มี.ค.",
-  "เม.ย.",
-  "พ.ค.",
-  "มิ.ย.",
-  "ก.ค.",
-  "ส.ค.",
-  "ก.ย.",
-  "ต.ค.",
-  "พ.ย.",
-  "ธ.ค.",
-];
+const TODAY_STR = toLocalYmd(new Date());
 
-/** Format Date object → "YYYY-MM-DD" using LOCAL time (avoids UTC offset bug). */
-function toLocalDateString(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-const TODAY_STR = toLocalDateString(new Date());
-
-export default function AvailabilityCalendar({ productId, initialBlackouts }: Props) {
+export default function AvailabilityCalendar({
+  productId,
+  variants,
+  initialProductBlackouts,
+  initialVariantBlackouts,
+}: Props) {
   const router = useRouter();
-  const [blackouts, setBlackouts] = useState<Set<string>>(new Set(initialBlackouts));
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  // Calendar view state (which month is displayed)
-  const today = new Date();
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-11
-
-  const firstDay = new Date(viewYear, viewMonth, 1);
-  const startWeekday = firstDay.getDay(); // 0 (Sun) - 6 (Sat)
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-
-  // Build a 6-row × 7-col grid (42 cells)
-  const cells: Array<{ date: Date; inMonth: boolean } | null> = [];
-  for (let i = 0; i < startWeekday; i++) cells.push(null); // leading blanks
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ date: new Date(viewYear, viewMonth, d), inMonth: true });
-  }
-  while (cells.length < 42) cells.push(null);
-
-  function prevMonth() {
-    if (viewMonth === 0) {
-      setViewYear(viewYear - 1);
-      setViewMonth(11);
-    } else {
-      setViewMonth(viewMonth - 1);
+  const [productBlackouts, setProductBlackouts] = useState<Set<string>>(
+    new Set(initialProductBlackouts),
+  );
+  const [variantBlackouts, setVariantBlackouts] = useState<Record<string, Set<string>>>(() => {
+    const map: Record<string, Set<string>> = {};
+    for (const v of variants) {
+      map[v.id] = new Set(initialVariantBlackouts[v.id] || []);
     }
-  }
-  function nextMonth() {
-    if (viewMonth === 11) {
-      setViewYear(viewYear + 1);
-      setViewMonth(0);
-    } else {
-      setViewMonth(viewMonth + 1);
-    }
-  }
+    return map;
+  });
 
-  function onDateClick(date: Date) {
-    const dateStr = toLocalDateString(date);
-    // Don't allow past dates
-    if (dateStr < TODAY_STR) return;
+  // Popup state
+  const [popupDate, setPopupDate] = useState<string | null>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  // Close popup on outside click
+  useEffect(() => {
+    if (!popupDate) return;
+    function onClickOutside(e: MouseEvent) {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        setPopupDate(null);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [popupDate]);
+
+  function toggleProductWide(dateStr: string) {
     setError(null);
-
-    // Optimistic toggle
-    const isBlocked = blackouts.has(dateStr);
-    const next = new Set(blackouts);
-    if (isBlocked) next.delete(dateStr);
-    else next.add(dateStr);
-    setBlackouts(next);
+    const isBlocked = productBlackouts.has(dateStr);
+    const next = new Set(productBlackouts);
+    if (isBlocked) {
+      next.delete(dateStr);
+    } else {
+      next.add(dateStr);
+      // Also clear all variant-specific blackouts for this date
+      const nextV = { ...variantBlackouts };
+      for (const v of variants) {
+        const s = new Set(nextV[v.id]);
+        s.delete(dateStr);
+        nextV[v.id] = s;
+      }
+      setVariantBlackouts(nextV);
+    }
+    setProductBlackouts(next);
 
     startTransition(async () => {
-      const res = await toggleBlackout(productId, dateStr);
+      const res = await toggleBlackout(productId, dateStr, null);
       if (!res.ok) {
-        // Revert
-        setBlackouts(blackouts);
+        setProductBlackouts(productBlackouts);
         setError(res.error ?? "บันทึกไม่สำเร็จ");
       } else {
-        // Confirm state matches server
-        const confirmed = new Set(blackouts);
-        if (res.blocked) confirmed.add(dateStr);
-        else confirmed.delete(dateStr);
-        setBlackouts(confirmed);
         router.refresh();
       }
     });
   }
 
-  // Days from this month that are blocked
-  const blockedThisMonth = Array.from(blackouts)
-    .filter((d) => {
-      const [y, m] = d.split("-");
-      return parseInt(y) === viewYear && parseInt(m) - 1 === viewMonth;
-    })
-    .sort();
-  const blockedFutureCount = Array.from(blackouts).filter((d) => d >= TODAY_STR).length;
+  function toggleVariant(dateStr: string, variantId: string) {
+    setError(null);
+    const vSet = variantBlackouts[variantId] ?? new Set<string>();
+    const isBlocked = vSet.has(dateStr);
+    const nextV = new Set(vSet);
+    if (isBlocked) nextV.delete(dateStr);
+    else nextV.add(dateStr);
+    setVariantBlackouts((prev) => ({ ...prev, [variantId]: nextV }));
+
+    startTransition(async () => {
+      const res = await toggleBlackout(productId, dateStr, variantId);
+      if (!res.ok) {
+        setVariantBlackouts((prev) => ({ ...prev, [variantId]: vSet }));
+        setError(res.error ?? "บันทึกไม่สำเร็จ");
+      } else {
+        router.refresh();
+      }
+    });
+  }
+
+  // Summary helpers
+  const [viewYear, setViewYear] = useState(new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(new Date().getMonth());
+
+  // Count for summary
+  const allBlockedDates = useMemo(() => {
+    const set = new Set(productBlackouts);
+    for (const v of variants) {
+      const vSet = variantBlackouts[v.id];
+      if (vSet) vSet.forEach((d) => set.add(d));
+    }
+    return set;
+  }, [productBlackouts, variantBlackouts, variants]);
+
+  const blockedFutureCount = Array.from(allBlockedDates).filter((d) => d >= TODAY_STR).length;
+
+  // Cell status helper
+  function cellStatus(dateStr: string) {
+    const isProductWide = productBlackouts.has(dateStr);
+    const blockedVariants = variants.filter((v) => variantBlackouts[v.id]?.has(dateStr));
+    const allVariantsBlocked = isProductWide || blockedVariants.length === variants.length;
+    const someBlocked = blockedVariants.length > 0;
+    return { isProductWide, blockedVariants, allVariantsBlocked, someBlocked };
+  }
 
   return (
     <div>
-      {/* Month navigation header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 14,
-          gap: 12,
-        }}
-      >
-        <button
-          type="button"
-          onClick={prevMonth}
-          style={navBtnStyle}
-          aria-label="เดือนก่อนหน้า"
-        >
-          ←
-        </button>
-        <div style={{ fontWeight: 600, fontSize: 17 }}>
-          {MONTHS_TH[viewMonth]} {viewYear + 543}
+      {variants.length > 0 && (
+        <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 14, lineHeight: 1.6 }}>
+          กดที่วันที่เพื่อเลือกปิดไซซ์ที่ต้องการ
         </div>
-        <button type="button" onClick={nextMonth} style={navBtnStyle} aria-label="เดือนถัดไป">
-          →
-        </button>
-      </div>
+      )}
 
-      {/* Weekday header */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          gap: 4,
-          marginBottom: 8,
-        }}
-      >
-        {DAYS_TH.map((d) => (
-          <div
-            key={d}
-            style={{
-              textAlign: "center",
-              fontSize: 11,
-              fontWeight: 600,
-              color: "var(--ink-3)",
-              padding: "4px 0",
-            }}
-          >
-            {d}
-          </div>
-        ))}
-      </div>
-
-      {/* Date grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          gap: 4,
-        }}
-      >
-        {cells.map((cell, i) => {
-          if (!cell) return <div key={i} />;
-          const dateStr = toLocalDateString(cell.date);
+      <CalendarGrid
+        navBtnStyle={navBtnStyle}
+        onViewChange={(y, m) => { setViewYear(y); setViewMonth(m); }}
+        renderDay={({ date, dateStr }) => {
           const isToday = dateStr === TODAY_STR;
           const isPast = dateStr < TODAY_STR;
-          const isBlocked = blackouts.has(dateStr);
+          const { isProductWide, blockedVariants, allVariantsBlocked, someBlocked } = cellStatus(dateStr);
+          const isActive = popupDate === dateStr;
 
           return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onDateClick(cell.date)}
-              disabled={isPast || pending}
-              aria-pressed={isBlocked}
-              aria-label={`${cell.date.getDate()} ${MONTHS_TH[viewMonth]}${isBlocked ? " (ไม่ว่าง)" : " (ว่าง)"}`}
-              style={{
-                aspectRatio: "1/1",
-                border: `1px solid ${isBlocked ? "var(--danger)" : isToday ? "var(--ink)" : "var(--line)"}`,
-                background: isBlocked
-                  ? "var(--danger)"
-                  : isPast
-                    ? "var(--bg)"
-                    : "var(--surface)",
-                color: isBlocked ? "var(--on-dark)" : isPast ? "var(--ink-3)" : "var(--ink)",
-                borderRadius: 6,
-                cursor: isPast ? "not-allowed" : pending ? "wait" : "pointer",
-                fontSize: 14,
-                fontWeight: isToday ? 700 : 400,
-                position: "relative",
-                opacity: isPast ? 0.4 : 1,
-                transition: "background 0.15s, border-color 0.15s",
-              }}
-            >
-              {cell.date.getDate()}
-            </button>
-          );
-        })}
-      </div>
+            <div style={{ position: "relative" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isPast) return;
+                  setError(null);
+                  if (variants.length === 0) {
+                    // No variants — toggle product-wide directly
+                    toggleProductWide(dateStr);
+                  } else {
+                    setPopupDate(isActive ? null : dateStr);
+                  }
+                }}
+                disabled={isPast}
+                style={{
+                  width: "100%",
+                  aspectRatio: "1/1",
+                  border: `1.5px solid ${isActive ? "var(--accent)" : allVariantsBlocked ? "var(--danger)" : someBlocked ? "var(--warn)" : isToday ? "var(--ink)" : "var(--line)"}`,
+                  background: allVariantsBlocked
+                    ? "var(--danger)"
+                    : someBlocked
+                      ? "var(--warn-soft, rgba(245,166,35,0.12))"
+                      : isPast
+                        ? "var(--bg)"
+                        : "var(--surface)",
+                  color: allVariantsBlocked ? "#fff" : isPast ? "var(--ink-3)" : "var(--ink)",
+                  borderRadius: 6,
+                  cursor: isPast ? "not-allowed" : "pointer",
+                  fontSize: 13,
+                  fontWeight: isToday ? 700 : 400,
+                  opacity: isPast ? 0.4 : 1,
+                  transition: "background 0.15s, border-color 0.15s",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 1,
+                  padding: 2,
+                }}
+              >
+                <span>{date.getDate()}</span>
+                {/* Mini variant indicators */}
+                {variants.length > 0 && !isPast && !allVariantsBlocked && someBlocked && (
+                  <span style={{ display: "flex", gap: 2 }}>
+                    {variants.map((v) => {
+                      const blocked = variantBlackouts[v.id]?.has(dateStr);
+                      return (
+                        <span
+                          key={v.id}
+                          style={{
+                            width: 5,
+                            height: 5,
+                            borderRadius: "50%",
+                            background: blocked ? "var(--danger)" : "var(--success, #22c55e)",
+                          }}
+                        />
+                      );
+                    })}
+                  </span>
+                )}
+              </button>
 
-      {/* Legend + summary */}
-      <div
-        style={{
-          marginTop: 18,
-          padding: 12,
-          background: "var(--bg)",
-          border: "1px solid var(--line)",
-          borderRadius: 8,
-          fontSize: 13,
+              {/* Popup */}
+              {isActive && (
+                <div
+                  ref={popupRef}
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 6px)",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    zIndex: 50,
+                    background: "var(--surface)",
+                    border: "1px solid var(--line)",
+                    borderRadius: 10,
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
+                    padding: "12px 14px",
+                    minWidth: 180,
+                    fontSize: 13,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 14 }}>
+                    {date.getDate()} {MONTHS_TH[date.getMonth()]}
+                  </div>
+
+                  {/* All sizes toggle */}
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 0",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                      borderBottom: "1px solid var(--line)",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isProductWide}
+                      onChange={() => toggleProductWide(dateStr)}
+                      disabled={pending}
+                      style={{ width: 16, height: 16, accentColor: "var(--danger)" }}
+                    />
+                    ปิดทุกไซซ์
+                  </label>
+
+                  {/* Per-variant toggles */}
+                  {variants.map((v) => {
+                    const blocked = isProductWide || (variantBlackouts[v.id]?.has(dateStr) ?? false);
+                    return (
+                      <label
+                        key={v.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "5px 0",
+                          cursor: isProductWide ? "not-allowed" : "pointer",
+                          opacity: isProductWide ? 0.5 : 1,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={blocked}
+                          onChange={() => {
+                            if (!isProductWide) toggleVariant(dateStr, v.id);
+                          }}
+                          disabled={pending || isProductWide}
+                          style={{ width: 16, height: 16, accentColor: "var(--danger)" }}
+                        />
+                        {v.label}
+                      </label>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={() => setPopupDate(null)}
+                    style={{
+                      marginTop: 8,
+                      width: "100%",
+                      padding: "6px 0",
+                      background: "none",
+                      border: "1px solid var(--line)",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      fontSize: 12,
+                      color: "var(--ink-2)",
+                    }}
+                  >
+                    ปิด
+                  </button>
+                </div>
+              )}
+            </div>
+          );
         }}
       >
-        <div style={{ display: "flex", gap: 14, marginBottom: 10, flexWrap: "wrap" }}>
-          <Legend color="#DC2626" label="ไม่ว่าง" />
-          <Legend color="var(--surface)" border="var(--line)" label="ว่าง" />
-          <Legend color="var(--bg)" border="var(--line)" label="ผ่านมาแล้ว" />
-        </div>
-        <div style={{ color: "var(--ink-2)" }}>
-          {blockedThisMonth.length > 0
-            ? `เดือนนี้: ปิด ${blockedThisMonth.length} วัน`
-            : "เดือนนี้: ยังไม่ปิดวันไหน"}
-          {" · "}
-          ปิดล่วงหน้าทั้งหมด {blockedFutureCount} วัน
-        </div>
-      </div>
-
-      {error ? (
+        {/* Legend */}
         <div
           style={{
-            marginTop: 12,
-            padding: 10,
-            background: "rgba(220,38,38,0.08)",
-            border: "1px solid rgba(220,38,38,0.3)",
-            borderRadius: 6,
-            color: "var(--danger)",
+            marginTop: 18,
+            padding: 12,
+            background: "var(--bg)",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
             fontSize: 13,
           }}
         >
-          {error}
+          <div style={{ display: "flex", gap: 14, marginBottom: 10, flexWrap: "wrap" }}>
+            <Legend color="#DC2626" label="ปิดทุกไซซ์" />
+            <Legend color="var(--warn-soft, rgba(245,166,35,0.12))" border="var(--warn)" label="ปิดบางไซซ์" />
+            <Legend color="var(--surface)" border="var(--line)" label="ว่างทุกไซซ์" />
+          </div>
+          {variants.length > 0 && (
+            <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--success, #22c55e)", display: "inline-block" }} />
+                <span style={{ fontSize: 12, color: "var(--ink-3)" }}>ว่าง</span>
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--danger)", display: "inline-block" }} />
+                <span style={{ fontSize: 12, color: "var(--ink-3)" }}>ปิด</span>
+              </span>
+              <span style={{ fontSize: 12, color: "var(--ink-3)" }}>= จุดสีแทนแต่ละไซซ์</span>
+            </div>
+          )}
+          <div style={{ color: "var(--ink-2)" }}>
+            ปิดล่วงหน้าทั้งหมด {blockedFutureCount} วัน
+          </div>
         </div>
-      ) : null}
 
-      {pending ? (
-        <div style={{ marginTop: 10, fontSize: 12, color: "var(--ink-3)" }}>กำลังบันทึก…</div>
-      ) : null}
+        {error ? (
+          <div
+            style={{
+              marginTop: 12,
+              padding: 10,
+              background: "rgba(220,38,38,0.08)",
+              border: "1px solid rgba(220,38,38,0.3)",
+              borderRadius: 6,
+              color: "var(--danger)",
+              fontSize: 13,
+            }}
+          >
+            {error}
+          </div>
+        ) : null}
+
+        {pending ? (
+          <div style={{ marginTop: 10, fontSize: 12, color: "var(--ink-3)" }}>กำลังบันทึก…</div>
+        ) : null}
+      </CalendarGrid>
     </div>
   );
 }

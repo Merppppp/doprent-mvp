@@ -177,14 +177,8 @@ export default function TagRequestRow({ req }: { req: TagRequestRowData }) {
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               placeholder="เหตุผลที่ตีกลับ (แสดงให้ seller เห็น)"
-              style={{
-                flex: 1,
-                padding: "9px 12px",
-                border: "1px solid var(--line)",
-                borderRadius: 6,
-                fontSize: 13,
-                minWidth: 220,
-              }}
+              className="input"
+              style={{ flex: 1, minWidth: 220 }}
             />
             <button
               type="button"
@@ -214,14 +208,8 @@ export default function TagRequestRow({ req }: { req: TagRequestRowData }) {
                     value={approveKey}
                     onChange={(e) => setApproveKey(e.target.value)}
                     placeholder="slug key (ว่าง = ระบบสร้างอัตโนมัติ)"
-                    style={{
-                      flex: 1,
-                      padding: "9px 12px",
-                      border: "1px solid var(--line)",
-                      borderRadius: 6,
-                      fontSize: 13,
-                      minWidth: 220,
-                    }}
+                    className="input"
+                    style={{ flex: 1, minWidth: 220 }}
                   />
                   <button
                     type="button"
@@ -255,7 +243,8 @@ export default function TagRequestRow({ req }: { req: TagRequestRowData }) {
                       value={swatchHex}
                       onChange={(e) => setSwatchHex(e.target.value)}
                       placeholder="#RRGGBB (ไม่บังคับ)"
-                      style={{ width: 130, padding: "6px 10px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 12 }}
+                      className="input"
+                      style={{ width: 130 }}
                     />
                     <label style={{ fontSize: 12, color: "var(--ink-2)", whiteSpace: "nowrap" }}>รูป swatch:</label>
                     <input

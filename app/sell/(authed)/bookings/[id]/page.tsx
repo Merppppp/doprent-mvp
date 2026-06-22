@@ -2,24 +2,22 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
-import { getBookingForView, currentUserIsSellerOf } from "@/lib/booking-queries";
+import { getBookingForView, currentUserIsSellerOf, getBookingTimeline } from "@/lib/booking-queries";
 import { getSignedPrivateUrl } from "@/lib/r2";
 import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
 import { getTrustScore } from "@/lib/trust-score";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import TrustBadge from "@/components/TrustBadge";
-import SellerBookingActions from "@/components/SellerBookingActions";
+import SellerBookingActions, { type ChannelOption } from "@/components/SellerBookingActions";
+import SellerAddressChange from "@/components/SellerAddressChange";
+import { PAYMENT_CHANNEL_LABEL } from "@/lib/payments";
+import { fmtThai } from "@/lib/date-th";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "รายละเอียดการจอง (ร้าน)",
   robots: { index: false, follow: false },
-};
-
-const fmtThai = (s: string) => {
-  const [y, m, d] = s.split("-");
-  return y ? `${d}/${m}/${y}` : s;
 };
 
 export default async function SellerBookingDetail({ params }: { params: { id: string } }) {
@@ -37,8 +35,32 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
   // Slip is private — sign a short-lived URL for the seller (authorized above).
   const slipUrl = b.slip_path ? await getSignedPrivateUrl(b.slip_path) : null;
 
-  // Trust score for this renter (single query — only one renter on a detail page).
+  // Sign the addr-change top-up slip URL (only for active sub-flow states)
+  const addrSlipUrl = b.addr_change_slip_path
+    ? await getSignedPrivateUrl(b.addr_change_slip_path)
+    : null;
+
   const renterTrust = await getTrustScore(b.renter_id);
+  const timeline = await getBookingTimeline(b.id);
+
+  // Channels the shop has configured — drives the accept-flow channel picker.
+  const channels: ChannelOption[] = [];
+  if (b.boutique_promptpay_id?.trim()) {
+    channels.push({
+      method: "promptpay",
+      label: PAYMENT_CHANNEL_LABEL.promptpay,
+      detail: b.boutique_promptpay_id.trim(),
+    });
+  }
+  if (b.boutique_bank_account_number?.trim()) {
+    channels.push({
+      method: "bank",
+      label: PAYMENT_CHANNEL_LABEL.bank,
+      detail: [b.boutique_bank_name, b.boutique_bank_account_number, b.boutique_bank_account_name]
+        .filter((s) => s && s.trim())
+        .join(" · "),
+    });
+  }
 
   return (
     <div className="container" style={{ paddingTop: 36, paddingBottom: 80, maxWidth: 560 }}>
@@ -78,6 +100,9 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
         />
         <div style={{ borderTop: "1px solid var(--line)", margin: "8px 0" }} />
         <Row label="ยอดที่ลูกค้าจ่าย" value={`฿${amountDue(b).toLocaleString()}`} bold />
+        {b.payment_method ? (
+          <Row label="เก็บเงินผ่าน" value={PAYMENT_CHANNEL_LABEL[b.payment_method]} />
+        ) : null}
       </div>
 
       {slipUrl ? (
@@ -94,7 +119,44 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
         </div>
       ) : null}
 
-      <SellerBookingActions bookingId={b.id} status={b.status} />
+      {["requested", "approved", "paid_review"].includes(b.addr_change_status ?? "") ? (
+        <SellerAddressChange
+          bookingId={b.id}
+          status={b.addr_change_status}
+          pending={
+            b.pending_recipient_name || b.pending_phone || b.pending_address_text
+              ? {
+                  recipientName: b.pending_recipient_name,
+                  phone: b.pending_phone,
+                  addressText: b.pending_address_text,
+                }
+              : null
+          }
+          currentShippingFee={b.shipping_fee}
+          diff={b.addr_change_diff}
+          slipUrl={addrSlipUrl}
+          reason={b.addr_change_reason}
+        />
+      ) : null}
+
+      <SellerBookingActions
+        bookingId={b.id}
+        status={b.status}
+        channels={channels}
+        defaultMethod={b.boutique_default_payment_method}
+      />
+
+      {timeline.length > 0 ? (
+        <div style={card}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>ประวัติการจอง</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            <TimelineRow label="สร้างการจอง" at={b.created_at} isFirst />
+            {timeline.map((ev, i) => (
+              <TimelineRow key={i} label={ev.label} at={ev.at} isLast={i === timeline.length - 1} />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -127,6 +189,45 @@ function Fallback() {
       <Link href="/sell/bookings" className="btn btn-dark" style={{ padding: "12px 22px" }}>
         การจองของร้าน
       </Link>
+    </div>
+  );
+}
+
+function fmtThaiDateTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Bangkok",
+  });
+}
+
+function TimelineRow({ label, at, isFirst, isLast }: { label: string; at: string; isFirst?: boolean; isLast?: boolean }) {
+  return (
+    <div style={{ display: "flex", gap: 12, minHeight: 36 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 14 }}>
+        <div
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: 999,
+            background: isLast ? "var(--accent)" : "var(--ink-3)",
+            border: isLast ? "2px solid var(--accent)" : "2px solid var(--ink-3)",
+            flexShrink: 0,
+            marginTop: 4,
+          }}
+        />
+        {!isLast && (
+          <div style={{ width: 2, flex: 1, background: "var(--line)", marginTop: 2, marginBottom: 2 }} />
+        )}
+      </div>
+      <div style={{ paddingBottom: isLast ? 0 : 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: isLast ? "var(--ink)" : "var(--ink-2)" }}>{label}</div>
+        <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{fmtThaiDateTime(at)}</div>
+      </div>
     </div>
   );
 }

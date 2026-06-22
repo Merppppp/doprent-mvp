@@ -8,126 +8,19 @@ import { withActor } from "@/lib/db-context";
 import { isValidLineContact, normalizeLineUrl } from "@/lib/line";
 import { dressLimitFor } from "@/lib/tiers";
 // normalizeTiers/validateTiers removed — replaced by parsePriceTiersFromForm
-import type { AdsTier, Color, PriceTier } from "@/lib/types";
-// DB-valid size enum values only (Prisma schema has XS..XL; no new enum values allowed)
-type DbSize = "XS" | "S" | "M" | "L" | "XL";
+import { type AdsTier, type Color, type PriceTier } from "@/lib/types";
 import { resolveTagSelections } from "@/lib/tag-groups";
-
-/** Valid Size enum values in the DB (no enum additions — Postgres 55P04 guard). */
-const VALID_SIZES = new Set<string>(["XS", "S", "M", "L", "XL"]);
-
-type VariantInput = {
-  size: DbSize;
-  quantity: number;
-  available: boolean;
-  bustCm: number | null;
-  waistCm: number | null;
-  lengthCm: number | null;
-};
-
-/**
- * Parse a `variants` JSON field from a FormData submission.
- * Returns an empty array if the field is absent or malformed.
- * Only rows with a valid Size enum value are included.
- */
-function parseVariants(formData: FormData): VariantInput[] {
-  const raw = formData.get("variants");
-  if (!raw || typeof raw !== "string") return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    const parseNullableInt = (v: unknown): number | null => {
-      if (v === null || v === undefined || String(v).trim() === "") return null;
-      const n = parseInt(String(v), 10);
-      return isNaN(n) ? null : n;
-    };
-    return (parsed as Array<Record<string, unknown>>)
-      .filter((r) => typeof r === "object" && r !== null && VALID_SIZES.has(String(r.size ?? "")))
-      .map((r) => ({
-        size: String(r.size) as DbSize,
-        quantity: Math.max(1, parseInt(String(r.quantity ?? "1"), 10) || 1),
-        available: r.available !== false,
-        bustCm: parseNullableInt(r.bustCm ?? r.bust_cm),
-        waistCm: parseNullableInt(r.waistCm ?? r.waist_cm),
-        lengthCm: parseNullableInt(r.lengthCm ?? r.length_cm),
-      }));
-  } catch {
-    return [];
-  }
-}
-
-type TierInput = { minDays: number; pricePerDay: number };
-type SharedTiers = TierInput[];
-type PerSizeTiers = { size: DbSize; tiers: TierInput[] }[];
-
-/** Validate a set of tier entries: at least one with minDays=1, all minDays>=1, pricePerDay>=0, unique minDays. */
-function validateTierSet(tiers: TierInput[], label?: string): { ok: boolean; error?: string } {
-  if (!tiers.length) return { ok: false, error: `${label ? label + ': ' : ''}ต้องมีอย่างน้อย 1 ช่วงราคา` };
-  if (!tiers.some((t) => t.minDays === 1)) return { ok: false, error: `${label ? label + ': ' : ''}ต้องมีช่วงเริ่มต้นที่ 1 วัน` };
-  for (const t of tiers) {
-    if (!Number.isInteger(t.minDays) || t.minDays < 1) return { ok: false, error: `${label ? label + ': ' : ''}จำนวนวันขั้นต่ำต้องเป็นจำนวนเต็ม >= 1` };
-    if (!Number.isInteger(t.pricePerDay) || t.pricePerDay < 0) return { ok: false, error: `${label ? label + ': ' : ''}ราคาต้องเป็นจำนวนเต็ม >= 0` };
-  }
-  const mins = tiers.map((t) => t.minDays);
-  if (new Set(mins).size !== mins.length) return { ok: false, error: `${label ? label + ': ' : ''}จำนวนวัน (minDays) ซ้ำกัน` };
-  // ราคาเช่าต่อวันต้องอย่างน้อย ฿100 (รักษา behavior เดิม กัน seller ตั้ง ฿0)
-  if (Math.min(...tiers.map((t) => t.pricePerDay)) < 100) return { ok: false, error: `${label ? label + ': ' : ''}ราคาเช่าต่อวันต้องอย่างน้อย ฿100` };
-  return { ok: true };
-}
-
-/** Parse the price_mode + price_tiers fields from form data. Returns null on parse error. */
-function parsePriceTiersFromForm(formData: FormData):
-  | { mode: "shared"; shared: SharedTiers; deposit: number }
-  | { mode: "per_size"; perSize: PerSizeTiers; deposit: number }
-  | { ok: false; error: string } {
-  const mode = String(formData.get("price_mode") ?? "shared") as "shared" | "per_size";
-  const depositRaw = parseInt(String(formData.get("deposit") ?? "0"), 10);
-  const deposit = isNaN(depositRaw) || depositRaw < 0 ? 0 : depositRaw;
-  const raw = formData.get("price_tiers");
-  if (!raw || typeof raw !== "string") return { ok: false, error: "ไม่พบข้อมูลราคา" };
-  let parsed: unknown;
-  try { parsed = JSON.parse(raw); } catch { return { ok: false, error: "ข้อมูลราคาไม่ถูกต้อง" }; }
-  if (!Array.isArray(parsed)) return { ok: false, error: "ข้อมูลราคาต้องเป็น array" };
-
-  if (mode === "per_size") {
-    const perSize: PerSizeTiers = [];
-    for (const item of parsed as Array<Record<string, unknown>>) {
-      const size = String(item.size ?? "");
-      if (!VALID_SIZES.has(size)) return { ok: false, error: `ไซซ์ไม่ถูกต้อง: ${size}` };
-      const ts = item.tiers;
-      if (!Array.isArray(ts)) return { ok: false, error: `tiers ของไซซ์ ${size} ต้องเป็น array` };
-      const tiers: TierInput[] = ts.map((t: Record<string, unknown>) => ({
-        minDays: parseInt(String(t.minDays ?? "0"), 10),
-        pricePerDay: parseInt(String(t.pricePerDay ?? "0"), 10),
-      }));
-      const v = validateTierSet(tiers, `ไซซ์ ${size}`);
-      if (!v.ok) return { ok: false, error: v.error! };
-      perSize.push({ size: size as DbSize, tiers });
-    }
-    if (perSize.length === 0) return { ok: false, error: "ต้องมีข้อมูลราคาอย่างน้อย 1 ไซซ์" };
-    return { mode: "per_size", perSize, deposit };
-  } else {
-    const shared: SharedTiers = (parsed as Array<Record<string, unknown>>).map((t) => ({
-      minDays: parseInt(String(t.minDays ?? "0"), 10),
-      pricePerDay: parseInt(String(t.pricePerDay ?? "0"), 10),
-    }));
-    const v = validateTierSet(shared);
-    if (!v.ok) return { ok: false, error: v.error! };
-    return { mode: "shared", shared, deposit };
-  }
-}
-
-function slugify(s: string): string {
-  return s.toLowerCase().trim()
-    .replace(/[^a-z0-9ก-๙]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 48);
-}
-
-function productSlug(name: string): string {
-  const base = slugify(name);
-  return base ? `${base}-${Date.now().toString(36).slice(-5)}` : `d-${Date.now().toString(36)}`;
-}
+import { allocateStaffLoginCode } from "@/lib/staff-login-code";
+import {
+  type DbSize,
+  type VariantInput,
+  VALID_SIZES,
+  parseVariants,
+  validateTierSet,
+  parsePriceTiersFromForm,
+  slugify,
+  productSlug,
+} from "@/lib/product-parse";
 
 export async function createShop(formData: FormData): Promise<{ ok: boolean; error?: string; slug?: string }> {
   const user = await getCurrentUser();
@@ -159,6 +52,7 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
   const bankName = String(formData.get("bank_name") ?? "").trim() || null;
   const bankAccountNumber = String(formData.get("bank_account_number") ?? "").trim() || null;
   const bankAccountName = String(formData.get("bank_account_name") ?? "").trim() || null;
+  const bankbookImagePath = String(formData.get("bankbook_image_path") ?? "").trim() || null;
 
   const address = [houseNo, street, subdistrict ? `แขวง${subdistrict}` : null, district ? `เขต${district}` : null, province, postalCode]
     .filter(Boolean).join(" ") || null;
@@ -172,6 +66,12 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
   if (sinceYear !== null && (isNaN(sinceYear) || sinceYear < 1980 || sinceYear > new Date().getFullYear())) {
     return { ok: false, error: "ปีที่เปิดบริการไม่ถูกต้อง" };
   }
+
+  // HARD-BLOCK: bank account number provided but no bankbook image
+  if (bankAccountNumber && !bankbookImagePath) {
+    return { ok: false, error: "กรุณาแนบรูปหน้าสมุดบัญชีเพื่อยืนยันเลขบัญชี" };
+  }
+  // SOFT: no payment channel at all — save succeeds, UI shows the warning
 
   // Resolve area_key → areaId (UUID FK)
   let areaId: string | null = null;
@@ -188,14 +88,17 @@ export async function createShop(formData: FormData): Promise<{ ok: boolean; err
     slug = `${slugify(name)}-${i + 2}`;
   }
 
+  const staffLoginCode = await allocateStaffLoginCode();
+
   return withActor(user.id, async () => {
     const created = await db.shop.create({
       data: {
         slug, name, ownerId: user.id, ownerName, areaId, areaLabel,
         address, houseNo, street, subdistrict, district, province, postalCode,
         lineUrl, instagram, facebook, twitter, tiktok, tag, story, sinceYear, coverColor, deliveryInfo,
-        promptpayId, bankName, bankAccountNumber, bankAccountName,
+        promptpayId, bankName, bankAccountNumber, bankAccountName, bankbookImagePath,
         status: "pending", kycStatus: "none",
+        staffLoginCode,
       },
       select: { slug: true },
     });
@@ -219,7 +122,7 @@ export async function updateShop(shopId: string, formData: FormData): Promise<{ 
 
   const updates: Record<string, unknown> = {};
   // area_key handled separately (UUID FK resolution); exclude from generic camelCase loop
-  const scalarFields = ["name","area_label","instagram","facebook","twitter","tiktok","tag","story","delivery_info","owner_name","address","hours","cover_color","promptpay_id","bank_name","bank_account_number","bank_account_name"] as const;
+  const scalarFields = ["name","area_label","instagram","facebook","twitter","tiktok","tag","story","delivery_info","owner_name","address","hours","cover_color","logo_url","promptpay_id","bank_name","bank_account_number","bank_account_name","bankbook_image_path"] as const;
   for (const f of scalarFields) {
     const v = formData.get(f);
     if (v !== null) {
@@ -308,6 +211,26 @@ export async function updateShop(shopId: string, formData: FormData): Promise<{ 
           .map((x) => ({ date: x.date as string, note: typeof x.note === "string" ? x.note : undefined }));
       }
     } catch { /* ignore malformed */ }
+  }
+
+  // HARD-BLOCK: bank account number provided but no bankbook image attached
+  const bankAcctNum = String(formData.get("bank_account_number") ?? "").trim();
+  const bankbookPath = String(formData.get("bankbook_image_path") ?? "").trim();
+  if (bankAcctNum && !bankbookPath) {
+    return { ok: false, error: "กรุณาแนบรูปหน้าสมุดบัญชีเพื่อยืนยันเลขบัญชี" };
+  }
+
+  // SOFT WARNING (non-blocking): no payment channel at all — save succeeds
+  // The UI already shows the warning; the action just allows it through.
+
+  // Default payment channel: only meaningful when BOTH channels are configured.
+  // Otherwise force null so the picker never defaults to an unconfigured channel.
+  const finalPromptpay = String(formData.get("promptpay_id") ?? "").trim();
+  const dpmRaw = String(formData.get("default_payment_method") ?? "").trim();
+  if (finalPromptpay && bankAcctNum) {
+    updates.defaultPaymentMethod = dpmRaw === "promptpay" || dpmRaw === "bank" ? dpmRaw : null;
+  } else {
+    updates.defaultPaymentMethod = null;
   }
 
   return withActor(user.id, async () => {
@@ -410,11 +333,15 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
 
   const shop = await db.shop.findUnique({
     where: { id: shopId },
-    select: { ownerId: true, name: true, lineUrl: true, kycStatus: true, adsTier: true },
+    select: { ownerId: true, name: true, lineUrl: true, kycStatus: true, adsTier: true, promptpayId: true, bankAccountNumber: true },
   });
   if (!shop || shop.ownerId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์เพิ่มสินค้าในร้านนี้" };
   if (shop.kycStatus === "none" || shop.kycStatus === "rejected") {
     return { ok: false, error: "ต้องส่งเอกสาร KYC ก่อนถึงจะเพิ่มสินค้าได้" };
+  }
+  // HARD-BLOCK: shop must have at least one payment channel before listing products
+  if (!shop.promptpayId && !shop.bankAccountNumber) {
+    return { ok: false, error: "กรุณาตั้งค่าช่องทางรับชำระเงิน (PromptPay หรือบัญชีธนาคาร) ก่อนลงขายสินค้า" };
   }
 
   // Enforce per-plan listing quota.
@@ -477,8 +404,14 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
     if (occasionKeys.length > 0) selectionsByGroup = { occasion: occasionKeys };
   }
 
-  // Resolve productTypeId (seller UI is dress-only today)
-  const productType = await db.productType.findUnique({ where: { key: "dress" }, select: { id: true } });
+  // Resolve productTypeId from form data; fall back to "dress" for backward compat
+  const submittedTypeId = String(formData.get("productTypeId") ?? "").trim();
+  let productType: { id: string } | null;
+  if (submittedTypeId) {
+    productType = await db.productType.findFirst({ where: { id: submittedTypeId, isActive: true }, select: { id: true } });
+  } else {
+    productType = await db.productType.findUnique({ where: { key: "dress" }, select: { id: true } });
+  }
   if (!productType) return { ok: false, error: "product type ไม่พบ — กรุณาแจ้ง admin" };
 
   // Resolve tags via binding-aware validator
@@ -772,7 +705,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     }
 
     revalidatePath("/sell/dashboard");
-    revalidatePath(`/dress/${productId}`);
+    revalidatePath(`/product/${productId}`);
     return { ok: true };
   });
 }
@@ -801,7 +734,7 @@ export async function updateProductPriceTiers(productId: string, tiers: PriceTie
       data: tiers.map((t) => ({ productId, minDays: t.min, pricePerDay: t.per_day })),
     });
     revalidatePath("/sell/dashboard");
-    revalidatePath(`/dress/${productId}`);
+    revalidatePath(`/product/${productId}`);
     return { ok: true };
   });
 }

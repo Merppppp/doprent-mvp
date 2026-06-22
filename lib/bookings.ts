@@ -51,8 +51,15 @@ export const BOOKING_STATUS_META: Record<
     label: "ยืนยันแล้ว",
     tone: "success",
     terminal: false,
-    renterHint: "ร้านยืนยันการชำระเงินแล้ว นัดรับ/ส่งชุดกับร้านได้เลย",
-    sellerHint: "ยืนยันแล้ว จัดส่งชุดตามที่อยู่ลูกค้า — กดรับคืนชุดเมื่อผู้เช่าส่งคืน",
+    renterHint: "ร้านยืนยันการชำระเงินแล้ว รอจัดส่งชุด",
+    sellerHint: "ยืนยันแล้ว จัดส่งชุดตามที่อยู่ลูกค้า",
+  },
+  renting: {
+    label: "กำลังเช่า",
+    tone: "info",
+    terminal: false,
+    renterHint: "คุณกำลังเช่าชุดอยู่ ส่งคืนตามกำหนด",
+    sellerHint: "ลูกค้ากำลังเช่าชุดอยู่ รอรับคืนเมื่อครบกำหนด",
   },
   cancel_requested: {
     label: "ร้านขอยกเลิก (รอแอดมิน)",
@@ -62,11 +69,11 @@ export const BOOKING_STATUS_META: Record<
     sellerHint: "ส่งคำขอยกเลิกให้แอดมินแล้ว",
   },
   slip_disputed: {
-    label: "สลิปมีปัญหา (รอแอดมิน)",
+    label: "สลิปมีปัญหา",
     tone: "danger",
     terminal: false,
-    renterHint: "ร้านแจ้งว่าสลิปไม่ถูกต้อง แอดมินกำลังตรวจสอบ",
-    sellerHint: "แจ้งสลิปไม่ถูกต้องแล้ว รอแอดมิน",
+    renterHint: "ร้านแจ้งว่าสลิปไม่ถูกต้อง อัปโหลดสลิปใหม่หรือโต้แย้งได้",
+    sellerHint: "แจ้งสลิปไม่ถูกต้องแล้ว รอลูกค้าตอบกลับ",
   },
   rejected: {
     label: "ร้านปฏิเสธ",
@@ -122,6 +129,7 @@ export const TRANSITIONS: Transition[] = [
   { from: "booking_pending", to: "cancelled", actor: "renter" },
   { from: "waiting_for_payment", to: "cancelled", actor: "renter" },
   { from: "waiting_for_payment", to: "payment_review", actor: "renter", requires: "slip_path" },
+  { from: "slip_disputed", to: "payment_review", actor: "renter", requires: "slip_path" },
   // seller
   { from: "booking_pending", to: "waiting_for_payment", actor: "seller", requires: "shipping_fee" },
   { from: "booking_pending", to: "rejected", actor: "seller" },
@@ -129,8 +137,9 @@ export const TRANSITIONS: Transition[] = [
   { from: "payment_review", to: "slip_disputed", actor: "seller" },
   { from: "payment_review", to: "cancel_requested", actor: "seller" },
   { from: "confirmed", to: "cancel_requested", actor: "seller" },
-  // completion lifecycle: seller marks dress received, then closes the rental
-  { from: "confirmed", to: "returned", actor: "seller" },
+  { from: "confirmed", to: "renting", actor: "seller" },
+  { from: "renting", to: "returned", actor: "seller" },
+  { from: "renting", to: "cancel_requested", actor: "seller" },
   { from: "returned", to: "completed", actor: "seller" },
 ];
 
@@ -148,6 +157,7 @@ export const ACTIVE_STATUSES: BookingStatus[] = [
   "waiting_for_payment",
   "payment_review",
   "confirmed",
+  "renting",
 ];
 
 export function isActive(status: BookingStatus): boolean {

@@ -1,7 +1,10 @@
 "use client";
 
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { Spinner } from "@/components/Loading";
 import AvailabilityCalendar from "./AvailabilityCalendar";
+import { sizeLabel } from "@/lib/types";
+import { MONTHS_TH } from "@/lib/date-th";
 
 type DressOption = {
   id: string;
@@ -11,21 +14,6 @@ type DressOption = {
   size: string;
   price_per_day: number;
 };
-
-const MONTHS_TH = [
-  "ม.ค.",
-  "ก.พ.",
-  "มี.ค.",
-  "เม.ย.",
-  "พ.ค.",
-  "มิ.ย.",
-  "ก.ค.",
-  "ส.ค.",
-  "ก.ย.",
-  "ต.ค.",
-  "พ.ย.",
-  "ธ.ค.",
-];
 
 function getMonthKey(year: number, month: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}`;
@@ -135,7 +123,7 @@ export default function SellerAvailabilityPicker({ dresses }: { dresses: DressOp
             <>
               <div style={{ fontWeight: 600, color: "var(--ink)" }}>{selectedDress.name}</div>
               <div style={{ marginTop: 4 }}>
-                {selectedDress.designer || "—"} · Size {selectedDress.size} · ฿{selectedDress.price_per_day.toLocaleString()}/วัน
+                {selectedDress.designer || "—"} · Size {sizeLabel(selectedDress.size)} · ฿{selectedDress.price_per_day.toLocaleString()}/วัน
               </div>
             </>
           ) : (
@@ -145,7 +133,9 @@ export default function SellerAvailabilityPicker({ dresses }: { dresses: DressOp
       </div>
 
       {loading ? (
-        <div style={{ marginTop: 18, color: "var(--ink-3)", fontSize: 13 }}>กำลังโหลดปฏิทิน...</div>
+        <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 10, color: "var(--ink-3)", fontSize: 13 }}>
+          <Spinner size={16} label="กำลังโหลดปฏิทิน..." />
+        </div>
       ) : null}
       {error ? (
         <div
@@ -176,7 +166,9 @@ export default function SellerAvailabilityPicker({ dresses }: { dresses: DressOp
         >
           <AvailabilityCalendar
             productId={selectedDressId}
-            initialBlackouts={blackouts}
+            variants={[]}
+            initialProductBlackouts={blackouts}
+            initialVariantBlackouts={{}}
           />
         </div>
       ) : null}

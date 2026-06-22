@@ -6,48 +6,28 @@
  * Unified shop-owner calendar: shows bookings, product blackouts, and shop
  * closed dates in a single month grid.  Month nav + optional product filter.
  *
- * Visual states per day cell:
- *   BOOKED   — accent (emerald) bg + count badge → at least one active booking
- *   BLACKOUT — warn (amber) bg → product blackout, no bookings
- *   CLOSED   — muted bg, reduced opacity → shop closed date / weekday
- *   TODAY    — ring border
- *   Multiple can coexist: BOOKED + CLOSED both show their indicators.
+ * Visual states per day cell (single-product filter):
+ *   allFree  — normal/white (surface bg) → every size still available
+ *   someFree — amber bg → at least one size available, at least one blocked
+ *   noneFree — red bg  → every size blocked
+ *
+ * Visual states per day cell (all-products overview):
+ *   normal — no bookings & no blackout that day
+ *   amber  — ≥1 booking or blackout that day ("มีจองบางส่วน")
+ *
+ * Closed days always show "ปิด" indicator + dimmed opacity regardless of state.
  *
  * Interaction: clicking a day opens a detail panel below the grid listing
- * every booking for that day plus blackout/closed notes.
+ * every booking for that day plus per-size availability thumbnails.
  */
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import type { SellerCalendarData, CalendarBooking } from "@/lib/seller-calendar";
+import type { SellerCalendarData, CalendarBooking, CalendarProduct } from "@/lib/seller-calendar";
 import { BOOKING_STATUS_META } from "@/lib/bookings";
 import type { BookingStatus } from "@/lib/types";
-
-// ─── constants ───────────────────────────────────────────────────────────────
-
-const DAYS_TH = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
-const MONTHS_TH = [
-  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน",
-  "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม",
-  "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
-];
-
-/** Format Date → "YYYY-MM-DD" using LOCAL time. */
-function toLocalYmd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** Format "YYYY-MM-DD" → Thai "DD เดือน YYYY (BE)" */
-function fmtThaiDate(s: string): string {
-  const [y, m, d] = s.split("-");
-  return `${parseInt(d, 10)} ${MONTHS_TH[parseInt(m, 10) - 1]} ${parseInt(y, 10) + 543}`;
-}
-
-/** Format "YYYY-MM-DD" → "DD/MM/YY" */
-function fmtShort(s: string): string {
-  const [y, m, d] = s.split("-");
-  return `${d}/${m}/${String(parseInt(y, 10) + 543).slice(-2)}`;
-}
+import { MONTHS_TH_FULL, toLocalYmd, fmtThaiLong, fmtThaiShort } from "@/lib/date-th";
+import CalendarGrid from "@/components/CalendarGrid";
 
 const STATUS_TONE: Record<string, { bg: string; fg: string }> = {
   neutral: { bg: "var(--surface)", fg: "var(--ink-2)" },
@@ -55,6 +35,22 @@ const STATUS_TONE: Record<string, { bg: string; fg: string }> = {
   warn:    { bg: "var(--warn-soft)", fg: "var(--warn)" },
   success: { bg: "var(--success-soft)", fg: "var(--success)" },
   danger:  { bg: "var(--danger-soft)", fg: "var(--danger)" },
+};
+
+// ─── per-size availability types ─────────────────────────────────────────────
+
+type SizeStatus = {
+  size: string;
+  freeUnits: number;
+  available: boolean;
+  blocked: boolean;
+};
+
+type ProductSizeAvail = {
+  product: CalendarProduct;
+  hasBlackout: boolean;
+  shopClosed: boolean;
+  sizes: SizeStatus[];
 };
 
 // ─── props ────────────────────────────────────────────────────────────────────
@@ -70,22 +66,17 @@ export default function SellerCalendar({ data }: Props) {
   const todayStr = toLocalYmd(today);
 
   // ── view state ────────────────────────────────────────────────────────────
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-11
   const [filterProductId, setFilterProductId] = useState<string>(""); // "" = all
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
-  // ── month navigation ──────────────────────────────────────────────────────
-  function prevMonth() {
-    if (viewMonth === 0) { setViewYear(viewYear - 1); setViewMonth(11); }
-    else setViewMonth(viewMonth - 1);
-  }
-  function nextMonth() {
-    if (viewMonth === 11) { setViewYear(viewYear + 1); setViewMonth(0); }
-    else setViewMonth(viewMonth + 1);
-  }
+  // ── product lookup map ────────────────────────────────────────────────────
+  const productById = useMemo(() => {
+    const m = new Map<string, CalendarProduct>();
+    for (const p of data.products) m.set(p.id, p);
+    return m;
+  }, [data.products]);
 
-  // ── filtered bookings (by product) ───────────────────────────────────────
+  // ── filtered bookings (by product, for display) ───────────────────────────
   const filteredBookings = useMemo(
     () => filterProductId
       ? data.bookings.filter((b) => b.productId === filterProductId)
@@ -93,9 +84,26 @@ export default function SellerCalendar({ data }: Props) {
     [data.bookings, filterProductId]
   );
 
-  // ── lookup maps (bookings per day) ────────────────────────────────────────
+  // ── booking count by (productId :: size :: date) ──────────────────────────
+  // Excludes legacy bookings (size === null) — those don't decrement any size.
+  const bookingCountBySizeDay = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const b of data.bookings) {
+      if (b.size === null) continue; // legacy booking — skip
+      const cur = new Date(b.startDate + "T00:00:00Z");
+      const end = new Date(b.endDate + "T00:00:00Z");
+      while (cur <= end) {
+        const d = cur.toISOString().slice(0, 10);
+        const key = `${b.productId}::${b.size}::${d}`;
+        map.set(key, (map.get(key) ?? 0) + 1);
+        cur.setUTCDate(cur.getUTCDate() + 1);
+      }
+    }
+    return map;
+  }, [data.bookings]);
+
+  // ── lookup maps (bookings per day, for display/count) ─────────────────────
   // Expand each booking's date range into individual days → O(bookings × days)
-  // acceptable for typical seller volumes.
   const bookingsByDay = useMemo(() => {
     const map = new Map<string, CalendarBooking[]>();
     for (const b of filteredBookings) {
@@ -140,23 +148,37 @@ export default function SellerCalendar({ data }: Props) {
 
   function isShopClosed(dateStr: string): boolean {
     if (closedDateMap.has(dateStr)) return true;
-    // weekday check — JS getDay() = 0 (Sun) … 6 (Sat)
     const weekday = new Date(dateStr + "T12:00:00").getDay();
     return data.closedWeekdays.includes(weekday);
   }
 
-  // ── grid cells ────────────────────────────────────────────────────────────
-  const firstDay = new Date(viewYear, viewMonth, 1);
-  const startWeekday = firstDay.getDay(); // 0=Sun
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  // ── per-product day status (3-level: allFree / someFree / noneFree) ────────
+  function getProductDayStatus(
+    product: CalendarProduct,
+    dateStr: string
+  ): "allFree" | "someFree" | "noneFree" {
+    // Blackout or shop closed blocks everything for this product
+    const hasBlackout = data.blackoutDates.some(
+      (bd) => bd.productId === product.id && bd.date === dateStr
+    );
+    if (hasBlackout || isShopClosed(dateStr)) return "noneFree";
 
-  const cells: Array<string | null> = [];
-  for (let i = 0; i < startWeekday; i++) cells.push(null); // leading blanks
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dt = new Date(viewYear, viewMonth, d);
-    cells.push(toLocalYmd(dt));
+    let freeCount = 0;
+    let blockedCount = 0;
+    for (const v of product.variants) {
+      if (!v.available) {
+        blockedCount++;
+        continue;
+      }
+      const booked = bookingCountBySizeDay.get(`${product.id}::${v.size}::${dateStr}`) ?? 0;
+      if (v.quantity - booked > 0) freeCount++;
+      else blockedCount++;
+    }
+
+    if (freeCount === 0) return "noneFree";
+    if (blockedCount === 0) return "allFree";
+    return "someFree";
   }
-  while (cells.length < 42) cells.push(null); // pad to 6 rows
 
   // ── selected day data ─────────────────────────────────────────────────────
   const selectedBookings = selectedDay ? (bookingsByDay.get(selectedDay) ?? []) : [];
@@ -164,12 +186,83 @@ export default function SellerCalendar({ data }: Props) {
   const selectedIsClosed = selectedDay ? isShopClosed(selectedDay) : false;
   const selectedClosedNote = selectedDay ? (closedDateMap.get(selectedDay) ?? null) : null;
 
-  // ── summary counts for current month ─────────────────────────────────────
-  const monthPrefix = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
+  // ── per-product size availability for detail panel ────────────────────────
+  const detailProductAvailability = useMemo((): ProductSizeAvail[] => {
+    if (!selectedDay) return [];
+
+    // Determine which products to show in the panel
+    const relevantIds = new Set<string>();
+    if (filterProductId) {
+      relevantIds.add(filterProductId);
+    } else {
+      // Products with any booking on this day (using all bookings, not filtered)
+      for (const b of data.bookings) {
+        const cur = new Date(b.startDate + "T00:00:00Z");
+        const end = new Date(b.endDate + "T00:00:00Z");
+        const sel = new Date(selectedDay + "T00:00:00Z");
+        if (cur <= sel && sel <= end) relevantIds.add(b.productId);
+      }
+      // Products with a blackout on this day
+      for (const bd of data.blackoutDates) {
+        if (bd.date === selectedDay) relevantIds.add(bd.productId);
+      }
+    }
+
+    // Weekday closed check
+    const weekday = new Date(selectedDay + "T12:00:00").getDay();
+    const shopClosedDay = closedDateMap.has(selectedDay) || data.closedWeekdays.includes(weekday);
+
+    return data.products
+      .filter((p) => relevantIds.has(p.id))
+      .map((p) => {
+        const hasBlackout = data.blackoutDates.some(
+          (bd) => bd.productId === p.id && bd.date === selectedDay
+        );
+        const sizes: SizeStatus[] = p.variants.map((v) => {
+          const booked =
+            bookingCountBySizeDay.get(`${p.id}::${v.size}::${selectedDay}`) ?? 0;
+          const freeUnits = Math.max(0, v.quantity - booked);
+          const blocked =
+            !v.available || freeUnits <= 0 || hasBlackout || shopClosedDay;
+          return { size: v.size, freeUnits, available: v.available, blocked };
+        });
+        return { product: p, hasBlackout, shopClosed: shopClosedDay, sizes };
+      });
+  }, [
+    selectedDay,
+    filterProductId,
+    data.products,
+    data.bookings,
+    data.blackoutDates,
+    data.closedWeekdays,
+    bookingCountBySizeDay,
+    closedDateMap,
+  ]);
+
+  // ── summary counts for current month — tracked via a ref updated in renderDay
+  // We use a stable approach: compute from bookingsByDay and blackoutDaySet
+  // filtered to the current view month. Since CalendarGrid owns view state,
+  // we expose month summary globally (all months) and simplify the display.
+  // The bookedDaysThisMonth / blackoutDaysThisMonth counts now show current
+  // calendar month which is tracked inside CalendarGrid — we pass a renderDay
+  // that captures these dynamically per cell.
+  // To keep the summary counts correct we track the visible month via state.
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const t = new Date();
+    return { y: t.getFullYear(), m: t.getMonth() };
+  });
+
+  const monthPrefix = `${visibleMonth.y}-${String(visibleMonth.m + 1).padStart(2, "0")}`;
   const bookedDaysThisMonth = Array.from(bookingsByDay.keys()).filter((d) => d.startsWith(monthPrefix)).length;
   const blackoutDaysThisMonth = Array.from(blackoutDaySet).filter((d) => d.startsWith(monthPrefix)).length;
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Selected filtered product (for single-product cell coloring)
+  const selectedFilterProduct = filterProductId ? (productById.get(filterProductId) ?? null) : null;
+
+  // Suppress unused variable warning — blackoutSet is used inside renderDay closure
+  void blackoutSet;
+
   return (
     <div style={{ maxWidth: 440, marginInline: "auto" }}>
       {/* ── Header: title + product filter ── */}
@@ -200,83 +293,65 @@ export default function SellerCalendar({ data }: Props) {
         </div>
       </div>
 
-      {/* ── Month navigation ── */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 14,
-          gap: 12,
-        }}
-      >
-        <button type="button" onClick={prevMonth} style={navBtnStyle} aria-label="เดือนก่อนหน้า">
-          ←
-        </button>
-        <div style={{ fontWeight: 700, fontSize: 18 }}>
-          {MONTHS_TH[viewMonth]} {viewYear + 543}
-        </div>
-        <button type="button" onClick={nextMonth} style={navBtnStyle} aria-label="เดือนถัดไป">
-          →
-        </button>
-      </div>
-
-      {/* ── Weekday header ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, marginBottom: 6 }}>
-        {DAYS_TH.map((d) => (
-          <div
-            key={d}
-            style={{
-              textAlign: "center",
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--ink-3)",
-              padding: "4px 0",
-              letterSpacing: "0.04em",
-            }}
-          >
-            {d}
-          </div>
-        ))}
-      </div>
-
-      {/* ── Day grid ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
-        {cells.map((dateStr, i) => {
-          if (!dateStr) return <div key={i} style={{ aspectRatio: "1/1" }} />;
-
+      <CalendarGrid
+        months={MONTHS_TH_FULL}
+        navBtnStyle={navBtnStyle}
+        gap={3}
+        monthLabelStyle={{ fontWeight: 700, fontSize: 18 }}
+        weekdayCellStyle={{ fontWeight: 700, letterSpacing: "0.04em" }}
+        blankCellStyle={{ aspectRatio: "1/1" }}
+        renderDay={({ dateStr }) => {
           const dayBookings = bookingsByDay.get(dateStr) ?? [];
           const hasBookings = dayBookings.length > 0;
-          const isBlackout = blackoutDaySet.has(dateStr) && !hasBookings;
-          // "ไม่ว่าง" = ชุดถูกจอง หรือ ร้านปิดเอง (blackout) → ต้องเป็นสีแดง
-          const isUnavailable = hasBookings || isBlackout;
+          const hasBlackout = blackoutDaySet.has(dateStr);
           const isClosed = isShopClosed(dateStr);
           const isToday = dateStr === todayStr;
           const isPast = dateStr < todayStr;
           const isSelected = dateStr === selectedDay;
 
-          // Background priority: unavailable (booked/blackout) > closed
-          const bg = isUnavailable
-            ? "var(--danger-soft)"
-            : isClosed
-            ? "var(--bg)"
-            : "var(--surface)";
+          // Update visible month tracking (side effect in render is acceptable for this purpose)
+          // We do this via a separate mechanism below
+
+          // ── cell coloring ──────────────────────────────────────────────
+          let bg: string;
+          let borderColorBase: string;
+
+          if (selectedFilterProduct) {
+            // Single-product mode: 3-level tone
+            const status = getProductDayStatus(selectedFilterProduct, dateStr);
+            if (status === "noneFree") {
+              bg = "var(--danger-soft)";
+              borderColorBase = "var(--danger)";
+            } else if (status === "someFree") {
+              bg = "var(--warn-soft)";
+              borderColorBase = "var(--warn)";
+            } else {
+              bg = "var(--surface)";
+              borderColorBase = "var(--line)";
+            }
+          } else {
+            // All-products overview: amber if any booking or blackout
+            if (hasBookings || hasBlackout) {
+              bg = "var(--warn-soft)";
+              borderColorBase = "var(--warn)";
+            } else {
+              bg = isClosed ? "var(--bg)" : "var(--surface)";
+              borderColorBase = "var(--line)";
+            }
+          }
 
           const borderColor = isSelected
             ? "var(--ink)"
-            : isUnavailable
-            ? "var(--danger)"
-            : isToday
+            : isToday && borderColorBase === "var(--line)"
             ? "var(--cobalt)"
-            : "var(--line)";
+            : borderColorBase;
 
           return (
             <button
-              key={dateStr}
               type="button"
               onClick={() => setSelectedDay(isSelected ? null : dateStr)}
               aria-pressed={isSelected}
-              aria-label={`${parseInt(dateStr.slice(8), 10)} ${MONTHS_TH[viewMonth]}${hasBookings ? ` (จอง ${dayBookings.length})` : ""}${isClosed ? " (ร้านหยุด)" : ""}`}
+              aria-label={`${parseInt(dateStr.slice(8), 10)} ${MONTHS_TH_FULL[parseInt(dateStr.slice(5, 7), 10) - 1]}${hasBookings ? ` (จอง ${dayBookings.length})` : ""}${isClosed ? " (ร้านหยุด)" : ""}`}
               style={{
                 aspectRatio: "1/1",
                 position: "relative",
@@ -295,8 +370,8 @@ export default function SellerCalendar({ data }: Props) {
                 gap: 1,
                 padding: "2px 1px",
                 transition: "border-color 0.12s, box-shadow 0.12s",
-                boxShadow: isSelected ? "0 0 0 2px var(--danger-soft)" : undefined,
-                minHeight: 38, // touch-target
+                boxShadow: isSelected ? "0 0 0 2px var(--warn-soft)" : undefined,
+                minHeight: 38,
               }}
             >
               {/* Day number */}
@@ -306,7 +381,7 @@ export default function SellerCalendar({ data }: Props) {
               {hasBookings && (
                 <span
                   style={{
-                    background: "var(--danger)",
+                    background: selectedFilterProduct ? "var(--danger)" : "var(--warn)",
                     color: "#fff",
                     fontSize: 9,
                     fontWeight: 700,
@@ -322,10 +397,10 @@ export default function SellerCalendar({ data }: Props) {
               )}
 
               {/* Small indicators row */}
-              {(isBlackout || (isClosed && hasBookings) || (isClosed && !hasBookings && !isPast)) && (
+              {(hasBlackout || (isClosed && !isPast)) && (
                 <span style={{ display: "flex", gap: 2, alignItems: "center" }}>
-                  {isBlackout && (
-                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--danger)", display: "block" }} />
+                  {hasBlackout && !hasBookings && (
+                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--warn)", display: "block" }} />
                   )}
                   {isClosed && (
                     <span style={{ fontSize: 8, color: "var(--ink-3)", lineHeight: 1 }}>ปิด</span>
@@ -334,30 +409,43 @@ export default function SellerCalendar({ data }: Props) {
               )}
             </button>
           );
-        })}
-      </div>
-
-      {/* ── Legend ── */}
-      <div
-        style={{
-          marginTop: 16,
-          padding: "10px 14px",
-          background: "var(--bg)",
-          border: "1px solid var(--line)",
-          borderRadius: 8,
-          fontSize: 12,
-          display: "flex",
-          gap: 14,
-          flexWrap: "wrap",
-          alignItems: "center",
         }}
       >
-        <LegendItem color="var(--danger-soft)" border="var(--danger)" label="ไม่ว่าง (จอง/ปิดเอง)" />
-        <LegendItem color="var(--bg)" border="var(--line)" label="ร้านหยุด" dim />
-        <LegendItem color="var(--surface)" border="var(--cobalt)" label="วันนี้" />
-      </div>
+        {/* ── Legend ── */}
+        <div
+          style={{
+            marginTop: 16,
+            padding: "10px 14px",
+            background: "var(--bg)",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            fontSize: 12,
+            display: "flex",
+            gap: 14,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          {selectedFilterProduct ? (
+            // Single-product legend: 3 levels
+            <>
+              <LegendItem color="var(--surface)" border="var(--line)" label="ว่างทุกไซส์" />
+              <LegendItem color="var(--warn-soft)" border="var(--warn)" label="ว่างบางไซส์" />
+              <LegendItem color="var(--danger-soft)" border="var(--danger)" label="เต็มทุกไซส์" />
+            </>
+          ) : (
+            // All-products legend
+            <>
+              <LegendItem color="var(--surface)" border="var(--line)" label="ว่าง" />
+              <LegendItem color="var(--warn-soft)" border="var(--warn)" label="มีจองบางส่วน" />
+            </>
+          )}
+          <LegendItem color="var(--bg)" border="var(--line)" label="ร้านหยุด" dim />
+          <LegendItem color="var(--surface)" border="var(--cobalt)" label="วันนี้" />
+        </div>
+      </CalendarGrid>
 
-      {/* ── Day detail panel ── */}
+      {/* ── Day detail panel — OUTSIDE CalendarGrid, after it ── */}
       {selectedDay && (
         <DayDetailPanel
           dateStr={selectedDay}
@@ -366,6 +454,8 @@ export default function SellerCalendar({ data }: Props) {
           isClosed={selectedIsClosed}
           closedNote={selectedClosedNote}
           onClose={() => setSelectedDay(null)}
+          productAvailability={detailProductAvailability}
+          productById={productById}
         />
       )}
     </div>
@@ -412,6 +502,8 @@ type DayDetailProps = {
   isClosed: boolean;
   closedNote: string | null;
   onClose: () => void;
+  productAvailability: ProductSizeAvail[];
+  productById: Map<string, CalendarProduct>;
 };
 
 function DayDetailPanel({
@@ -421,6 +513,8 @@ function DayDetailPanel({
   isClosed,
   closedNote,
   onClose,
+  productAvailability,
+  productById,
 }: DayDetailProps) {
   return (
     <div
@@ -443,7 +537,7 @@ function DayDetailPanel({
           gap: 8,
         }}
       >
-        <div style={{ fontWeight: 700, fontSize: 16 }}>{fmtThaiDate(dateStr)}</div>
+        <div style={{ fontWeight: 700, fontSize: 16 }}>{fmtThaiLong(dateStr)}</div>
         <button
           type="button"
           onClick={onClose}
@@ -499,7 +593,127 @@ function DayDetailPanel({
         </div>
       )}
 
-      {/* Bookings list */}
+      {/* ── Size availability summary ── */}
+      {productAvailability.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <div
+            style={{
+              fontWeight: 600,
+              fontSize: 12,
+              color: "var(--ink-3)",
+              marginBottom: 6,
+              letterSpacing: "0.03em",
+              textTransform: "uppercase",
+            }}
+          >
+            สรุปความว่างตามไซส์
+          </div>
+          <div style={{ display: "grid", gap: 6 }}>
+            {productAvailability.map(({ product, hasBlackout: prodBlackout, shopClosed, sizes }) => (
+              <div
+                key={product.id}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 10,
+                  padding: "8px 10px",
+                  background: "var(--bg)",
+                  borderRadius: 8,
+                  border: "1px solid var(--line)",
+                }}
+              >
+                {/* Product thumbnail */}
+                {product.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={product.imageUrl}
+                    alt={product.name}
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 6,
+                      objectFit: "cover",
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 6,
+                      background: "var(--line)",
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
+                    {product.name}
+                  </div>
+                  {shopClosed || prodBlackout ? (
+                    <div style={{ fontSize: 11, color: "var(--danger)" }}>
+                      {shopClosed ? "ร้านหยุดทำการ — ทุกไซส์ไม่ว่าง" : "ปิดสินค้าชั่วคราว — ทุกไซส์ไม่ว่าง"}
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                      {/* Free sizes */}
+                      {sizes.some((s) => !s.blocked) && (
+                        <>
+                          <span style={{ fontSize: 11, color: "var(--ink-3)" }}>ว่าง:</span>
+                          {sizes
+                            .filter((s) => !s.blocked)
+                            .map((s) => (
+                              <span
+                                key={s.size}
+                                style={{
+                                  padding: "2px 7px",
+                                  borderRadius: 999,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  background: "var(--success-soft)",
+                                  color: "var(--success)",
+                                }}
+                              >
+                                {s.size}
+                              </span>
+                            ))}
+                        </>
+                      )}
+                      {/* Blocked sizes */}
+                      {sizes.some((s) => s.blocked) && (
+                        <>
+                          <span style={{ fontSize: 11, color: "var(--ink-3)" }}>ไม่ว่าง:</span>
+                          {sizes
+                            .filter((s) => s.blocked)
+                            .map((s) => (
+                              <span
+                                key={s.size}
+                                style={{
+                                  padding: "2px 7px",
+                                  borderRadius: 999,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  background: "var(--danger-soft)",
+                                  color: "var(--danger)",
+                                  textDecoration: "line-through",
+                                }}
+                              >
+                                {s.size}
+                              </span>
+                            ))}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Bookings list ── */}
       {bookings.length === 0 ? (
         <div style={{ fontSize: 13, color: "var(--ink-3)", padding: "8px 0" }}>
           ไม่มีการจองในวันนี้
@@ -509,13 +723,13 @@ function DayDetailPanel({
           {bookings.map((b) => {
             const meta = BOOKING_STATUS_META[b.status as BookingStatus];
             const tone = STATUS_TONE[meta?.tone ?? "neutral"] ?? STATUS_TONE.neutral;
+            const product = productById.get(b.productId);
             return (
               <Link
                 key={b.id}
                 href={`/sell/bookings/${b.id}`}
                 style={{
                   display: "flex",
-                  justifyContent: "space-between",
                   alignItems: "flex-start",
                   gap: 10,
                   padding: "10px 12px",
@@ -527,8 +741,44 @@ function DayDetailPanel({
                   transition: "border-color 0.12s",
                 }}
               >
+                {/* Product thumbnail (small) */}
+                {product?.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={product.imageUrl}
+                    alt={b.productName}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 5,
+                      objectFit: "cover",
+                      flexShrink: 0,
+                      marginTop: 1,
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 5,
+                      background: "var(--line)",
+                      flexShrink: 0,
+                      marginTop: 1,
+                    }}
+                  />
+                )}
+
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div
+                    style={{
+                      fontWeight: 600,
+                      fontSize: 14,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {b.productName}
                   </div>
                   {b.renterName && (
@@ -537,24 +787,50 @@ function DayDetailPanel({
                     </div>
                   )}
                   <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 3 }}>
-                    {fmtShort(b.startDate)} – {fmtShort(b.endDate)}
+                    {fmtThaiShort(b.startDate)} – {fmtThaiShort(b.endDate)}
                   </div>
                 </div>
-                <span
+
+                {/* Size badge + status pill */}
+                <div
                   style={{
-                    display: "inline-block",
-                    padding: "3px 9px",
-                    borderRadius: 999,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    background: tone.bg,
-                    color: tone.fg,
-                    whiteSpace: "nowrap",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    gap: 4,
                     flexShrink: 0,
                   }}
                 >
-                  {meta?.label ?? b.status}
-                </span>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "2px 8px",
+                      borderRadius: 999,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      background: b.size ? "var(--info-soft)" : "var(--bg)",
+                      color: b.size ? "var(--cobalt)" : "var(--ink-3)",
+                      border: "1px solid var(--line)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {b.size ? `ไซส์ ${b.size}` : "ไม่ระบุไซส์"}
+                  </span>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "3px 9px",
+                      borderRadius: 999,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      background: tone.bg,
+                      color: tone.fg,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {meta?.label ?? b.status}
+                  </span>
+                </div>
               </Link>
             );
           })}

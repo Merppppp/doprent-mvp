@@ -11,30 +11,9 @@ type Props = {
   initialMonth?: number;
 };
 
-const DAYS_TH = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
-const MONTHS_TH = [
-  "ม.ค.",
-  "ก.พ.",
-  "มี.ค.",
-  "เม.ย.",
-  "พ.ค.",
-  "มิ.ย.",
-  "ก.ค.",
-  "ส.ค.",
-  "ก.ย.",
-  "ต.ค.",
-  "พ.ย.",
-  "ธ.ค.",
-];
+import { DAYS_TH, MONTHS_TH, toLocalYmd } from "@/lib/date-th";
 
-function toLocalDateString(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-const TODAY = toLocalDateString(new Date());
+const TODAY = toLocalYmd(new Date());
 
 export default function ProductAvailabilityCalendar({
   blackouts = [],
@@ -189,7 +168,7 @@ export default function ProductAvailabilityCalendar({
             );
           }
 
-          const dateStr = toLocalDateString(cell.date);
+          const dateStr = toLocalYmd(cell.date);
           const isToday = dateStr === TODAY;
           const isPast = dateStr < TODAY;
           const isBlackout = blackoutSet.has(dateStr);

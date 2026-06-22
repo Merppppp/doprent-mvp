@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createShop } from "@/app/actions/seller";
 import RequiredMark from "@/components/RequiredMark";
 import { BANGKOK_DISTRICTS, findDistrict, PROVINCE_TH } from "@/lib/bangkok-districts";
+import { prepareImageFileForUpload } from "@/lib/image";
 
 const COLORS = [
   { key: "rose", label: "กุหลาบ" },
@@ -34,10 +35,39 @@ export default function SignupForm(_props: Props) {
   const [subdistrict, setSubdistrict] = useState("");
   const [postal, setPostal] = useState("");
 
+  // Payment / bankbook state
+  const [promptpayId, setPromptpayId] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankbookKey, setBankbookKey] = useState("");
+  const [bankbookUploading, setBankbookUploading] = useState(false);
+  const [bankbookError, setBankbookError] = useState<string | null>(null);
+  const bankbookInputRef = useRef<HTMLInputElement>(null);
+
   const subdistricts = useMemo(() => {
     const d = findDistrict(district);
     return d?.subdistricts ?? [];
   }, [district]);
+
+  async function handleBankbookFile(file: File) {
+    setBankbookError(null);
+    setBankbookUploading(true);
+    try {
+      const prepared = await prepareImageFileForUpload(file);
+      const fd = new FormData();
+      fd.append("file", prepared);
+      const res = await fetch("/api/upload/bankbook", { method: "POST", body: fd });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error((j as { error?: string }).error ?? "อัปโหลดไม่สำเร็จ");
+      }
+      const j = (await res.json()) as { key: string };
+      setBankbookKey(j.key);
+    } catch (e) {
+      setBankbookError((e as Error).message);
+    } finally {
+      setBankbookUploading(false);
+    }
+  }
 
   function onDistrictChange(v: string) {
     setDistrict(v);
@@ -64,6 +94,11 @@ export default function SignupForm(_props: Props) {
       setError("กรุณาเลือกแขวง/ตำบล");
       return;
     }
+    // HARD-BLOCK: bank account filled but no bankbook
+    if (bankAccountNumber.trim() && !bankbookKey) {
+      setError("กรุณาแนบรูปหน้าสมุดบัญชีเพื่อยืนยันเลขบัญชี");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -79,6 +114,9 @@ export default function SignupForm(_props: Props) {
         formData.set("area_key", d.en);
         formData.set("area_label", `เขต${d.th} · กรุงเทพ`);
       }
+
+      // Pass bankbook key (private R2 object key, never a public URL)
+      formData.set("bankbook_image_path", bankbookKey);
 
       const res = await createShop(formData);
       if (!res.ok) {
@@ -96,11 +134,11 @@ export default function SignupForm(_props: Props) {
   return (
     <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       <Field label="ชื่อร้าน" hint="แสดงบนหน้าเว็บ ใช้ได้ทั้งไทย/อังกฤษ" required>
-        <input type="text" name="name" required aria-required={true} maxLength={60} style={inputStyle} />
+        <input type="text" name="name" required aria-required={true} maxLength={60} className="input input-surface" />
       </Field>
 
       <Field label="ผู้ดูแล (ไม่บังคับ)" hint='เช่น "คุณนิด" — จะแสดงใต้ชื่อร้านในหน้าโปรไฟล์'>
-        <input type="text" name="owner_name" maxLength={50} style={inputStyle} />
+        <input type="text" name="owner_name" maxLength={50} className="input input-surface" />
       </Field>
 
       {/* ==== ADDRESS SECTION ==== */}
@@ -126,7 +164,7 @@ export default function SignupForm(_props: Props) {
               aria-required={true}
               maxLength={80}
               placeholder="เช่น 88/8 ชั้น 2"
-              style={inputStyle}
+              className="input input-surface"
             />
           </Field>
 
@@ -136,7 +174,7 @@ export default function SignupForm(_props: Props) {
               name="street"
               maxLength={80}
               placeholder="เช่น ซ.ทองหล่อ 9, ถ.สุขุมวิท 55"
-              style={inputStyle}
+              className="input input-surface"
             />
           </Field>
 
@@ -147,7 +185,7 @@ export default function SignupForm(_props: Props) {
                 onChange={(e) => onDistrictChange(e.target.value)}
                 required
                 aria-required={true}
-                style={inputStyle}
+                className="input input-surface"
               >
                 <option value="">— เลือกเขต —</option>
                 {BANGKOK_DISTRICTS.map((d) => (
@@ -165,7 +203,7 @@ export default function SignupForm(_props: Props) {
                 required
                 aria-required={true}
                 disabled={!district}
-                style={{ ...inputStyle, opacity: !district ? 0.5 : 1 }}
+                className="input input-surface" style={{ opacity: !district ? 0.5 : 1 }}
               >
                 <option value="">
                   {district ? "— เลือกแขวง —" : "เลือกเขตก่อน"}
@@ -185,7 +223,7 @@ export default function SignupForm(_props: Props) {
                 type="text"
                 value={PROVINCE_TH}
                 disabled
-                style={{ ...inputStyle, background: "var(--bg)", color: "var(--ink-3)" }}
+                className="input" style={{ background: "var(--bg)", color: "var(--ink-3)" }}
               />
             </Field>
             <Field label="รหัสไปรษณีย์">
@@ -196,7 +234,7 @@ export default function SignupForm(_props: Props) {
                 maxLength={5}
                 placeholder="—"
                 inputMode="numeric"
-                style={inputStyle}
+                className="input input-surface"
               />
             </Field>
           </div>
@@ -219,24 +257,24 @@ export default function SignupForm(_props: Props) {
           required
           aria-required={true}
           placeholder="@yourshop, https://line.me/..., หรือ https://lin.ee/..."
-          style={inputStyle}
+          className="input input-surface"
         />
       </Field>
 
       <Field label="Instagram (ไม่บังคับ)" hint="เช่น @yourshop">
-        <input type="text" name="instagram" maxLength={40} style={inputStyle} placeholder="@..." />
+        <input type="text" name="instagram" maxLength={40} className="input input-surface" placeholder="@..." />
       </Field>
 
       <Field label="Facebook (ไม่บังคับ)" hint="ลิงก์เพจ หรือชื่อเพจ เช่น facebook.com/yourshop">
-        <input type="text" name="facebook" maxLength={120} style={inputStyle} placeholder="facebook.com/..." />
+        <input type="text" name="facebook" maxLength={120} className="input input-surface" placeholder="facebook.com/..." />
       </Field>
 
       <Field label="X / Twitter (ไม่บังคับ)" hint="เช่น @yourshop">
-        <input type="text" name="twitter" maxLength={40} style={inputStyle} placeholder="@..." />
+        <input type="text" name="twitter" maxLength={40} className="input input-surface" placeholder="@..." />
       </Field>
 
       <Field label="TikTok (ไม่บังคับ)" hint="เช่น @yourshop">
-        <input type="text" name="tiktok" maxLength={40} style={inputStyle} placeholder="@..." />
+        <input type="text" name="tiktok" maxLength={40} className="input input-surface" placeholder="@..." />
       </Field>
 
       <Field label="ปีที่เปิดบริการ (ไม่บังคับ)">
@@ -246,7 +284,7 @@ export default function SignupForm(_props: Props) {
           min={1980}
           max={new Date().getFullYear()}
           placeholder="2018"
-          style={{ ...inputStyle, width: 140 }}
+          className="input input-surface" style={{ width: 140 }}
         />
       </Field>
 
@@ -254,7 +292,7 @@ export default function SignupForm(_props: Props) {
         label="Tagline (ไม่บังคับ)"
         hint='ประโยคสั้นๆ ใต้ชื่อร้าน ไม่เกิน 80 ตัว เช่น "เดรสงานหมั้น handcrafted lace"'
       >
-        <input type="text" name="tag" maxLength={80} style={inputStyle} />
+        <input type="text" name="tag" maxLength={80} className="input input-surface" />
       </Field>
 
       <Field label="เกี่ยวกับร้าน (ไม่บังคับ)" hint="แนะนำตัวร้าน 2-3 ประโยค ใช้ได้ทั้งไทย/อังกฤษ">
@@ -262,12 +300,12 @@ export default function SignupForm(_props: Props) {
           name="story"
           maxLength={500}
           rows={3}
-          style={{ ...inputStyle, resize: "vertical" }}
+          className="input input-surface" style={{ resize: "vertical" }}
         />
       </Field>
 
       <Field label="สีหลักของร้าน" hint="ใช้กับ cover ตอนยังไม่มีรูป">
-        <select name="cover_color" style={inputStyle} defaultValue="rose">
+        <select name="cover_color" className="input input-surface" defaultValue="rose">
           {COLORS.map((c) => (
             <option key={c.key} value={c.key}>
               {c.label}
@@ -285,10 +323,28 @@ export default function SignupForm(_props: Props) {
           borderRadius: 8,
         }}
       >
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>วิธีรับเงิน (ไม่บังคับ)</div>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>ช่องทางรับชำระเงิน</div>
         <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 14, lineHeight: 1.5 }}>
-          ลูกค้าจะโอนเงินให้ร้านโดยตรง DopRent ไม่เก็บเงินแทน
+          ต้องมีอย่างน้อยหนึ่งช่องทาง (PromptPay หรือบัญชีธนาคาร) ก่อนลงขายสินค้าได้
+          — ลูกค้าจะโอนเงินให้ร้านโดยตรง DopRent ไม่เก็บเงินแทน
         </div>
+
+        {/* Soft warning: no channel selected yet */}
+        {!promptpayId.trim() && !bankAccountNumber.trim() && (
+          <div
+            style={{
+              padding: "10px 14px",
+              background: "#FFFBEB",
+              border: "1px solid #F59E0B",
+              borderRadius: 6,
+              fontSize: 13,
+              color: "#92400E",
+              marginBottom: 14,
+            }}
+          >
+            ⚠️ ยังไม่มีช่องทางรับชำระเงิน — ต้องเพิ่มก่อนจึงจะลงขายสินค้าได้
+          </div>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <Field
@@ -300,12 +356,26 @@ export default function SignupForm(_props: Props) {
               name="promptpay_id"
               maxLength={20}
               placeholder="เช่น 0812345678"
-              style={inputStyle}
+              value={promptpayId}
+              onChange={(e) => setPromptpayId(e.target.value)}
+              className="input input-surface"
             />
           </Field>
+          {/* Bold PromptPay remark */}
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--ink)",
+              marginTop: -8,
+              lineHeight: 1.5,
+            }}
+          >
+            ชื่อบัญชี PromptPay ต้องตรงกับชื่อในบัตรประชาชน/เอกสารนิติบุคคลที่ใช้ยืนยันร้าน (KYC)
+          </div>
 
           <Field label="ธนาคาร (ไม่บังคับ)">
-            <select name="bank_name" style={inputStyle} defaultValue="">
+            <select name="bank_name" className="input input-surface" defaultValue="">
               <option value="">— ไม่ระบุ —</option>
               <option value="ธ.กสิกรไทย">ธ.กสิกรไทย</option>
               <option value="ธ.ไทยพาณิชย์">ธ.ไทยพาณิชย์</option>
@@ -325,7 +395,9 @@ export default function SignupForm(_props: Props) {
               inputMode="numeric"
               maxLength={20}
               placeholder="เช่น 123-4-56789-0"
-              style={inputStyle}
+              value={bankAccountNumber}
+              onChange={(e) => setBankAccountNumber(e.target.value)}
+              className="input input-surface"
             />
           </Field>
 
@@ -335,9 +407,90 @@ export default function SignupForm(_props: Props) {
               name="bank_account_name"
               maxLength={100}
               placeholder="เช่น นางสาว วรรณิษา ใจดี"
-              style={inputStyle}
+              className="input input-surface"
             />
           </Field>
+
+          {/* Bankbook upload */}
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
+              รูปหน้าสมุดบัญชี{bankAccountNumber.trim() ? <RequiredMark /> : " (ไม่บังคับ)"}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8, lineHeight: 1.5 }}>
+              จำเป็นต้องแนบเมื่อระบุเลขบัญชี — เก็บเป็นความลับ ผู้ดูแลระบบเท่านั้นที่เห็นได้
+            </div>
+
+            {/* Hidden key — set programmatically */}
+            <input type="hidden" name="bankbook_image_path" value={bankbookKey} readOnly />
+
+            {bankbookKey ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "8px 12px",
+                  background: "var(--success-soft, #F0FDF4)",
+                  border: "1px solid var(--success, #22C55E)",
+                  borderRadius: 6,
+                  fontSize: 13,
+                  marginBottom: 8,
+                }}
+              >
+                <span style={{ color: "var(--success, #16A34A)", fontWeight: 600 }}>✓ แนบแล้ว</span>
+                <button
+                  type="button"
+                  style={{
+                    marginLeft: "auto",
+                    border: 0,
+                    background: "none",
+                    color: "var(--ink-3)",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                    textDecoration: "underline",
+                  }}
+                  onClick={() => {
+                    setBankbookKey("");
+                    if (bankbookInputRef.current) bankbookInputRef.current.value = "";
+                  }}
+                >
+                  เปลี่ยนรูป
+                </button>
+              </div>
+            ) : null}
+
+            <label
+              style={{
+                display: "inline-block",
+                padding: "9px 14px",
+                border: "1px solid var(--line)",
+                borderRadius: 6,
+                fontSize: 13,
+                background: "var(--surface)",
+                cursor: bankbookUploading ? "wait" : "pointer",
+                color: "var(--ink)",
+              }}
+            >
+              {bankbookUploading ? "กำลังอัปโหลด…" : bankbookKey ? "เปลี่ยนรูปสมุดบัญชี" : "เลือกรูปสมุดบัญชี"}
+              <input
+                ref={bankbookInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display: "none" }}
+                disabled={bankbookUploading}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (f) await handleBankbookFile(f);
+                }}
+              />
+            </label>
+
+            {bankbookError ? (
+              <div style={{ color: "var(--danger)", fontSize: 12, marginTop: 6 }}>{bankbookError}</div>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -400,12 +553,3 @@ function Field({
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  border: "1px solid var(--line)",
-  borderRadius: 6,
-  background: "var(--surface)",
-  fontSize: 14,
-  fontFamily: "inherit",
-};

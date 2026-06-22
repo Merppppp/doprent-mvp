@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, BookingStatus } from "@prisma/client";
 import type { Blackout, Color, Occasion, OccasionKey, PriceTier, Product, ProductCard, AdsTier, Shop, Status, KycStatus, Size } from "./types";
 
 /**
@@ -17,6 +17,9 @@ const FALLBACK_OCCASIONS: Occasion[] = [
   { key: "party",      th: "ปาร์ตี้",  en: "Party",      color_token: "purple",sort_order: 6 },
   { key: "work",       th: "ทำงาน",   en: "Work",       color_token: "black", sort_order: 7 },
   { key: "casual",     th: "ลำลอง",   en: "Casual",     color_token: "blue",  sort_order: 8 },
+  { key: "thai",       th: "ชุดไทย",  en: "Thai",       color_token: "rose",  sort_order: 9 },
+  { key: "graduation", th: "รับปริญญา", en: "Graduation", color_token: "navy", sort_order: 10 },
+  { key: "costume",    th: "คอสตูม/แฟนซี", en: "Costume",  color_token: "purple", sort_order: 11 },
 ];
 
 /** Default catalog product type — preserves today's dress-only browse behavior. */
@@ -47,8 +50,11 @@ export type ProductFilters = {
   lengthMax?: number;
   search?: string;
   sort?: "featured" | "price-asc" | "price-desc" | "name" | "rating-desc";
+  /** Filter by product type key (e.g. "suit"). Defaults to "dress" when absent. */
+  productTypeKey?: string;
   dateFrom?: string; // YYYY-MM-DD
   dateTo?: string;   // YYYY-MM-DD
+  openOnly?: boolean;
   page?: number;
 };
 
@@ -63,7 +69,7 @@ const PRODUCT_INCLUDE = {
   productTags: { select: { tag: { select: { key: true, tagGroup: { select: { key: true } } } } } },
   productType: { select: { key: true } },
   category: { select: { key: true } },
-  shop: { select: { name: true, verified: true, ratingAvg: true, ratingCount: true, area: { select: { key: true } } } },
+  shop: { select: { name: true, verified: true, ratingAvg: true, ratingCount: true, isOpen: true, area: { select: { key: true } } } },
 } satisfies Prisma.ProductInclude;
 
 type ProductRow = Prisma.ProductGetPayload<{ include: typeof PRODUCT_INCLUDE }>;
@@ -93,6 +99,7 @@ function mapProduct(d: ProductRow): Product {
     shop_rating_avg: d.shop.ratingAvg !== null && d.shop.ratingAvg !== undefined ? Number(d.shop.ratingAvg) : null,
     shop_rating_count: d.shop.ratingCount,
     area_key: d.shop.area?.key ?? null,
+    shop_is_open: d.shop.isOpen,
     product_type_key: d.productType.key,
     category_key: d.category?.key ?? null,
     size: d.size as Size,
@@ -145,6 +152,7 @@ function mapShop(b: PrismaShop, coverImage?: string | null): Shop {
     since_year: b.sinceYear,
     cover_color: b.coverColor as Color,
     cover_image: coverImage ?? null,
+    logo_url: b.logoUrl ?? null,
     tag: b.tag,
     story: b.story,
     delivery_info: b.deliveryInfo,
@@ -231,7 +239,10 @@ function mapShopWithCards(r: ShopWithPreviews, index: number): Shop {
  * Returns null when no candidates exceed the threshold — caller falls back
  * to the existing substring AND search so nothing regresses.
  */
-async function getTrigamRankedIds(q: string): Promise<string[] | null> {
+async function getTrigamRankedIds(
+  q: string,
+  productTypeKey: string = DEFAULT_PRODUCT_TYPE_KEY,
+): Promise<string[] | null> {
   type Row = { id: string; score: number };
 
   // All params are positional placeholders via Prisma tagged template —
@@ -242,17 +253,22 @@ async function getTrigamRankedIds(q: string): Promise<string[] | null> {
       SELECT
         p.id,
         GREATEST(
-          similarity(p.name,        ${q}),
-          COALESCE(similarity(p.designer,    ${q}), 0::real),
-          COALESCE(similarity(p.description, ${q}), 0::real),
-          similarity(s.name,        ${q})
+          MAX(similarity(p.name,        ${q})),
+          MAX(COALESCE(similarity(p.designer,    ${q}), 0::real)),
+          MAX(COALESCE(similarity(p.description, ${q}), 0::real)),
+          MAX(similarity(s.name,        ${q})),
+          COALESCE(MAX(similarity(t.label, ${q})), 0::real),
+          COALESCE(MAX(similarity(t.key,   ${q})), 0::real)
         ) AS score
       FROM products p
-      JOIN shops s         ON s.id  = p.shop_id
-      JOIN product_types pt ON pt.id = p.product_type_id
+      JOIN shops s           ON s.id  = p.shop_id
+      JOIN product_types pt  ON pt.id = p.product_type_id
+      LEFT JOIN product_tags ptg ON ptg.product_id = p.id
+      LEFT JOIN tags t           ON t.id = ptg.tag_id
       WHERE p.status    = 'live'
         AND p.available = true
-        AND pt.key      = ${DEFAULT_PRODUCT_TYPE_KEY}
+        AND pt.key      = ${productTypeKey}
+      GROUP BY p.id
     ) sub
     WHERE sub.score > 0.15
     ORDER BY sub.score DESC
@@ -273,12 +289,12 @@ export async function listProducts(
   const PAGE_SIZE = 25;
   const page = Math.max(1, opts.page ?? 1);
 
-  // Build where clause — catalog default: dress-type products only
-  // (preserves today's behavior until multi-type browse ships).
+  // Build where clause — default to dress when no productTypeKey provided.
+  const effectiveTypeKey = opts.productTypeKey ?? DEFAULT_PRODUCT_TYPE_KEY;
   const where: Prisma.ProductWhereInput = {
     status: "live",
     available: true,
-    productType: { key: DEFAULT_PRODUCT_TYPE_KEY },
+    productType: { key: effectiveTypeKey },
   };
 
   if (opts.sizes?.length) where.size = { in: opts.sizes as unknown as Prisma.EnumSizeFilter<"Product">["in"] };
@@ -328,6 +344,11 @@ export async function listProducts(
     where.shop = { slug: { in: opts.shopSlugs } };
   }
 
+  // Open shops only (optional filter)
+  if (opts.openOnly) {
+    where.shop = { ...where.shop as Prisma.ShopWhereInput, isOpen: true };
+  }
+
   // Body-measurement filter — one variant must satisfy ALL active bounds simultaneously.
   // Placed on the Prisma `where` object so it applies to both the standard path and the
   // trigram path (both call db.product.findMany({ where, ... }) with the same object).
@@ -359,18 +380,92 @@ export async function listProducts(
 
   // Date range: compute blocked product IDs first — needed before the search
   // section so the trigram path can pre-filter the ranked candidate list.
+  //
+  // Two sources of blocked IDs:
+  //   1. ProductBlackoutDate rows falling in the requested date range.
+  //   2. Products FULLY BOOKED for the range: the total count of overlapping
+  //      active bookings meets or exceeds total variant capacity.
+  //
+  // Active statuses — mirrors ACTIVE_BOOKING_STATUSES in app/actions/bookings.ts:183
+  // and ACTIVE_STATUSES in lib/bookings.ts. Must stay in sync with both.
+  // Typed as BookingStatus[] so Prisma's Exact<> enum filter accepts it.
+  const ACTIVE_BOOKING_STATUSES_CATALOG: BookingStatus[] = [
+    "booking_pending",
+    "waiting_for_payment",
+    "payment_review",
+    "confirmed",
+  ];
+  //
+  // Capacity approximation: we compare the TOTAL count of overlapping active
+  // bookings (across the whole requested range) against total unit capacity
+  // (sum of available ProductVariant.quantity; 1 for products with no variants).
+  // This is conservative — it may over-block products whose bookings don't all
+  // occupy the same day — but it NEVER surfaces a genuinely fully-booked product
+  // as available.  Tradeoff: a product with N units where N separate bookings
+  // each cover a different non-overlapping sub-range inside [dateFrom,dateTo]
+  // will appear blocked even though it has spare units every day.  Acceptable
+  // for a list-page pre-filter; the product detail page runs the exact per-day
+  // check via computeUnavailableDates().
   let blockedIds: string[] = [];
   if (opts.dateFrom || opts.dateTo) {
-    const blocked = await db.productBlackoutDate.findMany({
-      where: {
-        date: {
-          gte: opts.dateFrom ? new Date(opts.dateFrom) : undefined,
-          lte: opts.dateTo ? new Date(opts.dateTo) : undefined,
+    // Open-ended queries get sentinel dates so the overlap predicate is correct.
+    const dateFromDate = opts.dateFrom ? new Date(opts.dateFrom) : new Date("2000-01-01");
+    const dateToDate   = opts.dateTo   ? new Date(opts.dateTo)   : new Date("2100-12-31");
+
+    // Run both pre-filter queries in parallel.
+    // Overlap predicate: booking.startDate ≤ dateTo AND booking.endDate ≥ dateFrom.
+    // Using findMany+select (not groupBy) for stable Prisma type inference;
+    // in-memory grouping is trivial at list-page volumes.
+    const [blackoutRows, overlappingBookings] = await Promise.all([
+      db.productBlackoutDate.findMany({
+        where: {
+          date: {
+            gte: opts.dateFrom ? new Date(opts.dateFrom) : undefined,
+            lte: opts.dateTo   ? new Date(opts.dateTo)   : undefined,
+          },
         },
-      },
-      select: { productId: true },
-    });
-    blockedIds = [...new Set(blocked.map((b) => b.productId))];
+        select: { productId: true },
+      }),
+      db.booking.findMany({
+        where: {
+          status: { in: ACTIVE_BOOKING_STATUSES_CATALOG },
+          startDate: { lte: dateToDate },
+          endDate:   { gte: dateFromDate },
+        },
+        select: { productId: true },
+      }),
+    ]);
+
+    const blockedSet = new Set(blackoutRows.map((b) => b.productId));
+
+    if (overlappingBookings.length > 0) {
+      // Count overlapping active bookings per product (in memory, no N+1).
+      const bookingCountMap = new Map<string, number>();
+      for (const b of overlappingBookings) {
+        bookingCountMap.set(b.productId, (bookingCountMap.get(b.productId) ?? 0) + 1);
+      }
+
+      // Fetch total available capacity: sum of variant quantities per product.
+      // Products with no variants default to capacity = 1 (single-unit product).
+      const affectedIds = [...bookingCountMap.keys()];
+      const variantRows = await db.productVariant.findMany({
+        where: { productId: { in: affectedIds }, available: true },
+        select: { productId: true, quantity: true },
+      });
+      const capacityMap = new Map<string, number>();
+      for (const v of variantRows) {
+        capacityMap.set(v.productId, (capacityMap.get(v.productId) ?? 0) + v.quantity);
+      }
+
+      for (const [productId, count] of bookingCountMap) {
+        const capacity = capacityMap.get(productId) ?? 1; // no variants → single-unit
+        if (count >= capacity) {
+          blockedSet.add(productId);
+        }
+      }
+    }
+
+    blockedIds = [...blockedSet];
   }
 
   // Search — try trigram similarity first; fall back to substring AND when no
@@ -381,7 +476,7 @@ export async function listProducts(
     const q = opts.search.trim();
     // pg_trgm requires at least 2 characters to form meaningful trigrams.
     if (q.length >= 2) {
-      trigramRankedIds = await getTrigamRankedIds(q);
+      trigramRankedIds = await getTrigamRankedIds(q, effectiveTypeKey);
     }
 
     if (trigramRankedIds !== null) {
@@ -543,6 +638,94 @@ export async function listShops(opts: { limit?: number; featuredFirst?: boolean;
   return rows.map((r, index) => mapShopWithCards(r, index));
 }
 
+/** Default page size for the public /shops "load more" feed. */
+export const SHOPS_PAGE_SIZE = 24;
+
+/** Minimal shop row for the /shops finder grid (no product join — the finder
+ *  doesn't render previews, so we keep this query light enough for thousands of
+ *  shops with offset pagination + a free-text DB filter). */
+export type ShopListItem = {
+  id: string;
+  slug: string;
+  name: string;
+  areaKey: string | null;
+  areaLabel: string;
+  coverColor: Color;
+  /** Shop logo URL, else null (card falls back to the gradient cover). */
+  coverImage: string | null;
+  featured: boolean;
+  verified: boolean;
+  tag: string | null;
+  sinceYear: number | null;
+  instagram: string | null;
+};
+
+/**
+ * Paginated, DB-filtered list of live shops for the public finder.
+ * Search (`q`) matches name / area / IG / tag case-insensitively at the DB.
+ * Returns the rows for this page plus the total matching count (for "hasMore").
+ */
+export async function listShopsPage(opts: {
+  q?: string;
+  skip?: number;
+  take?: number;
+} = {}): Promise<{ rows: ShopListItem[]; total: number }> {
+  const q = (opts.q ?? "").trim();
+  const where: Prisma.ShopWhereInput = {
+    status: "live",
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { areaLabel: { contains: q, mode: "insensitive" } },
+            { instagram: { contains: q, mode: "insensitive" } },
+            { tag: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+  const [rows, total] = await Promise.all([
+    db.shop.findMany({
+      where,
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        areaLabel: true,
+        coverColor: true,
+        featured: true,
+        verified: true,
+        tag: true,
+        sinceYear: true,
+        instagram: true,
+        logoUrl: true,
+        area: { select: { key: true } },
+      },
+      orderBy: [{ featured: "desc" }, { name: "asc" }],
+      skip: opts.skip ?? 0,
+      take: opts.take ?? SHOPS_PAGE_SIZE,
+    }),
+    db.shop.count({ where }),
+  ]);
+  return {
+    rows: rows.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      name: r.name,
+      areaKey: r.area?.key ?? null,
+      areaLabel: r.areaLabel,
+      coverColor: r.coverColor as Color,
+      coverImage: r.logoUrl ?? null,
+      featured: r.featured,
+      verified: r.verified,
+      tag: r.tag,
+      sinceYear: r.sinceYear,
+      instagram: r.instagram,
+    })),
+    total,
+  };
+}
+
 export async function getShopBySlug(slug: string): Promise<Shop | null> {
   const b = await db.shop.findUnique({
     where: { slug },
@@ -597,14 +780,41 @@ export async function listOccasions(): Promise<Occasion[]> {
     .sort((a, b) => a.sort_order - b.sort_order || a.key.localeCompare(b.key));
 }
 
-export async function listBlackouts(productId: string): Promise<string[]> {
+/**
+ * List blackout dates for a product.
+ * variantId = undefined → product-wide only (variantId IS NULL).
+ * variantId = string   → variant-specific only.
+ * variantId = "all"    → all blackouts (product-wide + all variants).
+ */
+export async function listBlackouts(
+  productId: string,
+  variantId?: string | null,
+): Promise<{ date: string; variantId: string | null }[]> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
+  const where: Record<string, any> = { productId, date: { gte: today } };
+  if (variantId && variantId !== "all") {
+    where.OR = [{ variantId: null }, { variantId }];
+    delete where.variantId;
+  } else if (!variantId) {
+    where.variantId = null;
+  }
+  // variantId === "all" → no variantId filter
+
   const rows = await db.productBlackoutDate.findMany({
-    where: { productId, date: { gte: today } },
+    where: variantId && variantId !== "all"
+      ? { productId, date: { gte: today }, OR: [{ variantId: null }, { variantId }] }
+      : variantId === "all"
+        ? { productId, date: { gte: today } }
+        : { productId, date: { gte: today }, variantId: null },
     orderBy: { date: "asc" },
+    select: { date: true, variantId: true },
   });
-  return rows.map((r) => r.date.toISOString().slice(0, 10));
+  return rows.map((r) => ({
+    date: r.date.toISOString().slice(0, 10),
+    variantId: r.variantId,
+  }));
 }
 
 export async function getStats(): Promise<{ shops: number; products: number; minPrice: number }> {

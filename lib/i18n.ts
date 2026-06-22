@@ -14,12 +14,20 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   "nav.followUs": { th: "ติดตามเราบน", en: "Follow us on" },
   "nav.login":    { th: "เข้าสู่ระบบ",          en: "Sign In" },
   "nav.signup":   { th: "สมัครสมาชิก",           en: "Sign Up" },
-  "nav.savedAria":{ th: "ชุดที่ถูกใจ",           en: "Liked dresses" },
+  "nav.savedAria":{ th: "สินค้าที่ถูกใจ",          en: "Liked items" },
 
   // ── Search ────────────────────────────────────────────────────────────────
   "search.placeholder": { th: "ค้นหาชุด...",             en: "Search dresses..." },
   "search.label":       { th: "ค้นหาชุดเช่า",            en: "Search dress rentals" },
   "search.button":      { th: "ค้นหา",                  en: "Search" },
+  "search.loading":     { th: "กำลังค้นหา...",          en: "Searching..." },
+  "search.empty":       { th: "ไม่พบผลลัพธ์",            en: "No results" },
+  "search.products":    { th: "สินค้า",                 en: "Products" },
+  "search.shops":       { th: "ร้านค้า",                en: "Shops" },
+  "search.shop":        { th: "ร้านค้า",                en: "Shop" },
+  "search.brands":      { th: "แบรนด์",                 en: "Brands" },
+  "search.brand":       { th: "แบรนด์",                 en: "Brand" },
+  "search.searchFor":   { th: "ค้นหา",                  en: "Search for" },
 
   // ── Sort ─────────────────────────────────────────────────────────────────
   "sort.label":       { th: "เรียงลำดับ",      en: "Sort" },
@@ -49,7 +57,6 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   "filter.waist":               { th: "รอบเอว",                   en: "Waist" },
   "filter.length":              { th: "ความยาว",                  en: "Length" },
   "unit.cm":                    { th: "ซม.",                       en: "cm" },
-
   // Dress-type sub-group headers
   "type.group.top":    { th: "เสื้อ",                  en: "Tops" },
   "type.group.bottom": { th: "กางเกง / กระโปรง",      en: "Bottoms" },
@@ -102,7 +109,7 @@ const TRANSLATIONS: Record<string, Record<Locale, string>> = {
 
   // ── User menu ────────────────────────────────────────────────────────────
   "menu.myBookings":   { th: "การจองของฉัน",        en: "My Bookings" },
-  "menu.savedItems":   { th: "สินค้าที่ชอบ",         en: "Saved Items" },
+  "menu.savedItems":   { th: "สินค้าที่ถูกใจ",        en: "Saved Items" },
   "menu.likedShops":   { th: "ร้านค้าที่ถูกใจ",     en: "Liked Shops" },
   "menu.myAccount":    { th: "บัญชีของฉัน",          en: "My Account" },
   "menu.manageShop":   { th: "จัดการร้านค้า",        en: "Manage Shop" },

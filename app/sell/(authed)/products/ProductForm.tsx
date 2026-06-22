@@ -5,14 +5,17 @@ import { useState } from "react";
 import { createProduct, updateProduct } from "@/app/actions/seller";
 import { requestTag } from "@/app/actions/seller-tags";
 import type { BoundTagGroup } from "@/lib/tag-groups";
-import type { PriceTier, Size } from "@/lib/types";
+import { type PriceTier, type Size, SIZES, sizeLabel } from "@/lib/types";
 import { priceForNights } from "@/lib/pricing";
+import { prepareImageFileForUpload } from "@/lib/image";
 import RequiredMark from "@/components/RequiredMark";
 import ToggleSwitch from "@/components/ToggleSwitch";
 
 // PriceTier imported for priceForNights usage (legacy type — kept)
 type _UsedPriceTier = PriceTier;
 
+/** ตัวเลือกประเภทสินค้า */
+type ProductTypeOption = { id: string; key: string; label: string };
 /** กลุ่มแท็กสำหรับ dropdown ขอเพิ่มแท็ก */
 type TagGroupOption = { id: string; key: string; label: string };
 /** คำขอเพิ่มแท็กของร้านนี้ */
@@ -25,8 +28,8 @@ type ShopTagRequest = {
   tagGroup: { label: string; key: string };
 };
 
-/** Sizes available in the DB enum (XS–XL only — no enum additions allowed) */
-const SIZES: Size[] = ["XS", "S", "M", "L", "XL"];
+// Canonical size list (XXXS … 4XL, Free size) lives in lib/types — shared with
+// the browse filter so the form offers exactly the sizes a shopper can filter by.
 
 type TierEntry = { minDays: number; pricePerDay: number };
 
@@ -73,6 +76,10 @@ type Props =
       tagGroupSections: BoundTagGroup[];
       tagGroups: TagGroupOption[];
       shopTagRequests: ShopTagRequest[];
+      /** All active product types — enables the type selector (create-only). */
+      productTypes?: ProductTypeOption[];
+      /** Tag-group sections keyed by productTypeId (create-only, multi-type form). */
+      tagGroupSectionsByType?: Record<string, BoundTagGroup[]>;
     }
   | {
       mode: "edit";
@@ -130,11 +137,6 @@ const labelStyle: React.CSSProperties = {
   color: "var(--ink-2)", marginBottom: 6,
 };
 
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "10px 12px", fontSize: 14, borderRadius: 7,
-  border: "1px solid var(--line)", background: "var(--surface)",
-  color: "var(--ink)", outline: "none", boxSizing: "border-box",
-};
 
 function Labeled({
   label, hint, required, children,
@@ -160,6 +162,32 @@ export default function ProductForm(props: Props) {
   const router = useRouter();
   const isEdit = props.mode === "edit";
   const initial = isEdit ? props.initial : null;
+
+  // ── Product type selection (create mode only) ─────────────────────────────
+  const [selectedTypeId, setSelectedTypeId] = useState(props.productTypeId);
+
+  /** Active tag-group sections: multi-type map (create) or single-type list (edit/legacy). */
+  const activeSections: BoundTagGroup[] =
+    !isEdit && props.mode === "create" && props.tagGroupSectionsByType
+      ? (props.tagGroupSectionsByType[selectedTypeId] ?? props.tagGroupSections)
+      : props.tagGroupSections;
+
+  function handleTypeChange(newTypeId: string) {
+    const newSections: BoundTagGroup[] =
+      props.mode === "create" && props.tagGroupSectionsByType
+        ? (props.tagGroupSectionsByType[newTypeId] ?? [])
+        : [];
+    const newGroupKeys = new Set(newSections.map((g) => g.groupKey));
+    // Clear tag selections that don't belong to the new type's groups
+    setSelectedByGroup((curr) => {
+      const next: Record<string, string[]> = {};
+      for (const [k, v] of Object.entries(curr)) {
+        if (newGroupKeys.has(k)) next[k] = v;
+      }
+      return next;
+    });
+    setSelectedTypeId(newTypeId);
+  }
 
   // ── Basic fields ─────────────────────────────────────────────────────────
   const [name, setName] = useState(initial?.name ?? "");
@@ -279,8 +307,8 @@ export default function ProductForm(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // ── Bound group ids ───────────────────────────────────────────────────────
-  const boundGroupIds = new Set(props.tagGroupSections.map((g) => g.groupId));
+  // ── Bound group ids (derived from activeSections) ────────────────────────
+  const boundGroupIds = new Set(activeSections.map((g) => g.groupId));
   const boundTagGroups = props.tagGroups.filter((g) => boundGroupIds.has(g.id));
   const tagReqGroupOptions = boundTagGroups.length > 0 ? boundTagGroups : props.tagGroups;
 
@@ -323,8 +351,11 @@ export default function ProductForm(props: Props) {
     setUploadingCount(files.length);
     try {
       for (let i = 0; i < files.length; i++) {
+        // Downscale + re-encode (WebP/JPEG, <=1920px, <=2MB) in the browser
+        // before upload so large phone photos don't blow the 2MB server limit.
+        const prepared = await prepareImageFileForUpload(files[i]);
         const fd = new FormData();
-        fd.append("file", files[i]);
+        fd.append("file", prepared);
         const res = await fetch("/api/upload", { method: "POST", body: fd });
         if (!res.ok) {
           setError("อัปโหลดรูปไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง");
@@ -334,6 +365,9 @@ export default function ProductForm(props: Props) {
         uploads.push(json.urls?.large ?? json.url ?? "");
       }
       setImages((curr) => [...curr, ...uploads.filter(Boolean)]);
+    } catch (err) {
+      // Surface the Thai 2MB / unreadable-image error thrown by prepareImageFileForUpload.
+      setError((err as Error).message || "อัปโหลดรูปไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง");
     } finally {
       setUploadingCount(0);
     }
@@ -386,8 +420,8 @@ export default function ProductForm(props: Props) {
     setError(null);
     setSubmitting(true);
 
-    // Validate required tag groups
-    for (const g of props.tagGroupSections) {
+    // Validate required tag groups (use active sections for the selected type)
+    for (const g of activeSections) {
       if (g.isRequired) {
         const sel = selectedByGroup[g.groupKey] ?? [];
         if (sel.length === 0) {
@@ -406,7 +440,7 @@ export default function ProductForm(props: Props) {
     }
     for (const vr of variantRows) {
       if (vr.quantity < 1) {
-        setError(`จำนวนสต็อกของไซซ์ ${vr.size} ต้องอย่างน้อย 1`);
+        setError(`จำนวนสต็อกของไซซ์ ${sizeLabel(vr.size)} ต้องอย่างน้อย 1`);
         setSubmitting(false);
         return;
       }
@@ -419,12 +453,16 @@ export default function ProductForm(props: Props) {
     } else {
       for (const vr of variantRows) {
         const tiers = perSizeTiers[vr.size] ?? sharedTiers;
-        const tierErr = validateTierEntries(tiers, `ไซซ์ ${vr.size}`);
+        const tierErr = validateTierEntries(tiers, `ไซซ์ ${sizeLabel(vr.size)}`);
         if (tierErr) { setError(tierErr); setSubmitting(false); return; }
       }
     }
 
     const fd = new FormData();
+    // In create mode, pass the selected product type ID so createProduct knows which type to use
+    if (!isEdit) {
+      fd.set("productTypeId", selectedTypeId);
+    }
     fd.set("shop_id", props.shopId);
     fd.set("name", name);
     fd.set("designer", designer);
@@ -509,7 +547,7 @@ export default function ProductForm(props: Props) {
                         onChange(next);
                       }}
                       aria-label="วันเริ่มต้นของช่วงราคา"
-                      style={{ ...inputStyle, width: 60, textAlign: "center" }}
+                      className="input input-surface" style={{ width: 60, textAlign: "center" }}
                     />
                   </div>
                 )}
@@ -526,7 +564,7 @@ export default function ProductForm(props: Props) {
                     next[i] = { ...next[i], pricePerDay: parseInt(e.target.value) || 0 };
                     onChange(next);
                   }}
-                  placeholder="฿/วัน" style={{ ...inputStyle, flex: 1 }}
+                  placeholder="฿/วัน" className="input input-surface" style={{ flex: 1 }}
                 />
                 <span style={{ fontSize: 12, color: "var(--ink-3)", whiteSpace: "nowrap" }}>/วัน</span>
               </div>
@@ -577,6 +615,38 @@ export default function ProductForm(props: Props) {
     <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column" }}>
 
       {/* ═══════════════════════════════════════════
+          PRODUCT TYPE SELECTOR — create mode only
+          ═══════════════════════════════════════════ */}
+      {!isEdit && props.mode === "create" && props.productTypes && props.productTypes.length > 1 ? (
+        <div style={{ ...cardStyle, marginBottom: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink-2)", marginBottom: 10 }}>
+            ประเภทสินค้า
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {props.productTypes.map((pt) => {
+              const active = selectedTypeId === pt.id;
+              return (
+                <button
+                  key={pt.id}
+                  type="button"
+                  onClick={() => handleTypeChange(pt.id)}
+                  style={{
+                    padding: "8px 18px", fontSize: 14, fontWeight: active ? 600 : 400,
+                    border: `1.5px solid ${active ? "var(--ink)" : "var(--line)"}`,
+                    background: active ? "var(--ink)" : "var(--surface)",
+                    color: active ? "var(--on-dark)" : "var(--ink)",
+                    borderRadius: 8, cursor: "pointer",
+                  }}
+                >
+                  {pt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {/* ═══════════════════════════════════════════
           CARD 1 — ชุดนี้คืออะไร
           ═══════════════════════════════════════════ */}
       <div style={cardStyle}>
@@ -620,7 +690,7 @@ export default function ProductForm(props: Props) {
               <textarea
                 value={urlInput} onChange={(e) => setUrlInput(e.target.value)}
                 placeholder={"https://images.unsplash.com/photo-...\nhttps://..."}
-                rows={3} style={{ ...inputStyle, flex: 1, resize: "vertical", fontSize: 12 }}
+                rows={3} className="input input-surface" style={{ flex: 1, resize: "vertical", fontSize: 12 }}
               />
               <button type="button" onClick={addUrlImage} className="btn btn-outline" style={{ padding: "10px 14px", fontSize: 12, whiteSpace: "nowrap" }}>
                 + เพิ่ม
@@ -632,13 +702,13 @@ export default function ProductForm(props: Props) {
         {/* ชื่อชุด */}
         <div style={{ marginBottom: 14 }}>
           <Labeled label="ชื่อชุด" required>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required aria-required={true} maxLength={80} style={inputStyle} />
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required aria-required={true} maxLength={80} className="input input-surface" />
           </Labeled>
         </div>
 
         {/* แบรนด์ */}
         <Labeled label="แบรนด์ (ไม่บังคับ)">
-          <input type="text" value={designer} onChange={(e) => setDesigner(e.target.value)} maxLength={60} style={inputStyle} />
+          <input type="text" value={designer} onChange={(e) => setDesigner(e.target.value)} maxLength={60} className="input input-surface" />
         </Labeled>
       </div>
 
@@ -660,10 +730,10 @@ export default function ProductForm(props: Props) {
                   <select
                     value={row.size}
                     onChange={(e) => updateVariantRow(i, { size: e.target.value as Size })}
-                    style={{ ...inputStyle, width: 90, padding: "8px 6px", fontSize: 13 }}
+                    className="input input-surface" style={{ width: 90, padding: "8px 6px", fontSize: 13 }}
                   >
                     {SIZES.map((s) => (
-                      <option key={s} value={s} disabled={usedSizes.has(s) && s !== row.size}>{s}</option>
+                      <option key={s} value={s} disabled={usedSizes.has(s) && s !== row.size}>{sizeLabel(s)}</option>
                     ))}
                   </select>
                   {/* Qty stepper */}
@@ -718,7 +788,7 @@ export default function ProductForm(props: Props) {
                             const v = e.target.value.trim();
                             updateVariantRow(i, { [field]: v === "" ? null : (parseInt(v) || null) });
                           }}
-                          style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }}
+                          className="input input-surface" style={{ padding: "6px 8px", fontSize: 12 }}
                         />
                       </div>
                     ))}
@@ -785,7 +855,7 @@ export default function ProductForm(props: Props) {
               return (
                 <div key={row.size}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)", marginBottom: 8 }}>
-                    ไซซ์ {row.size}
+                    ไซซ์ {sizeLabel(row.size)}
                   </div>
                   <TierEditor
                     tiers={tiers}
@@ -803,7 +873,7 @@ export default function ProductForm(props: Props) {
             <input
               type="number" min={0} step={1} value={deposit}
               onChange={(e) => setDeposit(parseInt(e.target.value) || 0)}
-              style={inputStyle}
+              className="input input-surface"
             />
           </Labeled>
         </div>
@@ -830,18 +900,18 @@ export default function ProductForm(props: Props) {
                 value={description} onChange={(e) => setDescription(e.target.value)}
                 rows={4} maxLength={500}
                 placeholder="เช่น ผ้าซาตินสีกุหลาบ ปักลูกไม้ตรงคอ จับจีบที่เอว ใส่กับเข็มขัดได้"
-                style={{ ...inputStyle, resize: "vertical" }}
+                className="input input-surface" style={{ resize: "vertical" }}
               />
             </Labeled>
 
-            {/* Tag group sections */}
-            {props.tagGroupSections.length > 0 ? (
+            {/* Tag group sections (uses activeSections for the selected product type) */}
+            {activeSections.length > 0 ? (
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)", marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid var(--line)" }}>
                   คุณสมบัติชุด
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  {props.tagGroupSections.map((g) => (
+                  {activeSections.map((g) => (
                     <Labeled
                       key={g.groupId}
                       label={g.selectionMode === "single" ? g.groupLabel : `${g.groupLabel} (เลือกได้หลายอัน)`}
@@ -916,7 +986,7 @@ export default function ProductForm(props: Props) {
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingLeft: 8, borderLeft: "2px solid var(--line)" }}>
                     <div>
                       <label style={{ ...labelStyle, fontSize: 13 }}>กลุ่มแท็ก</label>
-                      <select value={tagReqGroupId} onChange={(e) => setTagReqGroupId(e.target.value)} style={inputStyle}>
+                      <select value={tagReqGroupId} onChange={(e) => setTagReqGroupId(e.target.value)} className="input input-surface">
                         {tagReqGroupOptions.map((g) => (
                           <option key={g.id} value={g.id}>{g.label}</option>
                         ))}
@@ -924,11 +994,11 @@ export default function ProductForm(props: Props) {
                     </div>
                     <div>
                       <label style={{ ...labelStyle, fontSize: 13 }}>ชื่อแท็กที่ต้องการ (ภาษาไทย) <RequiredMark /></label>
-                      <input type="text" value={tagReqLabel} onChange={(e) => setTagReqLabel(e.target.value)} maxLength={80} placeholder="เช่น งานกีฬาสี" style={inputStyle} />
+                      <input type="text" value={tagReqLabel} onChange={(e) => setTagReqLabel(e.target.value)} maxLength={80} placeholder="เช่น งานกีฬาสี" className="input input-surface" />
                     </div>
                     <div>
                       <label style={{ ...labelStyle, fontSize: 13 }}>slug key (ไม่บังคับ)</label>
-                      <input type="text" value={tagReqKey} onChange={(e) => setTagReqKey(e.target.value)} maxLength={48} placeholder="เช่น sport-event" style={inputStyle} />
+                      <input type="text" value={tagReqKey} onChange={(e) => setTagReqKey(e.target.value)} maxLength={48} placeholder="เช่น sport-event" className="input input-surface" />
                     </div>
                     {tagReqError ? <div style={{ fontSize: 12, color: "var(--danger)" }}>{tagReqError}</div> : null}
                     <button type="button" onClick={onTagRequest} disabled={tagReqSubmitting}
@@ -1002,7 +1072,7 @@ export default function ProductForm(props: Props) {
 
             {/* LINE override */}
             <Labeled label="LINE สำหรับชุดนี้" hint="ปล่อยว่างถ้าใช้ LINE หลักของร้าน">
-              <input type="text" value={lineUrl} onChange={(e) => setLineUrl(e.target.value)} style={inputStyle} />
+              <input type="text" value={lineUrl} onChange={(e) => setLineUrl(e.target.value)} className="input input-surface" />
             </Labeled>
 
             {/* Policy override */}
@@ -1018,19 +1088,19 @@ export default function ProductForm(props: Props) {
               {policyOverride ? (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, paddingLeft: 8, borderLeft: "2px solid var(--line)" }}>
                   <Labeled label="จองล่วงหน้าขั้นต่ำ (วัน)" hint="ว่าง = ใช้ค่าร้าน">
-                    <input type="number" min={0} value={overrideLeadTime} onChange={(e) => setOverrideLeadTime(e.target.value)} placeholder="ใช้ค่าร้าน" style={inputStyle} />
+                    <input type="number" min={0} value={overrideLeadTime} onChange={(e) => setOverrideLeadTime(e.target.value)} placeholder="ใช้ค่าร้าน" className="input input-surface" />
                   </Labeled>
                   <Labeled label="เช่าขั้นต่ำ (วัน)" hint="ว่าง = ใช้ค่าร้าน">
-                    <input type="number" min={1} value={overrideMinRental} onChange={(e) => setOverrideMinRental(e.target.value)} placeholder="ใช้ค่าร้าน" style={inputStyle} />
+                    <input type="number" min={1} value={overrideMinRental} onChange={(e) => setOverrideMinRental(e.target.value)} placeholder="ใช้ค่าร้าน" className="input input-surface" />
                   </Labeled>
                   <Labeled label="เช่าสูงสุด (วัน)" hint="ว่าง = ไม่จำกัด (ใช้ค่าร้าน)">
-                    <input type="number" min={1} value={overrideMaxRental} onChange={(e) => setOverrideMaxRental(e.target.value)} placeholder="ไม่จำกัด" style={inputStyle} />
+                    <input type="number" min={1} value={overrideMaxRental} onChange={(e) => setOverrideMaxRental(e.target.value)} placeholder="ไม่จำกัด" className="input input-surface" />
                   </Labeled>
                   <Labeled label="คืนสินค้าภายใน (วัน)" hint="ว่าง = ใช้ค่าร้าน">
-                    <input type="number" min={0} value={overrideReturnWindow} onChange={(e) => setOverrideReturnWindow(e.target.value)} placeholder="ใช้ค่าร้าน" style={inputStyle} />
+                    <input type="number" min={0} value={overrideReturnWindow} onChange={(e) => setOverrideReturnWindow(e.target.value)} placeholder="ใช้ค่าร้าน" className="input input-surface" />
                   </Labeled>
                   <Labeled label="บัฟเฟอร์หลังเช่า (วัน)" hint="ว่าง = ใช้ค่าร้าน">
-                    <input type="number" min={0} value={overrideBuffer} onChange={(e) => setOverrideBuffer(e.target.value)} placeholder="ใช้ค่าร้าน" style={inputStyle} />
+                    <input type="number" min={0} value={overrideBuffer} onChange={(e) => setOverrideBuffer(e.target.value)} placeholder="ใช้ค่าร้าน" className="input input-surface" />
                   </Labeled>
                 </div>
               ) : null}
