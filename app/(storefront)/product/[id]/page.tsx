@@ -93,7 +93,7 @@ export default async function DressPage({ params }: { params: Params }) {
       minRentalDays: true,
       maxRentalDays: true,
       returnWindowDays: true,
-      bufferDaysAfter: true,
+      bufferDaysAfter: true, cleaningDays: true,
       bufferDaysBefore: true,
       closedWeekdays: true,
       closedDates: { select: { date: true } },
@@ -110,7 +110,7 @@ export default async function DressPage({ params }: { params: Params }) {
           minRentalDays: true,
           maxRentalDays: true,
           returnWindowDays: true,
-          bufferDaysAfter: true,
+          bufferDaysAfter: true, cleaningDays: true,
           bufferDaysBefore: true,
         },
       })
@@ -125,13 +125,15 @@ export default async function DressPage({ params }: { params: Params }) {
       select: {
         productId: true,
         variantId: true,
-        booking: { select: { startDate: true, endDate: true, status: true } },
+        booking: { select: { startDate: true, endDate: true, status: true, outboundMethod: true, returnMethod: true } },
       },
     }).then((itemRows) =>
       itemRows.map((it) => ({
         startDate: it.booking.startDate,
         endDate: it.booking.endDate,
         status: it.booking.status,
+        outboundMethod: it.booking.outboundMethod,
+        returnMethod: it.booking.returnMethod,
         variantId: it.variantId,
       })),
     ),
@@ -190,6 +192,7 @@ export default async function DressPage({ params }: { params: Params }) {
           returnWindowDays: shopWithPolicy.returnWindowDays,
           bufferDaysAfter: shopWithPolicy.bufferDaysAfter,
           bufferDaysBefore: shopWithPolicy.bufferDaysBefore,
+          cleaningDays: shopWithPolicy.cleaningDays,
           closedWeekdays: shopWithPolicy.closedWeekdays,
         },
         productPolicyRow ?? {
@@ -200,6 +203,7 @@ export default async function DressPage({ params }: { params: Params }) {
           returnWindowDays: null,
           bufferDaysAfter: null,
           bufferDaysBefore: null,
+          cleaningDays: null,
         },
       )
     : {
@@ -207,8 +211,9 @@ export default async function DressPage({ params }: { params: Params }) {
         minRentalDays: 1,
         maxRentalDays: null,
         returnWindowDays: 2,
-        bufferDaysAfter: 1,
-        bufferDaysBefore: 0,
+        bufferDaysAfter: 2,
+        bufferDaysBefore: 2,
+        cleaningDays: 1,
         closedWeekdays: [] as number[],
       };
 
@@ -257,6 +262,8 @@ export default async function DressPage({ params }: { params: Params }) {
               startDate: b.startDate,
               endDate: b.endDate,
               status: b.status,
+              outboundMethod: b.outboundMethod,
+              returnMethod: b.returnMethod,
             })),
         effectivePolicy,
         rangeStart,
@@ -285,7 +292,7 @@ export default async function DressPage({ params }: { params: Params }) {
     const variantUnavailableSet = computeUnavailableDates({
       blackouts: variantSpecificBlackouts,
       shopClosedDates: shopWithPolicy?.closedDates.map((d) => d.date.toISOString().slice(0, 10)) ?? [],
-      bookings: variantBookings.map((b) => ({ startDate: b.startDate, endDate: b.endDate, status: b.status })),
+      bookings: variantBookings.map((b) => ({ startDate: b.startDate, endDate: b.endDate, status: b.status, outboundMethod: b.outboundMethod, returnMethod: b.returnMethod })),
       effectivePolicy,
       rangeStart,
       rangeEnd,
@@ -295,9 +302,10 @@ export default async function DressPage({ params }: { params: Params }) {
     // Per-day booked count (same blocking statuses + buffer as the calendar),
     // so the picker can show "เหลือ X ตัว" for the selected range.
     const dailyBooked = computeDailyBookedCounts({
-      bookings: variantBookings.map((b) => ({ startDate: b.startDate, endDate: b.endDate, status: b.status })),
+      bookings: variantBookings.map((b) => ({ startDate: b.startDate, endDate: b.endDate, status: b.status, outboundMethod: b.outboundMethod, returnMethod: b.returnMethod })),
       bufferDaysAfter: effectivePolicy.bufferDaysAfter,
       bufferDaysBefore: effectivePolicy.bufferDaysBefore,
+      effectivePolicy,
       statuses: BOOKING_BLOCKING_STATUSES,
     });
 
@@ -585,6 +593,7 @@ export default async function DressPage({ params }: { params: Params }) {
             unavailable={unavailable}
             leadTimeDays={effectivePolicy.leadTimeDays}
             bufferDaysBefore={effectivePolicy.bufferDaysBefore}
+            bufferDaysAfter={effectivePolicy.bufferDaysAfter}
             minRentalDays={effectivePolicy.minRentalDays}
             maxRentalDays={effectivePolicy.maxRentalDays}
             productId={dress.id}

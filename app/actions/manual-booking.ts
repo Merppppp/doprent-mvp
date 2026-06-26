@@ -28,7 +28,7 @@ const PRODUCT_POLICY_SELECT = {
   minRentalDays: true,
   maxRentalDays: true,
   returnWindowDays: true,
-  bufferDaysAfter: true,
+  bufferDaysAfter: true, cleaningDays: true,
   bufferDaysBefore: true,
   shop: {
     select: {
@@ -36,7 +36,7 @@ const PRODUCT_POLICY_SELECT = {
       minRentalDays: true,
       maxRentalDays: true,
       returnWindowDays: true,
-      bufferDaysAfter: true,
+      bufferDaysAfter: true, cleaningDays: true,
       bufferDaysBefore: true,
       closedWeekdays: true,
     },
@@ -86,7 +86,7 @@ export async function getAssignableUnits(
 
   const policy = resolveEffectivePolicy(product.shop, product);
   const before = beforeBufferFor(fulfillment, policy.bufferDaysBefore);
-  const after = policy.bufferDaysAfter;
+  const after = policy.bufferDaysAfter + (policy.cleaningDays ?? 1);
   const win = bookingWindow(startDate, endDate, before, after);
 
   const allUnits = await db.productUnit.findMany({
@@ -200,7 +200,7 @@ export async function createManualBooking(formData: FormData): Promise<Result<{ 
       minRentalDays: true,
       maxRentalDays: true,
       returnWindowDays: true,
-      bufferDaysAfter: true,
+      bufferDaysAfter: true, cleaningDays: true,
       bufferDaysBefore: true,
       shop: {
         select: {
@@ -208,7 +208,7 @@ export async function createManualBooking(formData: FormData): Promise<Result<{ 
           minRentalDays: true,
           maxRentalDays: true,
           returnWindowDays: true,
-          bufferDaysAfter: true,
+          bufferDaysAfter: true, cleaningDays: true,
           bufferDaysBefore: true,
           closedWeekdays: true,
         },
@@ -272,8 +272,8 @@ export async function createManualBooking(formData: FormData): Promise<Result<{ 
     const perItemCalcTotal = priceForNights(tiers, variantPricePerDay, days).total;
 
     const policy = resolveEffectivePolicy(product.shop, product);
-    const bufferBefore = fulfillment === "standard" ? (policy.bufferDaysBefore ?? 0) : 0;
-    const bufferAfter = policy.bufferDaysAfter;
+    const bufferBefore = beforeBufferFor(fulfillment, policy.bufferDaysBefore);
+    const bufferAfter = policy.bufferDaysAfter + (policy.cleaningDays ?? 1);
 
     resolvedItems.push({
       productId: product.id,
@@ -301,7 +301,11 @@ export async function createManualBooking(formData: FormData): Promise<Result<{ 
 
   const sumDeposit = resolvedItems.reduce((s, it) => s + it.deposit, 0);
 
+  // Manual bookings have one fulfillment leg; mirror it onto both shipping
+  // columns so the customer calendar derives the same buffer. walk_in = null.
   const deliveryMethod = fulfillment === "walk_in" ? null : fulfillment;
+  const outboundMethod = deliveryMethod;
+  const returnMethod = deliveryMethod;
   const addressText = fulfillment === "walk_in" ? "รับหน้าร้าน" : shippingAddress;
   const isWalkIn = fulfillment === "walk_in";
   const initialStatus = isWalkIn ? ("renting" as const) : ("confirmed" as const);
@@ -318,6 +322,8 @@ export async function createManualBooking(formData: FormData): Promise<Result<{ 
     status: initialStatus,
     source: "walk_in",
     deliveryMethod,
+    outboundMethod,
+    returnMethod,
     internalNote,
     recipientName: customerName,
     phone: customerPhone || null,

@@ -43,11 +43,14 @@ type Props = {
   /** Minimum days in advance the rental must start. */
   leadTimeDays?: number;
   /**
-   * Transit days reserved BEFORE the start date (standard shipping). The picker
-   * treats these pre-start days like part of the rental for availability so it
-   * agrees with the server's oversell guard, which scans [start - buffer, end].
+   * One-way standard-shipping transit days. Applied before the start (outbound
+   * leg) and/or after the end (return leg) depending on the chosen methods.
+   * Express collapses its leg to 0. The picker scans the same buffered window
+   * the server's oversell guard does, so a range can't pass here yet be rejected.
    */
   bufferDaysBefore?: number;
+  /** Cleaning/preparation days always reserved AFTER the end date. */
+  bufferDaysAfter?: number;
   /** Minimum rental length in days. */
   minRentalDays?: number;
   /** Maximum rental length in days; null = unlimited. */
@@ -123,6 +126,20 @@ function bufferDatesBefore(start: string, count: number): string[] {
   return result;
 }
 
+/** The `count` buffer days immediately AFTER `end` (YYYY-MM-DD, soonest first). */
+function bufferDatesAfter(end: string, count: number): string[] {
+  if (!end || count <= 0) return [];
+  const e = new Date(end);
+  if (isNaN(e.getTime())) return [];
+  const result: string[] = [];
+  for (let i = 1; i <= count; i++) {
+    const d = new Date(e);
+    d.setDate(d.getDate() + i);
+    result.push(isoOf(d));
+  }
+  return result;
+}
+
 function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -153,6 +170,7 @@ export default function DateRangePicker({
   unavailable = [],
   leadTimeDays = 0,
   bufferDaysBefore = 0,
+  bufferDaysAfter = 0,
   minRentalDays = 1,
   maxRentalDays = null,
   productId,
@@ -195,6 +213,18 @@ export default function DateRangePicker({
   const effectivePricePerDay = selectedVariant ? selectedVariant.pricePerDay : pricePerDay;
   const effectiveDeposit = selectedVariant ? selectedVariant.deposit : deposit;
 
+  // Shipping methods — chosen here on the calendar page (no longer at checkout).
+  //   outbound (ร้าน→ลูกค้า) drives the before-rental transit buffer
+  //   return   (ลูกค้า→ร้าน) drives the after-rental transit buffer
+  // express collapses its leg's transit to 0; cleaning is always reserved.
+  type ShipMethod = "express" | "standard";
+  const [outboundMethod, setOutboundMethod] = useState<ShipMethod>("standard");
+  const [returnMethod, setReturnMethod] = useState<ShipMethod>("standard");
+
+  // Method-aware buffer windows (mirror lib/booking-policy.shippingBuffers).
+  const windowBefore = outboundMethod === "express" ? 0 : bufferDaysBefore;
+  const windowAfter = (returnMethod === "express" ? 0 : bufferDaysBefore) + bufferDaysAfter;
+
   // Effective unavailable set: merge product-level + variant-specific unavailable dates
   const effectiveUnavailable = useMemo(() => {
     if (selectedVariant?.unavailable && selectedVariant.unavailable.length > 0) {
@@ -220,27 +250,28 @@ export default function DateRangePicker({
   const nights = nightsBetween(start, end);
   const quote = priceForNights(priceTiers ?? null, effectivePricePerDay ?? 0, nights);
 
-  // Conflict check: does the selected range — INCLUDING the standard-shipping
-  // transit days reserved before the start — hit any unavailable date? The
-  // server's oversell guard scans [start - bufferDaysBefore, end], so the
-  // picker must check the same window or a range can pass here yet be rejected.
+  // Conflict check: does the selected range — INCLUDING the shipping transit
+  // days before the start AND the cleaning + return-transit days after the end —
+  // hit any unavailable date? The server's oversell guard scans the same
+  // [start - windowBefore, end + windowAfter] window, so the picker must match
+  // it or a range could pass here yet be rejected at confirm time.
   const conflictDates = useMemo(() => {
     if (!start || !end) return [];
-    const buffer = bufferDatesBefore(start, bufferDaysBefore).filter((d) => d >= TODAY);
-    return [...buffer, ...rangeDates(start, end)].filter((d) => allUnavailableSet.has(d));
-  }, [start, end, bufferDaysBefore, allUnavailableSet]);
+    const pre = bufferDatesBefore(start, windowBefore).filter((d) => d >= TODAY);
+    const post = bufferDatesAfter(end, windowAfter);
+    return [...pre, ...rangeDates(start, end), ...post].filter((d) => allUnavailableSet.has(d));
+  }, [start, end, windowBefore, windowAfter, allUnavailableSet]);
 
   const hasConflict = conflictDates.length > 0;
 
   // The chosen size must have at least one unit free across the whole window the
-  // server checks — [start - bufferDaysBefore, end] — not just the rental nights.
+  // server checks — [start - windowBefore, end + windowAfter] — not just nights.
   const selectedVariantFull = useMemo(() => {
     if (!start || !end || !selectedVariant?.dailyBooked) return false;
-    const rangeStart = bufferDaysBefore > 0
-      ? (bufferDatesBefore(start, bufferDaysBefore)[0] ?? start)
-      : start;
-    return remainingForRange(selectedVariant.dailyBooked, selectedVariant.quantity, rangeStart, end) <= 0;
-  }, [start, end, selectedVariant, bufferDaysBefore]);
+    const rangeStart = windowBefore > 0 ? (bufferDatesBefore(start, windowBefore)[0] ?? start) : start;
+    const rangeEnd = windowAfter > 0 ? (bufferDatesAfter(end, windowAfter).at(-1) ?? end) : end;
+    return remainingForRange(selectedVariant.dailyBooked, selectedVariant.quantity, rangeStart, rangeEnd) <= 0;
+  }, [start, end, selectedVariant, windowBefore, windowAfter]);
 
   // Policy validation: min/max rental days (checked only when no date conflict)
   const policyError = useMemo<string | null>(() => {
@@ -254,24 +285,58 @@ export default function DateRangePicker({
     return null;
   }, [start, end, nights, minRentalDays, maxRentalDays, hasConflict]);
 
-  const isInvalid = hasConflict || selectedVariantFull || !!policyError;
 
-  // Shop closing-soon warning (within 1 hour of today's closing time)
+  // Shop closing-soon warning + minutes-until-close (drives same-day express gating).
+  // null = shop closed today / hours unknown → express same-day not possible.
   const [closingSoon, setClosingSoon] = useState(false);
+  const [minsToClose, setMinsToClose] = useState<number | null>(null);
   useEffect(() => {
-    if (!shopClosingTime) { setClosingSoon(false); return; }
+    if (!shopClosingTime) { setClosingSoon(false); setMinsToClose(null); return; }
     function check() {
       const now = new Date();
       const [h, m] = shopClosingTime!.split(":").map(Number);
       const closeMin = h * 60 + m;
       const nowMin = now.getHours() * 60 + now.getMinutes();
       const diff = closeMin - nowMin;
+      setMinsToClose(diff);
       setClosingSoon(diff > 0 && diff <= 60);
     }
     check();
     const iv = setInterval(check, 60_000);
     return () => clearInterval(iv);
   }, [shopClosingTime]);
+
+  // Same-day-start delivery gating (mirrors the server rule in createBooking):
+  //   • standard outbound can never ship same-day
+  //   • express outbound needs the shop open with > 60 min before closing
+  const sameDayStart = !!start && start === TODAY;
+  const expressTodayOk = shopIsOpen !== false && minsToClose != null && minsToClose > 60;
+  const standardOutboundDisabled = sameDayStart;
+  const expressOutboundDisabled = sameDayStart && !expressTodayOk;
+
+  // If a same-day pickup makes the current outbound choice impossible, nudge the
+  // user to the only valid option (or surface the no-delivery error below).
+  useEffect(() => {
+    if (standardOutboundDisabled && outboundMethod === "standard" && !expressOutboundDisabled) {
+      setOutboundMethod("express");
+    }
+  }, [standardOutboundDisabled, expressOutboundDisabled, outboundMethod]);
+
+  const deliveryError = useMemo<string | null>(() => {
+    if (!start || !end) return null;
+    if (standardOutboundDisabled && expressOutboundDisabled) {
+      return "ไม่สามารถจัดส่งให้ทันภายในวันนี้ได้ กรุณาเลือกวันรับชุดเป็นวันอื่น";
+    }
+    if (outboundMethod === "standard" && standardOutboundDisabled) {
+      return "ส่งพัสดุไม่สามารถจัดส่งภายในวันได้ กรุณาเลือกส่งด่วน หรือเลือกวันรับเป็นวันอื่น";
+    }
+    if (outboundMethod === "express" && expressOutboundDisabled) {
+      return "เลยเวลาส่งด่วนสำหรับวันนี้แล้ว กรุณาเลือกวันรับชุดเป็นวันอื่น";
+    }
+    return null;
+  }, [start, end, outboundMethod, standardOutboundDisabled, expressOutboundDisabled]);
+
+  const isInvalid = hasConflict || selectedVariantFull || !!policyError || !!deliveryError;
 
   // Up to 6 nearest future blackouts to show as warning
   const nextBlackouts = useMemo(() => {
@@ -301,6 +366,8 @@ export default function DateRangePicker({
       endDate: end,
       startTime: !allDay && startTime ? startTime : null,
       endTime: !allDay && endTime ? endTime : null,
+      outboundMethod,
+      returnMethod,
       qty: 1,
     });
     setAddedToCart(true);
@@ -326,7 +393,8 @@ export default function DateRangePicker({
   // pickup/return times when the customer opted out of full-day.
   const checkoutBase = `/checkout/address?product=${productId ?? ""}&start=${start}&end=${end}`;
   const timeQuery = !allDay && startTime && endTime ? `&startTime=${startTime}&endTime=${endTime}` : "";
-  const checkoutHref = `${selectedVariantId ? `${checkoutBase}&variant=${selectedVariantId}` : checkoutBase}${timeQuery}`;
+  const shipQuery = `&outbound=${outboundMethod}&return=${returnMethod}`;
+  const checkoutHref = `${selectedVariantId ? `${checkoutBase}&variant=${selectedVariantId}` : checkoutBase}${timeQuery}${shipQuery}`;
 
   return (
     <div style={{ border: "1px solid var(--line)", borderRadius: 8, padding: 14, marginBottom: 16, background: "var(--bg)" }}>
@@ -455,6 +523,33 @@ export default function DateRangePicker({
         {start && !end ? "เลือกวันคืนชุด (แตะหรือลากไปอีกวัน)" : start && end ? `${fmtThai(start)} → ${fmtThai(end)}` : "แตะวันรับชุดเพื่อเริ่ม"}
       </div>
 
+      {/* ── Shipping method (both legs) — chosen here so the buffer is known ── */}
+      {start && end ? (
+        <div className="mt-3 grid gap-3 rounded-lg border border-line bg-surface p-3">
+          <DeliveryToggle
+            label="ตอนร้านจัดส่งของ (ขาไป)"
+            value={outboundMethod}
+            onChange={setOutboundMethod}
+            expressDisabled={expressOutboundDisabled}
+            standardDisabled={standardOutboundDisabled}
+            transitDays={bufferDaysBefore}
+          />
+          <DeliveryToggle
+            label="ตอนส่งคืนสินค้า (ขากลับ)"
+            value={returnMethod}
+            onChange={setReturnMethod}
+            transitDays={bufferDaysBefore}
+          />
+        </div>
+      ) : null}
+
+      {/* Same-day delivery gating warning */}
+      {deliveryError ? (
+        <div className="mt-2.5 rounded-md border border-danger/30 bg-danger/10 px-3 py-2.5 text-[13px] font-medium leading-relaxed text-danger">
+          ⚠️ {deliveryError}
+        </div>
+      ) : null}
+
       {/* Blackouts info */}
       {nextBlackouts.length > 0 ? (
         <div style={{ padding: "8px 10px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 6, fontSize: 12, color: "var(--ink-2)", margin: "10px 0", lineHeight: 1.5 }}>
@@ -496,7 +591,7 @@ export default function DateRangePicker({
       ) : null}
 
       {nights > 0 && !isInvalid ? (
-        <div style={{ padding: "8px 10px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 6, fontSize: 12, color: "var(--ink-2)", lineHeight: 1.5 }}>
+        <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 6, fontSize: 12, color: "var(--ink-2)", lineHeight: 1.5 }}>
           <div style={{ fontWeight: 500, color: "var(--ink)" }}>
             ระยะเวลา: {nights} วัน ({fmtThai(start)} ถึง {fmtThai(end)})
           </div>
@@ -757,6 +852,65 @@ function Calendar({
                 ) : null}
               </button>
             </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────── Delivery method toggle ─────────────────────── */
+
+function DeliveryToggle({
+  label,
+  value,
+  onChange,
+  expressDisabled = false,
+  standardDisabled = false,
+  transitDays = 0,
+}: {
+  label: string;
+  value: "express" | "standard";
+  onChange: (v: "express" | "standard") => void;
+  expressDisabled?: boolean;
+  standardDisabled?: boolean;
+  /** One-way standard transit estimate, shown as a hint. */
+  transitDays?: number;
+}) {
+  const options: { key: "express" | "standard"; title: string; hint: string; disabled: boolean }[] = [
+    { key: "express", title: "ส่งด่วน", hint: "ภายในวัน", disabled: expressDisabled },
+    {
+      key: "standard",
+      title: "ส่งพัสดุ",
+      hint: transitDays > 0 ? `+${transitDays} วันขนส่ง` : "ขนส่งทั่วไป",
+      disabled: standardDisabled,
+    },
+  ];
+  return (
+    <div className="grid gap-1.5">
+      <div className="text-[13px] font-semibold text-ink">{label}</div>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map((o) => {
+          const selected = value === o.key;
+          return (
+            <button
+              key={o.key}
+              type="button"
+              disabled={o.disabled}
+              onClick={() => onChange(o.key)}
+              className={`flex flex-col items-start rounded-lg border-2 px-3 py-2 text-left transition-colors ${
+                selected
+                  ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                  : o.disabled
+                    ? "border-line bg-bg opacity-50"
+                    : "border-line bg-bg hover:border-ink-3"
+              } ${o.disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
+            >
+              <span className={`text-[13px] font-semibold ${selected ? "text-[var(--accent)]" : "text-ink"}`}>
+                {o.title}
+              </span>
+              <span className={`text-[11px] ${selected ? "text-[var(--accent-2)]" : "text-ink-3"}`}>{o.hint}</span>
+            </button>
           );
         })}
       </div>

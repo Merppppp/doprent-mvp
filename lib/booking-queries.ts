@@ -42,6 +42,8 @@ type PrismaBookingWithJoins = {
   slipPath: string | null;
   paymentMethod: "promptpay" | "bank" | null;
   deliveryMethod: string | null;
+  outboundMethod: string | null;
+  returnMethod: string | null;
   deliveryCarrier: string | null;
   trackingNumber: string | null;
   trackingUrl: string | null;
@@ -134,6 +136,8 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     slip_path: b.slipPath,
     payment_method: b.paymentMethod,
     delivery_method: b.deliveryMethod ?? null,
+    outbound_method: b.outboundMethod ?? b.deliveryMethod ?? null,
+    return_method: b.returnMethod ?? b.deliveryMethod ?? null,
     delivery_carrier: b.deliveryCarrier ?? null,
     tracking_number: b.trackingNumber ?? null,
     tracking_url: b.trackingUrl ?? null,

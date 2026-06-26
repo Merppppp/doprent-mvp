@@ -90,6 +90,12 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
       <div style={card}>
         <Row label="ร้าน" value={b.boutique_name ?? "-"} />
         {b.dress_size ? <Row label="ไซซ์" value={sizeLabel(b.dress_size)} /> : null}
+        {b.items[0]?.unit_code ? (
+          <div className="flex justify-between gap-4 py-1 text-sm">
+            <span className="shrink-0 text-[var(--ink-3)]">รหัสสินค้า</span>
+            <span className="font-mono font-medium text-right text-[var(--ink)]">{b.items[0].unit_code}</span>
+          </div>
+        ) : null}
         <Row label="วันเช่า" value={fmtRentalWindow(b.start_date, b.end_date, b.start_time, b.end_time)} />
         <Row label="ส่งถึง" value={`${b.recipient_name ?? ""} · ${b.phone ?? ""}`} />
         <Row label="ที่อยู่" value={b.address_text ?? "-"} />
@@ -238,6 +244,22 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
         <div style={card}>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>สลิปการโอน</div>
           <SlipImage src={slipUrl} contain />
+        </div>
+      ) : null}
+
+      {/* Deposit forfeited — shown when customer didn't return items */}
+      {b.refund_status === "forfeited" ? (
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] mb-4 p-4">
+          <div className="font-semibold text-sm mb-3">เงินมัดจำ</div>
+          <div className="flex justify-between gap-4 py-1 text-sm">
+            <span className="text-[var(--ink-3)] shrink-0">สถานะ</span>
+            <span className="font-semibold text-[var(--danger)]">หักมัดจำ</span>
+          </div>
+          <div className="flex justify-between gap-4 py-1 text-sm">
+            <span className="text-[var(--ink-3)] shrink-0">จำนวน</span>
+            <span className="font-medium">฿{b.deposit.toLocaleString()}</span>
+          </div>
+          <p className="mt-2 text-xs text-[var(--ink-3)]">ไม่ส่งคืนสินค้า — เงินมัดจำถูกหักเต็มจำนวน</p>
         </div>
       ) : null}
 

@@ -20,6 +20,10 @@ export type CartItem = {
   endDate: string; // YYYY-MM-DD
   startTime?: string | null;
   endTime?: string | null;
+  /** Outbound shipping leg (shop→customer): "express" | "standard". */
+  outboundMethod?: "express" | "standard";
+  /** Return shipping leg (customer→shop): "express" | "standard". */
+  returnMethod?: "express" | "standard";
   qty: number;
 };
 
@@ -62,7 +66,11 @@ function writeStorage(items: CartItem[]): void {
   }
 }
 
-let _items: CartItem[] = []; // server starts empty; hydrated on first client subscribe
+/** Shared stable empty array — getServerSnapshot/getSnapshot must return a
+ *  referentially stable value or useSyncExternalStore loops infinitely. */
+const EMPTY_ITEMS: CartItem[] = [];
+
+let _items: CartItem[] = EMPTY_ITEMS; // server starts empty; hydrated on first client subscribe
 let _hydrated = false;
 
 /** Hydrate from localStorage exactly once on the client. */
@@ -103,7 +111,7 @@ function getSnapshot(): CartItem[] {
 
 /** Called once per subscriber on the client to hydrate from localStorage. */
 function getServerSnapshot(): CartItem[] {
-  return []; // no localStorage on server
+  return EMPTY_ITEMS; // no localStorage on server; stable ref avoids render loop
 }
 
 /* ── mutations ──────────────────────────────────────────────────── */

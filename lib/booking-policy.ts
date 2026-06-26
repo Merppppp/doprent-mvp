@@ -21,9 +21,12 @@ export type PolicySource = {
   minRentalDays: number;
   maxRentalDays: number | null;
   returnWindowDays: number;
+  /** Transit days reserved AFTER the rental end (standard return shipping). Express collapses to 0. */
   bufferDaysAfter: number;
-  /** Transit days reserved BEFORE the rental start (standard shipping). 0 for same-day/express. */
+  /** Transit days reserved BEFORE the rental start (standard outbound shipping). Express collapses to 0. */
   bufferDaysBefore: number;
+  /** Cleaning/preparation days after each rental (always reserved, regardless of shipping method). */
+  cleaningDays: number;
   closedWeekdays: number[];
 };
 
@@ -35,15 +38,54 @@ export type ProductPolicyOverride = {
   returnWindowDays: number | null;
   bufferDaysAfter: number | null;
   bufferDaysBefore: number | null;
+  cleaningDays: number | null;
 };
 
 export type EffectivePolicy = PolicySource;
+
+/**
+ * Shipping method for one leg. Only "express" collapses the transit buffer;
+ * any other value (including "standard", null, legacy, or unknown strings) is
+ * treated as standard (worst case). Kept as a widened string so DB rows
+ * (string | null) flow in without coercion.
+ */
+export type ShippingMethod = string | null | undefined;
 
 type BookingDateRange = {
   startDate: Date;
   endDate: Date;
   status: string;
+  /** Outbound leg (shop→customer) — drives before-buffer. Defaults to standard. */
+  outboundMethod?: ShippingMethod;
+  /** Return leg (customer→shop) — drives after-buffer. Defaults to standard. */
+  returnMethod?: ShippingMethod;
 };
+
+/**
+ * Buffer days reserved before/after a rental, derived from shipping legs + cleaning.
+ *   transitBefore = effectivePolicy.bufferDaysBefore (standard outbound transit, default 2)
+ *   transitAfter  = effectivePolicy.bufferDaysAfter  (standard return transit, default 2)
+ *   cleaning      = effectivePolicy.cleaningDays     (prep/wash after return, default 1)
+ *
+ *   before = outbound express → 0, else transitBefore
+ *   after  = cleaning + (return express → 0, else transitAfter)
+ *
+ * Express collapses only its own transit leg. Cleaning is always reserved
+ * regardless of shipping method. null/undefined (legacy bookings) is treated
+ * as standard so the calendar always shows the worst case.
+ */
+export function shippingBuffers(
+  policy: EffectivePolicy,
+  outboundMethod: ShippingMethod,
+  returnMethod: ShippingMethod,
+): { before: number; after: number } {
+  const transitBefore = policy.bufferDaysBefore ?? 2;
+  const transitAfter = policy.bufferDaysAfter ?? 2;
+  const cleaning = policy.cleaningDays ?? 1;
+  const before = outboundMethod === "express" ? 0 : transitBefore;
+  const after = cleaning + (returnMethod === "express" ? 0 : transitAfter);
+  return { before, after };
+}
 
 // ---------------------------------------------------------------------------
 // Active-status set — must stay in sync with BookingStatus enum + TRANSITIONS
@@ -101,6 +143,7 @@ export function resolveEffectivePolicy(
       returnWindowDays: shop.returnWindowDays,
       bufferDaysAfter: shop.bufferDaysAfter,
       bufferDaysBefore: shop.bufferDaysBefore,
+      cleaningDays: shop.cleaningDays,
       closedWeekdays: shop.closedWeekdays,
     };
   }
@@ -117,6 +160,7 @@ export function resolveEffectivePolicy(
     returnWindowDays: product.returnWindowDays ?? shop.returnWindowDays,
     bufferDaysAfter: product.bufferDaysAfter ?? shop.bufferDaysAfter,
     bufferDaysBefore: product.bufferDaysBefore ?? shop.bufferDaysBefore,
+    cleaningDays: product.cleaningDays ?? shop.cleaningDays,
     // closedWeekdays is shop-level only
     closedWeekdays: shop.closedWeekdays,
   };
@@ -209,17 +253,21 @@ export function computeUnavailableDates({
   //    When quantity > 1: a date is blocked only when overlap_count >= quantity.
   //    Buffer days after each booking are included (cleaning/preparation window).
   // Each blocking booking occupies its unit across
-  //   [startDate − bufferDaysBefore  ..  endDate + bufferDaysAfter]
-  // The before-buffer is the worst-case (standard shipping) transit window the
-  // shop ships the dress out ahead of the rental start. The calendar always
-  // shows this worst case; express checkout collapses it to 0 at validation time.
-  const bufferBefore = effectivePolicy.bufferDaysBefore ?? 0;
+  //   [startDate − before  ..  endDate + after]
+  // where before/after derive from that booking's own shipping legs (see
+  // shippingBuffers). Legacy/null methods fall back to standard (worst case),
+  // so the calendar shows the safe maximum hold for each existing booking.
   if (quantity <= 1) {
     // Fast path (legacy single-unit behaviour)
     for (const booking of bookings) {
       if (!BOOKING_BLOCKING_STATUSES.has(booking.status as BookingStatus)) continue;
-      const start = addDays(booking.startDate.toISOString().slice(0, 10), -bufferBefore);
-      const end = addDays(booking.endDate.toISOString().slice(0, 10), effectivePolicy.bufferDaysAfter);
+      const { before, after } = shippingBuffers(
+        effectivePolicy,
+        booking.outboundMethod,
+        booking.returnMethod,
+      );
+      const start = addDays(booking.startDate.toISOString().slice(0, 10), -before);
+      const end = addDays(booking.endDate.toISOString().slice(0, 10), after);
       for (const d of dateRange(start, end)) {
         unavailable.add(d);
       }
@@ -229,8 +277,13 @@ export function computeUnavailableDates({
     const overlapCount = new Map<string, number>();
     for (const booking of bookings) {
       if (!BOOKING_BLOCKING_STATUSES.has(booking.status as BookingStatus)) continue;
-      const start = addDays(booking.startDate.toISOString().slice(0, 10), -bufferBefore);
-      const end = addDays(booking.endDate.toISOString().slice(0, 10), effectivePolicy.bufferDaysAfter);
+      const { before, after } = shippingBuffers(
+        effectivePolicy,
+        booking.outboundMethod,
+        booking.returnMethod,
+      );
+      const start = addDays(booking.startDate.toISOString().slice(0, 10), -before);
+      const end = addDays(booking.endDate.toISOString().slice(0, 10), after);
       for (const d of dateRange(start, end)) {
         overlapCount.set(d, (overlapCount.get(d) ?? 0) + 1);
       }
@@ -267,6 +320,14 @@ export type DailyBookedParams = {
   /** Transit window reserved before each booking's startDate (worst-case standard shipping). */
   bufferDaysBefore?: number;
   /**
+   * When provided, each booking's hold window is computed per-leg from its own
+   * shipping methods via shippingBuffers(policy, …) instead of the flat
+   * bufferDaysAfter/bufferDaysBefore above. Legacy/null methods fall back to
+   * standard (worst case). The flat values remain the fallback for callers that
+   * don't pass a policy (e.g. seller "out today" counts).
+   */
+  effectivePolicy?: EffectivePolicy;
+  /**
    * Which statuses hold a unit. Pass BOOKING_BLOCKING_STATUSES for the
    * customer date-picker (keeps the remaining badge in lock-step with the
    * calendar) or lib/bookings.ACTIVE_STATUSES for physical "out today" counts
@@ -285,13 +346,17 @@ export function computeDailyBookedCounts({
   bookings,
   bufferDaysAfter,
   bufferDaysBefore = 0,
+  effectivePolicy,
   statuses,
 }: DailyBookedParams): Record<string, number> {
   const map: Record<string, number> = {};
   for (const b of bookings) {
     if (!statuses.has(b.status)) continue;
-    const start = addDays(b.startDate.toISOString().slice(0, 10), -bufferDaysBefore);
-    const end = addDays(b.endDate.toISOString().slice(0, 10), bufferDaysAfter);
+    const { before, after } = effectivePolicy
+      ? shippingBuffers(effectivePolicy, b.outboundMethod, b.returnMethod)
+      : { before: bufferDaysBefore, after: bufferDaysAfter };
+    const start = addDays(b.startDate.toISOString().slice(0, 10), -before);
+    const end = addDays(b.endDate.toISOString().slice(0, 10), after);
     for (const d of dateRange(start, end)) {
       map[d] = (map[d] ?? 0) + 1;
     }
@@ -331,11 +396,16 @@ export type ValidateBookingRangeParams = {
   /** Today's date (YYYY-MM-DD, UTC). */
   today: string;
   /**
-   * Express (same-day) shipping collapses the before-buffer transit window to 0.
-   * Standard shipping (default) reserves effectivePolicy.bufferDaysBefore days
-   * ahead of startDate so the shop can ship the dress out in time.
+   * Outbound leg (shop→customer) of THIS booking. Express collapses the
+   * before-buffer to 0; standard (or null/legacy) reserves the transit window
+   * ahead of startDate. See shippingBuffers.
    */
-  isExpress?: boolean;
+  outboundMethod?: ShippingMethod;
+  /**
+   * Return leg (customer→shop) of THIS booking. Express collapses its transit
+   * portion of the after-buffer to 0; cleaning is always reserved.
+   */
+  returnMethod?: ShippingMethod;
 };
 
 export type ValidationResult =
@@ -360,7 +430,8 @@ export function validateBookingRange({
   effectivePolicy,
   unavailableDates,
   today,
-  isExpress = false,
+  outboundMethod,
+  returnMethod,
 }: ValidateBookingRangeParams): ValidationResult {
   const { leadTimeDays, minRentalDays, maxRentalDays, closedWeekdays } = effectivePolicy;
 
@@ -398,12 +469,14 @@ export function validateBookingRange({
     };
   }
 
-  // 5. No date in range is unavailable. For standard shipping also scan the
-  //    before-buffer transit days ahead of startDate — the unit must already be
-  //    free then so the shop can ship it out on time. Express collapses this to 0.
-  const bufferBefore = isExpress ? 0 : (effectivePolicy.bufferDaysBefore ?? 0);
-  const scanStart = addDays(startDate, -bufferBefore);
-  for (const d of dateRange(scanStart, endDate)) {
+  // 5. No date in the held window is unavailable. The window extends before
+  //    startDate by the outbound transit buffer (so the shop can ship in time)
+  //    and after endDate by cleaning + return transit. Express legs collapse
+  //    their transit portions; cleaning is always reserved. See shippingBuffers.
+  const { before, after } = shippingBuffers(effectivePolicy, outboundMethod, returnMethod);
+  const scanStart = addDays(startDate, -before);
+  const scanEnd = addDays(endDate, after);
+  for (const d of dateRange(scanStart, scanEnd)) {
     if (unavailableDates.has(d)) {
       return { ok: false, error: `วันที่ ${formatThai(d)} ไม่ว่าง กรุณาเลือกวันอื่น` };
     }

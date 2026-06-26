@@ -509,10 +509,12 @@ model Shop {
   maxRentalDays        Int?           @map("max_rental_days")
   /// จำนวนวันที่ผู้เช่าต้องคืนสินค้าหลังวันสิ้นสุดการเช่า (แสดงต่อผู้เช่า)
   returnWindowDays     Int            @default(2) @map("return_window_days")
-  /// จำนวนวันบัฟเฟอร์หลังการเช่าแต่ละครั้ง (รอของกลับมาถึงร้าน — บล็อกช่วง [start, end+bufferDaysAfter])
-  bufferDaysAfter      Int            @default(1) @map("buffer_days_after")
-  /// จำนวนวันบัฟเฟอร์ก่อนวันเริ่มเช่า (เผื่อเวลาขนส่งไปถึงผู้เช่า — บล็อกช่วง [start-bufferDaysBefore, ...]); ส่งด่วน (express) ไม่ใช้บัฟเฟอร์นี้
-  bufferDaysBefore     Int            @default(0) @map("buffer_days_before")
+  /// จำนวนวันบัฟเฟอร์หลังการเช่าแต่ละครั้ง (เผื่อเวลาขนส่งพัสดุกลับร้าน); ส่งด่วน (express) ไม่ใช้บัฟเฟอร์นี้
+  bufferDaysAfter      Int            @default(2) @map("buffer_days_after")
+  /// จำนวนวันบัฟเฟอร์ก่อนวันเริ่มเช่า (เผื่อเวลาขนส่งพัสดุไปถึงผู้เช่า); ส่งด่วน (express) ไม่ใช้บัฟเฟอร์นี้
+  bufferDaysBefore     Int            @default(2) @map("buffer_days_before")
+  /// จำนวนวันเตรียมของ/ซักรีด หลังคืนของแต่ละครั้ง (บล็อกเสมอ ไม่ว่าจะ express หรือ standard)
+  cleaningDays         Int            @default(1) @map("cleaning_days")
   /// วันปิดทำการประจำสัปดาห์ (0=อาทิตย์..6=เสาร์) — ซ้ำทุกสัปดาห์
   closedWeekdays       Int[]          @default([]) @map("closed_weekdays")
   /// คะแนนเฉลี่ยรีวิวทั้งหมดของร้าน (NULL = ยังไม่มีรีวิว) — อัปเดตโดย recomputeShopRating()
@@ -645,6 +647,8 @@ model Product {
   bufferDaysAfter  Int?                     @map("buffer_days_after")
   /// override: จำนวนวันบัฟเฟอร์ก่อนเริ่มเช่า (ใช้เมื่อ policyOverride = true; null = ใช้ค่าของร้าน)
   bufferDaysBefore Int?                     @map("buffer_days_before")
+  /// override: จำนวนวันเตรียมของ/ซักรีด (ใช้เมื่อ policyOverride = true; null = ใช้ค่าของร้าน)
+  cleaningDays     Int?                     @map("cleaning_days")
   /// full-text search vector (จัดการผ่าน raw SQL/trigger)
   searchVector     Unsupported("tsvector")? @map("search_vector")
 
@@ -804,21 +808,25 @@ model ProductUnit {
   code      String
   /// สถานะของหน่วย: available=พร้อมเช่า, rented=ออกไปกับลูกค้า, repair=ติดซ่อม, retired=ปลดระวาง
   status    UnitStatus @default(available)
-  /// หมายเหตุของร้าน (เหตุผลที่ซ่อม/ปลดระวาง ฯลฯ)
+  /// หมายเหตุของร้าน (เหตุผลที่ซ่อม/ปลดระวาง/สูญหาย ฯลฯ)
   note      String?
+  /// FK → bookings.id — เก็บว่าหน่วยนี้สูญหายจาก order ไหน (null = ไม่ได้สูญหาย)
+  lostFromBookingId String? @map("lost_from_booking_id") @db.Uuid
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedBy String?  @map("updated_by") @db.Uuid
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  variant   ProductVariant        @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  items     BookingItem[]
-  blackouts ProductBlackoutDate[]
+  variant        ProductVariant        @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  items          BookingItem[]
+  blackouts      ProductBlackoutDate[]
+  lostFromBooking Booking?             @relation("LostUnits", fields: [lostFromBookingId], references: [id], onDelete: SetNull)
 
   @@unique([variantId, code])
   @@index([variantId])
   @@index([status])
+  @@index([lostFromBookingId])
   @@map("product_units")
 }
 
@@ -1160,7 +1168,12 @@ model Booking {
   internalNote String? @map("internal_note")
 
   /// วิธีจัดส่ง: "express" (ส่งด่วนภายในวัน) | "standard" (ขนส่งพัสดุ)
+  /// คงไว้เพื่อ back-compat — มีค่าเท่ากับ outboundMethod (ขาร้านส่งให้ลูกค้า)
   deliveryMethod  String? @map("delivery_method")
+  /// วิธีจัดส่งขาไป (ร้าน→ลูกค้า): "express" | "standard" — ใช้คำนวณ buffer ก่อนเริ่มเช่า
+  outboundMethod  String? @map("outbound_method")
+  /// วิธีส่งคืนขากลับ (ลูกค้า→ร้าน): "express" | "standard" — ใช้คำนวณ buffer หลังจบเช่า
+  returnMethod    String? @map("return_method")
   /// ผู้ให้บริการขนส่ง (standard): "flash" | "kerry" | "jt" | "thaipost" | "other:<provider>"
   deliveryCarrier String? @map("delivery_carrier")
   /// ช่วงเวลารับของสำหรับส่งด่วน เช่น "14:00-18:00"
@@ -1185,7 +1198,7 @@ model Booking {
   paymentReviewAt       DateTime? @map("payment_review_at") @db.Timestamptz(6)
 
   /// สถานะการคืนเงิน: "none" (ไม่มี), "required" (แอดมินอนุมัติยกเลิกหลังจ่ายแล้ว — รอโอนคืน),
-  /// "refunded" (โอนคืนแล้ว มีสลิปยืนยัน)
+  /// "refunded" (โอนคืนแล้ว มีสลิปยืนยัน), "forfeited" (หักมัดจำ — ลูกค้าไม่คืนของ)
   refundStatus   String?   @default("none") @map("refund_status")
   /// จำนวนเงินที่คืน (บาท) — กรอกโดยแอดมินตอนอนุมัติยกเลิก หรือตอนบันทึกการคืนเงิน
   refundAmount   Int?      @map("refund_amount")
@@ -1201,11 +1214,12 @@ model Booking {
   updatedBy String?  @map("updated_by") @db.Uuid
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  renter  User            @relation(fields: [renterId], references: [id], onDelete: Cascade)
-  shop    Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  address Address?        @relation(fields: [addressId], references: [id], onDelete: SetNull)
-  review  Review?
-  items   BookingItem[]
+  renter    User            @relation(fields: [renterId], references: [id], onDelete: Cascade)
+  shop      Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  address   Address?        @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  review    Review?
+  items     BookingItem[]
+  lostUnits ProductUnit[]   @relation("LostUnits")
 
   @@index([renterId])
   @@index([shopId])
@@ -1639,6 +1653,8 @@ enum UnitStatus {
   repair
   /// ปลดระวาง — ไม่นับเป็น stock ถาวร
   retired
+  /// สูญหาย — ลูกค้าไม่คืน, ไม่นับเป็น stock, มี link กลับไปหา booking
+  lost
 
   @@map("unit_status")
 }

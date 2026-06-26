@@ -20,7 +20,9 @@ import {
   resolveEffectivePolicy,
   computeUnavailableDates,
   validateBookingRange,
+  shippingBuffers,
   BOOKING_BLOCKING_STATUSES,
+  type EffectivePolicy,
 } from "@/lib/booking-policy";
 import { bookingWindow, pickFreeUnit, hasFreeUnit } from "@/lib/unit-assignment";
 import { blockedUnitDatesInRange } from "@/lib/product-units";
@@ -249,10 +251,17 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   const bothTimes = isHHMM(startTimeRaw) && isHHMM(endTimeRaw);
   const startTime = bothTimes ? startTimeRaw : null;
   const endTime = bothTimes ? endTimeRaw : null;
-  // Delivery method. The carrier is chosen later by the shop (when shipping a
-  // standard order), and the express pickup time is coordinated by the shop
-  // directly with the renter after the booking is accepted.
-  const deliveryMethod = String(formData.get("delivery_method") ?? "").trim() || null;
+  // Delivery methods, now split into two legs chosen on the calendar page:
+  //   outbound (shop→customer) drives the before-rental transit buffer
+  //   return   (customer→shop) drives the after-rental transit buffer
+  // The carrier is chosen later by the shop (when shipping a standard order),
+  // and express pickup is coordinated by the shop with the renter after accept.
+  // `delivery_method` is kept as a legacy fallback (= outbound) for old forms.
+  const legacyDelivery = String(formData.get("delivery_method") ?? "").trim() || null;
+  const outboundMethod = String(formData.get("outbound_method") ?? "").trim() || legacyDelivery;
+  const returnMethod = String(formData.get("return_method") ?? "").trim() || legacyDelivery;
+  // deliveryMethod column mirrors the outbound leg for back-compat.
+  const deliveryMethod = outboundMethod;
   const deliveryCarrier = null;
 
   // ── Normalize into a lineItems array ──────────────────────────────────────
@@ -321,7 +330,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
         minRentalDays: true,
         maxRentalDays: true,
         returnWindowDays: true,
-        bufferDaysAfter: true,
+        bufferDaysAfter: true, cleaningDays: true,
         bufferDaysBefore: true,
         shop: {
           select: {
@@ -332,7 +341,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
             minRentalDays: true,
             maxRentalDays: true,
             returnWindowDays: true,
-            bufferDaysAfter: true,
+            bufferDaysAfter: true, cleaningDays: true,
             bufferDaysBefore: true,
             closedWeekdays: true,
             closedDates: {
@@ -363,10 +372,14 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
     firstProduct = productById.get(lineItems[0].productId)!;
 
     // ── Delivery-method gating (same-day rules, uses first product's shop) ───
-    if (deliveryMethod !== "express" && deliveryMethod !== "standard")
-      return { ok: false, error: "กรุณาเลือกวิธีจัดส่ง" };
+    // Both legs must be a valid method. Same-day gating applies to the OUTBOUND
+    // leg only — that's the shipment the shop must get out the door today.
+    if (outboundMethod !== "express" && outboundMethod !== "standard")
+      return { ok: false, error: "กรุณาเลือกวิธีจัดส่ง (ขาไป)" };
+    if (returnMethod !== "express" && returnMethod !== "standard")
+      return { ok: false, error: "กรุณาเลือกวิธีส่งคืน (ขากลับ)" };
     if (startDate === todayBkk()) {
-      if (deliveryMethod === "standard")
+      if (outboundMethod === "standard")
         return {
           ok: false,
           error: "ส่งพัสดุไม่สามารถจัดส่งภายในวันได้ กรุณาเลือกส่งด่วน หรือเลือกวันรับชุดเป็นวันอื่น",
@@ -397,6 +410,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
       hasVariant: boolean;
       bufferAfter: number;
       bufferBefore: number;
+      effectivePolicy: EffectivePolicy;
     };
 
     const days = rentalDays(startDate, endDate);
@@ -439,6 +453,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
           returnWindowDays: product.shop.returnWindowDays,
           bufferDaysAfter: product.shop.bufferDaysAfter,
           bufferDaysBefore: product.shop.bufferDaysBefore,
+          cleaningDays: product.shop.cleaningDays,
           closedWeekdays: product.shop.closedWeekdays,
         },
         {
@@ -449,6 +464,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
           returnWindowDays: product.returnWindowDays,
           bufferDaysAfter: product.bufferDaysAfter,
           bufferDaysBefore: product.bufferDaysBefore,
+          cleaningDays: product.cleaningDays,
         },
       );
 
@@ -464,14 +480,14 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
                 ],
                 booking: { status: { in: [...ACTIVE_BOOKING_STATUSES] } },
               },
-              select: { booking: { select: { startDate: true, endDate: true, status: true } } },
+              select: { booking: { select: { startDate: true, endDate: true, status: true, outboundMethod: true, returnMethod: true } } },
             })
           : db.bookingItem.findMany({
               where: {
                 productId: product.id,
                 booking: { status: { in: [...ACTIVE_BOOKING_STATUSES] } },
               },
-              select: { booking: { select: { startDate: true, endDate: true, status: true } } },
+              select: { booking: { select: { startDate: true, endDate: true, status: true, outboundMethod: true, returnMethod: true } } },
             }),
         db.productBlackoutDate.findMany({
           where: { productId: product.id },
@@ -486,6 +502,8 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
           startDate: b.booking.startDate,
           endDate: b.booking.endDate,
           status: b.booking.status,
+          outboundMethod: b.booking.outboundMethod,
+          returnMethod: b.booking.returnMethod,
         })),
         effectivePolicy,
         rangeStart: startDate,
@@ -499,7 +517,8 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
         effectivePolicy,
         unavailableDates,
         today,
-        isExpress: deliveryMethod === "express",
+        outboundMethod,
+        returnMethod,
       });
       if (!policyCheck.ok) return { ok: false, error: policyCheck.error };
 
@@ -512,6 +531,9 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
       );
       const perUnitRentalTotal = priceForNights(tiers, variantPricePerDay, days).total;
 
+      // Final hold window for THIS booking derived from its two shipping legs.
+      const itemBuffers = shippingBuffers(effectivePolicy, outboundMethod, returnMethod);
+
       resolvedItems.push({
         productId: product.id,
         variantId: resolvedVariantId,
@@ -520,8 +542,9 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
         deposit: variantDeposit,
         variantQuantity,
         hasVariant: !!resolvedVariantId,
-        bufferAfter: effectivePolicy.bufferDaysAfter,
-        bufferBefore: effectivePolicy.bufferDaysBefore ?? 0,
+        bufferBefore: itemBuffers.before,
+        bufferAfter: itemBuffers.after,
+        effectivePolicy,
       });
     }
 
@@ -559,9 +582,10 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
 
           for (const item of variantItems) {
             const vId = item.variantId!;
-            const bufferAfter = item.bufferAfter;
-            const bufferBefore = item.bufferBefore;
-            const reqBufferBefore = deliveryMethod === "express" ? 0 : bufferBefore;
+            // THIS booking's hold window (before/after already derived from its
+            // own outbound/return legs via shippingBuffers in resolvedItems).
+            const reqBufferBefore = item.bufferBefore;
+            const reqBufferAfter = item.bufferAfter;
 
             const overlapItems = await tx.bookingItem.findMany({
               where: {
@@ -571,20 +595,28 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
                 ],
                 booking: { status: { in: [...BOOKING_BLOCKING_STATUSES] } },
               },
-              select: { booking: { select: { startDate: true, endDate: true } } },
+              select: { booking: { select: { startDate: true, endDate: true, outboundMethod: true, returnMethod: true } } },
             });
 
             const dayCount = new Map<string, number>();
             for (const b of overlapItems) {
-              const bStart = addDaysLocal(b.booking.startDate.toISOString().slice(0, 10), -bufferBefore);
-              const bEnd = addDaysLocal(b.booking.endDate.toISOString().slice(0, 10), bufferAfter);
+              // Each existing booking holds its own window from its own legs;
+              // null/legacy methods fall back to standard (worst case).
+              const { before, after } = shippingBuffers(
+                item.effectivePolicy,
+                b.booking.outboundMethod,
+                b.booking.returnMethod,
+              );
+              const bStart = addDaysLocal(b.booking.startDate.toISOString().slice(0, 10), -before);
+              const bEnd = addDaysLocal(b.booking.endDate.toISOString().slice(0, 10), after);
               for (const d of dateRangeLocal(bStart, bEnd)) {
                 dayCount.set(d, (dayCount.get(d) ?? 0) + 1);
               }
             }
 
             const reqStart = addDaysLocal(startDate, -reqBufferBefore);
-            const blockedDays = await blockedUnitDatesInRange(tx, vId, reqStart, endDate);
+            const reqEnd = addDaysLocal(endDate, reqBufferAfter);
+            const blockedDays = await blockedUnitDatesInRange(tx, vId, reqStart, reqEnd);
             for (const b of blockedDays) {
               dayCount.set(b.ymd, (dayCount.get(b.ymd) ?? 0) + 1);
             }
@@ -595,7 +627,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
             // Check each unit of qty this line item requests.
             for (let unitIdx = 0; unitIdx < item.qty; unitIdx++) {
               // Effective holds = committed holds + units already consumed by earlier cart items.
-              for (const d of dateRangeLocal(reqStart, endDate)) {
+              for (const d of dateRangeLocal(reqStart, reqEnd)) {
                 const effectiveCount = (dayCount.get(d) ?? 0) + cartConsumed + unitIdx;
                 if (effectiveCount >= item.variantQuantity) {
                   const [, m, day] = d.split("-");
@@ -649,6 +681,8 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
               phone: addr.phone,
               addressText: addr.addressLine,
               deliveryMethod,
+              outboundMethod,
+              returnMethod,
               deliveryCarrier,
               items: { create: itemCreateRows },
             },
@@ -703,6 +737,8 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
           phone: addr.phone,
           addressText: addr.addressLine,
           deliveryMethod,
+          outboundMethod,
+          returnMethod,
           deliveryCarrier,
           items: { create: itemCreateRows },
         },
@@ -852,7 +888,7 @@ export async function acceptBooking(
                     minRentalDays: true,
                     maxRentalDays: true,
                     returnWindowDays: true,
-                    bufferDaysAfter: true,
+                    bufferDaysAfter: true, cleaningDays: true,
                     bufferDaysBefore: true,
                     shop: {
                       select: {
@@ -860,7 +896,7 @@ export async function acceptBooking(
                         minRentalDays: true,
                         maxRentalDays: true,
                         returnWindowDays: true,
-                        bufferDaysAfter: true,
+                        bufferDaysAfter: true, cleaningDays: true,
                         bufferDaysBefore: true,
                         closedWeekdays: true,
                       },
@@ -1116,7 +1152,8 @@ export async function markReturned(
   return sellerSimpleMove(bookingId, to, undefined, undefined, {
     condition,
     damageNote: condition === "damaged" ? damageNote!.trim() : undefined,
-    requireRefund: condition === "damaged" || condition === "not_returned",
+    requireRefund: condition === "damaged",
+    forfeitDeposit: condition === "not_returned",
   });
 }
 
@@ -1130,7 +1167,7 @@ async function sellerSimpleMove(
   to: BookingStatus,
   reason?: string,
   shipping?: { carrier?: string; trackingNumber?: string; trackingUrl?: string },
-  returnInfo?: { condition: ReturnCondition; damageNote?: string; requireRefund: boolean }
+  returnInfo?: { condition: ReturnCondition; damageNote?: string; requireRefund: boolean; forfeitDeposit?: boolean }
 ): Promise<Result> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
@@ -1161,19 +1198,26 @@ async function sellerSimpleMove(
                   returnCondition: returnInfo.condition,
                   returnDamageNote: returnInfo.damageNote ?? null,
                   ...(returnInfo.requireRefund ? { refundStatus: "required" } : {}),
+                  ...(returnInfo.forfeitDeposit ? { refundStatus: "forfeited" } : {}),
                 }
               : {}),
           },
         });
         if (moved.count > 0) {
           // Physical unit status follows the rental lifecycle:
-          //   renting  → 'rented'    (dress is out the door)
-          //   returned → 'available' (back in stock, ready to rent again)
-          //   rejected → 'available' (hold dropped; harmless if it wasn't rented)
+          //   renting       → 'rented'    (dress is out the door)
+          //   returned      → 'available' (back in stock, ready to rent again)
+          //   rejected      → 'available' (hold dropped; harmless if it wasn't rented)
+          //   not_returned  → 'lost'      (customer didn't return — mark unit lost with booking ref)
           const itemUnitIds = booking.items.map((i) => i.unitId).filter((x): x is string => !!x);
           if (itemUnitIds.length > 0) {
             if (to === "renting") {
               await tx.productUnit.updateMany({ where: { id: { in: itemUnitIds } }, data: { status: "rented" } });
+            } else if (to === "not_returned") {
+              await tx.productUnit.updateMany({
+                where: { id: { in: itemUnitIds } },
+                data: { status: "lost", lostFromBookingId: bookingId, note: "สูญหาย — ลูกค้าไม่คืนของ" },
+              });
             } else if (to === "returned" || to === "rejected") {
               await tx.productUnit.updateMany({ where: { id: { in: itemUnitIds } }, data: { status: "available" } });
             }

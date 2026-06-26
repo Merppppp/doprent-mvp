@@ -101,8 +101,9 @@ export async function blockedUnitDatesInRange(
 export type UnitView = {
   id: string;
   code: string;
-  status: "available" | "rented" | "repair" | "retired";
+  status: "available" | "rented" | "repair" | "retired" | "lost";
   note: string | null;
+  lostFromBookingId: string | null;
 };
 
 export type VariantUnits = {
@@ -140,7 +141,7 @@ export async function loadProductUnits(productId: string): Promise<VariantUnits[
       available: true,
       units: {
         orderBy: { code: "asc" },
-        select: { id: true, code: true, status: true, note: true },
+        select: { id: true, code: true, status: true, note: true, lostFromBookingId: true },
       },
     },
   });
@@ -182,7 +183,7 @@ export async function loadProductUnits(productId: string): Promise<VariantUnits[
       available: true,
       units: {
         orderBy: { code: "asc" },
-        select: { id: true, code: true, status: true, note: true },
+        select: { id: true, code: true, status: true, note: true, lostFromBookingId: true },
       },
     },
   });

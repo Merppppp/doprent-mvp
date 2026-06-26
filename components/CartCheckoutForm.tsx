@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addAddress, updateAddress, createBooking } from "@/app/actions/bookings";
 import type { Address } from "@/lib/types";
@@ -8,28 +8,7 @@ import type { BusinessHours } from "@/lib/hours";
 import { fmtThai } from "@/lib/date-th";
 import { useCart } from "@/lib/cart";
 
-/* ── Shared time helpers (mirror CheckoutForm) ─────────────────── */
-
-function localToday(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** Shift a YYYY-MM-DD string by `delta` days, returning YYYY-MM-DD. */
-function addDaysStr(dateStr: string, delta: number): string {
-  const d = new Date(`${dateStr}T00:00:00`);
-  d.setDate(d.getDate() + delta);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function minutesUntilCloseToday(hours: BusinessHours | null | undefined): number | null {
-  if (!hours) return null;
-  const now = new Date();
-  const today = hours[now.getDay()];
-  if (!today?.open) return null;
-  const [closeH, closeM] = today.to.split(":").map(Number);
-  return closeH * 60 + closeM - (now.getHours() * 60 + now.getMinutes());
-}
+/* ── Shared time helpers ────────────────────────────────────────── */
 
 function nightsBetween(start: string, end: string): number {
   const s = new Date(start).getTime();
@@ -75,7 +54,7 @@ const addressLabelClass = "block text-[13px] font-medium text-ink-2 mb-1";
 
 /* ── Main component ─────────────────────────────────────────────── */
 
-export default function CartCheckoutForm({ groupKey, addresses: initialAddresses, shopHours, shopIsOpen }: Props) {
+export default function CartCheckoutForm({ groupKey, addresses: initialAddresses, shopHours }: Props) {
   const router = useRouter();
   const { groups, clearGroup } = useCart();
 
@@ -91,36 +70,17 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const [deliveryMethod, setDeliveryMethod] = useState<"express" | "standard" | null>(null);
-
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const iv = setInterval(() => setTick((t) => t + 1), 60_000);
-    return () => clearInterval(iv);
-  }, []);
-
   const startDate = group?.startDate ?? "";
   const endDate = group?.endDate ?? "";
 
-  const isSameDayStart = startDate === localToday();
-  const minsToClose = useMemo(() => minutesUntilCloseToday(shopHours), [shopHours]);
-  const expressAvailable = isSameDayStart
-    ? shopIsOpen !== false && minsToClose != null && minsToClose > 60
-    : true;
-  const standardAvailable = !isSameDayStart;
-  const noDeliveryToday = isSameDayStart && !expressAvailable;
-
-  useEffect(() => {
-    if (deliveryMethod === "express" && !expressAvailable) setDeliveryMethod(null);
-    if (deliveryMethod === "standard" && !standardAvailable) setDeliveryMethod(null);
-  }, [deliveryMethod, expressAvailable, standardAvailable]);
-
-  useEffect(() => {
-    if (deliveryMethod) return;
-    if (expressAvailable && !standardAvailable) setDeliveryMethod("express");
-  }, [deliveryMethod, expressAvailable, standardAvailable]);
-
-  const deliveryComplete = deliveryMethod === "standard" || deliveryMethod === "express";
+  // Shipping methods are chosen per-product on the calendar page and carried in
+  // the cart. Each leg is express only when EVERY item in the group is express;
+  // otherwise fall back to standard (worst case, wider buffer).
+  const items = group?.items ?? [];
+  const outboundMethod: "express" | "standard" =
+    items.length > 0 && items.every((i) => i.outboundMethod === "express") ? "express" : "standard";
+  const returnMethod: "express" | "standard" =
+    items.length > 0 && items.every((i) => i.returnMethod === "express") ? "express" : "standard";
 
   /* ── Address mutations ─────────────────────────────────────────── */
 
@@ -176,7 +136,6 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
 
   async function onConfirm() {
     if (!group) { setError("ไม่พบข้อมูลการจอง กรุณากลับไปที่ตะกร้า"); return; }
-    if (!deliveryMethod) { setError("กรุณาเลือกวิธีจัดส่ง"); return; }
     if (!selectedId) { setError("กรุณาเลือกที่อยู่จัดส่ง"); return; }
     setError("");
     setBusy(true);
@@ -192,7 +151,8 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
     fd.set("address_id", selectedId);
     fd.set("start_date", group.startDate);
     fd.set("end_date", group.endDate);
-    fd.set("delivery_method", deliveryMethod);
+    fd.set("outbound_method", outboundMethod);
+    fd.set("return_method", returnMethod);
 
     const firstWithTimes = group.items.find((i) => i.startTime && i.endTime);
     if (firstWithTimes?.startTime) fd.set("start_time", firstWithTimes.startTime);
@@ -271,78 +231,26 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
         </div>
       </div>
 
-      {/* ═══ 1. Delivery ═══ */}
-      <section>
-        <h2 className="text-[16px] font-semibold mb-3">
-          <StepNum n={1} /> วิธีจัดส่ง <Req />
-        </h2>
-        {noDeliveryToday ? (
-          <div className="p-4 rounded-xl border border-danger bg-danger-soft text-[13px] text-ink leading-relaxed">
-            ตอนนี้เลยเวลาส่งด่วนสำหรับวันนี้แล้ว และส่งพัสดุไม่สามารถจัดส่งภายในวันได้
-            กรุณาย้อนกลับไปเลือกวันรับชุดเป็นวันอื่น
-          </div>
-        ) : (
-          <div className="grid gap-2">
-            {expressAvailable && (
-              <label
-                className={`flex gap-3 items-center p-4 rounded-xl border-[1.5px] cursor-pointer transition-colors ${deliveryMethod === "express" ? "border-accent bg-accent-soft" : "border-line bg-surface"}`}
-              >
-                <input
-                  type="radio"
-                  name="delivery"
-                  checked={deliveryMethod === "express"}
-                  onChange={() => setDeliveryMethod("express")}
-                  className="w-[18px] h-[18px] accent-accent shrink-0"
-                />
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-accent"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <div className="flex-1">
-                  <div className="font-semibold text-[14px] text-ink">ส่งด่วน</div>
-                  <div className="text-[12px] text-ink-3 mt-0.5">
-                    ร้านจะจัดส่งวันที่ {fmtThai(startDate)}
-                  </div>
-                </div>
-              </label>
-            )}
-            {standardAvailable && (
-              <label
-                className={`flex gap-3 items-center p-4 rounded-xl border-[1.5px] cursor-pointer transition-colors ${deliveryMethod === "standard" ? "border-accent bg-accent-soft" : "border-line bg-surface"}`}
-              >
-                <input
-                  type="radio"
-                  name="delivery"
-                  checked={deliveryMethod === "standard"}
-                  onChange={() => setDeliveryMethod("standard")}
-                  className="w-[18px] h-[18px] accent-accent shrink-0"
-                />
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 ${deliveryMethod === "standard" ? "text-accent" : "text-ink-2"}`}><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                <div className="flex-1">
-                  <div className="font-semibold text-[14px] text-ink">ส่งพัสดุ</div>
-                  <div className="text-[12px] text-ink-3 mt-0.5">ร้านจะจัดส่งภายในวันที่ {fmtThai(addDaysStr(startDate, -1))}</div>
-                </div>
-              </label>
-            )}
-            {isSameDayStart && expressAvailable && (
-              <p className="text-[12px] text-ink-3 pl-1">เช่าวันนี้จัดส่งได้เฉพาะแบบส่งด่วนเท่านั้น</p>
-            )}
-          </div>
-        )}
-
-        {deliveryMethod === "express" && (
-          <p className="mt-4 text-[13px] text-ink-3 leading-relaxed">
-            ร้านจะติดต่อนัดเวลารับ–ส่งกับคุณหลังยืนยันการชำระเงิน
-          </p>
-        )}
-        {deliveryMethod === "standard" && (
-          <p className="mt-4 text-[13px] text-ink-3 leading-relaxed">
-            ร้านจะเลือกผู้ให้บริการขนส่งและแจ้งเลขพัสดุให้คุณหลังยืนยันการชำระเงิน
-          </p>
-        )}
+      {/* ═══ Shipping summary (chosen on the calendar page) ═══ */}
+      <section className="rounded-xl border border-line bg-surface px-4 py-3 text-[13px]">
+        <div className="font-semibold text-ink-2 mb-2">วิธีจัดส่ง</div>
+        <div className="flex justify-between py-0.5">
+          <span className="text-ink-2">ตอนร้านจัดส่งของ</span>
+          <span className="font-medium text-ink">{outboundMethod === "express" ? "ส่งด่วน" : "ส่งพัสดุ"}</span>
+        </div>
+        <div className="flex justify-between py-0.5">
+          <span className="text-ink-2">ตอนคืนสินค้า</span>
+          <span className="font-medium text-ink">{returnMethod === "express" ? "ส่งด่วน" : "ส่งพัสดุ"}</span>
+        </div>
+        <p className="text-[12px] text-ink-3 mt-2 leading-relaxed">
+          เลือกไว้จากหน้าชุด · แก้ไขได้โดยกลับไปที่หน้าชุด
+        </p>
       </section>
 
-      {/* ═══ 2. Address ═══ */}
-      <section className={deliveryComplete ? "opacity-100" : "opacity-50 pointer-events-none"}>
+      {/* ═══ 1. Address ═══ */}
+      <section>
         <h2 className="text-[16px] font-semibold mb-3">
-          <StepNum n={2} /> ที่อยู่จัดส่ง <Req />
+          <StepNum n={1} /> ที่อยู่จัดส่ง <Req />
         </h2>
         <div className="grid gap-2">
           {addresses.map((a) =>
@@ -444,7 +352,7 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
       {/* ═══ 3. Summary ═══ */}
       <section className="p-4 rounded-xl border border-line bg-surface text-[14px]">
         <h2 className="text-[16px] font-semibold mb-3">
-          <StepNum n={3} /> สรุปการจอง
+          <StepNum n={2} /> สรุปการจอง
         </h2>
         <div className="mb-3 grid gap-1.5">
           {group.items.map((item) => (
@@ -468,13 +376,9 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
         <p className="text-[12px] text-ink-3 mt-2 leading-relaxed">
           {fmtThai(group.startDate)} ถึง {fmtThai(group.endDate)} · ร้านจะใส่ค่าจัดส่งแล้วคุณค่อยจ่ายผ่าน QR PromptPay
         </p>
-        {deliveryMethod && (
-          <div className="mt-2 text-[12px] text-ink-2 px-3 py-1.5 bg-bg rounded-lg">
-            {deliveryMethod === "express"
-              ? "ส่งด่วน · ร้านนัดเวลารับ–ส่ง"
-              : "ส่งพัสดุ · ร้านเลือกขนส่ง"}
-          </div>
-        )}
+        <div className="mt-2 text-[12px] text-ink-2 px-3 py-1.5 bg-bg rounded-lg">
+          ส่งของ: {outboundMethod === "express" ? "ส่งด่วน" : "ส่งพัสดุ"} · คืนของ: {returnMethod === "express" ? "ส่งด่วน" : "ส่งพัสดุ"}
+        </div>
       </section>
 
       {/* Errors */}
@@ -484,13 +388,7 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
         </div>
       ) : null}
 
-      {!deliveryMethod && (
-        <div className="flex items-center gap-1.5 text-[13px] text-danger">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-          กรุณาเลือกวิธีจัดส่ง
-        </div>
-      )}
-      {deliveryComplete && !selectedId && (
+      {!selectedId && (
         <div className="flex items-center gap-1.5 text-[13px] text-danger">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
           กรุณาเลือกหรือเพิ่มที่อยู่จัดส่ง
@@ -501,7 +399,7 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
         type="button"
         className="btn btn-primary btn-lg py-3.5 px-5 text-[15px]"
         onClick={onConfirm}
-        disabled={busy || !deliveryComplete || !selectedId}
+        disabled={busy || !selectedId}
       >
         {busy ? "กำลังส่งคำขอ…" : "ยืนยันจอง"}
       </button>

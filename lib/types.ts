@@ -334,8 +334,12 @@ export type Booking = {
   slip_path: string | null;
   /** Channel the shop chose to collect through (snapshot at accept). */
   payment_method: "promptpay" | "bank" | null;
-  /** Delivery method the renter picked at checkout ("standard" | "express"). */
+  /** Delivery method the renter picked at checkout ("standard" | "express"). Mirrors outbound_method. */
   delivery_method: string | null;
+  /** Outbound shipping (shop→customer) — drives before-rental buffer. */
+  outbound_method: string | null;
+  /** Return shipping (customer→shop) — drives after-rental buffer. */
+  return_method: string | null;
   /** Carrier the shop handed a standard parcel to (set when shipping). */
   delivery_carrier: string | null;
   /** Parcel tracking number the shop entered when shipping. */

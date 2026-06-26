@@ -16,7 +16,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-type SP = { product?: string; dress?: string; start?: string; end?: string; variant?: string; startTime?: string; endTime?: string };
+type SP = { product?: string; dress?: string; start?: string; end?: string; variant?: string; startTime?: string; endTime?: string; outbound?: string; return?: string };
+
+const isShipMethod = (s: string | undefined): s is "express" | "standard" =>
+  s === "express" || s === "standard";
 
 const isHHMM = (s: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 
@@ -35,8 +38,12 @@ export default async function CheckoutAddressPage({
   const startTime = searchParams.startTime && isHHMM(searchParams.startTime) ? searchParams.startTime : null;
   const endTime = searchParams.endTime && isHHMM(searchParams.endTime) ? searchParams.endTime : null;
   const timeQuery = startTime && endTime ? `&startTime=${startTime}&endTime=${endTime}` : "";
+  // Shipping methods picked on the calendar page. Default to standard (worst case).
+  const outboundMethod = isShipMethod(searchParams.outbound) ? searchParams.outbound : "standard";
+  const returnMethod = isShipMethod(searchParams.return) ? searchParams.return : "standard";
+  const shipQuery = `&outbound=${outboundMethod}&return=${returnMethod}`;
 
-  const backHref = `/checkout/address?product=${productId}&start=${start}&end=${end}${variantId ? `&variant=${variantId}` : ""}${timeQuery}`;
+  const backHref = `/checkout/address?product=${productId}&start=${start}&end=${end}${variantId ? `&variant=${variantId}` : ""}${timeQuery}${shipQuery}`;
 
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(backHref)}`);
@@ -152,6 +159,8 @@ export default async function CheckoutAddressPage({
         deposit={Number(dress.deposit) || 0}
         addresses={addresses}
         variantId={variantId}
+        outboundMethod={outboundMethod}
+        returnMethod={returnMethod}
         shopHours={shopHours}
         shopIsOpen={dress.shop_is_open}
       />

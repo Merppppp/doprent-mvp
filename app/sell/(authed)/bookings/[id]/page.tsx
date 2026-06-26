@@ -83,6 +83,9 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
 
       <div style={card}>
         {b.dress_size ? <Row label="ไซซ์" value={sizeLabel(b.dress_size)} /> : null}
+        {b.items[0]?.unit_code ? (
+          <Row label="รหัสสินค้า" value={b.items[0].unit_code} mono />
+        ) : null}
         <Row label="วันเช่า" value={fmtRentalWindow(b.start_date, b.end_date, b.start_time, b.end_time)} />
         {/* Renter row: recipient name + reliability badge */}
         <div style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "4px 0", fontSize: 14 }}>
@@ -169,8 +172,21 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
         </div>
       ) : null}
 
-      {/* Refund status — read-only for the seller */}
-      {(b.refund_status === "required" || b.refund_status === "refunded") ? (
+      {/* Refund / deposit forfeiture status — read-only for the seller */}
+      {b.refund_status === "forfeited" ? (
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 mb-4">
+          <div className="font-semibold text-sm mb-2">เงินมัดจำ</div>
+          <div className="flex justify-between gap-4 py-1 text-sm">
+            <span className="text-[var(--ink-3)] shrink-0">สถานะ</span>
+            <span className="font-semibold text-[var(--danger)]">หักมัดจำ</span>
+          </div>
+          <div className="flex justify-between gap-4 py-1 text-sm">
+            <span className="text-[var(--ink-3)] shrink-0">จำนวน</span>
+            <span className="font-medium">฿{b.deposit.toLocaleString()}</span>
+          </div>
+          <p className="mt-2 text-xs text-[var(--ink-3)]">ลูกค้าไม่ส่งคืนของ — เงินมัดจำถูกหักเต็มจำนวน</p>
+        </div>
+      ) : (b.refund_status === "required" || b.refund_status === "refunded") ? (
         <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 mb-4">
           <div className="font-semibold text-sm mb-2">การคืนเงิน</div>
           <div className="flex justify-between gap-4 py-1 text-sm">
@@ -242,16 +258,18 @@ function Row({
   value,
   bold,
   muted,
+  mono,
 }: {
   label: string;
   value: string;
   bold?: boolean;
   muted?: boolean;
+  mono?: boolean;
 }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "4px 0", fontSize: 14 }}>
       <span style={{ color: "var(--ink-3)", flexShrink: 0 }}>{label}</span>
-      <span style={{ fontWeight: bold ? 700 : 500, color: muted ? "var(--ink-3)" : "var(--ink)", textAlign: "right" }}>
+      <span style={{ fontWeight: bold ? 700 : 500, color: muted ? "var(--ink-3)" : "var(--ink)", textAlign: "right", fontFamily: mono ? "var(--font-mono, monospace)" : undefined }}>
         {value}
       </span>
     </div>

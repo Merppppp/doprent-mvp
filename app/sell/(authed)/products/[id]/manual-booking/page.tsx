@@ -28,6 +28,7 @@ type ProductForVariantOptions = {
   returnWindowDays: number | null;
   bufferDaysAfter: number | null;
   bufferDaysBefore: number | null;
+  cleaningDays: number | null;
   shop: {
     leadTimeDays: number;
     minRentalDays: number;
@@ -35,6 +36,7 @@ type ProductForVariantOptions = {
     returnWindowDays: number;
     bufferDaysAfter: number;
     bufferDaysBefore: number;
+    cleaningDays: number;
     closedWeekdays: number[];
     closedDates: { date: Date }[];
   };
@@ -64,6 +66,7 @@ async function buildVariantOptions(
       returnWindowDays: product.shop.returnWindowDays,
       bufferDaysAfter: product.shop.bufferDaysAfter,
       bufferDaysBefore: product.shop.bufferDaysBefore,
+      cleaningDays: product.shop.cleaningDays,
       closedWeekdays: product.shop.closedWeekdays,
     },
     {
@@ -74,6 +77,7 @@ async function buildVariantOptions(
       returnWindowDays: product.returnWindowDays,
       bufferDaysAfter: product.bufferDaysAfter,
       bufferDaysBefore: product.bufferDaysBefore,
+      cleaningDays: product.cleaningDays,
     },
   );
 
@@ -174,7 +178,7 @@ export default async function ManualBookingPage({
     minRentalDays: true,
     maxRentalDays: true,
     returnWindowDays: true,
-    bufferDaysAfter: true,
+    bufferDaysAfter: true, cleaningDays: true,
     bufferDaysBefore: true,
     status: true,
     available: true,
@@ -190,7 +194,7 @@ export default async function ManualBookingPage({
         minRentalDays: true,
         maxRentalDays: true,
         returnWindowDays: true,
-        bufferDaysAfter: true,
+        bufferDaysAfter: true, cleaningDays: true,
         bufferDaysBefore: true,
         closedWeekdays: true,
         closedDates: { select: { date: true } },

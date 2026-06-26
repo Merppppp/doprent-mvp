@@ -10,6 +10,7 @@ const STATUS_LABEL: Record<UnitView["status"], string> = {
   rented: "กำลังเช่า",
   repair: "ติดซ่อม",
   retired: "ปลดระวาง",
+  lost: "สูญหาย",
 };
 
 const STATUS_BADGE: Record<UnitView["status"], string> = {
@@ -17,6 +18,7 @@ const STATUS_BADGE: Record<UnitView["status"], string> = {
   rented: "bg-info-soft text-info",
   repair: "bg-warn-soft text-warn",
   retired: "bg-danger-soft text-danger",
+  lost: "bg-danger-soft text-danger",
 };
 
 export default function ProductUnitsManager({ variants }: { variants: VariantUnits[] }) {
@@ -62,7 +64,7 @@ export default function ProductUnitsManager({ variants }: { variants: VariantUni
 
             <ul className="flex flex-col gap-2">
               {v.units.map((u) => {
-                const isRented = u.status === "rented";
+                const isLocked = u.status === "rented" || u.status === "lost";
                 const busy = pending && busyId === u.id;
                 return (
                   <li
@@ -77,7 +79,7 @@ export default function ProductUnitsManager({ variants }: { variants: VariantUni
                       {u.status !== "available" && (
                         <button
                           type="button"
-                          disabled={busy || isRented}
+                          disabled={busy || isLocked}
                           onClick={() => act(u.id, "available")}
                           className="btn btn-outline !px-3 !py-1.5 !text-xs disabled:opacity-50"
                         >
@@ -87,7 +89,7 @@ export default function ProductUnitsManager({ variants }: { variants: VariantUni
                       {u.status !== "repair" && (
                         <button
                           type="button"
-                          disabled={busy || isRented}
+                          disabled={busy || isLocked}
                           onClick={() => act(u.id, "repair")}
                           className="btn btn-outline !px-3 !py-1.5 !text-xs disabled:opacity-50"
                         >
@@ -97,7 +99,7 @@ export default function ProductUnitsManager({ variants }: { variants: VariantUni
                       {u.status !== "retired" && (
                         <button
                           type="button"
-                          disabled={busy || isRented}
+                          disabled={busy || isLocked}
                           onClick={() => act(u.id, "retired")}
                           className="btn btn-outline !px-3 !py-1.5 !text-xs disabled:opacity-50"
                         >
@@ -105,9 +107,22 @@ export default function ProductUnitsManager({ variants }: { variants: VariantUni
                         </button>
                       )}
                     </div>
-                    {isRented ? (
+                    {u.status === "rented" ? (
                       <span className="w-full text-xs text-ink-3">
                         หน่วยนี้กำลังถูกเช่าอยู่ — เปลี่ยนสถานะได้เมื่อลูกค้าคืนแล้ว
+                      </span>
+                    ) : null}
+                    {u.status === "lost" ? (
+                      <span className="w-full text-xs text-danger">
+                        สูญหาย — ลูกค้าไม่คืนของ
+                        {u.lostFromBookingId ? (
+                          <a
+                            href={`/sell/bookings/${u.lostFromBookingId}`}
+                            className="ml-1 underline text-accent"
+                          >
+                            ดูรายการจอง
+                          </a>
+                        ) : null}
                       </span>
                     ) : null}
                   </li>

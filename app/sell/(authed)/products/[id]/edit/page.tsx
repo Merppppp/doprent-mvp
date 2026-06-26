@@ -32,7 +32,7 @@ export default async function EditProductPage({ params }: { params: { id: string
         available: true, shopId: true, productTypeId: true,
         policyOverride: true,
         leadTimeDays: true, minRentalDays: true, maxRentalDays: true,
-        returnWindowDays: true, bufferDaysAfter: true,
+        returnWindowDays: true, bufferDaysAfter: true, cleaningDays: true,
         images: { orderBy: { sortOrder: "asc" }, select: { url: true } },
         priceTiers: { orderBy: { minDays: "asc" }, select: { variantId: true, minDays: true, pricePerDay: true } },
         productTags: {

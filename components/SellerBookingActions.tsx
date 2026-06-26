@@ -247,6 +247,14 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
             <p className="text-xs text-[var(--ink-3)]">กรอกเลขพัสดุหรือลิงก์ติดตามอย่างน้อยหนึ่งอย่าง เพื่อให้ผู้เช่าติดตามพัสดุได้</p>
           </>
         ) : null}
+        {/* Validation hints — show which field is blocking the button */}
+        {!carrierOk ? (
+          <p className="text-xs text-[var(--danger)]">กรุณากรอกชื่อผู้ให้บริการขนส่ง</p>
+        ) : !trackingOk ? (
+          <p className="text-xs text-[var(--danger)]">กรุณากรอกเลขพัสดุหรือลิงก์ติดตามอย่างน้อยหนึ่งอย่าง</p>
+        ) : !urlOk ? (
+          <p className="text-xs text-[var(--danger)]">ลิงก์ติดตามต้องขึ้นต้นด้วย http:// หรือ https://</p>
+        ) : null}
         <button
           type="button"
           className="btn btn-primary btn-lg"

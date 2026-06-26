@@ -47,7 +47,7 @@ export default async function EditShopPage() {
         minRentalDays: true,
         maxRentalDays: true,
         returnWindowDays: true,
-        bufferDaysAfter: true,
+        bufferDaysAfter: true, cleaningDays: true,
         bufferDaysBefore: true,
         closedWeekdays: true,
         area: { select: { key: true } },

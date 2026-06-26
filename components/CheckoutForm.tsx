@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addAddress, updateAddress, createBooking } from "@/app/actions/bookings";
 import { priceForNights } from "@/lib/pricing";
@@ -21,33 +21,12 @@ type Props = {
   deposit: number;
   addresses: Address[];
   variantId?: string | null;
+  /** Shipping methods chosen on the calendar page (display only here). */
+  outboundMethod: "express" | "standard";
+  returnMethod: "express" | "standard";
   shopHours?: BusinessHours | null;
   shopIsOpen?: boolean;
 };
-
-/** Local "today" as YYYY-MM-DD (browser clock = the renter's wall clock). */
-function localToday(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** Shift a YYYY-MM-DD string by `delta` days, returning YYYY-MM-DD. */
-function addDaysStr(dateStr: string, delta: number): string {
-  const d = new Date(`${dateStr}T00:00:00`);
-  d.setDate(d.getDate() + delta);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** Minutes from now until the shop closes today. null when shop is closed today
- *  or hours are unknown. Negative when already past closing. */
-function minutesUntilCloseToday(hours: BusinessHours | null | undefined): number | null {
-  if (!hours) return null;
-  const now = new Date();
-  const today = hours[now.getDay()];
-  if (!today?.open) return null;
-  const [closeH, closeM] = today.to.split(":").map(Number);
-  return closeH * 60 + closeM - (now.getHours() * 60 + now.getMinutes());
-}
 
 export default function CheckoutForm({
   productId,
@@ -61,8 +40,9 @@ export default function CheckoutForm({
   deposit,
   addresses: initialAddresses,
   variantId,
+  outboundMethod,
+  returnMethod,
   shopHours,
-  shopIsOpen,
 }: Props) {
   const router = useRouter();
   const [addresses, setAddresses] = useState<Address[]>(initialAddresses);
@@ -74,46 +54,7 @@ export default function CheckoutForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // Delivery state
-  const [deliveryMethod, setDeliveryMethod] = useState<"express" | "standard" | null>(null);
-
-  // Re-evaluate time-based gating every minute (today's cutoff shifts as time passes).
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const iv = setInterval(() => setTick((t) => t + 1), 60_000);
-    return () => clearInterval(iv);
-  }, []);
-
-  // Whether the rental starts today (same-day) — drives which methods are offered.
-  const isSameDayStart = startDate === localToday();
-
-  // Same-day delivery rules:
-  //   • Express needs the shop open today with > 1h before closing (time to dispatch).
-  //   • Standard (parcel) can never arrive same-day, so it's hidden when start = today.
-  //   • Future dates: both methods are available.
-  const minsToClose = useMemo(() => minutesUntilCloseToday(shopHours), [shopHours]);
-  const expressAvailable = isSameDayStart
-    ? shopIsOpen !== false && minsToClose != null && minsToClose > 60
-    : true;
-  const standardAvailable = !isSameDayStart;
-  // Same-day but too late / shop closed → nothing can ship today.
-  const noDeliveryToday = isSameDayStart && !expressAvailable;
-
-  // Drop a selected method the moment it stops being valid (e.g. time passes).
-  useEffect(() => {
-    if (deliveryMethod === "express" && !expressAvailable) setDeliveryMethod(null);
-    if (deliveryMethod === "standard" && !standardAvailable) setDeliveryMethod(null);
-  }, [deliveryMethod, expressAvailable, standardAvailable]);
-
-  // Auto-select when exactly one method is offered (same-day → express only).
-  useEffect(() => {
-    if (deliveryMethod) return;
-    if (expressAvailable && !standardAvailable) setDeliveryMethod("express");
-  }, [deliveryMethod, expressAvailable, standardAvailable]);
-
   const { perDay: effPerDay, total: rental } = priceForNights(priceTiers ?? null, pricePerDay, days);
-
-  const deliveryComplete = deliveryMethod === "standard" || deliveryMethod === "express";
 
   async function onAddAddress(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -170,10 +111,6 @@ export default function CheckoutForm({
   }
 
   async function onConfirm() {
-    if (!deliveryMethod) {
-      setError("กรุณาเลือกวิธีจัดส่ง");
-      return;
-    }
     if (!selectedId) {
       setError("กรุณาเลือกที่อยู่จัดส่ง");
       return;
@@ -188,7 +125,8 @@ export default function CheckoutForm({
     if (startTime) fd.set("start_time", startTime);
     if (endTime) fd.set("end_time", endTime);
     if (variantId) fd.set("variant_id", variantId);
-    fd.set("delivery_method", deliveryMethod);
+    fd.set("outbound_method", outboundMethod);
+    fd.set("return_method", returnMethod);
     const res = await createBooking(fd);
     if (!res.ok) {
       setBusy(false);
@@ -225,95 +163,32 @@ export default function CheckoutForm({
         );
       })() : null}
 
-      {/* ═══ 1. Delivery method (FIRST) ═══ */}
-      <section>
-        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
-          <StepNum n={1} /> วิธีจัดส่ง <Req />
-        </h2>
-        {noDeliveryToday ? (
-          <div
-            style={{
-              padding: 14,
-              borderRadius: 10,
-              border: "1px solid var(--danger)",
-              background: "var(--danger-soft)",
-              fontSize: 13,
-              color: "var(--ink)",
-              lineHeight: 1.6,
-            }}
-          >
-            ตอนนี้เลยเวลาส่งด่วนสำหรับวันนี้แล้ว และส่งพัสดุไม่สามารถจัดส่งภายในวันได้
-            กรุณาย้อนกลับไปเลือกวันรับชุดเป็นวันอื่น
-          </div>
-        ) : (
-          <div style={{ display: "grid", gap: 8 }}>
-            {/* Express option — same-day messenger (or future-date delivery). */}
-            {expressAvailable && (
-              <label style={{ ...optionBtn(deliveryMethod === "express", false), cursor: "pointer" }}>
-                <input
-                  type="radio"
-                  name="delivery"
-                  checked={deliveryMethod === "express"}
-                  onChange={() => { setDeliveryMethod("express"); }}
-                  style={{ accentColor: "var(--accent)", width: 18, height: 18, flexShrink: 0 }}
-                />
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: "var(--accent)" }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>ส่งด่วน</div>
-                  <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-                    ร้านจะจัดส่งวันที่ {fmtThai(startDate)}
-                  </div>
-                </div>
-              </label>
-            )}
-
-            {/* Standard option — parcel (future-date only; can't arrive same-day). */}
-            {standardAvailable && (
-              <label style={{ ...optionBtn(deliveryMethod === "standard", false), cursor: "pointer" }}>
-                <input
-                  type="radio"
-                  name="delivery"
-                  checked={deliveryMethod === "standard"}
-                  onChange={() => setDeliveryMethod("standard")}
-                  style={{ accentColor: "var(--accent)", width: 18, height: 18, flexShrink: 0 }}
-                />
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: deliveryMethod === "standard" ? "var(--accent)" : "var(--ink-2)" }}><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>ส่งพัสดุ</div>
-                  <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-                    ร้านจะจัดส่งภายในวันที่ {fmtThai(addDaysStr(startDate, -1))}
-                  </div>
-                </div>
-              </label>
-            )}
-
-            {isSameDayStart && expressAvailable && (
-              <div style={{ fontSize: 12, color: "var(--ink-3)", paddingLeft: 2 }}>
-                เช่าวันนี้จัดส่งได้เฉพาะแบบส่งด่วนเท่านั้น
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Express: shop coordinates the exact pickup/delivery time after accepting. */}
-        {deliveryMethod === "express" && (
-          <div style={{ marginTop: 14, fontSize: 13, color: "var(--ink-3)", lineHeight: 1.6 }}>
-            ร้านจะติดต่อนัดเวลารับ–ส่งกับคุณหลังยืนยันการชำระเงิน
-          </div>
-        )}
-
-        {/* Standard: shop chooses the carrier after accepting the booking. */}
-        {deliveryMethod === "standard" && (
-          <div style={{ marginTop: 14, fontSize: 13, color: "var(--ink-3)", lineHeight: 1.6 }}>
-            ร้านจะเลือกผู้ให้บริการขนส่งและแจ้งเลขพัสดุให้คุณหลังยืนยันการชำระเงิน
-          </div>
-        )}
+      {/* ═══ Shipping summary (chosen on the calendar page; read-only here) ═══ */}
+      <section
+        style={{
+          padding: "12px 14px",
+          border: "1px solid var(--line)",
+          borderRadius: 10,
+          background: "var(--surface)",
+          fontSize: 13,
+          display: "grid",
+          gap: 6,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>การจัดส่ง (ขาไป)</span>
+          <span style={{ color: "var(--ink)" }}>{outboundMethod === "express" ? "ส่งด่วน" : "ส่งพัสดุ"}</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>การส่งคืน (ขากลับ)</span>
+          <span style={{ color: "var(--ink)" }}>{returnMethod === "express" ? "ส่งด่วน" : "ส่งพัสดุ"}</span>
+        </div>
       </section>
 
-      {/* ═══ 2. Address selection ═══ */}
-      <section style={{ opacity: deliveryComplete ? 1 : 0.5, pointerEvents: deliveryComplete ? "auto" : "none" }}>
+      {/* ═══ 1. Address selection ═══ */}
+      <section>
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
-          <StepNum n={2} /> ที่อยู่จัดส่ง <Req />
+          <StepNum n={1} /> ที่อยู่จัดส่ง <Req />
         </h2>
         <div style={{ display: "grid", gap: 8 }}>
           {addresses.map((a) =>
@@ -522,7 +397,7 @@ export default function CheckoutForm({
         }}
       >
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
-          <StepNum n={3} /> สรุปการจอง
+          <StepNum n={2} /> สรุปการจอง
         </h2>
         <Row label={`ค่าเช่า (฿${effPerDay.toLocaleString()} × ${days} วัน)`} value={`฿${rental.toLocaleString()}`} />
         <Row label="ค่ามัดจำ" value={`฿${deposit.toLocaleString()}`} />
@@ -533,13 +408,11 @@ export default function CheckoutForm({
           วันที่ {fmtThai(startDate)}{startTime ? ` ${startTime}` : ""} ถึง {fmtThai(endDate)}{endTime ? ` ${endTime}` : ""}
           {startTime && endTime ? "" : " · ทั้งวัน"} · ร้านจะใส่ค่าจัดส่งแล้วคุณค่อยจ่ายผ่าน QR PromptPay
         </p>
-        {deliveryMethod && (
-          <div style={{ fontSize: 12, color: "var(--ink-2)", marginTop: 6, padding: "6px 10px", background: "var(--bg)", borderRadius: 6 }}>
-            {deliveryMethod === "express"
-              ? "ส่งด่วน · ร้านนัดเวลารับ–ส่ง"
-              : "ส่งพัสดุ · ร้านเลือกขนส่ง"}
-          </div>
-        )}
+        <div style={{ fontSize: 12, color: "var(--ink-2)", marginTop: 6, padding: "6px 10px", background: "var(--bg)", borderRadius: 6 }}>
+          {outboundMethod === "express" ? "ขาไป: ส่งด่วน · ร้านนัดเวลารับ–ส่ง" : "ขาไป: ส่งพัสดุ · ร้านเลือกขนส่ง"}
+          {" · "}
+          {returnMethod === "express" ? "ขากลับ: ส่งด่วน" : "ขากลับ: ส่งพัสดุ"}
+        </div>
       </section>
 
       {error ? (
@@ -557,13 +430,7 @@ export default function CheckoutForm({
       ) : null}
 
       {/* Validation hints */}
-      {!deliveryMethod && (
-        <div style={{ fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-          กรุณาเลือกวิธีจัดส่ง
-        </div>
-      )}
-      {deliveryComplete && !selectedId && (
+      {!selectedId && (
         <div style={{ fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
           กรุณาเลือกหรือเพิ่มที่อยู่จัดส่ง
@@ -574,7 +441,7 @@ export default function CheckoutForm({
         type="button"
         className="btn btn-primary btn-lg"
         onClick={onConfirm}
-        disabled={busy || !deliveryComplete || !selectedId}
+        disabled={busy || !selectedId}
         style={{ padding: "14px 20px", fontSize: 15 }}
       >
         {busy ? "กำลังส่งคำขอ…" : "ยืนยันจอง"}
@@ -612,29 +479,6 @@ function StepNum({ n }: { n: number }) {
       {n}
     </span>
   );
-}
-
-function Check() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-function optionBtn(active: boolean, disabled: boolean): React.CSSProperties {
-  return {
-    display: "flex",
-    gap: 12,
-    alignItems: "center",
-    padding: "14px 16px",
-    borderRadius: 10,
-    border: `1.5px solid ${active ? "var(--accent)" : "var(--line)"}`,
-    background: active ? "var(--accent-soft)" : disabled ? "var(--bg)" : "var(--surface)",
-    cursor: disabled ? "not-allowed" : "pointer",
-    opacity: disabled ? 0.5 : 1,
-    textAlign: "left",
-  };
 }
 
 function Req() {

@@ -46,7 +46,12 @@ export async function setUnitStatus(
   await withActor(user.id, () =>
     db.productUnit.update({
       where: { id: unitId },
-      data: { status, note: trimmedNote },
+      data: {
+        status,
+        note: trimmedNote,
+        // Clear lost-from reference when recovering a lost unit
+        ...(unit.status === "lost" && status === "available" ? { lostFromBookingId: null } : {}),
+      },
     }),
   );
 
