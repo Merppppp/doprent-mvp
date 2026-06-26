@@ -99,6 +99,7 @@ export type BookingStatus =
   | "payment_review"
   | "confirmed"
   | "renting"
+  | "awaiting_return"
   | "cancel_requested"
   | "slip_disputed"
   | "rejected"
@@ -317,6 +318,8 @@ export type Booking = {
   dress_id: string;
   start_date: string; // YYYY-MM-DD
   end_date: string; // YYYY-MM-DD
+  start_time: string | null; // "HH:MM"; null = full day
+  end_time: string | null; // "HH:MM"; null = full day
   rental_total: number;
   deposit: number;
   shipping_fee: number | null; // null until seller sets on accept
@@ -329,6 +332,14 @@ export type Booking = {
   slip_path: string | null;
   /** Channel the shop chose to collect through (snapshot at accept). */
   payment_method: "promptpay" | "bank" | null;
+  /** Delivery method the renter picked at checkout ("standard" | "express"). */
+  delivery_method: string | null;
+  /** Carrier the shop handed a standard parcel to (set when shipping). */
+  delivery_carrier: string | null;
+  /** Parcel tracking number the shop entered when shipping. */
+  tracking_number: string | null;
+  /** Tracking URL the shop entered when shipping. */
+  tracking_url: string | null;
   address_id: string | null;
   recipient_name: string | null; // snapshot at booking time
   phone: string | null;
@@ -356,11 +367,30 @@ export type Booking = {
   updated_at: string;
 };
 
+/** One item row from BookingItem — sourced from booking.items[] in Phase 2. */
+export type BookingItemDetail = {
+  id: string;
+  product_id: string;
+  product_name: string | null;
+  product_slug: string | null;
+  product_image: string | null;
+  variant_id: string | null;
+  size: string | null;
+  unit_id: string | null;
+  unit_code: string | null;
+  rental_total: number;
+  deposit: number;
+};
+
 /** Booking joined with dress + boutique for list/detail rendering. */
 export type BookingDetail = Booking & {
   dress_name: string | null;
   dress_slug: string | null;
   dress_image: string | null;
+  /** Size of the booked variant (e.g. "M"). Null for legacy bookings with no variantId. */
+  dress_size: string | null;
+  /** Total stock of the booked variant. Null for legacy bookings. */
+  dress_variant_qty: number | null;
   boutique_name: string | null;
   boutique_slug: string | null;
   boutique_line_url: string | null;
@@ -374,6 +404,14 @@ export type BookingDetail = Booking & {
   boutique_facebook: string | null;
   boutique_twitter: string | null;
   boutique_tiktok: string | null;
+  /** Refund tracking — populated from the booking's refund_* columns. */
+  refund_status: string | null;
+  refund_amount: number | null;
+  refunded_at: string | null;
+  refund_note: string | null;
+  refund_slip_path: string | null;
+  /** Phase 2: item rows sourced from BookingItem child table. */
+  items: BookingItemDetail[];
 };
 
 export type Profile = {

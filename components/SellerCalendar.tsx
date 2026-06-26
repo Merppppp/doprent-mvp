@@ -382,7 +382,7 @@ export default function SellerCalendar({ data }: Props) {
                 <span
                   style={{
                     background: selectedFilterProduct ? "var(--danger)" : "var(--warn)",
-                    color: "#fff",
+                    color: "var(--on-dark)",
                     fontSize: 9,
                     fontWeight: 700,
                     lineHeight: 1,

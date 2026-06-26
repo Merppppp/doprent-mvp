@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   adminAcceptSlip,
@@ -8,11 +8,17 @@ import {
   adminDenyCancel,
   adminForceStatus,
   adminRejectSlip,
+  recordRefund,
 } from "@/app/actions/admin";
 import type { BookingStatus } from "@/lib/types";
 import { BOOKING_STATUS_META } from "@/lib/bookings";
 
-type Props = { bookingId: string; status: BookingStatus };
+type Props = {
+  bookingId: string;
+  status: BookingStatus;
+  /** Passed in from the server page so the approve form and refund form render correctly. */
+  refundStatus?: string | null;
+};
 
 type ActionDef = {
   label: string;
@@ -46,24 +52,32 @@ const ACTIONS: Partial<Record<BookingStatus, ActionDef[]>> = {
     { label: "ทำเครื่องหมายรับคืนแล้ว", target: "returned", variant: "primary", confirm: "ยืนยันรับคืนชุดแล้ว?" },
     { label: "ยกเลิก (ต้องคืนเงิน)", target: "cancelled", variant: "danger", confirm: "ยกเลิกการจองที่จ่ายแล้ว? ต้องประสานคืนเงินเอง" },
   ],
+  awaiting_return: [
+    { label: "ทำเครื่องหมายรับคืนแล้ว", target: "returned", variant: "primary", confirm: "ยืนยันรับคืนชุดแล้ว?" },
+    { label: "ยกเลิก (ต้องคืนเงิน)", target: "cancelled", variant: "danger", confirm: "ยกเลิกการจองที่จ่ายแล้ว? ต้องประสานคืนเงินเอง" },
+  ],
   returned: [
     { label: "ปิดรายการ · เสร็จสิ้น", target: "completed", variant: "primary", confirm: "ปิดรายการเช่า?" },
   ],
-  cancel_requested: [
-    { label: "อนุมัติยกเลิก", target: undefined, variant: "danger", confirm: "อนุมัติยกเลิก? (ถ้าจ่ายแล้ว ต้องประสานคืนเงิน)", fn: (id) => adminApproveCancel(id) },
-    { label: "ไม่อนุมัติ · คืนสถานะเดิม", target: undefined, variant: "outline", confirm: "คืนสถานะก่อนหน้า?", fn: (id) => adminDenyCancel(id) },
-  ],
+  // cancel_requested is handled by a bespoke form below (needs refundAmount input).
+  // Leave this entry absent so it falls through to the custom branch.
   slip_disputed: [
     { label: "สลิปถูกต้อง · ยืนยันการจอง", target: undefined, variant: "primary", confirm: "ยืนยันว่าสลิปถูกต้อง?", fn: (id) => adminAcceptSlip(id) },
     { label: "สลิปไม่ถูกต้อง · ให้จ่ายใหม่", target: undefined, variant: "danger", confirm: "ส่งกลับให้ลูกค้าอัปโหลดสลิปใหม่?", fn: (id) => adminRejectSlip(id) },
   ],
 };
 
-export default function AdminBookingActions({ bookingId, status }: Props) {
+export default function AdminBookingActions({ bookingId, status, refundStatus }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [forceTarget, setForceTarget] = useState("");
+  // cancel_requested approve form state
+  const [approveRefundAmount, setApproveRefundAmount] = useState("");
+  const [approveRefundNote, setApproveRefundNote] = useState("");
+  // refund slip upload state
+  const refundFileRef = useRef<HTMLInputElement>(null);
+  const [refundFileName, setRefundFileName] = useState("");
 
   async function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
     setError("");
@@ -113,6 +127,102 @@ export default function AdminBookingActions({ bookingId, status }: Props) {
       ) : isTerminal ? (
         <div style={{ fontSize: 13, color: "var(--ink-3)", padding: "8px 0" }}>
           สถานะนี้เป็นสถานะสุดท้าย ไม่มี action ปกติ
+        </div>
+      ) : null}
+
+      {/* ── cancel_requested: approve with optional refund inputs ── */}
+      {status === "cancel_requested" ? (
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 flex flex-col gap-3">
+          <div className="text-sm font-semibold text-[var(--ink-2)]">อนุมัติยกเลิก</div>
+          <input
+            type="number"
+            min={0}
+            placeholder="จำนวนเงินคืน (บาท) — ไม่บังคับ"
+            value={approveRefundAmount}
+            onChange={(e) => setApproveRefundAmount(e.target.value)}
+            className="w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)]"
+          />
+          <input
+            type="text"
+            placeholder="หมายเหตุการคืนเงิน (ไม่บังคับ)"
+            value={approveRefundNote}
+            onChange={(e) => setApproveRefundNote(e.target.value)}
+            className="w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)]"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="btn flex-1 text-sm"
+              style={{ padding: "10px 0", background: "var(--danger)", borderColor: "var(--danger)", color: "#fff" }}
+              disabled={busy}
+              onClick={() => {
+                if (!confirm("อนุมัติยกเลิกการจองนี้?")) return;
+                const note = prompt("หมายเหตุ admin (ไม่บังคับ)") ?? undefined;
+                const amt = approveRefundAmount ? Number(approveRefundAmount) : undefined;
+                const nt = approveRefundNote.trim() || undefined;
+                run(() => adminApproveCancel(bookingId, note, amt, nt));
+              }}
+            >
+              อนุมัติยกเลิก
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline flex-1 text-sm"
+              style={{ padding: "10px 0" }}
+              disabled={busy}
+              onClick={() => {
+                if (!confirm("คืนสถานะก่อนหน้า?")) return;
+                const note = prompt("หมายเหตุ (ไม่บังคับ)") ?? undefined;
+                run(() => adminDenyCancel(bookingId, note));
+              }}
+            >
+              ไม่อนุมัติ · คืนสถานะเดิม
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Refund recording: upload slip when refund is required ── */}
+      {refundStatus === "required" ? (
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 flex flex-col gap-3">
+          <div className="text-sm font-semibold text-[var(--ink-2)]">บันทึกการคืนเงิน (อัปโหลดสลิป)</div>
+          <p className="text-xs text-[var(--ink-3)]">
+            โอนเงินคืนให้ลูกค้าเสร็จแล้ว อัปโหลดสลิปเพื่อยืนยัน
+          </p>
+          <label className="flex items-center gap-2 cursor-pointer text-sm">
+            <span className="btn btn-outline px-3 py-2 text-xs">เลือกไฟล์สลิป</span>
+            <span className="text-[var(--ink-3)]">{refundFileName || "ยังไม่ได้เลือกไฟล์"}</span>
+            <input
+              ref={refundFileRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => setRefundFileName(e.target.files?.[0]?.name ?? "")}
+            />
+          </label>
+          <button
+            type="button"
+            className="btn btn-primary text-sm"
+            style={{ padding: "10px 0" }}
+            disabled={busy || !refundFileName}
+            onClick={async () => {
+              const file = refundFileRef.current?.files?.[0];
+              if (!file) { setError("เลือกไฟล์ก่อน"); return; }
+              setError("");
+              setBusy(true);
+              const fd = new FormData();
+              fd.append("slip", file);
+              const res = await recordRefund(bookingId, fd);
+              if (!res.ok) {
+                setError(res.error ?? "ทำรายการไม่สำเร็จ");
+                setBusy(false);
+                return;
+              }
+              router.refresh();
+            }}
+          >
+            {busy ? "กำลังบันทึก…" : "ยืนยันบันทึกการคืนเงิน"}
+          </button>
         </div>
       ) : null}
 

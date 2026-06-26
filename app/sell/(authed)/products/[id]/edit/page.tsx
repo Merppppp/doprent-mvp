@@ -107,9 +107,15 @@ export default async function EditProductPage({ params }: { params: { id: string
   return (
     <div className="container" style={{ paddingTop: 32, paddingBottom: 80, maxWidth: 720 }}>
       <Link href="/sell/dashboard" style={{ fontSize: 13, color: "var(--ink-3)" }}>← กลับ Dashboard</Link>
-      <h1 className="page-title" style={{ fontSize: 28, fontWeight: 600, margin: "12px 0 24px" }}>
+      <h1 className="page-title" style={{ fontSize: 28, fontWeight: 600, margin: "12px 0 12px" }}>
         แก้ไขสินค้า · {productRaw.name}
       </h1>
+      <Link
+        href={`/sell/products/${productRaw.id}/units`}
+        className="mb-6 inline-block text-sm font-medium text-accent"
+      >
+        จัดการสต็อกรายตัว (ติดซ่อม / ปลดระวาง) →
+      </Link>
       <ProductForm
         mode="edit"
         productId={productRaw.id}

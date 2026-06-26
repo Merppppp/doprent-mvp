@@ -426,11 +426,13 @@ export async function listProducts(
         },
         select: { productId: true },
       }),
-      db.booking.findMany({
+      db.bookingItem.findMany({
         where: {
-          status: { in: ACTIVE_BOOKING_STATUSES_CATALOG },
-          startDate: { lte: dateToDate },
-          endDate:   { gte: dateFromDate },
+          booking: {
+            status: { in: ACTIVE_BOOKING_STATUSES_CATALOG },
+            startDate: { lte: dateToDate },
+            endDate:   { gte: dateFromDate },
+          },
         },
         select: { productId: true },
       }),
@@ -762,10 +764,14 @@ export async function listProductsByShop(shopId: string): Promise<Product[]> {
  */
 export async function listOccasions(): Promise<Occasion[]> {
   const rows = await db.tag.findMany({
-    where: { isActive: true, tagGroup: { key: "occasion" } },
+    where: {
+      isActive: true,
+      tagGroup: { key: "occasion" },
+      // เฉพาะ occasion ที่มีสินค้าที่มองเห็นได้ผูกอยู่จริง (live + available)
+      productTags: { some: { product: { status: "live", available: true } } },
+    },
     select: { key: true, label: true },
   });
-  if (!rows.length) return FALLBACK_OCCASIONS;
   return rows
     .map((r) => {
       const meta = FALLBACK_OCCASIONS.find((f) => f.key === r.key);
@@ -789,18 +795,9 @@ export async function listOccasions(): Promise<Occasion[]> {
 export async function listBlackouts(
   productId: string,
   variantId?: string | null,
-): Promise<{ date: string; variantId: string | null }[]> {
+): Promise<{ date: string; variantId: string | null; unitId: string | null }[]> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
-  const where: Record<string, any> = { productId, date: { gte: today } };
-  if (variantId && variantId !== "all") {
-    where.OR = [{ variantId: null }, { variantId }];
-    delete where.variantId;
-  } else if (!variantId) {
-    where.variantId = null;
-  }
-  // variantId === "all" → no variantId filter
 
   const rows = await db.productBlackoutDate.findMany({
     where: variantId && variantId !== "all"
@@ -809,11 +806,12 @@ export async function listBlackouts(
         ? { productId, date: { gte: today } }
         : { productId, date: { gte: today }, variantId: null },
     orderBy: { date: "asc" },
-    select: { date: true, variantId: true },
+    select: { date: true, variantId: true, unitId: true },
   });
   return rows.map((r) => ({
     date: r.date.toISOString().slice(0, 10),
     variantId: r.variantId,
+    unitId: r.unitId,
   }));
 }
 

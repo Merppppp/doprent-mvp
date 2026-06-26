@@ -85,6 +85,107 @@ export function closedWeekdaysFromHours(days: BusinessHours): number[] {
     .filter((i) => i >= 0);
 }
 
+// ---------------------------------------------------------------------------
+// Shop-open time helpers (used for payment_review escalation badge)
+// ---------------------------------------------------------------------------
+
+/**
+ * How many hours the shop was open between `since` and `now`, measured using
+ * its configured weekly `BusinessHours` schedule (Asia/Bangkok timezone).
+ *
+ * Algorithm: iterate calendar days in Asia/Bangkok from the day of `since` to
+ * the day of `now`. For each day, if the weekday is marked open, compute
+ * that day's open window as absolute instants, intersect with [since, now],
+ * and accumulate the overlap.
+ *
+ * NOTE: This is based purely on the CONFIGURED weekly schedule.
+ * The shop's `isOpen` flag (ปิดร้านชั่วคราว) has no change-history, so we
+ * cannot retroactively know during which intervals it was toggled. Callers
+ * may suppress the badge if `shop.isOpen === false` right now, but the
+ * elapsed time is always computed from the weekly schedule alone.
+ *
+ * Capped at 60-day spans to guard against pathological inputs (returns a
+ * large sentinel value of 9999 if exceeded).
+ */
+export function openHoursElapsed(since: Date, now: Date, hours: BusinessHours): number {
+  if (now <= since) return 0;
+
+  // Cap at 60 days to avoid infinite loops on bad data.
+  const MAX_DAYS = 60;
+  const spanMs = now.getTime() - since.getTime();
+  if (spanMs > MAX_DAYS * 86400 * 1000) return 9999;
+
+  const TZ = "Asia/Bangkok";
+
+  // Convert a Date to a "YYYY-MM-DD" calendar day string in Bangkok.
+  function bkkDateStr(d: Date): string {
+    return d.toLocaleDateString("en-CA", { timeZone: TZ }); // "YYYY-MM-DD"
+  }
+
+  // Given a "YYYY-MM-DD" string and "HH:MM" string, return a UTC Date for
+  // that local time in Asia/Bangkok.
+  function bkkInstant(dateStr: string, timeStr: string): Date {
+    // e.g. "2025-06-25T10:00:00+07:00" → Bangkok is UTC+7
+    return new Date(`${dateStr}T${timeStr}:00+07:00`);
+  }
+
+  // Get the weekday (0=Sun..6=Sat) for a "YYYY-MM-DD" in Bangkok.
+  function bkkWeekday(dateStr: string): number {
+    // Use noon to avoid any DST-edge ambiguity (Thailand is fixed UTC+7, no DST)
+    return new Date(`${dateStr}T12:00:00+07:00`).getDay();
+  }
+
+  // Step through calendar days from sinceDay to nowDay inclusive.
+  const sinceDay = bkkDateStr(since);
+  const nowDay = bkkDateStr(now);
+
+  let accumulated = 0;
+  // Walk by advancing date strings (safe for up to MAX_DAYS)
+  let cursor = sinceDay;
+
+  while (cursor <= nowDay) {
+    const weekday = bkkWeekday(cursor);
+    const dayHours = hours[weekday];
+
+    if (dayHours && dayHours.open) {
+      const windowOpen = bkkInstant(cursor, dayHours.from);
+      const windowClose = bkkInstant(cursor, dayHours.to);
+
+      // Intersect [windowOpen, windowClose] with [since, now]
+      const overlapStart = since > windowOpen ? since : windowOpen;
+      const overlapEnd = now < windowClose ? now : windowClose;
+
+      if (overlapEnd > overlapStart) {
+        accumulated += (overlapEnd.getTime() - overlapStart.getTime()) / 3600000;
+      }
+    }
+
+    // Advance cursor by one calendar day
+    const next = new Date(`${cursor}T12:00:00+07:00`);
+    next.setDate(next.getDate() + 1);
+    cursor = bkkDateStr(next);
+  }
+
+  return accumulated;
+}
+
+/**
+ * Returns true when a `payment_review` booking has exceeded the escalation
+ * threshold measured in shop-open hours.
+ *
+ * Pass `thresholdHours` explicitly (import from lib/bookings) to avoid a
+ * circular-import between lib/hours ↔ lib/bookings.
+ */
+export function paymentReviewEscalated(
+  paymentReviewAt: Date | null,
+  hours: BusinessHours,
+  thresholdHours: number,
+  now = new Date(),
+): boolean {
+  if (!paymentReviewAt) return false;
+  return openHoursElapsed(paymentReviewAt, now, hours) >= thresholdHours;
+}
+
 /** Human-readable lines (Mon→Sun) for the public shop page. */
 export function formatBusinessHoursLines(days: BusinessHours): string[] {
   return WEEKDAYS_MON_FIRST.map(({ idx, th }) => {

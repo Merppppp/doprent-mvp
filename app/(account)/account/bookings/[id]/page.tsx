@@ -13,7 +13,9 @@ import ReviewForm from "@/components/ReviewForm";
 import EditAddressForm from "@/components/EditAddressForm";
 import ShopSocialLinks from "@/components/ShopSocialLinks";
 import RenterAddressChange from "@/components/RenterAddressChange";
-import { fmtThai } from "@/lib/date-th";
+import SlipImage from "@/components/SlipImage";
+import { fmtRentalWindow } from "@/lib/date-th";
+import { sizeLabel } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +46,7 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
 
   const timeline = await getBookingTimeline(b.id);
   const slipUrl = b.slip_path ? await getSignedPrivateUrl(b.slip_path) : null;
+  const refundSlipUrl = b.refund_slip_path ? await getSignedPrivateUrl(b.refund_slip_path) : null;
 
   const isReviewable = b.status === "returned" || b.status === "completed";
   const canEditAddress = b.status === "booking_pending" || b.status === "waiting_for_payment";
@@ -86,9 +89,25 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
       {/* details */}
       <div style={card}>
         <Row label="ร้าน" value={b.boutique_name ?? "-"} />
-        <Row label="วันเช่า" value={`${fmtThai(b.start_date)} – ${fmtThai(b.end_date)}`} />
+        {b.dress_size ? <Row label="ไซซ์" value={sizeLabel(b.dress_size)} /> : null}
+        <Row label="วันเช่า" value={fmtRentalWindow(b.start_date, b.end_date, b.start_time, b.end_time)} />
         <Row label="ส่งถึง" value={`${b.recipient_name ?? ""} · ${b.phone ?? ""}`} />
         <Row label="ที่อยู่" value={b.address_text ?? "-"} />
+        {b.delivery_carrier ? <Row label="ขนส่ง" value={b.delivery_carrier} /> : null}
+        {b.tracking_number ? <Row label="เลขพัสดุ" value={b.tracking_number} /> : null}
+        {b.tracking_url ? (
+          <div className="flex justify-between gap-4 py-1 text-sm">
+            <span className="shrink-0 text-[var(--ink-3)]">ลิงก์ติดตาม</span>
+            <a
+              href={b.tracking_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="break-all text-right font-medium text-[var(--accent)] underline"
+            >
+              ติดตามพัสดุ
+            </a>
+          </div>
+        ) : null}
         {canEditAddress ? (
           <EditAddressForm
             bookingId={b.id}
@@ -174,13 +193,15 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
         </>
       ) : null}
 
-      {b.status === "confirmed" || b.status === "renting" ? (
-        <div style={{ ...card, background: b.status === "renting" ? "var(--info-soft, rgba(59,130,246,0.06))" : "var(--success-soft)" }}>
-          <div style={{ fontWeight: 600, color: b.status === "renting" ? "var(--info, #3b82f6)" : "var(--success)", marginBottom: 4 }}>
-            {b.status === "renting" ? "กำลังเช่าอยู่" : "จองเรียบร้อย ✓"}
+      {b.status === "confirmed" || b.status === "renting" || b.status === "awaiting_return" ? (
+        <div style={{ ...card, background: b.status === "awaiting_return" ? "var(--warn-soft, rgba(217,119,6,0.08))" : b.status === "renting" ? "var(--info-soft, rgba(59,130,246,0.06))" : "var(--success-soft)" }}>
+          <div style={{ fontWeight: 600, color: b.status === "awaiting_return" ? "var(--warn)" : b.status === "renting" ? "var(--info, #3b82f6)" : "var(--success)", marginBottom: 4 }}>
+            {b.status === "awaiting_return" ? "ครบกำหนดคืนแล้ว" : b.status === "renting" ? "กำลังเช่าอยู่" : "จองเรียบร้อย ✓"}
           </div>
           <div style={{ fontSize: 14, color: "var(--ink-2)" }}>
-            {b.status === "renting"
+            {b.status === "awaiting_return"
+              ? "ครบกำหนดเช่าแล้ว กรุณาส่งชุดคืนร้านโดยเร็ว"
+              : b.status === "renting"
               ? "คุณกำลังเช่าชุดอยู่ กรุณาส่งคืนตามกำหนด"
               : "ร้านยืนยันการชำระเงินแล้ว รอจัดส่งชุด"}
           </div>
@@ -213,11 +234,49 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
       ) : null}
 
       {/* Slip image — shown after upload */}
-      {slipUrl && (b.status === "payment_review" || b.status === "confirmed" || b.status === "renting" || b.status === "returned" || b.status === "completed" || b.status === "slip_disputed") ? (
+      {slipUrl && (b.status === "payment_review" || b.status === "confirmed" || b.status === "renting" || b.status === "awaiting_return" || b.status === "returned" || b.status === "completed" || b.status === "slip_disputed") ? (
         <div style={card}>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>สลิปการโอน</div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={slipUrl} alt="สลิป" style={{ width: "100%", maxHeight: 400, objectFit: "contain", borderRadius: 8, border: "1px solid var(--line)", background: "var(--bg)" }} />
+          <SlipImage src={slipUrl} contain />
+        </div>
+      ) : null}
+
+      {/* Refund card — shown when admin approved a cancel after payment */}
+      {(b.refund_status === "required" || b.refund_status === "refunded") ? (
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] mb-4 p-4">
+          <div className="font-semibold text-sm mb-3">การคืนเงิน</div>
+          <div className="flex justify-between gap-4 py-1 text-sm">
+            <span className="text-[var(--ink-3)] shrink-0">สถานะ</span>
+            <span
+              className={`font-semibold ${b.refund_status === "refunded" ? "text-[var(--success)]" : "text-[var(--ink-2)]"}`}
+            >
+              {b.refund_status === "refunded" ? "คืนเงินแล้ว ✓" : "กำลังดำเนินการคืนเงิน"}
+            </span>
+          </div>
+          {b.refund_amount ? (
+            <div className="flex justify-between gap-4 py-1 text-sm">
+              <span className="text-[var(--ink-3)] shrink-0">จำนวนเงิน</span>
+              <span className="font-medium">฿{b.refund_amount.toLocaleString()}</span>
+            </div>
+          ) : null}
+          {b.refund_note ? (
+            <div className="flex justify-between gap-4 py-1 text-sm">
+              <span className="text-[var(--ink-3)] shrink-0">หมายเหตุ</span>
+              <span className="text-right text-[var(--ink-2)]">{b.refund_note}</span>
+            </div>
+          ) : null}
+          {b.refunded_at ? (
+            <div className="flex justify-between gap-4 py-1 text-sm">
+              <span className="text-[var(--ink-3)] shrink-0">โอนคืนเมื่อ</span>
+              <span className="text-right">{fmtThaiDateTime(b.refunded_at)}</span>
+            </div>
+          ) : null}
+          {refundSlipUrl && b.refund_status === "refunded" ? (
+            <div className="mt-3">
+              <div className="text-xs text-[var(--ink-3)] mb-2">สลิปยืนยันการคืนเงิน</div>
+              <SlipImage src={refundSlipUrl} contain />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -236,7 +295,7 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             <TimelineRow label="สร้างการจอง" at={b.created_at} isFirst />
             {timeline.map((ev, i) => (
-              <TimelineRow key={i} label={ev.label} at={ev.at} isLast={i === timeline.length - 1} />
+              <TimelineRow key={i} label={ev.label} at={ev.at} note={ev.note} isLast={i === timeline.length - 1} />
             ))}
           </div>
         </div>
@@ -251,7 +310,7 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 <span>
                   {[1, 2, 3, 4, 5].map((s) => (
-                    <span key={s} style={{ color: s <= existingReview.rating ? "#F5A623" : "var(--line)", fontSize: 16 }}>★</span>
+                    <span key={s} style={{ color: s <= existingReview.rating ? "var(--gold)" : "var(--line)", fontSize: 16 }}>★</span>
                   ))}
                 </span>
                 <span style={{ fontSize: 13, color: "var(--ink-3)" }}>
@@ -316,7 +375,7 @@ function fmtThaiDateTime(iso: string): string {
   });
 }
 
-function TimelineRow({ label, at, isFirst, isLast }: { label: string; at: string; isFirst?: boolean; isLast?: boolean }) {
+function TimelineRow({ label, at, note, isFirst, isLast }: { label: string; at: string; note?: string | null; isFirst?: boolean; isLast?: boolean }) {
   return (
     <div style={{ display: "flex", gap: 12, minHeight: 36 }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 14 }}>
@@ -338,6 +397,7 @@ function TimelineRow({ label, at, isFirst, isLast }: { label: string; at: string
       <div style={{ paddingBottom: isLast ? 0 : 8 }}>
         <div style={{ fontSize: 13, fontWeight: 500, color: isLast ? "var(--ink)" : "var(--ink-2)" }}>{label}</div>
         <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{fmtThaiDateTime(at)}</div>
+        {note ? <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 2 }}>เหตุผล: {note}</div> : null}
       </div>
     </div>
   );

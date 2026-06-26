@@ -1,9 +1,29 @@
 import type { Booking, BookingStatus } from "@/lib/types";
 
-/** Hours a renter has to pay after the seller accepts. Enforced lazily by
- *  expireOverdueBookings() (lib/booking-expiry.ts) on the booking list pages
- *  and via POST /api/cron/expire-payments for scheduled sweeps. */
-export const PAYMENT_WINDOW_HOURS = 24;
+/** Hours a renter has to pay (deposit + shipping) after the seller accepts.
+ *  Past this window the booking forfeits its hold and the reserved unit is
+ *  released back to stock. Enforced lazily by expireOverdueBookings()
+ *  (lib/booking-expiry.ts) on the booking list pages and via
+ *  POST /api/cron/expire-payments for scheduled sweeps. */
+export const PAYMENT_WINDOW_HOURS = 3;
+
+/** Days a booking may sit in `returned` (seller received the dress back, deposit
+ *  not yet settled) before the system auto-closes it to `completed`. A safety
+ *  net so deposits/records don't sit in limbo if the seller forgets to close.
+ *  Overridable via env. Enforced by expireOverdueBookings() (lib/booking-expiry.ts). */
+export const AUTO_COMPLETE_AFTER_RETURN_DAYS = (() => {
+  const raw = Number(process.env.AUTO_COMPLETE_AFTER_RETURN_DAYS);
+  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : 7;
+})();
+
+/** Hours of shop-OPEN time that may elapse after a renter uploads their payment
+ *  slip (booking enters `payment_review`) before the seller sees a red "ด่วน"
+ *  escalation badge. Counts only hours the shop is actually open per its configured
+ *  weekly schedule — the timer pauses while the shop is closed. Overridable via env. */
+export const PAYMENT_REVIEW_ESCALATE_OPEN_HOURS = (() => {
+  const raw = Number(process.env.PAYMENT_REVIEW_ESCALATE_OPEN_HOURS);
+  return Number.isFinite(raw) && raw >= 0 ? raw : 4;
+})();
 
 /**
  * Platform commission rate applied to rental_total. Overridable via env so the
@@ -61,12 +81,19 @@ export const BOOKING_STATUS_META: Record<
     renterHint: "คุณกำลังเช่าชุดอยู่ ส่งคืนตามกำหนด",
     sellerHint: "ลูกค้ากำลังเช่าชุดอยู่ รอรับคืนเมื่อครบกำหนด",
   },
-  cancel_requested: {
-    label: "ร้านขอยกเลิก (รอแอดมิน)",
+  awaiting_return: {
+    label: "รอคืนของ",
     tone: "warn",
     terminal: false,
-    renterHint: "ร้านขอยกเลิก แอดมินกำลังตรวจสอบ",
-    sellerHint: "ส่งคำขอยกเลิกให้แอดมินแล้ว",
+    renterHint: "ครบกำหนดเช่าแล้ว กรุณาส่งชุดคืนร้าน",
+    sellerHint: "ครบกำหนดเช่าแล้ว รอรับชุดคืนจากลูกค้า เมื่อได้รับแล้วกดยืนยัน",
+  },
+  cancel_requested: {
+    label: "รอแอดมินอนุมัติยกเลิก",
+    tone: "warn",
+    terminal: false,
+    renterHint: "ส่งคำขอยกเลิกแล้ว รอแอดมินอนุมัติ",
+    sellerHint: "ส่งคำขอยกเลิกแล้ว รอแอดมินอนุมัติ",
   },
   slip_disputed: {
     label: "สลิปมีปัญหา",
@@ -130,6 +157,10 @@ export const TRANSITIONS: Transition[] = [
   { from: "waiting_for_payment", to: "cancelled", actor: "renter" },
   { from: "waiting_for_payment", to: "payment_review", actor: "renter", requires: "slip_path" },
   { from: "slip_disputed", to: "payment_review", actor: "renter", requires: "slip_path" },
+  // renter cancel-after-payment (→ cancel_requested; requires admin approval)
+  { from: "payment_review", to: "cancel_requested", actor: "renter" },
+  { from: "confirmed", to: "cancel_requested", actor: "renter" },
+  { from: "renting", to: "cancel_requested", actor: "renter" },
   // seller
   { from: "booking_pending", to: "waiting_for_payment", actor: "seller", requires: "shipping_fee" },
   { from: "booking_pending", to: "rejected", actor: "seller" },
@@ -140,6 +171,10 @@ export const TRANSITIONS: Transition[] = [
   { from: "confirmed", to: "renting", actor: "seller" },
   { from: "renting", to: "returned", actor: "seller" },
   { from: "renting", to: "cancel_requested", actor: "seller" },
+  // awaiting_return is reached automatically (sweep) at the rental's last day;
+  // from there the seller confirms the physical return or escalates a cancel.
+  { from: "awaiting_return", to: "returned", actor: "seller" },
+  { from: "awaiting_return", to: "cancel_requested", actor: "seller" },
   { from: "returned", to: "completed", actor: "seller" },
 ];
 
@@ -158,6 +193,7 @@ export const ACTIVE_STATUSES: BookingStatus[] = [
   "payment_review",
   "confirmed",
   "renting",
+  "awaiting_return",
 ];
 
 export function isActive(status: BookingStatus): boolean {

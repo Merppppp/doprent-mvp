@@ -334,11 +334,11 @@ export default function SignupForm(_props: Props) {
           <div
             style={{
               padding: "10px 14px",
-              background: "#FFFBEB",
-              border: "1px solid #F59E0B",
+              background: "var(--warn-soft)",
+              border: "1px solid var(--warn)",
               borderRadius: 6,
               fontSize: 13,
-              color: "#92400E",
+              color: "var(--warn-ink)",
               marginBottom: 14,
             }}
           >

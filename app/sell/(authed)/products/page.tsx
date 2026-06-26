@@ -6,7 +6,10 @@ import { SELL_PRODUCTS_PAGE_SIZE as PAGE_SIZE } from "@/lib/config";
 import { ProductArt } from "@/components/ProductArt";
 import { toggleProductAvailable } from "@/app/actions/seller";
 import ToggleSwitch from "@/components/ToggleSwitch";
-import { formatVariantSizes } from "@/lib/types";
+import DeleteProductButton from "@/components/DeleteProductButton";
+import SizeInventoryBadges from "@/components/SizeInventoryBadges";
+import { ACTIVE_STATUSES } from "@/lib/bookings";
+import { todayBkk } from "@/lib/date-th";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +57,7 @@ export default async function SellerProductsPage({
   const { shopId } = await requireShopAccess({ need: "products" });
 
   const search = (searchParams?.q ?? "").trim();
-  const where: Record<string, any> = { shopId };
+  const where: Record<string, any> = { shopId, status: { not: "archived" } };
   if (search) {
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },
@@ -87,9 +90,31 @@ export default async function SellerProductsPage({
       available: true,
       views: true,
       images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
-      variants: { select: { size: true, available: true } },
+      variants: { select: { id: true, size: true, quantity: true, available: true }, orderBy: { size: "asc" } },
     },
   });
+
+  // Per-variant units physically out *today* (Bangkok), so each size chip can
+  // show free/total stock. Uses the physical ACTIVE set (incl. renting).
+  const today = todayBkk();
+  const todayDate = new Date(today + "T00:00:00.000Z");
+  const outTodayRows = await db.bookingItem.groupBy({
+    by: ["variantId"],
+    where: {
+      productId: { in: productRows.map((p) => p.id) },
+      variantId: { not: null },
+      booking: {
+        status: { in: ACTIVE_STATUSES },
+        startDate: { lte: todayDate },
+        endDate: { gte: todayDate },
+      },
+    },
+    _count: { _all: true },
+  });
+  const bookedToday: Record<string, number> = {};
+  for (const r of outTodayRows) {
+    if (r.variantId) bookedToday[r.variantId] = r._count._all;
+  }
 
   return (
     <div style={{ paddingBottom: 60 }}>
@@ -178,7 +203,7 @@ export default async function SellerProductsPage({
               <thead>
                 <tr>
                   <th style={thStyle}>สินค้า</th>
-                  <th style={thStyle}>ไซซ์</th>
+                  <th style={thStyle}>ไซซ์ · ว่างวันนี้</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>ราคา/วัน</th>
                   <th style={thStyle}>สถานะ</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>ยอดวิว</th>
@@ -238,7 +263,9 @@ export default async function SellerProductsPage({
                           </div>
                         </div>
                       </td>
-                      <td style={tdStyle}>{formatVariantSizes(d.variants, d.size)}</td>
+                      <td style={tdStyle}>
+                        <SizeInventoryBadges variants={d.variants} bookedToday={bookedToday} fallbackSize={d.size} />
+                      </td>
                       <td style={{ ...tdStyle, textAlign: "right", whiteSpace: "nowrap" }}>
                         ฿{d.pricePerDay.toLocaleString()}
                       </td>
@@ -272,13 +299,15 @@ export default async function SellerProductsPage({
                           >
                             แก้ไข
                           </Link>
+
                           <Link
                             href={`/sell/products/${d.id}/calendar`}
                             className="btn btn-outline"
                             style={{ padding: "5px 10px", fontSize: 12 }}
                           >
-                            📅
+                            ปฏิทิน
                           </Link>
+
                           {d.status === "live" && d.available && (
                             <Link
                               href={`/sell/products/${d.id}/manual-booking`}
@@ -296,6 +325,8 @@ export default async function SellerProductsPage({
                               จองหน้าร้าน
                             </Link>
                           )}
+
+                          <DeleteProductButton productId={d.id} productName={d.name} />
                         </div>
                       </td>
                     </tr>

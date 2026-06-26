@@ -75,16 +75,16 @@ export default async function NewProductPage() {
         <div
           style={{
             padding: "16px 18px",
-            background: "#FFFBEB",
-            border: "1px solid #F59E0B",
+            background: "var(--warn-soft)",
+            border: "1px solid var(--warn)",
             borderRadius: 8,
             marginBottom: 24,
           }}
         >
-          <div style={{ fontWeight: 600, fontSize: 14, color: "#92400E", marginBottom: 6 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, color: "var(--warn-ink)", marginBottom: 6 }}>
             ⚠️ ยังไม่มีช่องทางรับชำระเงิน
           </div>
-          <div style={{ fontSize: 13, color: "#78350F", lineHeight: 1.6 }}>
+          <div style={{ fontSize: 13, color: "var(--warn-ink)", lineHeight: 1.6 }}>
             ต้องตั้งค่า PromptPay หรือบัญชีธนาคารก่อนจึงจะลงขายสินค้าได้
           </div>
           <a
@@ -95,10 +95,10 @@ export default async function NewProductPage() {
               padding: "8px 14px",
               fontSize: 13,
               fontWeight: 600,
-              border: "1px solid #F59E0B",
+              border: "1px solid var(--warn)",
               borderRadius: 6,
-              color: "#92400E",
-              background: "#FEF3C7",
+              color: "var(--warn-ink)",
+              background: "var(--warn-soft)",
               textDecoration: "none",
             }}
           >

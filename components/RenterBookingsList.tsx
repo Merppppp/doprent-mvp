@@ -7,6 +7,7 @@ import { fmtThaiShort } from "@/lib/date-th";
 import { RENTER_TABS, RENTER_PAGE_SIZE, type RenterTabKey } from "@/lib/renter-booking-tabs";
 import { fetchRenterBookingsPage } from "@/app/actions/renter-bookings";
 import type { RenterBookingCard } from "@/lib/booking-queries";
+import { sizeLabel } from "@/lib/types";
 
 type Props = {
   initialRows: RenterBookingCard[];
@@ -184,7 +185,14 @@ export default function RenterBookingsList({ initialRows, initialTotal, statusCo
                 {/* Details */}
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start gap-2">
-                    <div className="font-semibold text-sm truncate">{b.dress_name ?? "ชุด"}</div>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-semibold text-sm truncate">{b.dress_name ?? "ชุด"}</span>
+                      {b.dress_size ? (
+                        <span className="whitespace-nowrap rounded bg-bg-hover px-1.5 py-0.5 text-[11px] font-semibold text-ink-2">
+                          ไซซ์ {sizeLabel(b.dress_size)}
+                        </span>
+                      ) : null}
+                    </div>
                     <BookingStatusBadge status={b.status} />
                   </div>
                   <div className="text-[var(--ink-3)] text-xs mt-1">

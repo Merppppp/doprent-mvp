@@ -33,19 +33,19 @@
      just-in sections so they read as one editorial composition. */
   --warm: oklch(0.945 0.014 80);
 
-  /* Brand accent — vibrant emerald green (#2e9c65 from revamp palette).
-     Carries CTAs, brand mark, verified/trust. Pair with --accent-ink
-     for text on top. */
-  --accent: oklch(0.58 0.12 158);
-  --accent-2: oklch(0.47 0.10 158); /* darker hover state / deep */
-  --accent-soft: oklch(0.94 0.04 158); /* tint for badge / wash fills */
-  --accent-ink: oklch(0.985 0.012 158);  /* warm near-white text on green */
+  /* Brand accent — deep teal (#0A4C4C, the navbar/header color).
+     Single source of truth for the whole-app theme: navbar, CTAs, brand
+     mark, verified/trust, nav active. Pair with --accent-ink for text. */
+  --accent: oklch(0.379 0.061 195);
+  --accent-2: oklch(0.30 0.055 195); /* darker hover state / deep */
+  --accent-soft: oklch(0.94 0.028 195); /* tint for badge / wash fills */
+  --accent-ink: oklch(0.985 0.012 195);  /* near-white text on teal */
 
-  /* Cobalt slot — same green family so links / verified badge /
+  /* Cobalt slot — same teal family so links / verified badge /
      info / focus / saved state read on-brand. (name kept for compat) */
-  --cobalt: oklch(0.55 0.11 158);
-  --cobalt-2: oklch(0.45 0.09 158);  /* darker hover */
-  --cobalt-soft: oklch(0.94 0.04 158); /* tint fill */
+  --cobalt: oklch(0.45 0.07 195);
+  --cobalt-2: oklch(0.37 0.06 195);  /* darker hover */
+  --cobalt-soft: oklch(0.94 0.03 195); /* tint fill */
 
   /* Saved-heart — stays a warm red (universal "saved/favourite" signal),
      intentionally NOT the teal brand hue so the wishlist reads instantly. */
@@ -69,6 +69,7 @@
   --success-soft: oklch(0.94 0.03 150);
   --warn: oklch(0.62 0.12 70);        /* amber, warm-tinted */
   --warn-soft: oklch(0.94 0.04 75);
+  --warn-ink: oklch(0.42 0.095 62);   /* dark amber — readable warn text on warn-soft */
   --info: var(--cobalt);              /* teal family — was blue */
   --info-soft: var(--cobalt-soft);
 
@@ -511,7 +512,7 @@ select:focus-visible {
   padding: 10px 12px;
   border-radius: 6px;
   font-size: 14px;
-  background: var(--info);
+  background: var(--accent);
   color: var(--on-dark);
   font-weight: 500;
   text-align: center;
@@ -1423,21 +1424,6 @@ body:has(.seller-dashboard) #main > main { display: contents; }
   align-items: center;
   gap: 9px;
   padding: 4px 8px 18px;
-}
-.seller-brand-logo {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 16px;
-}
-.seller-brand b {
-  font-weight: 700;
-  font-size: 16px;
 }
 .seller-brand small {
   display: block;

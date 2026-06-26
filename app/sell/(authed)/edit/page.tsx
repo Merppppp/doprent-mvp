@@ -48,6 +48,7 @@ export default async function EditShopPage() {
         maxRentalDays: true,
         returnWindowDays: true,
         bufferDaysAfter: true,
+        bufferDaysBefore: true,
         closedWeekdays: true,
         area: { select: { key: true } },
         closedDates: { select: { date: true, note: true }, orderBy: { date: "asc" } },
@@ -98,6 +99,7 @@ export default async function EditShopPage() {
           max_rental_days: raw.maxRentalDays,
           return_window_days: raw.returnWindowDays,
           buffer_days_after: raw.bufferDaysAfter,
+          buffer_days_before: raw.bufferDaysBefore,
           closed_weekdays: raw.closedWeekdays,
           closed_dates: raw.closedDates.map((cd) => ({
             date: cd.date.toISOString().slice(0, 10),

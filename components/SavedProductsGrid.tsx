@@ -81,7 +81,7 @@ export default function SavedProductsGrid({ products, savedIds }: Props) {
         {filtered.length} รายการ
       </div>
 
-      <div className="grid-4" style={{ gap: 16 }}>
+      <div className="grid-3" style={{ gap: "24px 20px" }}>
         {filtered.map((p, i) => (
           <ProductCard
             key={p.id}

@@ -16,7 +16,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-type SP = { product?: string; dress?: string; start?: string; end?: string; variant?: string };
+type SP = { product?: string; dress?: string; start?: string; end?: string; variant?: string; startTime?: string; endTime?: string };
+
+const isHHMM = (s: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 
 export default async function CheckoutAddressPage({
   searchParams,
@@ -28,8 +30,13 @@ export default async function CheckoutAddressPage({
   const start = searchParams.start ?? "";
   const end = searchParams.end ?? "";
   const variantId = searchParams.variant ?? null;
+  // Optional pickup/return time-of-day. Only honoured when both are valid HH:MM;
+  // otherwise the booking is treated as full-day (null times).
+  const startTime = searchParams.startTime && isHHMM(searchParams.startTime) ? searchParams.startTime : null;
+  const endTime = searchParams.endTime && isHHMM(searchParams.endTime) ? searchParams.endTime : null;
+  const timeQuery = startTime && endTime ? `&startTime=${startTime}&endTime=${endTime}` : "";
 
-  const backHref = `/checkout/address?product=${productId}&start=${start}&end=${end}${variantId ? `&variant=${variantId}` : ""}`;
+  const backHref = `/checkout/address?product=${productId}&start=${start}&end=${end}${variantId ? `&variant=${variantId}` : ""}${timeQuery}`;
 
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(backHref)}`);
@@ -137,6 +144,8 @@ export default async function CheckoutAddressPage({
         productId={dress.id}
         startDate={start}
         endDate={end}
+        startTime={startTime}
+        endTime={endTime}
         days={days}
         pricePerDay={Number(dress.price_per_day)}
         priceTiers={normalizeTiers(dress.price_tiers)}

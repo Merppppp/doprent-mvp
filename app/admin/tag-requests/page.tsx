@@ -46,8 +46,8 @@ export default async function TagRequestsPage() {
               style={{
                 marginLeft: 8,
                 fontSize: 12,
-                background: "#d97706",
-                color: "#fff",
+                background: "var(--warn)",
+                color: "var(--on-dark)",
                 borderRadius: 999,
                 padding: "2px 8px",
                 fontWeight: 600,

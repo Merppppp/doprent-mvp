@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { expireOverdueBookings } from "@/lib/booking-expiry";
+import { expireOverdueBookings, sendReturnReminders } from "@/lib/booking-expiry";
 
 export const dynamic = "force-dynamic";
 
@@ -25,5 +25,6 @@ export async function POST(req: NextRequest) {
   }
 
   const expired = await expireOverdueBookings();
-  return NextResponse.json({ ok: true, expired });
+  const reminders = await sendReturnReminders();
+  return NextResponse.json({ ok: true, expired, reminders });
 }

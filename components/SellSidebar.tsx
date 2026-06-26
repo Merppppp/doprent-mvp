@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ToggleSwitch from "@/components/ToggleSwitch";
+import Logo from "@/components/Logo";
 import { toggleShopOpen } from "@/app/actions/seller";
 
 /* ── Icon helper (inline SVG path) ── */
@@ -145,8 +146,7 @@ export default function SellSidebar({
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
         </button>
         <div className="seller-brand">
-          <div className="seller-brand-logo">D</div>
-          <div><b>DopRent</b></div>
+          <Logo size={20} />
         </div>
       </div>
 
@@ -160,9 +160,8 @@ export default function SellSidebar({
         </button>
 
         <div className="seller-brand">
-          <div className="seller-brand-logo">D</div>
           <div>
-            <b>DopRent</b>
+            <Logo size={22} />
             <small>แดชบอร์ดร้าน</small>
           </div>
         </div>

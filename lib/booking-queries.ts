@@ -1,16 +1,24 @@
 import { db, base } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import type { Address, BookingDetail, BookingStatus } from "@/lib/types";
+import type { Address, BookingDetail, BookingItemDetail, BookingStatus } from "@/lib/types";
 import { ymdUtc } from "@/lib/date-th";
-import { BOOKING_STATUS_META } from "@/lib/bookings";
+import { BOOKING_STATUS_META, PAYMENT_REVIEW_ESCALATE_OPEN_HOURS } from "@/lib/bookings";
+import { parseBusinessHours, defaultBusinessHours, paymentReviewEscalated } from "@/lib/hours";
 
-/** Prisma include that hydrates the product + shop fields a BookingDetail needs. */
+/** Prisma include that hydrates the items[] + shop fields a BookingDetail needs. */
 const BOOKING_INCLUDE = {
-  product: {
+  items: {
+    orderBy: { createdAt: "asc" as const },
     select: {
-      name: true,
-      slug: true,
-      images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } },
+      id: true,
+      productId: true,
+      variantId: true,
+      unitId: true,
+      rentalTotal: true,
+      deposit: true,
+      product: { select: { name: true, slug: true, images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } } } },
+      variant: { select: { size: true, quantity: true } },
+      unit: { select: { code: true } },
     },
   },
   shop: { select: { name: true, slug: true, lineUrl: true, promptpayId: true, bankName: true, bankAccountNumber: true, bankAccountName: true, defaultPaymentMethod: true, instagram: true, facebook: true, twitter: true, tiktok: true } },
@@ -20,9 +28,10 @@ type PrismaBookingWithJoins = {
   id: string;
   renterId: string;
   shopId: string;
-  productId: string;
   startDate: Date;
   endDate: Date;
+  startTime: string | null;
+  endTime: string | null;
   rentalTotal: number;
   deposit: number;
   shippingFee: number | null;
@@ -32,6 +41,10 @@ type PrismaBookingWithJoins = {
   status: string;
   slipPath: string | null;
   paymentMethod: "promptpay" | "bank" | null;
+  deliveryMethod: string | null;
+  deliveryCarrier: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
   addressId: string | null;
   recipientName: string | null;
   phone: string | null;
@@ -48,9 +61,24 @@ type PrismaBookingWithJoins = {
   addrChangeDiff: number | null;
   addrChangeSlipPath: string | null;
   addrChangeReason: string | null;
+  refundStatus: string | null;
+  refundAmount: number | null;
+  refundedAt: Date | null;
+  refundNote: string | null;
+  refundSlipPath: string | null;
   createdAt: Date;
   updatedAt: Date;
-  product?: { name: string | null; slug: string | null; images: Array<{ url: string }> } | null;
+  items: Array<{
+    id: string;
+    productId: string;
+    variantId: string | null;
+    unitId: string | null;
+    rentalTotal: number;
+    deposit: number;
+    product: { name: string | null; slug: string | null; images: Array<{ url: string }> } | null;
+    variant: { size: string; quantity: number } | null;
+    unit: { code: string } | null;
+  }>;
   shop?: {
     name: string | null;
     slug: string | null;
@@ -71,14 +99,29 @@ const ymd = ymdUtc;
 
 /** Map a Prisma booking (camelCase + joins) to the snake_case BookingDetail UI shape. */
 export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
-  const images = (b.product?.images ?? []).map((img) => img.url);
+  const first = b.items[0];
+  const mappedItems: BookingItemDetail[] = b.items.map((item) => ({
+    id: item.id,
+    product_id: item.productId,
+    product_name: item.product?.name ?? null,
+    product_slug: item.product?.slug ?? null,
+    product_image: item.product?.images?.[0]?.url ?? null,
+    variant_id: item.variantId ?? null,
+    size: item.variant?.size ?? null,
+    unit_id: item.unitId ?? null,
+    unit_code: item.unit?.code ?? null,
+    rental_total: item.rentalTotal,
+    deposit: item.deposit,
+  }));
   return {
     id: b.id,
     renter_id: b.renterId,
     boutique_id: b.shopId,
-    dress_id: b.productId,
+    dress_id: first?.productId ?? null,
     start_date: ymd(b.startDate),
     end_date: ymd(b.endDate),
+    start_time: b.startTime ?? null,
+    end_time: b.endTime ?? null,
     rental_total: b.rentalTotal,
     deposit: b.deposit,
     shipping_fee: b.shippingFee,
@@ -88,6 +131,10 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     status: b.status as BookingDetail["status"],
     slip_path: b.slipPath,
     payment_method: b.paymentMethod,
+    delivery_method: b.deliveryMethod ?? null,
+    delivery_carrier: b.deliveryCarrier ?? null,
+    tracking_number: b.trackingNumber ?? null,
+    tracking_url: b.trackingUrl ?? null,
     address_id: b.addressId,
     recipient_name: b.recipientName,
     phone: b.phone,
@@ -104,11 +151,18 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     addr_change_diff: b.addrChangeDiff,
     addr_change_slip_path: b.addrChangeSlipPath,
     addr_change_reason: b.addrChangeReason,
+    refund_status: b.refundStatus ?? null,
+    refund_amount: b.refundAmount ?? null,
+    refunded_at: b.refundedAt ? b.refundedAt.toISOString() : null,
+    refund_note: b.refundNote ?? null,
+    refund_slip_path: b.refundSlipPath ?? null,
     created_at: b.createdAt.toISOString(),
     updated_at: b.updatedAt.toISOString(),
-    dress_name: b.product?.name ?? null,
-    dress_slug: b.product?.slug ?? null,
-    dress_image: images[0] ?? null,
+    dress_name: first?.product?.name ?? null,
+    dress_slug: first?.product?.slug ?? null,
+    dress_image: first?.product?.images?.[0]?.url ?? null,
+    dress_size: first?.variant?.size ?? null,
+    dress_variant_qty: first?.variant?.quantity ?? null,
     boutique_name: b.shop?.name ?? null,
     boutique_slug: b.shop?.slug ?? null,
     boutique_line_url: b.shop?.lineUrl ?? null,
@@ -121,6 +175,7 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     boutique_facebook: b.shop?.facebook ?? null,
     boutique_twitter: b.shop?.twitter ?? null,
     boutique_tiktok: b.shop?.tiktok ?? null,
+    items: mappedItems,
   };
 }
 
@@ -186,6 +241,7 @@ export type SellerBookingCard = {
   id: string;
   dress_name: string | null;
   dress_image: string | null;
+  dress_size: string | null;
   recipient_name: string | null;
   renter_id: string;
   start_date: string;
@@ -194,6 +250,11 @@ export type SellerBookingCard = {
   status: BookingStatus;
   source: string | null;
   created_at: string;
+  /** True when status is payment_review and ≥ PAYMENT_REVIEW_ESCALATE_OPEN_HOURS of
+   *  shop-open time have elapsed since the renter uploaded their slip. */
+  slip_review_urgent: boolean;
+  /** Phase 2: number of BookingItems (for "+N ชุด" display in future UI). */
+  item_count: number;
 };
 
 /**
@@ -226,7 +287,9 @@ export async function getSellerBookingsPage(
     where.createdAt = { gte: new Date(Date.now() - opts.sinceDays * 86400 * 1000) };
   }
 
-  const [total, rows] = await Promise.all([
+  // We need the shop's business hours once to compute the slip-review urgency flag.
+  // Fetch it alongside the rows (single extra query, not N+1).
+  const [total, rows, shopRow] = await Promise.all([
     db.booking.count({ where }),
     db.booking.findMany({
       where,
@@ -245,31 +308,52 @@ export async function getSellerBookingsPage(
         source: true,
         recipientName: true,
         createdAt: true,
-        product: {
+        paymentReviewAt: true,
+        items: {
+          orderBy: { createdAt: "asc" as const },
           select: {
-            name: true,
-            images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+            id: true,
+            product: {
+              select: {
+                name: true,
+                images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } },
+              },
+            },
+            variant: { select: { size: true } },
           },
         },
       },
     }),
+    db.shop.findUnique({ where: { id: shopId }, select: { hours: true } }),
   ]);
+
+  const businessHours = parseBusinessHours(shopRow?.hours ?? null) ?? defaultBusinessHours();
+  const now = new Date();
 
   return {
     total,
-    rows: rows.map((b) => ({
-      id: b.id,
-      dress_name: b.product?.name ?? null,
-      dress_image: b.product?.images[0]?.url ?? null,
-      recipient_name: b.recipientName,
-      renter_id: b.renterId,
-      start_date: ymd(b.startDate),
-      end_date: ymd(b.endDate),
-      amount_due: b.rentalTotal + b.deposit + (b.shippingFee ?? 0),
-      status: b.status as BookingStatus,
-      source: b.source,
-      created_at: b.createdAt.toISOString(),
-    })),
+    rows: rows.map((b) => {
+      const first = b.items[0];
+      return {
+        id: b.id,
+        dress_name: first?.product?.name ?? null,
+        dress_image: first?.product?.images[0]?.url ?? null,
+        dress_size: first?.variant?.size ?? null,
+        recipient_name: b.recipientName,
+        renter_id: b.renterId,
+        start_date: ymd(b.startDate),
+        end_date: ymd(b.endDate),
+        amount_due: b.rentalTotal + b.deposit + (b.shippingFee ?? 0),
+        status: b.status as BookingStatus,
+        source: b.source,
+        created_at: b.createdAt.toISOString(),
+        slip_review_urgent:
+          b.status === "payment_review"
+            ? paymentReviewEscalated(b.paymentReviewAt, businessHours, PAYMENT_REVIEW_ESCALATE_OPEN_HOURS, now)
+            : false,
+        item_count: b.items.length,
+      };
+    }),
   };
 }
 
@@ -283,11 +367,18 @@ export async function getBookingForView(id: string): Promise<BookingDetail | nul
   const b = await db.booking.findUnique({
     where: { id },
     include: {
-      product: {
+      items: {
+        orderBy: { createdAt: "asc" as const },
         select: {
-          name: true,
-          slug: true,
-          images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } },
+          id: true,
+          productId: true,
+          variantId: true,
+          unitId: true,
+          rentalTotal: true,
+          deposit: true,
+          product: { select: { name: true, slug: true, images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } } } },
+          variant: { select: { size: true, quantity: true } },
+          unit: { select: { code: true } },
         },
       },
       shop: {
@@ -365,6 +456,7 @@ export type RenterBookingCard = {
   id: string;
   dress_name: string | null;
   dress_image: string | null;
+  dress_size: string | null;
   dress_slug: string | null;
   shop_name: string | null;
   shop_slug: string | null;
@@ -376,6 +468,8 @@ export type RenterBookingCard = {
   shipping_fee: number | null;
   status: BookingStatus;
   created_at: string;
+  /** Phase 2: number of BookingItems (for "+N ชุด" display in future UI). */
+  item_count: number;
 };
 
 export async function getRenterBookingsPage(
@@ -397,7 +491,7 @@ export async function getRenterBookingsPage(
   if (opts.search && opts.search.trim()) {
     const q = opts.search.trim();
     where.OR = [
-      { product: { name: { contains: q, mode: "insensitive" } } },
+      { items: { some: { product: { name: { contains: q, mode: "insensitive" } } } } },
       { shop: { name: { contains: q, mode: "insensitive" } } },
     ];
   }
@@ -418,11 +512,18 @@ export async function getRenterBookingsPage(
         shippingFee: true,
         status: true,
         createdAt: true,
-        product: {
+        items: {
+          orderBy: { createdAt: "asc" as const },
           select: {
-            name: true,
-            slug: true,
-            images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+            id: true,
+            product: {
+              select: {
+                name: true,
+                slug: true,
+                images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } },
+              },
+            },
+            variant: { select: { size: true } },
           },
         },
         shop: {
@@ -434,22 +535,27 @@ export async function getRenterBookingsPage(
 
   return {
     total,
-    rows: rows.map((b) => ({
-      id: b.id,
-      dress_name: b.product?.name ?? null,
-      dress_image: b.product?.images[0]?.url ?? null,
-      dress_slug: b.product?.slug ?? null,
-      shop_name: b.shop?.name ?? null,
-      shop_slug: b.shop?.slug ?? null,
-      shop_line_url: b.shop?.lineUrl ?? null,
-      start_date: ymd(b.startDate),
-      end_date: ymd(b.endDate),
-      rental_total: b.rentalTotal,
-      deposit: b.deposit,
-      shipping_fee: b.shippingFee,
-      status: b.status as BookingStatus,
-      created_at: b.createdAt.toISOString(),
-    })),
+    rows: rows.map((b) => {
+      const first = b.items[0];
+      return {
+        id: b.id,
+        dress_name: first?.product?.name ?? null,
+        dress_image: first?.product?.images[0]?.url ?? null,
+        dress_size: first?.variant?.size ?? null,
+        dress_slug: first?.product?.slug ?? null,
+        shop_name: b.shop?.name ?? null,
+        shop_slug: b.shop?.slug ?? null,
+        shop_line_url: b.shop?.lineUrl ?? null,
+        start_date: ymd(b.startDate),
+        end_date: ymd(b.endDate),
+        rental_total: b.rentalTotal,
+        deposit: b.deposit,
+        shipping_fee: b.shippingFee,
+        status: b.status as BookingStatus,
+        created_at: b.createdAt.toISOString(),
+        item_count: b.items.length,
+      };
+    }),
   };
 }
 
@@ -481,6 +587,7 @@ export type BookingEvent = {
   status: string;
   label: string;
   at: string;
+  note?: string | null;
 };
 
 export async function getBookingTimeline(bookingId: string): Promise<BookingEvent[]> {
@@ -502,10 +609,12 @@ export async function getBookingTimeline(bookingId: string): Promise<BookingEven
     if (!newStatus || newStatus === oldStatus) continue;
 
     const meta = BOOKING_STATUS_META[newStatus as BookingStatus];
+    const note = newStatus === "slip_disputed" ? ((after.cancelReason as string | undefined) ?? null) : null;
     events.push({
       status: newStatus,
       label: meta?.label ?? newStatus,
       at: log.createdAt.toISOString(),
+      note,
     });
   }
 

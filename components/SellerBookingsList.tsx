@@ -16,6 +16,7 @@ import {
   type SellerBookingCardWithTrust,
 } from "@/app/actions/seller-bookings";
 import { fmtThai } from "@/lib/date-th";
+import { sizeLabel } from "@/lib/types";
 
 type Props = {
   initialRows: SellerBookingCardWithTrust[];
@@ -151,7 +152,7 @@ export default function SellerBookingsList({
         {BOOKING_TABS.map((t) => {
           const active = tab === t.key;
           const count = countForTab(t.key, statusCounts);
-          const isActionable = ["booking_pending", "payment_review", "returned"].includes(t.key) && count > 0;
+          const isActionable = ["booking_pending", "payment_review", "awaiting_return", "returned"].includes(t.key) && count > 0;
           return (
             <button
               key={t.key}
@@ -189,7 +190,7 @@ export default function SellerBookingsList({
                     fontSize: 11,
                     fontWeight: 700,
                     background: isActionable ? "var(--danger, #e53e3e)" : active ? "var(--accent)" : "var(--line)",
-                    color: isActionable || active ? "#fff" : "var(--ink-2)",
+                    color: isActionable || active ? "var(--on-dark)" : "var(--ink-2)",
                   }}
                 >
                   {count}
@@ -271,7 +272,17 @@ export default function SellerBookingsList({
                 <div style={{ flex: 1, fontSize: 14, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     <span style={{ fontWeight: 600 }}>{b.dress_name ?? "ชุด"}</span>
+                    {b.dress_size ? (
+                      <span className="whitespace-nowrap rounded bg-bg-hover px-1.5 py-0.5 text-[11px] font-semibold text-ink-2">
+                        ไซซ์ {sizeLabel(b.dress_size)}
+                      </span>
+                    ) : null}
                     <BookingStatusBadge status={b.status} />
+                    {b.slip_review_urgent && (
+                      <span className="inline-flex items-center rounded-full bg-[var(--danger,#e53e3e)] px-2 py-0.5 text-[11px] font-bold text-white whitespace-nowrap">
+                        ตรวจสลิปด่วน
+                      </span>
+                    )}
                     {b.source === "walk_in" && (
                       <span
                         style={{
@@ -294,13 +305,15 @@ export default function SellerBookingsList({
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4, fontSize: 12.5, flexWrap: "wrap" }}>
                     <span style={{ color: startUrgency !== null && startUrgency <= 2 ? "var(--danger, #e53e3e)" : startUrgency !== null && startUrgency <= 5 ? "var(--warn)" : "var(--ink-2)", fontWeight: startUrgency !== null && startUrgency <= 2 ? 700 : 500 }}>
                       เริ่มเช่า {fmtThai(b.start_date)}
-                      {startUrgency !== null && startUrgency <= 0
+                      {startUrgency !== null && startUrgency === 0
                         ? " (วันนี้!)"
                         : startUrgency !== null && startUrgency === 1
                           ? " (พรุ่งนี้)"
-                          : startUrgency !== null && startUrgency <= 5
+                          : startUrgency !== null && startUrgency > 1 && startUrgency <= 5
                             ? ` (อีก ${startUrgency} วัน)`
-                            : ""}
+                            : startUrgency !== null && startUrgency < 0
+                              ? ` (เลยมาแล้ว ${Math.abs(startUrgency)} วัน)`
+                              : ""}
                     </span>
                     <span style={{ color: "var(--line)" }}>|</span>
                     <span style={{ color: "var(--ink-3)" }}>

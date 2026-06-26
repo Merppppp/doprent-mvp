@@ -146,7 +146,159 @@ export function notifySlipDisputed(opts: RenterNotifyOpts) {
   );
 }
 
+/* --------------------------- return reminders --------------------------- */
+
+type ReturnNotifyOpts = {
+  renterEmail: string | null | undefined;
+  sellerEmail: string | null | undefined;
+  dressName: string;
+  endDate: Date | string;
+  bookingId: string;
+};
+
+/** Rental period ends today: nudge BOTH parties that it's time to return/collect. */
+export function notifyReturnDue(opts: ReturnNotifyOpts) {
+  const when = formatThaiDate(opts.endDate);
+  fireEmail(
+    opts.renterEmail,
+    "ถึงกำหนดคืนชุดแล้ว — DopRent",
+    emailShell({
+      title: "ถึงกำหนดคืนชุดแล้ว",
+      bodyHtml: `
+        <p>ครบกำหนดการเช่าชุด <strong>${opts.dressName}</strong> วันที่ ${when}</p>
+        <p>กรุณาส่งชุดคืนให้ร้านตามวิธีที่ตกลงกันไว้</p>
+      `,
+      ctaLabel: "ดูการจองของฉัน",
+      ctaUrl: `${baseUrl()}/account/bookings/${opts.bookingId}`,
+    }),
+    "return_reminder",
+  );
+  fireEmail(
+    opts.sellerEmail,
+    "ลูกค้าครบกำหนดคืนชุดวันนี้ — DopRent",
+    emailShell({
+      title: "ครบกำหนดคืนชุดวันนี้",
+      bodyHtml: `
+        <p>การเช่าชุด <strong>${opts.dressName}</strong> ครบกำหนดวันที่ ${when}</p>
+        <p>เมื่อได้รับชุดคืนแล้ว กรุณากด "รับคืนแล้ว" ในระบบ</p>
+      `,
+      ctaLabel: "ดูการจอง",
+      ctaUrl: `${baseUrl()}/sell/bookings/${opts.bookingId}`,
+    }),
+    "return_reminder",
+  );
+}
+
+/** Past the return grace window and still not returned: stronger nudge to both. */
+export function notifyReturnOverdue(opts: ReturnNotifyOpts) {
+  const when = formatThaiDate(opts.endDate);
+  fireEmail(
+    opts.renterEmail,
+    "เลยกำหนดคืนชุดแล้ว กรุณาส่งคืนด่วน — DopRent",
+    emailShell({
+      title: "เลยกำหนดคืนชุดแล้ว",
+      bodyHtml: `
+        <p>ชุด <strong>${opts.dressName}</strong> เลยกำหนดคืน (${when}) แล้ว</p>
+        <p>กรุณาส่งคืนโดยด่วนเพื่อหลีกเลี่ยงค่าปรับล่าช้า</p>
+      `,
+      ctaLabel: "ดูการจองของฉัน",
+      ctaUrl: `${baseUrl()}/account/bookings/${opts.bookingId}`,
+    }),
+    "return_reminder",
+  );
+  fireEmail(
+    opts.sellerEmail,
+    "ลูกค้าเลยกำหนดคืนชุด — DopRent",
+    emailShell({
+      title: "ลูกค้าเลยกำหนดคืนชุด",
+      bodyHtml: `
+        <p>การเช่าชุด <strong>${opts.dressName}</strong> เลยกำหนดคืน (${when}) แล้ว และยังไม่ได้บันทึกการรับคืน</p>
+        <p>กรุณาติดตามลูกค้า และกด "รับคืนแล้ว" เมื่อได้รับชุด</p>
+      `,
+      ctaLabel: "ดูการจอง",
+      ctaUrl: `${baseUrl()}/sell/bookings/${opts.bookingId}`,
+    }),
+    "return_reminder",
+  );
+}
+
 /* --------------------------- admin notifications --------------------------- */
+
+/* --------------------------- cancel + refund notifications ------------------- */
+
+/** Notify admin that a renter or seller has requested a cancel and approval is needed. */
+export function notifyCancelRequested(opts: {
+  adminEmail: string | null | undefined;
+  dressName: string;
+  bookingId: string;
+  requestedBy: "renter" | "shop";
+  reason?: string | null;
+}) {
+  const byLabel = opts.requestedBy === "renter" ? "ผู้เช่า" : "ร้านค้า";
+  fireEmail(
+    opts.adminEmail,
+    `${byLabel}ขอยกเลิกการจอง รอแอดมินอนุมัติ — DopRent`,
+    emailShell({
+      title: `${byLabel}ขอยกเลิกการจอง`,
+      bodyHtml: `
+        <p>${byLabel}ส่งคำขอยกเลิกการจองชุด <strong>${opts.dressName}</strong></p>
+        ${opts.reason ? `<p style="padding:8px 12px;background:#f5f5f5;border-radius:6px;color:#555">"${opts.reason}"</p>` : ""}
+        <p>กรุณาเข้าไปตรวจสอบและอนุมัติหรือปฏิเสธคำขอ</p>
+      `,
+      ctaLabel: "ดูรายการจอง",
+      ctaUrl: `${baseUrl()}/admin/bookings/${opts.bookingId}`,
+    }),
+  );
+}
+
+/** Notify renter that admin approved the cancel (booking is now cancelled). */
+export function notifyBookingCancelled(opts: {
+  renterEmail: string | null | undefined;
+  dressName: string;
+  bookingId: string;
+  refundRequired: boolean;
+  refundAmount?: number | null;
+}) {
+  const refundLine = opts.refundRequired
+    ? `<p>ทีมงานจะดำเนินการคืนเงิน${opts.refundAmount ? ` ฿${opts.refundAmount.toLocaleString()}` : ""} ให้ท่านต่อไป</p>`
+    : "";
+  fireEmail(
+    opts.renterEmail,
+    "การจองของคุณถูกยกเลิก — DopRent",
+    emailShell({
+      title: "การจองถูกยกเลิก",
+      bodyHtml: `
+        <p>การจองชุด <strong>${opts.dressName}</strong> ถูกยกเลิกโดยแอดมินแล้ว</p>
+        ${refundLine}
+        <p>หากมีข้อสงสัย กรุณาติดต่อทีมงาน DopRent</p>
+      `,
+      ctaLabel: "ดูรายละเอียดการจอง",
+      ctaUrl: `${baseUrl()}/account/bookings/${opts.bookingId}`,
+    }),
+  );
+}
+
+/** Notify renter that admin has uploaded the refund slip — transfer done. */
+export function notifyRefundIssued(opts: {
+  renterEmail: string | null | undefined;
+  dressName: string;
+  bookingId: string;
+  refundAmount?: number | null;
+}) {
+  fireEmail(
+    opts.renterEmail,
+    "คืนเงินการจองแล้ว — DopRent",
+    emailShell({
+      title: "ดำเนินการคืนเงินแล้ว",
+      bodyHtml: `
+        <p>ทีมงาน DopRent ได้โอนคืนเงิน${opts.refundAmount ? ` ฿${opts.refundAmount.toLocaleString()}` : ""} สำหรับการจองชุด <strong>${opts.dressName}</strong> แล้ว</p>
+        <p>กรุณาตรวจสอบสลิปการโอนในรายละเอียดการจอง</p>
+      `,
+      ctaLabel: "ดูรายละเอียดการจอง",
+      ctaUrl: `${baseUrl()}/account/bookings/${opts.bookingId}`,
+    }),
+  );
+}
 
 export function notifyAdminDisputeEscalated(opts: {
   adminEmail: string | null | undefined;

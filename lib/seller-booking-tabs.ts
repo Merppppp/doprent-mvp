@@ -10,6 +10,7 @@ export type BookingTabKey =
   | "payment_review"
   | "confirmed"
   | "renting"
+  | "awaiting_return"
   | "returned"
   | "completed"
   | "cancelled_shop"
@@ -30,6 +31,7 @@ export const BOOKING_TABS: ReadonlyArray<{
   { key: "payment_review", label: "ตรวจสลิป", statuses: ["payment_review", "slip_disputed"] },
   { key: "confirmed", label: "ยืนยันแล้ว", statuses: ["confirmed"] },
   { key: "renting", label: "กำลังเช่า", statuses: ["renting"] },
+  { key: "awaiting_return", label: "รอคืนของ", statuses: ["awaiting_return"] },
   { key: "returned", label: "รอตรวจคืน", statuses: ["returned"] },
   { key: "completed", label: "จบงาน", statuses: ["completed"] },
   { key: "cancelled_shop", label: "ยกเลิกโดยร้าน", statuses: ["rejected", "cancelled", "cancel_requested"] },

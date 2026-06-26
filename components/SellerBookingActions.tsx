@@ -28,11 +28,16 @@ type Props = {
   /** Channels the shop has set up + the shop's default — used by the accept flow. */
   channels?: ChannelOption[];
   defaultMethod?: PaymentChannel | null;
+  /** "standard" | "express" — drives the carrier prompt on the ship step. */
+  deliveryMethod?: string | null;
 };
 
-export default function SellerBookingActions({ bookingId, status, channels = [], defaultMethod = null }: Props) {
+export default function SellerBookingActions({ bookingId, status, channels = [], defaultMethod = null, deliveryMethod = null }: Props) {
   const router = useRouter();
   const [fee, setFee] = useState("");
+  const [carrier, setCarrier] = useState("");
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [trackingUrl, setTrackingUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [showDisputeModal, setShowDisputeModal] = useState(false);
@@ -191,14 +196,70 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
   }
 
   if (status === "confirmed") {
+    const isStandard = deliveryMethod === "standard";
+    const isShipping = deliveryMethod === "standard" || deliveryMethod === "express";
+    const carrierOk = !isStandard || carrier.trim().length > 0;
+    // For any shipping method the seller must record how the renter can track
+    // the parcel — at least a tracking number or a tracking URL.
+    const trackingOk = !isShipping || trackingNumber.trim().length > 0 || trackingUrl.trim().length > 0;
+    const urlOk = trackingUrl.trim().length === 0 || /^https?:\/\//i.test(trackingUrl.trim());
+    const inputCls =
+      "mt-1.5 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-[15px] text-[var(--ink)] outline-none focus:border-[var(--accent)]";
     return (
-      <div style={{ display: "grid", gap: 12 }}>
+      <div className="grid gap-3">
+        {isStandard ? (
+          <label className="text-sm font-semibold">
+            ผู้ให้บริการขนส่ง
+            <input
+              type="text"
+              value={carrier}
+              onChange={(e) => setCarrier(e.target.value)}
+              placeholder="เช่น Flash Express, Kerry, ไปรษณีย์ไทย"
+              maxLength={80}
+              className={inputCls}
+            />
+          </label>
+        ) : null}
+        {isShipping ? (
+          <>
+            <label className="text-sm font-semibold">
+              เลขพัสดุ / เลขติดตาม
+              <input
+                type="text"
+                value={trackingNumber}
+                onChange={(e) => setTrackingNumber(e.target.value)}
+                placeholder="เช่น TH1234567890"
+                maxLength={120}
+                className={inputCls}
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              ลิงก์ติดตามการจัดส่ง (ถ้ามี)
+              <input
+                type="url"
+                value={trackingUrl}
+                onChange={(e) => setTrackingUrl(e.target.value)}
+                placeholder="https://..."
+                maxLength={500}
+                className={inputCls}
+              />
+            </label>
+            <p className="text-xs text-[var(--ink-3)]">กรอกเลขพัสดุหรือลิงก์ติดตามอย่างน้อยหนึ่งอย่าง เพื่อให้ผู้เช่าติดตามพัสดุได้</p>
+          </>
+        ) : null}
         <button
           type="button"
           className="btn btn-primary btn-lg"
-          disabled={busy}
-          onClick={() => run(() => markRenting(bookingId))}
-          style={{ padding: "13px 18px" }}
+          disabled={busy || !carrierOk || !trackingOk || !urlOk}
+          onClick={() =>
+            run(() =>
+              markRenting(bookingId, {
+                carrier: isStandard ? carrier.trim() : undefined,
+                trackingNumber: isShipping ? trackingNumber.trim() || undefined : undefined,
+                trackingUrl: isShipping ? trackingUrl.trim() || undefined : undefined,
+              }),
+            )
+          }
         >
           ส่งชุดแล้ว · เริ่มเช่า
         </button>
@@ -207,9 +268,9 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
     );
   }
 
-  if (status === "renting") {
+  if (status === "renting" || status === "awaiting_return") {
     return (
-      <div style={{ display: "grid", gap: 12 }}>
+      <div className="grid gap-3">
         <button
           type="button"
           className="btn btn-primary btn-lg"

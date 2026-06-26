@@ -161,7 +161,7 @@ export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
             background: "transparent",
             padding: "0 10px",
             fontSize: 13.5,
-            color: "#fff",
+            color: "var(--on-dark)",
             fontFamily: "inherit",
             minWidth: 0,
           }}
@@ -176,8 +176,8 @@ export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
             width: 30,
             height: 30,
             borderRadius: 999,
-            background: "#fff",
-            color: "#2e9c65",
+            background: "var(--on-dark)",
+            color: "var(--accent)",
             border: "none",
             cursor: "pointer",
             display: "grid",
@@ -199,10 +199,10 @@ export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
             top: "calc(100% + 6px)",
             left: 0,
             right: 0,
-            background: "#fff",
+            background: "var(--surface)",
             borderRadius: 14,
             boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
-            border: "1px solid rgba(0,0,0,0.06)",
+            border: "1px solid var(--line)",
             overflow: "hidden",
             zIndex: 60,
             maxHeight: 420,
@@ -210,10 +210,10 @@ export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
           }}
         >
           {!hasResults && loading && (
-            <div style={{ padding: "14px 16px", fontSize: 13, color: "#888" }}>{t("search.loading", locale)}</div>
+            <div style={{ padding: "14px 16px", fontSize: 13, color: "var(--ink-3)" }}>{t("search.loading", locale)}</div>
           )}
           {!hasResults && !loading && (
-            <div style={{ padding: "14px 16px", fontSize: 13, color: "#888" }}>{t("search.empty", locale)}</div>
+            <div style={{ padding: "14px 16px", fontSize: 13, color: "var(--ink-3)" }}>{t("search.empty", locale)}</div>
           )}
 
           {sug.products.length > 0 && (
@@ -229,7 +229,7 @@ export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
                     aria-selected={active === idx}
                     onMouseEnter={() => setActive(idx)}
                     onClick={() => goTo(`/product/${p.slug}`)}
-                    style={{ ...ns_row, background: active === idx ? "#f1f6f3" : "transparent" }}
+                    style={{ ...ns_row, background: active === idx ? "var(--accent-soft)" : "transparent" }}
                   >
                     <span style={ns_thumb}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -258,9 +258,9 @@ export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
                     aria-selected={active === idx}
                     onMouseEnter={() => setActive(idx)}
                     onClick={() => goSearch(b)}
-                    style={{ ...ns_row, background: active === idx ? "#f1f6f3" : "transparent" }}
+                    style={{ ...ns_row, background: active === idx ? "var(--accent-soft)" : "transparent" }}
                   >
-                    <span style={{ ...ns_thumb, display: "grid", placeItems: "center", color: "#2e9c65" }}>
+                    <span style={{ ...ns_thumb, display: "grid", placeItems: "center", color: "var(--accent)" }}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                         <path d="M6 3h12l3 7-9 11L3 10z" /><path d="M3 10h18" />
                       </svg>
@@ -288,9 +288,9 @@ export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
                     aria-selected={active === idx}
                     onMouseEnter={() => setActive(idx)}
                     onClick={() => goTo(`/shop/${s.slug}`)}
-                    style={{ ...ns_row, background: active === idx ? "#f1f6f3" : "transparent" }}
+                    style={{ ...ns_row, background: active === idx ? "var(--accent-soft)" : "transparent" }}
                   >
-                    <span style={{ ...ns_thumb, display: "grid", placeItems: "center", color: "#2e9c65" }}>
+                    <span style={{ ...ns_thumb, display: "grid", placeItems: "center", color: "var(--accent)" }}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                         <path d="M3 9l1-5h16l1 5M4 9v10a1 1 0 001 1h14a1 1 0 001-1V9M3 9h18" />
                       </svg>
@@ -314,13 +314,13 @@ export default function NavbarSearch({ locale = "th" }: { locale?: Locale }) {
               onClick={() => goSearch(trimmed)}
               style={{
                 ...ns_row,
-                borderTop: hasResults ? "1px solid rgba(0,0,0,0.06)" : "none",
-                background: active === flatItems.length - 1 ? "#f1f6f3" : "transparent",
-                color: "#2e9c65",
+                borderTop: hasResults ? "1px solid var(--line)" : "none",
+                background: active === flatItems.length - 1 ? "var(--accent-soft)" : "transparent",
+                color: "var(--accent)",
                 fontWeight: 600,
               }}
             >
-              <span style={{ ...ns_thumb, display: "grid", placeItems: "center", color: "#2e9c65", background: "#eaf5ef" }}>
+              <span style={{ ...ns_thumb, display: "grid", placeItems: "center", color: "var(--accent)", background: "var(--accent-soft)" }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
                   <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" />
                 </svg>
@@ -347,7 +347,7 @@ const ns_groupLabel: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 700,
   letterSpacing: 0.4,
-  color: "#9aa0a6",
+  color: "var(--ink-3)",
   textTransform: "uppercase",
 };
 const ns_row: React.CSSProperties = {
@@ -367,12 +367,12 @@ const ns_thumb: React.CSSProperties = {
   flexShrink: 0,
   borderRadius: 8,
   overflow: "hidden",
-  background: "#f0f0f0",
+  background: "var(--line-2)",
 };
 const ns_name: React.CSSProperties = {
   display: "block",
   fontSize: 13.5,
-  color: "#222",
+  color: "var(--ink)",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
@@ -380,7 +380,7 @@ const ns_name: React.CSSProperties = {
 const ns_sub: React.CSSProperties = {
   display: "block",
   fontSize: 11.5,
-  color: "#9aa0a6",
+  color: "var(--ink-3)",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",

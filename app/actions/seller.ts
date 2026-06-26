@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import type { BookingStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { withActor } from "@/lib/db-context";
@@ -11,6 +12,7 @@ import { dressLimitFor } from "@/lib/tiers";
 import { type AdsTier, type Color, type PriceTier } from "@/lib/types";
 import { resolveTagSelections } from "@/lib/tag-groups";
 import { allocateStaffLoginCode } from "@/lib/staff-login-code";
+import { syncVariantUnits } from "@/lib/product-units";
 import {
   type DbSize,
   type VariantInput,
@@ -154,7 +156,7 @@ export async function updateShop(shopId: string, formData: FormData): Promise<{ 
   }
 
   // Booking policy: integer fields (>= 0; empty / missing = skip)
-  for (const f of ["lead_time_days","min_rental_days","return_window_days","buffer_days_after"] as const) {
+  for (const f of ["lead_time_days","min_rental_days","return_window_days","buffer_days_after","buffer_days_before"] as const) {
     const v = formData.get(f);
     if (v !== null) {
       const s = String(v).trim();
@@ -487,6 +489,7 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
         select: { id: true, size: true },
       });
       createdVariants.push({ id: created_v.id, size: created_v.size as DbSize });
+      await syncVariantUnits(created_v.id, created_v.size, created.slug, vi.quantity);
     }
 
     // Create ProductPriceTier rows
@@ -665,6 +668,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
           select: { id: true, size: true },
         });
         updatedVariants.push({ id: v.id, size: v.size });
+        await syncVariantUnits(v.id, v.size, product.slug, vi.quantity);
       }
       // Update product.pricePerDay from min variant price (per_size mode)
       if (priceData.mode === "per_size" && updatedVariants.length > 0) {
@@ -683,6 +687,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
           select: { id: true, size: true },
         });
         updatedVariants.push({ id: v.id, size: v.size });
+        await syncVariantUnits(v.id, v.size, product.slug, vi.quantity);
       }
     }
 
@@ -759,6 +764,59 @@ export async function toggleProductAvailable(productId: string): Promise<void> {
   revalidatePath("/sell/products");
   revalidatePath("/sell/dashboard");
   revalidatePath(`/product/${productId}`);
+}
+
+// A booking that still ties up the product. Anything NOT in this terminal set
+// blocks deletion (incl. returned/cancel_requested/slip_disputed — still in flight).
+const CLOSED_BOOKING_STATUSES: BookingStatus[] = [
+  "completed",
+  "rejected",
+  "cancelled",
+  "payment_expired",
+];
+
+/**
+ * Soft-delete a product (status → archived). We never hard-delete: the
+ * Booking/BookingItem FKs are onDelete: Cascade, so a real DELETE would also
+ * wipe historical bookings. Blocked while any non-terminal booking references
+ * the product (as the header or as a multi-item line).
+ */
+export async function deleteProduct(
+  productId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const product = await db.product.findUnique({
+    where: { id: productId },
+    select: { status: true, shop: { select: { ownerId: true } } },
+  });
+  if (!product || product.shop.ownerId !== user.id) {
+    return { ok: false, error: "ไม่พบสินค้า" };
+  }
+  if (product.status === "archived") return { ok: true };
+
+  const itemOpen = await db.bookingItem.count({
+    where: { productId, booking: { status: { notIn: CLOSED_BOOKING_STATUSES } } },
+  });
+  if (itemOpen > 0) {
+    return {
+      ok: false,
+      error: "ลบไม่ได้ — สินค้านี้ยังมีออเดอร์ที่ค้างอยู่ กรุณาปิดหรือยกเลิกออเดอร์ก่อน",
+    };
+  }
+
+  await withActor(user.id, async () => {
+    await db.product.update({
+      where: { id: productId },
+      data: { status: "archived", available: false },
+    });
+  });
+
+  revalidatePath("/sell/products");
+  revalidatePath("/sell/dashboard");
+  revalidatePath(`/product/${productId}`);
+  return { ok: true };
 }
 
 export async function replyToReview(reviewId: string, text: string): Promise<{ ok: true } | { ok: false; error: string }> {

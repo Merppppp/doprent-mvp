@@ -176,7 +176,7 @@ export default function MobileMenu({ user, locale = "th" }: Props) {
                     {user.isAdmin ? (
                       <span
                         style={{
-                          background: "var(--info)",
+                          background: "var(--accent)",
                           color: "var(--on-dark)",
                           fontSize: 10,
                           padding: "2px 6px",
@@ -280,7 +280,7 @@ export default function MobileMenu({ user, locale = "th" }: Props) {
                     </Link>
                   ) : null}
                   {user.isAdmin ? (
-                    <Link href="/admin" style={{ ...drawerItem, color: "var(--info)" }}>
+                    <Link href="/admin" style={{ ...drawerItem, color: "var(--accent)" }}>
                       Admin Dashboard
                     </Link>
                   ) : null}

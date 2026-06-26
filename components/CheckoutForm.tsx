@@ -8,18 +8,13 @@ import type { Address, PriceTier } from "@/lib/types";
 import { fmtThai } from "@/lib/date-th";
 import type { BusinessHours } from "@/lib/hours";
 
-const CARRIERS = [
-  { key: "flash", label: "Flash Express" },
-  { key: "kerry", label: "Kerry Express" },
-  { key: "jt", label: "J&T Express" },
-  { key: "thaipost", label: "ไปรษณีย์ไทย" },
-  { key: "other", label: "อื่นๆ" },
-] as const;
-
 type Props = {
   productId: string;
   startDate: string;
   endDate: string;
+  /** Optional pickup/return time-of-day "HH:MM"; null = full day. */
+  startTime?: string | null;
+  endTime?: string | null;
   days: number;
   pricePerDay: number;
   priceTiers?: PriceTier[] | null;
@@ -30,43 +25,29 @@ type Props = {
   shopIsOpen?: boolean;
 };
 
-/** Generate express delivery time slots for today based on shop hours.
- *  Each slot is a 4-hour window. Slots start from (shop open + 4h) to (shop close).
- *  Only future slots (start >= next full hour from now) are returned. */
-function buildExpressSlots(hours: BusinessHours | null | undefined): string[] {
-  if (!hours) return [];
+/** Local "today" as YYYY-MM-DD (browser clock = the renter's wall clock). */
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Minutes from now until the shop closes today. null when shop is closed today
+ *  or hours are unknown. Negative when already past closing. */
+function minutesUntilCloseToday(hours: BusinessHours | null | undefined): number | null {
+  if (!hours) return null;
   const now = new Date();
-  const dow = now.getDay();
-  const today = hours[dow];
-  if (!today?.open) return [];
-
-  const [openH, openM] = today.from.split(":").map(Number);
+  const today = hours[now.getDay()];
+  if (!today?.open) return null;
   const [closeH, closeM] = today.to.split(":").map(Number);
-  const openMin = openH * 60 + openM;
-  const closeMin = closeH * 60 + closeM;
-
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-  const nextFullHour = Math.ceil((nowMin + 1) / 60) * 60;
-
-  const firstSlotStart = openMin + 240; // shop open + 4 hours
-  const slots: string[] = [];
-
-  for (let start = firstSlotStart; start + 240 <= closeMin; start += 60) {
-    if (start < nextFullHour) continue;
-    const end = start + 240;
-    const sh = String(Math.floor(start / 60)).padStart(2, "0");
-    const sm = String(start % 60).padStart(2, "0");
-    const eh = String(Math.floor(end / 60)).padStart(2, "0");
-    const em = String(end % 60).padStart(2, "0");
-    slots.push(`${sh}:${sm}-${eh}:${em}`);
-  }
-  return slots;
+  return closeH * 60 + closeM - (now.getHours() * 60 + now.getMinutes());
 }
 
 export default function CheckoutForm({
   productId,
   startDate,
   endDate,
+  startTime,
+  endTime,
   days,
   pricePerDay,
   priceTiers,
@@ -88,35 +69,44 @@ export default function CheckoutForm({
 
   // Delivery state
   const [deliveryMethod, setDeliveryMethod] = useState<"express" | "standard" | null>(null);
-  const [carrier, setCarrier] = useState<string | null>(null);
-  const [otherCarrier, setOtherCarrier] = useState("");
-  const [expressSlot, setExpressSlot] = useState<string | null>(null);
 
-  const expressSlots = useMemo(() => buildExpressSlots(shopHours), [shopHours]);
-  const canExpress = expressSlots.length > 0 && shopIsOpen !== false;
-
-  // Auto-clear express slot if it becomes unavailable (time passes)
+  // Re-evaluate time-based gating every minute (today's cutoff shifts as time passes).
   const [, setTick] = useState(0);
   useEffect(() => {
-    if (deliveryMethod !== "express") return;
     const iv = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(iv);
-  }, [deliveryMethod]);
+  }, []);
 
-  const currentSlots = useMemo(() => buildExpressSlots(shopHours), [shopHours]);
+  // Whether the rental starts today (same-day) — drives which methods are offered.
+  const isSameDayStart = startDate === localToday();
+
+  // Same-day delivery rules:
+  //   • Express needs the shop open today with > 1h before closing (time to dispatch).
+  //   • Standard (parcel) can never arrive same-day, so it's hidden when start = today.
+  //   • Future dates: both methods are available.
+  const minsToClose = useMemo(() => minutesUntilCloseToday(shopHours), [shopHours]);
+  const expressAvailable = isSameDayStart
+    ? shopIsOpen !== false && minsToClose != null && minsToClose > 60
+    : true;
+  const standardAvailable = !isSameDayStart;
+  // Same-day but too late / shop closed → nothing can ship today.
+  const noDeliveryToday = isSameDayStart && !expressAvailable;
+
+  // Drop a selected method the moment it stops being valid (e.g. time passes).
   useEffect(() => {
-    if (expressSlot && !currentSlots.includes(expressSlot)) {
-      setExpressSlot(null);
-    }
-  }, [currentSlots, expressSlot]);
+    if (deliveryMethod === "express" && !expressAvailable) setDeliveryMethod(null);
+    if (deliveryMethod === "standard" && !standardAvailable) setDeliveryMethod(null);
+  }, [deliveryMethod, expressAvailable, standardAvailable]);
+
+  // Auto-select when exactly one method is offered (same-day → express only).
+  useEffect(() => {
+    if (deliveryMethod) return;
+    if (expressAvailable && !standardAvailable) setDeliveryMethod("express");
+  }, [deliveryMethod, expressAvailable, standardAvailable]);
 
   const { perDay: effPerDay, total: rental } = priceForNights(priceTiers ?? null, pricePerDay, days);
 
-  const resolvedCarrier = carrier === "other" ? `other:${otherCarrier.trim()}` : carrier;
-  const deliveryComplete =
-    deliveryMethod === "standard" ? !!resolvedCarrier && (carrier !== "other" || !!otherCarrier.trim()) :
-    deliveryMethod === "express" ? !!expressSlot :
-    false;
+  const deliveryComplete = deliveryMethod === "standard" || deliveryMethod === "express";
 
   async function onAddAddress(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -177,18 +167,6 @@ export default function CheckoutForm({
       setError("กรุณาเลือกวิธีจัดส่ง");
       return;
     }
-    if (deliveryMethod === "standard" && !resolvedCarrier) {
-      setError("กรุณาเลือกผู้ให้บริการขนส่ง");
-      return;
-    }
-    if (deliveryMethod === "standard" && carrier === "other" && !otherCarrier.trim()) {
-      setError("กรุณาระบุผู้ให้บริการขนส่ง");
-      return;
-    }
-    if (deliveryMethod === "express" && !expressSlot) {
-      setError("กรุณาเลือกช่วงเวลารับของ");
-      return;
-    }
     if (!selectedId) {
       setError("กรุณาเลือกที่อยู่จัดส่ง");
       return;
@@ -200,10 +178,10 @@ export default function CheckoutForm({
     fd.set("address_id", selectedId);
     fd.set("start_date", startDate);
     fd.set("end_date", endDate);
+    if (startTime) fd.set("start_time", startTime);
+    if (endTime) fd.set("end_time", endTime);
     if (variantId) fd.set("variant_id", variantId);
     fd.set("delivery_method", deliveryMethod);
-    if (deliveryMethod === "standard" && resolvedCarrier) fd.set("delivery_carrier", resolvedCarrier);
-    if (deliveryMethod === "express" && expressSlot) fd.set("express_slot", expressSlot);
     const res = await createBooking(fd);
     if (!res.ok) {
       setBusy(false);
@@ -220,135 +198,82 @@ export default function CheckoutForm({
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
           <StepNum n={1} /> วิธีจัดส่ง <Req />
         </h2>
-        <div style={{ display: "grid", gap: 8 }}>
-          {/* Express option */}
-          <label
-            style={{ ...optionBtn(deliveryMethod === "express", !canExpress), cursor: canExpress ? "pointer" : "not-allowed" }}
+        {noDeliveryToday ? (
+          <div
+            style={{
+              padding: 14,
+              borderRadius: 10,
+              border: "1px solid var(--danger)",
+              background: "var(--danger-soft)",
+              fontSize: 13,
+              color: "var(--ink)",
+              lineHeight: 1.6,
+            }}
           >
-            <input
-              type="radio"
-              name="delivery"
-              checked={deliveryMethod === "express"}
-              disabled={!canExpress}
-              onChange={() => { setDeliveryMethod("express"); setCarrier(null); }}
-              style={{ accentColor: "var(--accent)", width: 18, height: 18, flexShrink: 0 }}
-            />
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: canExpress ? "var(--accent)" : "var(--ink-3)" }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>ส่งด่วน</div>
-              {canExpress ? (
-                <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-                  ได้รับภายในวัน — เลือกช่วงเวลารับของ
+            ตอนนี้เลยเวลาส่งด่วนสำหรับวันนี้แล้ว และส่งพัสดุไม่สามารถจัดส่งภายในวันได้
+            กรุณาย้อนกลับไปเลือกวันรับชุดเป็นวันอื่น
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 8 }}>
+            {/* Express option — same-day messenger (or future-date delivery). */}
+            {expressAvailable && (
+              <label style={{ ...optionBtn(deliveryMethod === "express", false), cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name="delivery"
+                  checked={deliveryMethod === "express"}
+                  onChange={() => { setDeliveryMethod("express"); }}
+                  style={{ accentColor: "var(--accent)", width: 18, height: 18, flexShrink: 0 }}
+                />
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: "var(--accent)" }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>ส่งด่วน</div>
+                  <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
+                    {isSameDayStart ? "ได้รับภายในวัน" : "ส่งถึงในวันรับชุด"} — ร้านนัดเวลารับ–ส่ง
+                  </div>
                 </div>
-              ) : shopIsOpen === false ? (
-                <div style={{ fontSize: 12, color: "var(--danger)", fontWeight: 500, marginTop: 2 }}>
-                  ร้านปิดอยู่ — ไม่สามารถส่งด่วนได้
-                </div>
-              ) : (
-                <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-                  ไม่มีช่วงเวลาว่างสำหรับวันนี้
-                </div>
-              )}
-            </div>
-          </label>
+              </label>
+            )}
 
-          {/* Standard option */}
-          <label
-            style={{ ...optionBtn(deliveryMethod === "standard", false), cursor: "pointer" }}
-          >
-            <input
-              type="radio"
-              name="delivery"
-              checked={deliveryMethod === "standard"}
-              onChange={() => { setDeliveryMethod("standard"); setExpressSlot(null); }}
-              style={{ accentColor: "var(--accent)", width: 18, height: 18, flexShrink: 0 }}
-            />
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: deliveryMethod === "standard" ? "var(--accent)" : "var(--ink-2)" }}><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>ส่งพัสดุ</div>
-              <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-                เลือกผู้ให้บริการขนส่งที่ต้องการ — ใช้เวลา 1–3 วัน
-              </div>
-            </div>
-          </label>
-        </div>
+            {/* Standard option — parcel (future-date only; can't arrive same-day). */}
+            {standardAvailable && (
+              <label style={{ ...optionBtn(deliveryMethod === "standard", false), cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name="delivery"
+                  checked={deliveryMethod === "standard"}
+                  onChange={() => setDeliveryMethod("standard")}
+                  style={{ accentColor: "var(--accent)", width: 18, height: 18, flexShrink: 0 }}
+                />
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: deliveryMethod === "standard" ? "var(--accent)" : "var(--ink-2)" }}><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>ส่งพัสดุ</div>
+                  <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
+                    ร้านเป็นผู้เลือกผู้ให้บริการขนส่ง — ใช้เวลา 1–3 วัน
+                  </div>
+                </div>
+              </label>
+            )}
 
-        {/* Express: time slot picker */}
-        {deliveryMethod === "express" && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>เลือกช่วงเวลารับของ <Req /></div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 6 }}>
-              {currentSlots.map((slot) => (
-                <button
-                  key={slot}
-                  type="button"
-                  onClick={() => setExpressSlot(slot)}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: 8,
-                    border: `1.5px solid ${expressSlot === slot ? "var(--accent)" : "var(--line)"}`,
-                    background: expressSlot === slot ? "var(--accent)" : "var(--surface)",
-                    color: expressSlot === slot ? "var(--accent-ink)" : "var(--ink)",
-                    fontSize: 14,
-                    fontWeight: expressSlot === slot ? 600 : 400,
-                    cursor: "pointer",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {slot.replace("-", " – ")}
-                </button>
-              ))}
-            </div>
-            {currentSlots.length === 0 && (
-              <div style={{ fontSize: 13, color: "var(--ink-3)", padding: "12px 0" }}>
-                ไม่มีช่วงเวลาว่างสำหรับวันนี้แล้ว
+            {isSameDayStart && expressAvailable && (
+              <div style={{ fontSize: 12, color: "var(--ink-3)", paddingLeft: 2 }}>
+                เช่าวันนี้จัดส่งได้เฉพาะแบบส่งด่วนเท่านั้น
               </div>
             )}
           </div>
         )}
 
-        {/* Standard: carrier picker */}
+        {/* Express: shop coordinates the exact pickup/delivery time after accepting. */}
+        {deliveryMethod === "express" && (
+          <div style={{ marginTop: 14, fontSize: 13, color: "var(--ink-3)", lineHeight: 1.6 }}>
+            ร้านจะติดต่อนัดเวลารับ–ส่งกับคุณหลังยืนยันการชำระเงิน
+          </div>
+        )}
+
+        {/* Standard: shop chooses the carrier after accepting the booking. */}
         {deliveryMethod === "standard" && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>เลือกผู้ให้บริการขนส่ง <Req /></div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              {CARRIERS.map((c) => (
-                <button
-                  key={c.key}
-                  type="button"
-                  onClick={() => setCarrier(c.key)}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: 8,
-                    border: `1.5px solid ${carrier === c.key ? "var(--accent)" : "var(--line)"}`,
-                    background: carrier === c.key ? "var(--accent)" : "var(--surface)",
-                    color: carrier === c.key ? "var(--accent-ink)" : "var(--ink)",
-                    fontSize: 13,
-                    fontWeight: carrier === c.key ? 600 : 400,
-                    cursor: "pointer",
-                    textAlign: "center",
-                  }}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-            {carrier === "other" && (
-              <div style={{ marginTop: 8 }}>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 5 }} htmlFor="other-carrier">
-                  ระบุผู้ให้บริการขนส่ง <Req />
-                </label>
-                <input
-                  id="other-carrier"
-                  type="text"
-                  value={otherCarrier}
-                  onChange={(e) => setOtherCarrier(e.target.value)}
-                  placeholder="เช่น Ninja Van, DHL หรือ Lalamove"
-                  className="input"
-                  maxLength={80}
-                />
-              </div>
-            )}
+          <div style={{ marginTop: 14, fontSize: 13, color: "var(--ink-3)", lineHeight: 1.6 }}>
+            ร้านจะเลือกผู้ให้บริการขนส่งและแจ้งเลขพัสดุให้คุณหลังยืนยันการชำระเงิน
           </div>
         )}
       </section>
@@ -573,15 +498,14 @@ export default function CheckoutForm({
         <div style={{ borderTop: "1px solid var(--line)", margin: "10px 0" }} />
         <Row label="ยอดเบื้องต้น" value={`฿${(rental + deposit).toLocaleString()}`} bold />
         <p style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 8, lineHeight: 1.5 }}>
-          วันที่ {fmtThai(startDate)} ถึง {fmtThai(endDate)} · ร้านจะใส่ค่าจัดส่งแล้วคุณค่อยจ่ายผ่าน QR PromptPay
+          วันที่ {fmtThai(startDate)}{startTime ? ` ${startTime}` : ""} ถึง {fmtThai(endDate)}{endTime ? ` ${endTime}` : ""}
+          {startTime && endTime ? "" : " · ทั้งวัน"} · ร้านจะใส่ค่าจัดส่งแล้วคุณค่อยจ่ายผ่าน QR PromptPay
         </p>
         {deliveryMethod && (
           <div style={{ fontSize: 12, color: "var(--ink-2)", marginTop: 6, padding: "6px 10px", background: "var(--bg)", borderRadius: 6 }}>
             {deliveryMethod === "express"
-              ? `ส่งด่วน · ช่วงเวลา ${expressSlot?.replace("-", " – ") ?? "—"}`
-              : carrier === "other"
-                ? `อื่นๆ · ${otherCarrier.trim() || "ยังไม่ระบุ"}`
-                : `${CARRIERS.find((c) => c.key === carrier)?.label ?? "ส่งพัสดุ"}`}
+              ? "ส่งด่วน · ร้านนัดเวลารับ–ส่ง"
+              : "ส่งพัสดุ · ร้านเลือกขนส่ง"}
           </div>
         )}
       </section>
@@ -605,18 +529,6 @@ export default function CheckoutForm({
         <div style={{ fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
           กรุณาเลือกวิธีจัดส่ง
-        </div>
-      )}
-      {deliveryMethod === "express" && !expressSlot && (
-        <div style={{ fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-          กรุณาเลือกช่วงเวลารับของ
-        </div>
-      )}
-      {deliveryMethod === "standard" && (!carrier || (carrier === "other" && !otherCarrier.trim())) && (
-        <div style={{ fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-          {carrier === "other" ? "กรุณาระบุผู้ให้บริการขนส่ง" : "กรุณาเลือกผู้ให้บริการขนส่ง"}
         </div>
       )}
       {deliveryComplete && !selectedId && (

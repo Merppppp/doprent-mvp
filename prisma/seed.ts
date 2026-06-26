@@ -64,26 +64,37 @@ export async function seedBase() {
     create: { key: "occasion", label: "โอกาสใช้งาน", sortOrder: 0 },
   });
 
+  // Active occasion tags (display order). Retired ones are handled below.
   const occasionTags = [
-    { key: "engagement", label: "งานหมั้น" },
     { key: "wedding", label: "งานแต่ง" },
-    { key: "cocktail", label: "ค็อกเทล" },
     { key: "evening", label: "ราตรี" },
-    { key: "gala", label: "กาล่า" },
     { key: "party", label: "ปาร์ตี้" },
     { key: "work", label: "ทำงาน" },
     { key: "casual", label: "ลำลอง" },
     { key: "thai", label: "ชุดไทย" },
     { key: "graduation", label: "รับปริญญา" },
     { key: "costume", label: "คอสตูม/แฟนซี" },
+    { key: "swimwear", label: "ชุดว่ายน้ำ" },
+    { key: "suit", label: "ชุดสูท" },
+    { key: "travel_dress", label: "เดรสไปเที่ยว" },
+    { key: "winter", label: "ชุดกันหนาว" },
+    { key: "vietnamese", label: "ชุดเวียดนาม" },
   ];
   for (const t of occasionTags) {
     await db.tag.upsert({
       where: { key: t.key },
-      update: {},
+      update: { label: t.label, isActive: true },
       create: { ...t, tagGroupId: occasionGroup.id },
     });
   }
+
+  // Retired occasion tags — keep the rows so existing product_tags stay intact,
+  // but hide them from filters/forms by deactivating.
+  const retiredOccasionKeys = ["engagement", "cocktail", "gala"];
+  await db.tag.updateMany({
+    where: { key: { in: retiredOccasionKeys } },
+    data: { isActive: false },
+  });
 
   // Bind occasion to dress product type (mirrors 20260613190000 migration INSERT)
   await db.productTypeTagGroup.upsert({

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { withActor } from "@/lib/db-context";
+import { ACTIVE_STATUSES } from "@/lib/bookings";
 
 async function verifyProductOwner(productId: string): Promise<{ ok: boolean; error?: string; userId?: string }> {
   const user = await getCurrentUser();
@@ -20,14 +21,16 @@ async function verifyProductOwner(productId: string): Promise<{ ok: boolean; err
 }
 
 /**
- * Toggle a blackout date for a product or a specific variant.
- * variantId = null → product-wide blackout (blocks all variants).
- * variantId = uuid → variant-specific blackout.
+ * Toggle a blackout date for a product, a specific variant, or a single unit.
+ * variantId = null, unitId = null → product-wide blackout (blocks all variants).
+ * variantId = uuid, unitId = null → variant-specific blackout (blocks one size).
+ * unitId = uuid (variantId set)   → unit-specific blackout (blocks one code).
  */
 export async function toggleBlackout(
   productId: string,
   date: string,
   variantId?: string | null,
+  unitId?: string | null,
 ): Promise<{ ok: boolean; blocked: boolean; error?: string }> {
   const owner = await verifyProductOwner(productId);
   if (!owner.ok) return { ok: false, blocked: false, error: owner.error };
@@ -37,15 +40,18 @@ export async function toggleBlackout(
   }
 
   const dateObj = new Date(date);
+  const uid = unitId ?? null;
   const vid = variantId ?? null;
 
-  const existing = vid
-    ? await db.productBlackoutDate.findFirst({
-        where: { productId, variantId: vid, date: dateObj },
-      })
-    : await db.productBlackoutDate.findFirst({
-        where: { productId, variantId: null, date: dateObj },
-      });
+  // A unit blackout must carry its owning variant id so the storefront can map
+  // it back to a size when reducing that size's free count.
+  if (uid && !vid) {
+    return { ok: false, blocked: false, error: "ต้องระบุไซซ์ของรหัสที่จะปิด" };
+  }
+
+  const existing = await db.productBlackoutDate.findFirst({
+    where: { productId, variantId: vid, unitId: uid, date: dateObj },
+  });
 
   return withActor(owner.userId, async () => {
     if (existing) {
@@ -54,12 +60,80 @@ export async function toggleBlackout(
       return { ok: true, blocked: false };
     } else {
       await db.productBlackoutDate.create({
-        data: { productId, variantId: vid, date: dateObj },
+        data: { productId, variantId: vid, unitId: uid, date: dateObj },
       });
       revalidatePath(`/product/${productId}`);
       return { ok: true, blocked: true };
     }
   });
+}
+
+export type VariantDayAvailability = {
+  variantId: string;
+  size: string;
+  quantity: number;
+  available: boolean;
+  /** Units physically out on the chosen date. */
+  out: number;
+  /** quantity − out, floored at 0. */
+  free: number;
+};
+
+/**
+ * Seller-only: how many units of each size are free on a specific date.
+ * "Out" counts physical bookings (ACTIVE_STATUSES incl. renting) whose
+ * [startDate, endDate] span includes the date. Auth-guarded by product owner.
+ */
+export async function getVariantAvailabilityByDate(
+  productId: string,
+  date: string,
+): Promise<{ ok: boolean; date?: string; variants?: VariantDayAvailability[]; error?: string }> {
+  const owner = await verifyProductOwner(productId);
+  if (!owner.ok) return { ok: false, error: owner.error };
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { ok: false, error: "รูปแบบวันที่ไม่ถูกต้อง" };
+  }
+  const dateObj = new Date(date + "T00:00:00.000Z");
+
+  const variants = await db.productVariant.findMany({
+    where: { productId },
+    orderBy: { size: "asc" },
+    select: { id: true, size: true, quantity: true, available: true },
+  });
+
+  const outRows = await db.bookingItem.findMany({
+    where: {
+      productId,
+      variantId: { not: null },
+      booking: {
+        status: { in: ACTIVE_STATUSES },
+        startDate: { lte: dateObj },
+        endDate: { gte: dateObj },
+      },
+    },
+    select: { variantId: true },
+  });
+  const outMap: Record<string, number> = {};
+  for (const r of outRows) {
+    if (r.variantId) outMap[r.variantId] = (outMap[r.variantId] ?? 0) + 1;
+  }
+
+  return {
+    ok: true,
+    date,
+    variants: variants.map((v) => {
+      const out = outMap[v.id] ?? 0;
+      return {
+        variantId: v.id,
+        size: v.size,
+        quantity: v.quantity,
+        available: v.available,
+        out,
+        free: Math.max(0, v.quantity - out),
+      };
+    }),
+  };
 }
 
 export async function setBlackouts(

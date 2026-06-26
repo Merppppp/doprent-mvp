@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { dressLimitFor, TIER_LABEL } from "@/lib/tiers";
 import { type AdsTier } from "@/lib/types";
+import { parseBusinessHours } from "@/lib/hours";
 
 export const dynamic = "force-dynamic";
 
@@ -21,12 +22,14 @@ const STAGES = {
   payment_review: { label: "ตรวจสลิป", color: "var(--cobalt)", hint: "ลูกค้าจ่ายแล้ว รอยืนยัน" },
   confirmed: { label: "ยืนยันแล้ว", color: "var(--success)", hint: "พร้อมจัดส่ง" },
   renting: { label: "กำลังเช่า", color: "var(--info, #3b82f6)", hint: "ลูกค้ากำลังเช่าอยู่" },
+  awaiting_return: { label: "รอคืนของ", color: "var(--warn)", hint: "ครบกำหนดแล้ว รอรับชุดคืน" },
   returned: { label: "รอตรวจคืน", color: "var(--save, #d6492f)", hint: "ตรวจชุด + คืนมัดจำ" },
 } as const;
 
 const TODO_ORDER: (keyof typeof STAGES)[] = [
   "booking_pending",
   "payment_review",
+  "awaiting_return",
   "returned",
   "waiting_for_payment",
   "confirmed",
@@ -39,6 +42,7 @@ const ALL_VISIBLE: (keyof typeof STAGES | "completed" | "cancelled")[] = [
   "payment_review",
   "confirmed",
   "renting",
+  "awaiting_return",
   "returned",
   "completed",
   "cancelled",
@@ -105,6 +109,10 @@ export default async function SellerDashboard({
   const atLimit = productLimit != null && productRows.length >= productLimit;
   const canAddProduct = shopRaw.kycStatus === "submitted" || shopRaw.kycStatus === "verified";
 
+  // Business hours not configured (null or legacy free-text) → renters can't
+  // pick a pickup time slot at checkout. Nudge the seller to set it.
+  const hoursUnset = parseBusinessHours(shopRaw.hours) === null;
+
   // KYC status
   const justSubmitted = searchParams?.kyc === "submitted";
   const kycLabel: Record<string, { text: string; color: string }> = {
@@ -158,6 +166,34 @@ export default async function SellerDashboard({
         >
           KYC อยู่ระหว่างตรวจสอบ สามารถเพิ่มสินค้าได้เลยระหว่างรอ
         </div>
+      )}
+
+      {/* ── Business-hours not set nudge (informational) ── */}
+      {hoursUnset && (
+        <Link
+          href="/sell/edit#hours"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            padding: "11px 14px",
+            background: "var(--info-soft)",
+            border: "1px solid color-mix(in oklch, var(--info) 30%, transparent)",
+            borderRadius: 10,
+            marginBottom: 18,
+            fontSize: 12.5,
+            color: "var(--ink-2)",
+            textDecoration: "none",
+          }}
+        >
+          <span>
+            ตั้ง <strong>เวลาทำการ</strong> ของร้าน เพื่อให้ลูกค้าเห็นเวลาเปิด–ปิด และเปิดรับส่งด่วนภายในวันได้
+          </span>
+          <span style={{ fontWeight: 600, color: "var(--accent)", whiteSpace: "nowrap" }}>
+            ตั้งค่าเลย →
+          </span>
+        </Link>
       )}
 
       {/* ── Greeting ── */}

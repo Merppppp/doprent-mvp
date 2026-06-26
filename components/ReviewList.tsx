@@ -4,7 +4,7 @@ function Stars({ rating }: { rating: number }) {
   return (
     <span>
       {[1, 2, 3, 4, 5].map((s) => (
-        <span key={s} style={{ color: s <= rating ? "#F5A623" : "var(--line)", fontSize: 14 }}>
+        <span key={s} style={{ color: s <= rating ? "var(--gold)" : "var(--line)", fontSize: 14 }}>
           ★
         </span>
       ))}

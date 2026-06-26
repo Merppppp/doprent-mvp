@@ -32,7 +32,7 @@ export default function ReviewAdminRow({ review }: { review: RowData }) {
       <div style={{ flex: 1 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
           <span style={{ fontWeight: 600, fontSize: 14 }}>{review.shop_name}</span>
-          <span style={{ fontSize: 13, color: "#F5A623" }}>{"★".repeat(review.rating)}</span>
+          <span style={{ fontSize: 13, color: "var(--gold)" }}>{"★".repeat(review.rating)}</span>
           <span style={{ fontSize: 12, color: "var(--ink-3)" }}>{new Date(review.created_at).toLocaleDateString("th-TH")}</span>
         </div>
         {review.comment && <p style={{ fontSize: 13, margin: "4px 0", color: "var(--ink-2)" }}>{review.comment}</p>}

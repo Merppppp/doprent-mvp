@@ -9,6 +9,7 @@ import NavbarSearch from "./NavbarSearch";
 import UserMenu from "./UserMenu";
 import DetailsAutoClose from "./DetailsAutoClose";
 import LocaleToggle from "./LocaleToggle";
+import CartIcon from "./CartIcon";
 import { t } from "@/lib/i18n";
 import { getServerLocale } from "@/lib/i18n-server";
 
@@ -53,7 +54,7 @@ export default async function Header() {
 
   return (
     <header
-      className="sticky top-0 z-40 bg-[rgba(10,76,76,0.97)] backdrop-blur-[12px] border-b border-b-[rgba(10,76,76,0.5)] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.25),0_1px_3px_rgba(0,0,0,0.1)]"
+      className="sticky top-0 z-40 bg-[color-mix(in_oklch,var(--accent)_97%,transparent)] backdrop-blur-[12px] border-b border-b-[color-mix(in_oklch,var(--accent)_50%,transparent)] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.25),0_1px_3px_rgba(0,0,0,0.1)]"
     >
       {/* ═══ TOP ROW ═══ (28px — utility links) */}
       <div
@@ -138,7 +139,7 @@ export default async function Header() {
         <Link
           href="/"
           aria-label="doprent"
-          style={{ display: "inline-flex", alignItems: "center", flexShrink: 0, color: "#fff" }}
+          style={{ display: "inline-flex", alignItems: "center", flexShrink: 0, color: "var(--on-dark)" }}
         >
           <Logo size={26} />
         </Link>
@@ -162,7 +163,7 @@ export default async function Header() {
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18"/><path d="M16 10a4 4 0 01-8 0"/></svg>
                 {badges.renter > 0 && (
-                  <span style={{ position: "absolute", top: 2, right: 2, minWidth: 16, height: 16, borderRadius: 999, background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 700, display: "grid", placeItems: "center", padding: "0 4px", lineHeight: 1 }}>
+                  <span style={{ position: "absolute", top: 2, right: 2, minWidth: 16, height: 16, borderRadius: 999, background: "var(--danger)", color: "var(--on-dark)", fontSize: 10, fontWeight: 700, display: "grid", placeItems: "center", padding: "0 4px", lineHeight: 1 }}>
                     {badges.renter > 9 ? "9+" : badges.renter}
                   </span>
                 )}
@@ -177,6 +178,8 @@ export default async function Header() {
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill={savedCount > 0 ? "rgba(255,255,255,0.85)" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
               </Link>
+              {/* Cart icon (client component — reads localStorage for badge count) */}
+              <CartIcon />
             </>
           ) : null}
           {user ? (
@@ -199,8 +202,8 @@ export default async function Header() {
                 style={{
                   fontSize: 13,
                   fontWeight: 600,
-                  color: "#0A4C4C",
-                  background: "#fff",
+                  color: "var(--accent)",
+                  background: "var(--on-dark)",
                   padding: "0 16px",
                   height: 38,
                   display: "inline-flex",
@@ -208,7 +211,7 @@ export default async function Header() {
                   borderRadius: 6,
                   whiteSpace: "nowrap",
                   textDecoration: "none",
-                  border: "1px solid #fff",
+                  border: "1px solid var(--on-dark)",
                 }}
               >
                 {t("menu.shopDashboard", locale)}
@@ -219,7 +222,7 @@ export default async function Header() {
                   style={{
                     fontSize: 13,
                     fontWeight: 600,
-                    color: "#fff",
+                    color: "var(--on-dark)",
                     background: "transparent",
                     padding: "0 12px",
                     height: 38,
@@ -242,8 +245,8 @@ export default async function Header() {
                 style={{
                   fontSize: 13,
                   fontWeight: 600,
-                  color: "#0A4C4C",
-                  background: "#fff",
+                  color: "var(--accent)",
+                  background: "var(--on-dark)",
                   padding: "0 16px",
                   height: 38,
                   display: "inline-flex",
@@ -251,7 +254,7 @@ export default async function Header() {
                   borderRadius: 6,
                   whiteSpace: "nowrap",
                   textDecoration: "none",
-                  border: "1px solid #fff",
+                  border: "1px solid var(--on-dark)",
                 }}
               >
                 {t("nav.login", locale)}
@@ -357,12 +360,12 @@ export default async function Header() {
       <style dangerouslySetInnerHTML={{ __html: `
         header details > div a { color: var(--ink) !important; }
         header details > div button { color: var(--ink) !important; }
-        .hdr-sell-link:hover { color: #fff !important; }
-        .hdr-top-row a:hover { color: #fff !important; }
-        .hdr-trend-link:hover { color: #fff !important; }
+        .hdr-sell-link:hover { color: var(--on-dark) !important; }
+        .hdr-top-row a:hover { color: var(--on-dark) !important; }
+        .hdr-trend-link:hover { color: var(--on-dark) !important; }
         .hdr-trending::-webkit-scrollbar { display: none; }
         .hdr-cat-link:hover { background: rgba(255,255,255,0.12); }
-        .hdr-cat-active { background: rgba(255,255,255,0.18) !important; color: #fff !important; }
+        .hdr-cat-active { background: rgba(255,255,255,0.18) !important; color: var(--on-dark) !important; }
         .hdr-cat-details > summary::-webkit-details-marker { display: none; }
         .hdr-cat-details > summary::marker { content: ""; }
         .hdr-cat-dropdown a:hover { background: var(--bg-hover, rgba(0,0,0,0.04)); }
@@ -414,11 +417,10 @@ const QUICK_OCCASIONS = [
   { key: "evening",  th: "ราตรี",       en: "Evening",  href: "/?occasion=evening" },
   { key: "thai",     th: "ชุดไทย",      en: "Thai",     href: "/?occasion=thai" },
   { key: "suit",     th: "ชุดสูท",      en: "Suit",     href: "/?type=suit" },
-  { key: "swimwear", th: "ชุดว่ายน้ำ",  en: "Swimwear", href: "/?type=swimwear" },
 ];
 
 const catTriggerStyle: React.CSSProperties = {
-  color: "#fff",
+  color: "var(--on-dark)",
   background: "rgba(255,255,255,0.16)",
   textDecoration: "none",
   fontSize: 12.5,

@@ -74,6 +74,18 @@ export function ymdUtc(d: Date): string {
 }
 
 /**
+ * Today's date as "YYYY-MM-DD" in the **Asia/Bangkok** wall-clock (UTC+7).
+ *
+ * Server code runs in UTC, so `new Date().toISOString().slice(0,10)` is wrong
+ * for ~7 hours every night (it reports tomorrow/yesterday relative to a Thai
+ * user). Use this whenever "today" must match what a customer in Thailand sees
+ * — e.g. seller "booked today" counts and availability day-views.
+ */
+export function todayBkk(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
+}
+
+/**
  * "YYYY-MM-DD" → "DD/MM/YYYY".
  * Returns the input unchanged when it cannot be parsed.
  */
@@ -81,6 +93,23 @@ export function fmtThai(s: string): string {
   const [y, m, d] = s.split("-");
   if (!y || !m || !d) return s;
   return `${d}/${m}/${y}`;
+}
+
+/**
+ * Human label for a rental window's date range plus optional pickup/return
+ * time-of-day. When both times are null it reads as a full-day rental.
+ * Example: "15/03/2024 09:00 – 17/03/2024 18:00" or "15/03/2024 – 17/03/2024 · ทั้งวัน".
+ */
+export function fmtRentalWindow(
+  startDate: string,
+  endDate: string,
+  startTime?: string | null,
+  endTime?: string | null,
+): string {
+  if (startTime && endTime) {
+    return `${fmtThai(startDate)} ${startTime} – ${fmtThai(endDate)} ${endTime}`;
+  }
+  return `${fmtThai(startDate)} – ${fmtThai(endDate)} · ทั้งวัน`;
 }
 
 /**

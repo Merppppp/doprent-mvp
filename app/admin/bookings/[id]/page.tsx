@@ -5,6 +5,7 @@ import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
 import { getSignedPrivateUrl } from "@/lib/r2";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import AdminBookingActions from "./AdminBookingActions";
+import SlipImage from "@/components/SlipImage";
 import type { BookingStatus } from "@/lib/types";
 import { fmtThai as _fmtThai, ymdUtc } from "@/lib/date-th";
 
@@ -26,11 +27,13 @@ export default async function AdminBookingDetail({ params }: { params: { id: str
   const b = await db.booking.findUnique({
     where: { id: params.id },
     include: {
-      product: { select: { name: true, slug: true } },
+      items: { orderBy: { createdAt: "asc" as const }, take: 1, select: { product: { select: { name: true, slug: true } } } },
       shop: { select: { name: true, slug: true, promptpayId: true } },
       renter: { select: { fullName: true, email: true } },
     },
   });
+  // Note: refund scalar fields (refundStatus, refundAmount, refundNote,
+  // refundedAt, refundSlipPath) are available on `b` directly via the include.
 
   if (!b) {
     return (
@@ -48,6 +51,7 @@ export default async function AdminBookingDetail({ params }: { params: { id: str
   // Slip is private in R2 — sign a short-lived URL (same mechanism as
   // GET /api/bookings/[id]/slip-url, which also allows admin).
   const slipUrl = b.slipPath ? await getSignedPrivateUrl(b.slipPath) : null;
+  const refundSlipUrl = b.refundSlipPath ? await getSignedPrivateUrl(b.refundSlipPath) : null;
 
   const total = amountDue({ rental_total: b.rentalTotal, deposit: b.deposit, shipping_fee: b.shippingFee });
 
@@ -59,7 +63,7 @@ export default async function AdminBookingDetail({ params }: { params: { id: str
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "14px 0 6px" }}>
         <h1 className="page-title" style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em" }}>
-          {b.product?.name ?? "การจอง"}
+          {b.items[0]?.product?.name ?? "การจอง"}
         </h1>
         <BookingStatusBadge status={status} />
       </div>
@@ -118,7 +122,29 @@ export default async function AdminBookingDetail({ params }: { params: { id: str
         <div style={{ ...card, fontSize: 14, color: "var(--ink-3)" }}>ยังไม่มีสลิปการโอน</div>
       )}
 
-      <AdminBookingActions bookingId={b.id} status={status} />
+      {/* Refund status card */}
+      {(b.refundStatus === "required" || b.refundStatus === "refunded") ? (
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 mb-4">
+          <div className="font-semibold text-sm mb-3">การคืนเงิน</div>
+          <Row
+            label="สถานะ"
+            value={b.refundStatus === "refunded" ? "คืนเงินแล้ว ✓" : "รอดำเนินการคืนเงิน"}
+          />
+          {b.refundAmount != null ? (
+            <Row label="จำนวน" value={`฿${b.refundAmount.toLocaleString()}`} />
+          ) : null}
+          {b.refundNote ? <Row label="หมายเหตุ" value={b.refundNote} /> : null}
+          {b.refundedAt ? <Row label="โอนคืนเมื่อ" value={fmtDateTime(b.refundedAt)} /> : null}
+          {refundSlipUrl ? (
+            <div className="mt-3">
+              <div className="text-xs text-[var(--ink-3)] mb-2">สลิปยืนยันการคืนเงิน</div>
+              <SlipImage src={refundSlipUrl} contain />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <AdminBookingActions bookingId={b.id} status={status} refundStatus={b.refundStatus ?? null} />
     </div>
   );
 }

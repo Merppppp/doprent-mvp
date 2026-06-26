@@ -13,6 +13,8 @@ import {
   defaultBusinessHours,
   serializeBusinessHours,
   closedWeekdaysFromHours,
+  DEFAULT_FROM,
+  DEFAULT_TO,
 } from "@/lib/hours";
 
 type ClosedDateRow = { date: string; note: string };
@@ -61,6 +63,7 @@ type Props = {
     max_rental_days?: number | null;
     return_window_days?: number;
     buffer_days_after?: number;
+    buffer_days_before?: number;
     closed_weekdays?: number[];
     closed_dates?: ClosedDateRow[];
   };
@@ -77,8 +80,15 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
   // (with existing closed weekdays preserved) and the old text is shown as a note.
   const parsedHours = parseBusinessHours(boutique.hours);
   const legacyHoursText = !parsedHours && boutique.hours?.trim() ? boutique.hours.trim() : null;
+  // Never configured (null / empty, no legacy text either) → seed every day CLOSED
+  // so the form honestly reflects "not set yet" instead of masquerading as open
+  // 10:00–19:00. A warning banner prompts the seller to configure and save.
+  const hoursUnset = !parsedHours && !legacyHoursText;
   const [hoursDays, setHoursDays] = useState<BusinessHours>(
-    parsedHours ?? defaultBusinessHours(boutique.closed_weekdays ?? []),
+    parsedHours ??
+      (hoursUnset
+        ? defaultBusinessHours([0, 1, 2, 3, 4, 5, 6])
+        : defaultBusinessHours(boutique.closed_weekdays ?? [])),
   );
 
   function setDayOpen(idx: number, open: boolean) {
@@ -87,6 +97,33 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
   function setDayTime(idx: number, field: "from" | "to", value: string) {
     setHoursDays((prev) => prev.map((d, i) => (i === idx ? { ...d, [field]: value } : d)));
   }
+  // Open 24 hours = 00:00–23:59 (toggle back to the default window).
+  function setDay24h(idx: number, on: boolean) {
+    setHoursDays((prev) =>
+      prev.map((d, i) =>
+        i === idx
+          ? on
+            ? { ...d, open: true, from: "00:00", to: "23:59" }
+            : { ...d, from: DEFAULT_FROM, to: DEFAULT_TO }
+          : d,
+      ),
+    );
+  }
+  // Quick presets — set which weekdays are open (keeps each day's existing
+  // from/to times; uses the default window for days currently with no time).
+  function applyOpenDays(openIdx: number[]) {
+    const open = new Set(openIdx);
+    setHoursDays((prev) =>
+      prev.map((d, i) => ({
+        open: open.has(i),
+        from: d.from || DEFAULT_FROM,
+        to: d.to || DEFAULT_TO,
+      })),
+    );
+  }
+  const presetEveryDay = () => applyOpenDays([0, 1, 2, 3, 4, 5, 6]);
+  const presetWeekdays = () => applyOpenDays([1, 2, 3, 4, 5]);
+  const presetNone = () => applyOpenDays([]);
 
   // Booking policy state
   const [closedDates, setClosedDates] = useState<ClosedDateRow[]>(boutique.closed_dates ?? []);
@@ -252,7 +289,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
       <Labeled label="ที่อยู่ร้าน">
         <input type="text" name="address" defaultValue={boutique.address ?? ""} className="input input-surface" />
       </Labeled>
-      <div>
+      <div id="hours" style={{ scrollMarginTop: 80 }}>
         <label style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
           วันและเวลาทำการ
         </label>
@@ -277,8 +314,38 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
           </div>
         ) : null}
 
+        {hoursUnset ? (
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--warn-ink, #92400e)",
+              background: "var(--warn-soft, #fef3c7)",
+              border: "1px solid var(--warn-line, #fde68a)",
+              borderRadius: 6,
+              padding: "8px 10px",
+              marginBottom: 12,
+              lineHeight: 1.5,
+            }}
+          >
+            ยังไม่ได้ตั้งเวลาทำการ — ทุกวันถูกตั้งเป็น “ปิด” ไว้ก่อน กรุณาเปิดวันที่ให้บริการแล้วกำหนดเวลา จากนั้นกดบันทึก เพื่อให้ลูกค้าเห็นเวลาเปิด–ปิด และเปิดรับส่งด่วนภายในวันได้
+          </div>
+        ) : null}
+
         {/* Hidden field carries the serialized schedule (set in onSubmit too). */}
         <input type="hidden" name="hours" value={serializeBusinessHours(hoursDays)} readOnly />
+
+        {/* Quick presets — one tap to set common weekly patterns. */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          <button type="button" onClick={presetEveryDay} className="btn btn-outline" style={{ fontSize: 13, padding: "6px 12px" }}>
+            เปิดทุกวัน
+          </button>
+          <button type="button" onClick={presetWeekdays} className="btn btn-outline" style={{ fontSize: 13, padding: "6px 12px" }}>
+            จันทร์–ศุกร์
+          </button>
+          <button type="button" onClick={presetNone} className="btn btn-outline" style={{ fontSize: 13, padding: "6px 12px" }}>
+            ปิดทุกวัน
+          </button>
+        </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {WEEKDAYS_MON_FIRST.map(({ idx, th }) => {
@@ -325,7 +392,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
                       width: 20,
                       height: 20,
                       borderRadius: "50%",
-                      background: "#fff",
+                      background: "var(--on-dark)",
                       transition: "left .15s",
                       boxShadow: "0 1px 2px rgba(0,0,0,0.25)",
                     }}
@@ -335,21 +402,41 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
                 <span style={{ width: 72, fontSize: 14, fontWeight: 500, flexShrink: 0 }}>{th}</span>
 
                 {open ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <input
-                      type="time"
-                      value={day.from}
-                      onChange={(e) => setDayTime(idx, "from", e.target.value)}
-                      className="input input-surface" style={{ width: 120, padding: "7px 10px" }}
-                    />
-                    <span style={{ color: "var(--ink-3)" }}>–</span>
-                    <input
-                      type="time"
-                      value={day.to}
-                      onChange={(e) => setDayTime(idx, "to", e.target.value)}
-                      className="input input-surface" style={{ width: 120, padding: "7px 10px" }}
-                    />
-                  </div>
+                  (() => {
+                    const is24 = day.from === "00:00" && day.to === "23:59";
+                    return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        {is24 ? (
+                          <span style={{ fontSize: 13, color: "var(--ink-2)", padding: "7px 0" }}>เปิด 24 ชั่วโมง</span>
+                        ) : (
+                          <>
+                            <input
+                              type="time"
+                              value={day.from}
+                              onChange={(e) => setDayTime(idx, "from", e.target.value)}
+                              className="input input-surface" style={{ width: 120, padding: "7px 10px" }}
+                            />
+                            <span style={{ color: "var(--ink-3)" }}>–</span>
+                            <input
+                              type="time"
+                              value={day.to}
+                              onChange={(e) => setDayTime(idx, "to", e.target.value)}
+                              className="input input-surface" style={{ width: 120, padding: "7px 10px" }}
+                            />
+                          </>
+                        )}
+                        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--ink-2)", cursor: "pointer", userSelect: "none" }}>
+                          <input
+                            type="checkbox"
+                            checked={is24}
+                            onChange={(e) => setDay24h(idx, e.target.checked)}
+                            style={{ width: 16, height: 16, cursor: "pointer" }}
+                          />
+                          24 ชั่วโมง
+                        </label>
+                      </div>
+                    );
+                  })()
                 ) : (
                   <span style={{ fontSize: 13, color: "var(--ink-3)" }}>ปิด</span>
                 )}
@@ -501,11 +588,11 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
           <div
             style={{
               padding: "10px 14px",
-              background: "#FFFBEB",
-              border: "1px solid #F59E0B",
+              background: "var(--warn-soft)",
+              border: "1px solid var(--warn)",
               borderRadius: 6,
               fontSize: 13,
-              color: "#92400E",
+              color: "var(--warn-ink)",
               marginBottom: 14,
             }}
           >
@@ -761,12 +848,21 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
               className="input input-surface"
             />
           </Labeled>
+          <Labeled label="บัฟเฟอร์ก่อนเช่า (วัน, ส่งด่วนไม่ใช้)">
+            <input
+              type="number"
+              name="buffer_days_before"
+              min={0}
+              defaultValue={boutique.buffer_days_before ?? 0}
+              className="input input-surface"
+            />
+          </Labeled>
           <Labeled label="บัฟเฟอร์หลังเช่า (วัน)">
             <input
               type="number"
               name="buffer_days_after"
               min={0}
-              defaultValue={boutique.buffer_days_after ?? 2}
+              defaultValue={boutique.buffer_days_after ?? 1}
               className="input input-surface"
             />
           </Labeled>
@@ -868,7 +964,20 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
         </div>
       ) : null}
 
-      <div style={{ display: "flex", gap: 8 }}>
+      <div
+        style={{
+          position: "sticky",
+          bottom: 0,
+          zIndex: 10,
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 8,
+          padding: "12px 0",
+          marginTop: 6,
+          background: "var(--bg)",
+          borderTop: "1px solid var(--line)",
+        }}
+      >
         <button type="submit" className="btn btn-dark" disabled={submitting} style={{ padding: "12px 22px" }}>
           {submitting ? "กำลังบันทึก…" : "บันทึกการแก้ไข"}
         </button>

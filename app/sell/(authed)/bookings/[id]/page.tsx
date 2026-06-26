@@ -10,8 +10,10 @@ import BookingStatusBadge from "@/components/BookingStatusBadge";
 import TrustBadge from "@/components/TrustBadge";
 import SellerBookingActions, { type ChannelOption } from "@/components/SellerBookingActions";
 import SellerAddressChange from "@/components/SellerAddressChange";
+import SlipImage from "@/components/SlipImage";
 import { PAYMENT_CHANNEL_LABEL } from "@/lib/payments";
-import { fmtThai } from "@/lib/date-th";
+import { fmtRentalWindow } from "@/lib/date-th";
+import { sizeLabel } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,9 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
   const addrSlipUrl = b.addr_change_slip_path
     ? await getSignedPrivateUrl(b.addr_change_slip_path)
     : null;
+
+  // Sign the refund slip URL if one has been uploaded.
+  const refundSlipUrl = b.refund_slip_path ? await getSignedPrivateUrl(b.refund_slip_path) : null;
 
   const renterTrust = await getTrustScore(b.renter_id);
   const timeline = await getBookingTimeline(b.id);
@@ -77,7 +82,8 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
       <p style={{ color: "var(--ink-2)", fontSize: 14, marginBottom: 20 }}>{meta.sellerHint}</p>
 
       <div style={card}>
-        <Row label="วันเช่า" value={`${fmtThai(b.start_date)} – ${fmtThai(b.end_date)}`} />
+        {b.dress_size ? <Row label="ไซซ์" value={sizeLabel(b.dress_size)} /> : null}
+        <Row label="วันเช่า" value={fmtRentalWindow(b.start_date, b.end_date, b.start_time, b.end_time)} />
         {/* Renter row: recipient name + reliability badge */}
         <div style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "4px 0", fontSize: 14 }}>
           <span style={{ color: "var(--ink-3)", flexShrink: 0 }}>ผู้เช่า / ผู้รับ</span>
@@ -88,6 +94,21 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
           </span>
         </div>
         <Row label="ที่อยู่จัดส่ง" value={b.address_text ?? "-"} />
+        {b.delivery_carrier ? <Row label="ขนส่ง" value={b.delivery_carrier} /> : null}
+        {b.tracking_number ? <Row label="เลขพัสดุ" value={b.tracking_number} /> : null}
+        {b.tracking_url ? (
+          <div className="flex justify-between gap-4 py-1 text-sm">
+            <span className="shrink-0 text-[var(--ink-3)]">ลิงก์ติดตาม</span>
+            <a
+              href={b.tracking_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="break-all text-right font-medium text-[var(--accent)] underline"
+            >
+              ติดตามพัสดุ
+            </a>
+          </div>
+        ) : null}
       </div>
 
       <div style={card}>
@@ -108,14 +129,41 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
       {slipUrl ? (
         <div style={{ ...card }}>
           <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>สลิปการโอน</div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={slipUrl} alt="สลิป" style={{ width: "100%", borderRadius: 8, border: "1px solid var(--line)" }} />
+          <SlipImage src={slipUrl} />
         </div>
       ) : null}
 
-      {b.cancel_reason ? (
+      {/* Only show the standing reason while it reflects the CURRENT state.
+          Once the booking moves on (e.g. a cancel-request was rejected and it's
+          renting again) the reason lives in the timeline history below, not here. */}
+      {b.cancel_reason && REASON_VISIBLE_STATUSES.has(b.status) ? (
         <div style={{ ...card, fontSize: 14, color: "var(--ink-2)" }}>
           <b>เหตุผล:</b> {b.cancel_reason}
+        </div>
+      ) : null}
+
+      {/* Refund status — read-only for the seller */}
+      {(b.refund_status === "required" || b.refund_status === "refunded") ? (
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 mb-4">
+          <div className="font-semibold text-sm mb-2">การคืนเงิน</div>
+          <div className="flex justify-between gap-4 py-1 text-sm">
+            <span className="text-[var(--ink-3)] shrink-0">สถานะ</span>
+            <span className={`font-semibold ${b.refund_status === "refunded" ? "text-[var(--success)]" : "text-[var(--ink-2)]"}`}>
+              {b.refund_status === "refunded" ? "คืนเงินแล้ว ✓" : "กำลังดำเนินการคืนเงิน"}
+            </span>
+          </div>
+          {b.refund_amount ? (
+            <div className="flex justify-between gap-4 py-1 text-sm">
+              <span className="text-[var(--ink-3)] shrink-0">จำนวน</span>
+              <span className="font-medium">฿{b.refund_amount.toLocaleString()}</span>
+            </div>
+          ) : null}
+          {refundSlipUrl && b.refund_status === "refunded" ? (
+            <div className="mt-3">
+              <div className="text-xs text-[var(--ink-3)] mb-2">สลิปยืนยันการคืนเงิน</div>
+              <SlipImage src={refundSlipUrl} contain />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -144,6 +192,7 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
         status={b.status}
         channels={channels}
         defaultMethod={b.boutique_default_payment_method}
+        deliveryMethod={b.delivery_method}
       />
 
       {timeline.length > 0 ? (
@@ -152,7 +201,7 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             <TimelineRow label="สร้างการจอง" at={b.created_at} isFirst />
             {timeline.map((ev, i) => (
-              <TimelineRow key={i} label={ev.label} at={ev.at} isLast={i === timeline.length - 1} />
+              <TimelineRow key={i} label={ev.label} at={ev.at} note={ev.note} isLast={i === timeline.length - 1} />
             ))}
           </div>
         </div>
@@ -205,7 +254,7 @@ function fmtThaiDateTime(iso: string): string {
   });
 }
 
-function TimelineRow({ label, at, isFirst, isLast }: { label: string; at: string; isFirst?: boolean; isLast?: boolean }) {
+function TimelineRow({ label, at, note, isFirst, isLast }: { label: string; at: string; note?: string | null; isFirst?: boolean; isLast?: boolean }) {
   return (
     <div style={{ display: "flex", gap: 12, minHeight: 36 }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 14 }}>
@@ -227,10 +276,21 @@ function TimelineRow({ label, at, isFirst, isLast }: { label: string; at: string
       <div style={{ paddingBottom: isLast ? 0 : 8 }}>
         <div style={{ fontSize: 13, fontWeight: 500, color: isLast ? "var(--ink)" : "var(--ink-2)" }}>{label}</div>
         <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{fmtThaiDateTime(at)}</div>
+        {note ? <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 2 }}>เหตุผล: {note}</div> : null}
       </div>
     </div>
   );
 }
+
+// Statuses where `cancelReason` is the booking's CURRENT, relevant reason.
+// Outside these, any stored reason is stale and belongs to the timeline history.
+const REASON_VISIBLE_STATUSES = new Set([
+  "cancel_requested",
+  "cancelled",
+  "rejected",
+  "slip_disputed",
+  "payment_expired",
+]);
 
 const card: React.CSSProperties = {
   padding: 16,

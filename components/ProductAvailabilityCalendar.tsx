@@ -185,18 +185,18 @@ export default function ProductAvailabilityCalendar({
           } else if (isBlackout) {
             // Unavailable dates are red
             bgColor = "rgba(220, 38, 38, 0.1)";
-            textColor = "#DC2626";
+            textColor = "var(--danger)";
             borderColor = "rgba(220, 38, 38, 0.3)";
           } else if (isAvailable) {
             // Available dates are green
             bgColor = "rgba(34, 197, 94, 0.1)";
-            textColor = "#22C55E";
+            textColor = "var(--success)";
             borderColor = "rgba(34, 197, 94, 0.3)";
           }
 
           if (isToday) {
             bgColor = "rgba(59, 130, 246, 0.1)";
-            textColor = "#3B82F6";
+            textColor = "var(--info)";
             borderColor = "rgba(59, 130, 246, 0.3)";
           }
 

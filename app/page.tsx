@@ -187,7 +187,8 @@ export default async function HomePage({
       </Suspense>
 
       {/* ======== BANNER CAROUSEL ======== */}
-      {dbBanners.length > 0 && (
+      {/* แสดงเมื่อมี DB banner หรือมีร้านให้ทำสไลด์ fallback (BannerCarousel จัดการ fallback เอง) */}
+      {(dbBanners.length > 0 || bannerShops.length > 0) && (
         <section className="bg-bg pt-6">
           <div className="container">
             <BannerCarousel shops={bannerShops} slides={bannerSlides} locale={locale} />

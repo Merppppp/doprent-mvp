@@ -67,7 +67,7 @@ export default async function AdminBookingsPage({
       status: true,
       currentDueAt: true,
       recipientName: true,
-      product: { select: { name: true } },
+      items: { orderBy: { createdAt: "asc" as const }, take: 1, select: { product: { select: { name: true } } } },
       shop: { select: { name: true } },
       renter: { select: { fullName: true, email: true } },
     },
@@ -135,7 +135,7 @@ export default async function AdminBookingsPage({
                 <tr key={b.id} style={{ borderBottom: "1px solid var(--line)" }}>
                   <Td>
                     <Link href={`/admin/bookings/${b.id}`} style={{ fontWeight: 600 }}>
-                      {b.product?.name ?? "สินค้า"}
+                      {b.items[0]?.product?.name ?? "สินค้า"}
                     </Link>
                   </Td>
                   <Td>
