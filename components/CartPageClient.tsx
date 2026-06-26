@@ -200,7 +200,7 @@ export default function CartPageClient() {
       </div>
 
       <div className="text-[13px] text-ink-2 mb-5 px-3 py-2 rounded-lg bg-surface border border-line">
-        สินค้าในตะกร้าจัดกลุ่มตามร้านค้าและวันที่เช่า — กด "ดำเนินการต่อ" ในแต่ละกลุ่มเพื่อชำระเงิน
+        สินค้าในตะกร้าจัดกลุ่มตามร้านค้าและวันที่เช่า — กด “ดำเนินการต่อ” ในแต่ละกลุ่มเพื่อชำระเงิน
       </div>
 
       {groups.map((g) => (
