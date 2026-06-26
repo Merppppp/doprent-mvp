@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { uploadIdCard } from "@/app/actions/id-cards";
 import type { IdCardItem } from "@/app/actions/id-cards";
 import { prepareImageFileForUpload } from "@/lib/image";
@@ -22,6 +22,12 @@ export default function IdCardPicker({ initialCards, inputName = "id_card_path",
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  // Local blob: URLs created for just-uploaded cards (instant preview before the
+  // server signed URL exists). Revoked on unmount to avoid leaking object URLs.
+  const previewUrlsRef = useRef<string[]>([]);
+  useEffect(() => () => {
+    previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+  }, []);
 
   function select(path: string) {
     setSelectedPath(path);
@@ -60,11 +66,14 @@ export default function IdCardPicker({ initialCards, inputName = "id_card_path",
       return;
     }
 
-    // Build a temporary card entry (no signed URL; thumbnail falls back to icon).
+    // Preview instantly from the local (already-compressed) file — the server
+    // signed URL isn't back yet, so use a blob: URL for the thumbnail.
+    const previewUrl = URL.createObjectURL(prepared);
+    previewUrlsRef.current.push(previewUrl);
     const newCard: IdCardItem = {
       id: res.id,
       path: res.path,
-      signedUrl: "",
+      signedUrl: previewUrl,
       createdAt: new Date().toISOString(),
     };
 
