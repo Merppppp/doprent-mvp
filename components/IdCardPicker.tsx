@@ -21,6 +21,10 @@ export default function IdCardPicker({ initialCards, inputName = "id_card_path",
   );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [preparing, setPreparing] = useState(false);
+  // A picked-and-compressed photo awaiting the user's confirmation. Shown as a
+  // large preview; only uploaded to the server once they press "ใช้รูปนี้".
+  const [pending, setPending] = useState<{ file: File; url: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   // Local blob: URLs created for just-uploaded cards (instant preview before the
   // server signed URL exists). Revoked on unmount to avoid leaking object URLs.
@@ -34,11 +38,17 @@ export default function IdCardPicker({ initialCards, inputName = "id_card_path",
     onSelect?.(path);
   }
 
+  // Step 1: pick a file → compress → show a large preview. Nothing is uploaded
+  // yet; the user must review the photo and confirm it first.
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file later
     if (!file) return;
     setUploadError("");
-    setUploading(true);
+    // Drop any earlier pending preview before replacing it.
+    if (pending) URL.revokeObjectURL(pending.url);
+    setPending(null);
+    setPreparing(true);
 
     // Downscale to <=1920px + re-encode WebP/JPEG (reuses product-image
     // compressor). An ID card stays fully legible and shrinks to well under the
@@ -47,42 +57,51 @@ export default function IdCardPicker({ initialCards, inputName = "id_card_path",
     try {
       prepared = await prepareImageFileForUpload(file);
     } catch (err) {
-      setUploading(false);
-      e.target.value = "";
+      setPreparing(false);
       setUploadError(err instanceof Error ? err.message : "ไม่สามารถเตรียมไฟล์รูปภาพได้");
       return;
     }
 
+    setPreparing(false);
+    setPending({ file: prepared, url: URL.createObjectURL(prepared) });
+  }
+
+  // Step 2: confirm the previewed photo → upload → add it to the options list.
+  async function confirmPending() {
+    if (!pending) return;
+    setUploadError("");
+    setUploading(true);
+
     const fd = new FormData();
-    fd.set("id_card", prepared);
+    fd.set("id_card", pending.file);
     const res = await uploadIdCard(fd);
 
     setUploading(false);
-    // Reset the file input so the same file can be re-uploaded if needed.
-    e.target.value = "";
-
     if (!res.ok) {
       setUploadError(res.error);
       return;
     }
 
-    // Preview instantly from the local (already-compressed) file — the server
-    // signed URL isn't back yet, so use a blob: URL for the thumbnail.
-    const previewUrl = URL.createObjectURL(prepared);
-    previewUrlsRef.current.push(previewUrl);
+    // Reuse the pending blob: URL as the thumbnail (the server signed URL isn't
+    // back yet). Hand ownership to previewUrlsRef so it's revoked on unmount.
+    previewUrlsRef.current.push(pending.url);
     const newCard: IdCardItem = {
       id: res.id,
       path: res.path,
-      signedUrl: previewUrl,
+      signedUrl: pending.url,
       createdAt: new Date().toISOString(),
     };
-
-    setCards((prev) => {
-      // Newest first; server already removed oldest when at limit.
-      return [newCard, ...prev].slice(0, 3);
-    });
-
+    // Newest first; server already removed the oldest when at the limit.
+    setCards((prev) => [newCard, ...prev].slice(0, 3));
     select(res.path);
+    setPending(null);
+  }
+
+  // Discard the pending preview without uploading.
+  function cancelPending() {
+    if (pending) URL.revokeObjectURL(pending.url);
+    setPending(null);
+    setUploadError("");
   }
 
   return (
@@ -149,33 +168,77 @@ export default function IdCardPicker({ initialCards, inputName = "id_card_path",
       {/* Hidden input carrying the selected path to the parent form submit */}
       <input type="hidden" name={inputName} value={selectedPath} />
 
-      {/* Upload new photo button */}
-      <div>
-        <button
-          type="button"
-          className="btn btn-outline text-[13px] py-2 px-4"
-          onClick={() => fileRef.current?.click()}
-          disabled={uploading}
-        >
-          {uploading
-            ? "กำลังอัปโหลด..."
-            : cards.length === 0
-              ? "เลือกรูปถ่ายบัตรประชาชน"
-              : "อัปโหลดรูปใหม่"}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          onChange={handleFile}
-        />
-        {cards.length > 0 && (
-          <p className="text-[12px] text-ink-3 mt-1">
-            อัปโหลดรูปใหม่จะแทนที่รูปเก่าสุดโดยอัตโนมัติ (เก็บได้สูงสุด 3 รูป)
-          </p>
-        )}
-      </div>
+      {/* Hidden file input — always mounted so it can be triggered from either
+          the pick button or the "เลือกรูปอื่น" action in the preview. */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={handleFile}
+      />
+
+      {pending ? (
+        /* Step-2 large preview — review the photo before it's uploaded */
+        <div className="grid gap-3 p-3 rounded-xl border border-accent bg-accent-soft">
+          <div className="text-[13px] font-semibold text-ink">
+            ตรวจสอบรูปบัตรให้ชัดก่อนยืนยัน
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={pending.url}
+            alt="ตัวอย่างรูปบัตรประชาชน"
+            className="w-full max-h-[60vh] object-contain rounded-lg border border-line bg-bg"
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn btn-primary flex-1 py-2.5 text-[14px]"
+              onClick={confirmPending}
+              disabled={uploading}
+            >
+              {uploading ? "กำลังอัปโหลด..." : "ใช้รูปนี้"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline py-2.5 px-4 text-[14px]"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+            >
+              เลือกรูปอื่น
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline py-2.5 px-4 text-[14px]"
+              onClick={cancelPending}
+              disabled={uploading}
+            >
+              ยกเลิก
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Step-1 pick button */
+        <div>
+          <button
+            type="button"
+            className="btn btn-outline text-[13px] py-2 px-4"
+            onClick={() => fileRef.current?.click()}
+            disabled={preparing}
+          >
+            {preparing
+              ? "กำลังเตรียมรูป..."
+              : cards.length === 0
+                ? "เลือกรูปถ่ายบัตรประชาชน"
+                : "อัปโหลดรูปใหม่"}
+          </button>
+          {cards.length > 0 && (
+            <p className="text-[12px] text-ink-3 mt-1">
+              อัปโหลดรูปใหม่จะแทนที่รูปเก่าสุดโดยอัตโนมัติ (เก็บได้สูงสุด 3 รูป)
+            </p>
+          )}
+        </div>
+      )}
 
       {uploadError && (
         <p className="text-[13px] text-danger">{uploadError}</p>
