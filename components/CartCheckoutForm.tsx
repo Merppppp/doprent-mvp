@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { addAddress, updateAddress, createBooking } from "@/app/actions/bookings";
 import type { Address } from "@/lib/types";
 import type { BusinessHours } from "@/lib/hours";
+import type { IdCardItem } from "@/app/actions/id-cards";
+import IdCardPicker from "@/components/IdCardPicker";
 import { fmtThai } from "@/lib/date-th";
 import { useCart } from "@/lib/cart";
 
@@ -25,6 +27,8 @@ type Props = {
   addresses: Address[];
   shopHours?: BusinessHours | null;
   shopIsOpen?: boolean;
+  /** ID card photos already uploaded by this user. */
+  idCards?: IdCardItem[];
 };
 
 /* ── Sub-components ─────────────────────────────────────────────── */
@@ -54,7 +58,7 @@ const addressLabelClass = "block text-[13px] font-medium text-ink-2 mb-1";
 
 /* ── Main component ─────────────────────────────────────────────── */
 
-export default function CartCheckoutForm({ groupKey, addresses: initialAddresses, shopHours }: Props) {
+export default function CartCheckoutForm({ groupKey, addresses: initialAddresses, shopHours, idCards = [] }: Props) {
   const router = useRouter();
   const { groups, clearGroup } = useCart();
 
@@ -69,6 +73,9 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [selectedIdCardPath, setSelectedIdCardPath] = useState<string>(
+    idCards[0]?.path ?? ""
+  );
 
   const startDate = group?.startDate ?? "";
   const endDate = group?.endDate ?? "";
@@ -137,6 +144,7 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
   async function onConfirm() {
     if (!group) { setError("ไม่พบข้อมูลการจอง กรุณากลับไปที่ตะกร้า"); return; }
     if (!selectedId) { setError("กรุณาเลือกที่อยู่จัดส่ง"); return; }
+    if (!selectedIdCardPath) { setError("กรุณาแนบรูปถ่ายบัตรประชาชน"); return; }
     setError("");
     setBusy(true);
 
@@ -153,6 +161,7 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
     fd.set("end_date", group.endDate);
     fd.set("outbound_method", outboundMethod);
     fd.set("return_method", returnMethod);
+    fd.set("id_card_path", selectedIdCardPath);
 
     const firstWithTimes = group.items.find((i) => i.startTime && i.endTime);
     if (firstWithTimes?.startTime) fd.set("start_time", firstWithTimes.startTime);
@@ -381,6 +390,21 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
         </div>
       </section>
 
+      {/* ═══ 3. ID card photo ═══ */}
+      <section>
+        <h2 className="text-[16px] font-semibold mb-1">
+          <StepNum n={3} /> ภาพถ่ายบัตรประชาชน <Req />
+        </h2>
+        <p className="text-[13px] text-ink-3 mb-3">
+          ร้านต้องการบัตรประชาชนเพื่อยืนยันตัวตนผู้เช่า
+        </p>
+        <IdCardPicker
+          initialCards={idCards}
+          inputName="id_card_path"
+          onSelect={setSelectedIdCardPath}
+        />
+      </section>
+
       {/* Errors */}
       {error ? (
         <div className="px-4 py-3 rounded-lg bg-danger-soft text-danger text-[13.5px]">
@@ -394,12 +418,18 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
           กรุณาเลือกหรือเพิ่มที่อยู่จัดส่ง
         </div>
       )}
+      {selectedId && !selectedIdCardPath && (
+        <div className="flex items-center gap-1.5 text-[13px] text-danger">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          กรุณาแนบรูปถ่ายบัตรประชาชน
+        </div>
+      )}
 
       <button
         type="button"
         className="btn btn-primary btn-lg py-3.5 px-5 text-[15px]"
         onClick={onConfirm}
-        disabled={busy || !selectedId}
+        disabled={busy || !selectedId || !selectedIdCardPath}
       >
         {busy ? "กำลังส่งคำขอ…" : "ยืนยันจอง"}
       </button>

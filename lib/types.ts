@@ -420,6 +420,8 @@ export type BookingDetail = Booking & {
   return_condition: string | null;
   /** รายละเอียดความเสียหายที่ร้านระบุ (เมื่อ return_condition = "damaged"). */
   return_damage_note: string | null;
+  /** Private R2 key ของภาพบัตรประชาชนที่ใช้ในการจองนี้ (null = ไม่ได้แนบ). */
+  id_card_path: string | null;
   /** Phase 2: item rows sourced from BookingItem child table. */
   items: BookingItemDetail[];
 };

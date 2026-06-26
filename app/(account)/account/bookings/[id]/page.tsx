@@ -47,6 +47,7 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
   const timeline = await getBookingTimeline(b.id);
   const slipUrl = b.slip_path ? await getSignedPrivateUrl(b.slip_path) : null;
   const refundSlipUrl = b.refund_slip_path ? await getSignedPrivateUrl(b.refund_slip_path) : null;
+  const idCardUrl = b.id_card_path ? await getSignedPrivateUrl(b.id_card_path) : null;
 
   const isReviewable = b.status === "returned" || b.status === "completed";
   const canEditAddress = b.status === "booking_pending" || b.status === "waiting_for_payment";
@@ -260,6 +261,14 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
             <span className="font-medium">฿{b.deposit.toLocaleString()}</span>
           </div>
           <p className="mt-2 text-xs text-[var(--ink-3)]">ไม่ส่งคืนสินค้า — เงินมัดจำถูกหักเต็มจำนวน</p>
+        </div>
+      ) : null}
+
+      {/* ID card photo — reference copy for the renter */}
+      {idCardUrl ? (
+        <div style={card}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>บัตรประชาชนที่ใช้จอง</div>
+          <SlipImage src={idCardUrl} contain />
         </div>
       ) : null}
 

@@ -45,6 +45,9 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
   // Sign the refund slip URL if one has been uploaded.
   const refundSlipUrl = b.refund_slip_path ? await getSignedPrivateUrl(b.refund_slip_path) : null;
 
+  // Sign the ID card URL — visible to the seller from booking_pending onwards.
+  const idCardUrl = b.id_card_path ? await getSignedPrivateUrl(b.id_card_path) : null;
+
   const renterTrust = await getTrustScore(b.renter_id);
   const timeline = await getBookingTimeline(b.id);
 
@@ -133,6 +136,13 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
         <div style={{ ...card }}>
           <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>สลิปการโอน</div>
           <SlipImage src={slipUrl} />
+        </div>
+      ) : null}
+
+      {idCardUrl ? (
+        <div style={{ ...card }}>
+          <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>บัตรประชาชน</div>
+          <SlipImage src={idCardUrl} contain />
         </div>
       ) : null}
 

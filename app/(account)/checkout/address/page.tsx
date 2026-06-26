@@ -8,6 +8,7 @@ import { rentalDays } from "@/lib/bookings";
 import { hasMultipleRates, normalizeTiers, startingPerDay } from "@/lib/pricing";
 import { parseBusinessHours } from "@/lib/hours";
 import CheckoutForm from "@/components/CheckoutForm";
+import { getUserIdCards } from "@/app/actions/id-cards";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +96,10 @@ export default async function CheckoutAddressPage({
   const days = rentalDays(start, end);
   const image =
     Array.isArray(dress.images) && dress.images.length > 0 ? String(dress.images[0]) : null;
-  const addresses = await getMyAddresses();
+  const [addresses, idCards] = await Promise.all([
+    getMyAddresses(),
+    getUserIdCards(),
+  ]);
 
   return (
     <div className="container" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 640 }}>
@@ -163,6 +167,7 @@ export default async function CheckoutAddressPage({
         returnMethod={returnMethod}
         shopHours={shopHours}
         shopIsOpen={dress.shop_is_open}
+        idCards={idCards}
       />
     </div>
   );
