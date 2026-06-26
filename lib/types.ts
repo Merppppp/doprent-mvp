@@ -108,7 +108,9 @@ export type BookingStatus =
   /** ผู้เช่าคืนชุดแล้ว รอร้านตรวจรับ — ระยะกลางของการปิดรายการ */
   | "returned"
   /** ร้านตรวจรับชุดเรียบร้อย ปิดรายการเช่าสมบูรณ์ — terminal สุดท้าย */
-  | "completed";
+  | "completed"
+  /** ลูกค้าไม่ส่งคืนชุด — terminal */
+  | "not_returned";
 
 /**
  * Public Occasion shape — mapper-output type (rev 3: assembled from the tag
@@ -410,6 +412,10 @@ export type BookingDetail = Booking & {
   refunded_at: string | null;
   refund_note: string | null;
   refund_slip_path: string | null;
+  /** สภาพชุดตอนรับคืน: "complete" | "damaged" | "not_returned". Null = ยังไม่ได้รับคืน. */
+  return_condition: string | null;
+  /** รายละเอียดความเสียหายที่ร้านระบุ (เมื่อ return_condition = "damaged"). */
+  return_damage_note: string | null;
   /** Phase 2: item rows sourced from BookingItem child table. */
   items: BookingItemDetail[];
 };

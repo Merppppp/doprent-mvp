@@ -66,6 +66,8 @@ type PrismaBookingWithJoins = {
   refundedAt: Date | null;
   refundNote: string | null;
   refundSlipPath: string | null;
+  returnCondition: string | null;
+  returnDamageNote: string | null;
   createdAt: Date;
   updatedAt: Date;
   items: Array<{
@@ -156,6 +158,8 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     refunded_at: b.refundedAt ? b.refundedAt.toISOString() : null,
     refund_note: b.refundNote ?? null,
     refund_slip_path: b.refundSlipPath ?? null,
+    return_condition: b.returnCondition ?? null,
+    return_damage_note: b.returnDamageNote ?? null,
     created_at: b.createdAt.toISOString(),
     updated_at: b.updatedAt.toISOString(),
     dress_name: first?.product?.name ?? null,

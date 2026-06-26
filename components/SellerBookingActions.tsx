@@ -270,18 +270,11 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
 
   if (status === "renting" || status === "awaiting_return") {
     return (
-      <div className="grid gap-3">
-        <button
-          type="button"
-          className="btn btn-primary btn-lg"
-          disabled={busy}
-          onClick={() => run(() => markReturned(bookingId))}
-          style={{ padding: "13px 18px" }}
-        >
-          ลูกค้าคืนชุดแล้ว
-        </button>
-        {error ? <Err msg={error} /> : null}
-      </div>
+      <ReturnPanel
+        busy={busy}
+        error={error}
+        onSubmit={(condition, note) => run(() => markReturned(bookingId, condition, note))}
+      />
     );
   }
 
@@ -390,6 +383,86 @@ function DisputeModal({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+type ReturnChoice = "complete" | "damaged" | "not_returned";
+
+function ReturnPanel({
+  busy,
+  error,
+  onSubmit,
+}: {
+  busy: boolean;
+  error: string;
+  onSubmit: (condition: ReturnChoice, damageNote?: string) => void;
+}) {
+  const [choice, setChoice] = useState<ReturnChoice>("complete");
+  const [note, setNote] = useState("");
+
+  const options: { value: ReturnChoice; label: string; hint: string }[] = [
+    { value: "complete", label: "คืนของแบบสมบูรณ์", hint: "ได้รับชุดคืนครบถ้วน สภาพดี" },
+    { value: "damaged", label: "มีความเสียหาย", hint: "ได้รับชุดคืนแต่มีความเสียหาย — ระบุรายละเอียด" },
+    { value: "not_returned", label: "ลูกค้าไม่ส่งคืนของ", hint: "ยังไม่ได้รับชุดคืน" },
+  ];
+
+  const canSubmit = !busy && (choice !== "damaged" || note.trim().length > 0);
+
+  return (
+    <div className="grid gap-3">
+      <div className="grid gap-2">
+        {options.map((opt) => {
+          const active = choice === opt.value;
+          return (
+            <label
+              key={opt.value}
+              className="flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3"
+              style={{
+                borderColor: active ? "var(--accent)" : "var(--line)",
+                background: active ? "var(--accent-soft)" : "var(--bg)",
+              }}
+            >
+              <input
+                type="radio"
+                name="return-condition"
+                checked={active}
+                onChange={() => setChoice(opt.value)}
+                style={{ width: 16, height: 16, marginTop: 2, cursor: "pointer" }}
+              />
+              <span>
+                <span className="block text-[14px] font-semibold text-[var(--ink)]">{opt.label}</span>
+                <span className="block text-[12px] text-[var(--ink-2)]">{opt.hint}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+
+      {choice === "damaged" ? (
+        <label className="text-sm font-semibold">
+          ระบุความเสียหายที่พบ
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="เช่น มีรอยเปื้อน / ตะเข็บขาด / ซิปเสีย"
+            rows={3}
+            maxLength={1000}
+            className="mt-1.5 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-[15px] text-[var(--ink)] outline-none focus:border-[var(--accent)]"
+          />
+        </label>
+      ) : null}
+
+      <button
+        type="button"
+        className="btn btn-primary btn-lg"
+        disabled={!canSubmit}
+        onClick={() => onSubmit(choice, choice === "damaged" ? note.trim() : undefined)}
+        style={{ padding: "13px 18px" }}
+      >
+        บันทึกการรับคืน
+      </button>
+      {error ? <Err msg={error} /> : null}
     </div>
   );
 }

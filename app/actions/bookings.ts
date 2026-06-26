@@ -1097,9 +1097,27 @@ export async function markRenting(
   });
 }
 
-/** Seller marks the dress as received back — transitions renting → returned. */
-export async function markReturned(bookingId: string): Promise<Result> {
-  return sellerSimpleMove(bookingId, "returned");
+export type ReturnCondition = "complete" | "damaged" | "not_returned";
+
+/**
+ * Seller records the physical return:
+ *   complete     → returned       (ชุดสมบูรณ์)
+ *   damaged      → returned       (มีความเสียหาย — ต้องระบุรายละเอียด, ตั้ง refund=required)
+ *   not_returned → not_returned   (ลูกค้าไม่ส่งคืน — ตั้ง refund=required)
+ */
+export async function markReturned(
+  bookingId: string,
+  condition: ReturnCondition,
+  damageNote?: string
+): Promise<Result> {
+  if (condition === "damaged" && !damageNote?.trim())
+    return { ok: false, error: "กรุณาระบุความเสียหายที่พบ" };
+  const to: BookingStatus = condition === "not_returned" ? "not_returned" : "returned";
+  return sellerSimpleMove(bookingId, to, undefined, undefined, {
+    condition,
+    damageNote: condition === "damaged" ? damageNote!.trim() : undefined,
+    requireRefund: condition === "damaged" || condition === "not_returned",
+  });
 }
 
 /** Seller closes the rental after inspection — transitions returned → completed. */
@@ -1111,7 +1129,8 @@ async function sellerSimpleMove(
   bookingId: string,
   to: BookingStatus,
   reason?: string,
-  shipping?: { carrier?: string; trackingNumber?: string; trackingUrl?: string }
+  shipping?: { carrier?: string; trackingNumber?: string; trackingUrl?: string },
+  returnInfo?: { condition: ReturnCondition; damageNote?: string; requireRefund: boolean }
 ): Promise<Result> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
@@ -1137,6 +1156,13 @@ async function sellerSimpleMove(
             ...(shipping?.trackingUrl ? { trackingUrl: shipping.trackingUrl } : {}),
             ...(to === "returned" ? { returnedAt: new Date() } : {}),
             ...(to === "rejected" || to === "cancel_requested" ? { cancelledBy: "shop" } : {}),
+            ...(returnInfo
+              ? {
+                  returnCondition: returnInfo.condition,
+                  returnDamageNote: returnInfo.damageNote ?? null,
+                  ...(returnInfo.requireRefund ? { refundStatus: "required" } : {}),
+                }
+              : {}),
           },
         });
         if (moved.count > 0) {

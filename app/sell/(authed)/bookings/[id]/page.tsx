@@ -142,6 +142,33 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
         </div>
       ) : null}
 
+      {/* Return condition recorded by the seller */}
+      {b.return_condition ? (
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 mb-4">
+          <div className="font-semibold text-sm mb-2">สภาพการรับคืน</div>
+          <div className="flex justify-between gap-4 py-1 text-sm">
+            <span className="text-[var(--ink-3)] shrink-0">ผลการตรวจรับ</span>
+            <span
+              className={`font-semibold ${
+                b.return_condition === "complete" ? "text-[var(--success)]" : "text-[var(--danger)]"
+              }`}
+            >
+              {b.return_condition === "complete"
+                ? "คืนของแบบสมบูรณ์"
+                : b.return_condition === "damaged"
+                  ? "มีความเสียหาย"
+                  : "ลูกค้าไม่ส่งคืนของ"}
+            </span>
+          </div>
+          {b.return_condition === "damaged" && b.return_damage_note ? (
+            <div className="mt-2 text-sm text-[var(--ink-2)] whitespace-pre-wrap">
+              <span className="text-[var(--ink-3)]">ความเสียหายที่พบ: </span>
+              {b.return_damage_note}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* Refund status — read-only for the seller */}
       {(b.refund_status === "required" || b.refund_status === "refunded") ? (
         <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 mb-4">

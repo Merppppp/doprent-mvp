@@ -31,6 +31,13 @@ function localToday(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** Shift a YYYY-MM-DD string by `delta` days, returning YYYY-MM-DD. */
+function addDaysStr(dateStr: string, delta: number): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + delta);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /** Minutes from now until the shop closes today. null when shop is closed today
  *  or hours are unknown. Negative when already past closing. */
 function minutesUntilCloseToday(hours: BusinessHours | null | undefined): number | null {
@@ -193,6 +200,31 @@ export default function CheckoutForm({
 
   return (
     <div style={{ display: "grid", gap: 22 }}>
+      {/* Shop hours for the first rental day (pickup day) — shown only when the
+          seller configured hours. */}
+      {shopHours ? (() => {
+        const dow = new Date(`${startDate}T00:00:00`).getDay();
+        const d = shopHours[dow];
+        return (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: "10px 12px",
+              border: "1px solid var(--line)",
+              borderRadius: 10,
+              fontSize: 13,
+            }}
+          >
+            <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>เวลาทำการวันรับชุด</span>
+            <span style={{ color: "var(--ink)" }}>
+              {fmtThai(startDate)} · {d && d.open ? `${d.from}–${d.to}` : "ปิด"}
+            </span>
+          </div>
+        );
+      })() : null}
+
       {/* ═══ 1. Delivery method (FIRST) ═══ */}
       <section>
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
@@ -229,7 +261,7 @@ export default function CheckoutForm({
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>ส่งด่วน</div>
                   <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-                    {isSameDayStart ? "ได้รับภายในวัน" : "ส่งถึงในวันรับชุด"} — ร้านนัดเวลารับ–ส่ง
+                    ร้านจะจัดส่งวันที่ {fmtThai(startDate)}
                   </div>
                 </div>
               </label>
@@ -249,7 +281,7 @@ export default function CheckoutForm({
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>ส่งพัสดุ</div>
                   <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-                    ร้านเป็นผู้เลือกผู้ให้บริการขนส่ง — ใช้เวลา 1–3 วัน
+                    ร้านจะจัดส่งภายในวันที่ {fmtThai(addDaysStr(startDate, -1))}
                   </div>
                 </div>
               </label>

@@ -1176,6 +1176,10 @@ model Booking {
   overdueReminderSentAt DateTime? @map("overdue_reminder_sent_at") @db.Timestamptz(6)
   /// เวลาที่ร้านกดรับคืนชุด (เข้าสถานะ returned) — ใช้เป็นจุดเริ่มนับ auto-complete
   returnedAt            DateTime? @map("returned_at") @db.Timestamptz(6)
+  /// สภาพชุดตอนรับคืน: "complete" (สมบูรณ์), "damaged" (มีความเสียหาย), "not_returned" (ไม่ส่งคืน)
+  returnCondition       String?   @map("return_condition")
+  /// รายละเอียดความเสียหายที่ร้านระบุ (เมื่อ returnCondition = "damaged")
+  returnDamageNote      String?   @map("return_damage_note")
   /// เวลาที่เข้าสถานะ payment_review (ลูกค้าอัปสลิป) — ใช้นับชั่วโมงร้านเปิดเพื่อแสดง badge ด่วน
   /// รีเซตทุกครั้งที่ลูกค้าอัปสลิปใหม่ (เช่น หลัง slip_disputed)
   paymentReviewAt       DateTime? @map("payment_review_at") @db.Timestamptz(6)
@@ -1619,6 +1623,8 @@ enum BookingStatus {
   returned
   /// ร้านตรวจรับชุดเรียบร้อย ปิดรายการเช่าสมบูรณ์ (terminal สุดท้าย)
   completed
+  /// ลูกค้าไม่ส่งคืนชุด (terminal — ร้านต้องดำเนินการเรื่องมัดจำ/คืนเงิน)
+  not_returned
 
   @@map("booking_status")
 }

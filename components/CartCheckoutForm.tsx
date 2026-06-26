@@ -15,6 +15,13 @@ function localToday(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** Shift a YYYY-MM-DD string by `delta` days, returning YYYY-MM-DD. */
+function addDaysStr(dateStr: string, delta: number): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + delta);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function minutesUntilCloseToday(hours: BusinessHours | null | undefined): number | null {
   if (!hours) return null;
   const now = new Date();
@@ -215,6 +222,21 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
 
   return (
     <div className="grid gap-6">
+      {/* Shop hours for the first rental day (pickup day) — shown only when the
+          seller configured hours. */}
+      {shopHours ? (() => {
+        const dow = new Date(`${startDate}T00:00:00`).getDay();
+        const d = shopHours[dow];
+        return (
+          <div className="flex justify-between gap-3 rounded-xl border border-line px-3 py-2.5 text-[13px]">
+            <span className="font-semibold text-ink-2">เวลาทำการวันรับชุด</span>
+            <span className="text-ink">
+              {fmtThai(startDate)} · {d && d.open ? `${d.from}–${d.to}` : "ปิด"}
+            </span>
+          </div>
+        );
+      })() : null}
+
       {/* Items summary */}
       <div className="rounded-xl border border-line bg-surface overflow-hidden">
         <div className="px-4 py-3 bg-bg border-b border-line">
@@ -276,7 +298,7 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
                 <div className="flex-1">
                   <div className="font-semibold text-[14px] text-ink">ส่งด่วน</div>
                   <div className="text-[12px] text-ink-3 mt-0.5">
-                    {isSameDayStart ? "ได้รับภายในวัน" : "ส่งถึงในวันรับชุด"} — ร้านนัดเวลารับ–ส่ง
+                    ร้านจะจัดส่งวันที่ {fmtThai(startDate)}
                   </div>
                 </div>
               </label>
@@ -295,7 +317,7 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 ${deliveryMethod === "standard" ? "text-accent" : "text-ink-2"}`}><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                 <div className="flex-1">
                   <div className="font-semibold text-[14px] text-ink">ส่งพัสดุ</div>
-                  <div className="text-[12px] text-ink-3 mt-0.5">ร้านเป็นผู้เลือกผู้ให้บริการขนส่ง — ใช้เวลา 1–3 วัน</div>
+                  <div className="text-[12px] text-ink-3 mt-0.5">ร้านจะจัดส่งภายในวันที่ {fmtThai(addDaysStr(startDate, -1))}</div>
                 </div>
               </label>
             )}

@@ -80,8 +80,9 @@ export default function RenterBookingActions({ bookingId, status, canPay, disput
   const canCancel = status === "booking_pending" || status === "waiting_for_payment";
   const isDisputed = status === "slip_disputed";
   // Renter can REQUEST cancel (not instant) for these post-payment statuses.
+  // Not allowed once renting: the dress is already out for the rental.
   const canRequestCancel =
-    status === "payment_review" || status === "confirmed" || status === "renting";
+    status === "payment_review" || status === "confirmed";
   const isCancelPending = status === "cancel_requested";
 
   const previewBlock = preview && (

@@ -42,6 +42,12 @@ type Props = {
   unavailable?: string[];
   /** Minimum days in advance the rental must start. */
   leadTimeDays?: number;
+  /**
+   * Transit days reserved BEFORE the start date (standard shipping). The picker
+   * treats these pre-start days like part of the rental for availability so it
+   * agrees with the server's oversell guard, which scans [start - buffer, end].
+   */
+  bufferDaysBefore?: number;
   /** Minimum rental length in days. */
   minRentalDays?: number;
   /** Maximum rental length in days; null = unlimited. */
@@ -103,6 +109,20 @@ function rangeDates(start: string, end: string): string[] {
   return result;
 }
 
+/** The `count` transit days immediately BEFORE `start` (YYYY-MM-DD, oldest first). */
+function bufferDatesBefore(start: string, count: number): string[] {
+  if (!start || count <= 0) return [];
+  const s = new Date(start);
+  if (isNaN(s.getTime())) return [];
+  const result: string[] = [];
+  for (let i = count; i >= 1; i--) {
+    const d = new Date(s);
+    d.setDate(d.getDate() - i);
+    result.push(isoOf(d));
+  }
+  return result;
+}
+
 function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -132,6 +152,7 @@ export default function DateRangePicker({
   blackouts = [],
   unavailable = [],
   leadTimeDays = 0,
+  bufferDaysBefore = 0,
   minRentalDays = 1,
   maxRentalDays = null,
   productId,
@@ -199,13 +220,27 @@ export default function DateRangePicker({
   const nights = nightsBetween(start, end);
   const quote = priceForNights(priceTiers ?? null, effectivePricePerDay ?? 0, nights);
 
-  // Conflict check: does the selected range hit any unavailable date?
+  // Conflict check: does the selected range — INCLUDING the standard-shipping
+  // transit days reserved before the start — hit any unavailable date? The
+  // server's oversell guard scans [start - bufferDaysBefore, end], so the
+  // picker must check the same window or a range can pass here yet be rejected.
   const conflictDates = useMemo(() => {
     if (!start || !end) return [];
-    return rangeDates(start, end).filter((d) => allUnavailableSet.has(d));
-  }, [start, end, allUnavailableSet]);
+    const buffer = bufferDatesBefore(start, bufferDaysBefore).filter((d) => d >= TODAY);
+    return [...buffer, ...rangeDates(start, end)].filter((d) => allUnavailableSet.has(d));
+  }, [start, end, bufferDaysBefore, allUnavailableSet]);
 
   const hasConflict = conflictDates.length > 0;
+
+  // The chosen size must have at least one unit free across the whole window the
+  // server checks — [start - bufferDaysBefore, end] — not just the rental nights.
+  const selectedVariantFull = useMemo(() => {
+    if (!start || !end || !selectedVariant?.dailyBooked) return false;
+    const rangeStart = bufferDaysBefore > 0
+      ? (bufferDatesBefore(start, bufferDaysBefore)[0] ?? start)
+      : start;
+    return remainingForRange(selectedVariant.dailyBooked, selectedVariant.quantity, rangeStart, end) <= 0;
+  }, [start, end, selectedVariant, bufferDaysBefore]);
 
   // Policy validation: min/max rental days (checked only when no date conflict)
   const policyError = useMemo<string | null>(() => {
@@ -219,7 +254,7 @@ export default function DateRangePicker({
     return null;
   }, [start, end, nights, minRentalDays, maxRentalDays, hasConflict]);
 
-  const isInvalid = hasConflict || !!policyError;
+  const isInvalid = hasConflict || selectedVariantFull || !!policyError;
 
   // Shop closing-soon warning (within 1 hour of today's closing time)
   const [closingSoon, setClosingSoon] = useState(false);
@@ -302,15 +337,22 @@ export default function DateRangePicker({
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {variants!.map((v) => {
               const isSelected = v.id === selectedVariantId;
-              // Check if this variant is "full" for the chosen range
+              // Check if this variant is "full" for the chosen range. Standard
+              // shipping reserves transit days before the start, so widen the
+              // window to [start - bufferDaysBefore, end] — same span the server
+              // oversell guard scans — otherwise a size can look free here yet
+              // be rejected at confirm time.
               const variantUnavailSet = new Set([...blackouts, ...(v.unavailable ?? [])]);
               const hasRange = !!start && !!end;
+              const rangeStart = bufferDaysBefore > 0
+                ? (bufferDatesBefore(start, bufferDaysBefore)[0] ?? start)
+                : start;
               const isFullForRange = hasRange
-                ? rangeDates(start, end).some((d) => variantUnavailSet.has(d))
+                ? rangeDates(rangeStart, end).some((d) => variantUnavailSet.has(d))
                 : false;
               // Remaining units: for a chosen range use the per-day peak; otherwise total stock.
               const remaining = hasRange && v.dailyBooked
-                ? remainingForRange(v.dailyBooked, v.quantity, start, end)
+                ? remainingForRange(v.dailyBooked, v.quantity, rangeStart, end)
                 : v.quantity;
               const isFull = isFullForRange || (hasRange && remaining <= 0);
               const isDisabled = !v.available || isFull;
@@ -436,6 +478,13 @@ export default function DateRangePicker({
       {hasConflict ? (
         <div style={{ padding: "10px 12px", background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.3)", borderRadius: 6, fontSize: 13, color: "#DC2626", marginBottom: 10, lineHeight: 1.5, fontWeight: 500 }}>
           ⚠️ ช่วงวันที่เลือกชนกับวันที่ไม่ว่าง ({conflictDates.map(fmtThai).join(", ")}) กรุณาเลือกใหม่
+        </div>
+      ) : null}
+
+      {/* Size full for the window (rental nights + transit buffer) */}
+      {!hasConflict && selectedVariantFull ? (
+        <div style={{ padding: "10px 12px", background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.3)", borderRadius: 6, fontSize: 13, color: "#DC2626", marginBottom: 10, lineHeight: 1.5, fontWeight: 500 }}>
+          ⚠️ ไซซ์นี้เต็มสำหรับช่วงวันที่เลือก (รวมวันจัดส่ง) กรุณาเลือกวันอื่นหรือไซซ์อื่น
         </div>
       ) : null}
 

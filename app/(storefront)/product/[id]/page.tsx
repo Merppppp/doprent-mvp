@@ -27,7 +27,7 @@ import {
   computeDailyBookedCounts,
   BOOKING_BLOCKING_STATUSES,
 } from "@/lib/booking-policy";
-import { parseBusinessHours, WEEKDAYS_MON_FIRST } from "@/lib/hours";
+import { parseBusinessHours } from "@/lib/hours";
 
 export const dynamic = "force-dynamic";
 
@@ -533,42 +533,26 @@ export default async function DressPage({ params }: { params: Params }) {
             </div>
           )}
 
-          {/* Shop business hours — so renters see open–close times right where
-              they pick dates. Only shown when the seller has configured them
-              (never fabricated when unset). */}
+          {/* Shop business hours — show only today's open–close, right where
+              renters pick dates. Only shown when the seller has configured
+              hours (never fabricated when unset). */}
           {businessHours ? (
             <div
               style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 12,
                 border: "1px solid var(--line)",
                 borderRadius: 8,
-                padding: 12,
+                padding: "10px 12px",
                 marginBottom: 18,
+                fontSize: 13,
               }}
             >
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6 }}>
-                เวลาทำการ
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 12.5 }}>
-                {WEEKDAYS_MON_FIRST.map(({ idx, th }) => {
-                  const d = businessHours[idx];
-                  const isToday = idx === todayDow;
-                  return (
-                    <div
-                      key={idx}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: 12,
-                        fontWeight: isToday ? 700 : 400,
-                        color: isToday ? "var(--ink-1)" : "var(--ink-3)",
-                      }}
-                    >
-                      <span>{th}{isToday ? " · วันนี้" : ""}</span>
-                      <span>{d && d.open ? `${d.from}–${d.to}` : "ปิด"}</span>
-                    </div>
-                  );
-                })}
-              </div>
+              <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>เวลาทำการ</span>
+              <span style={{ color: "var(--ink-1)" }}>
+                {todayHours && todayHours.open ? `${todayHours.from}–${todayHours.to}` : "ปิด"}
+              </span>
             </div>
           ) : null}
 
@@ -600,6 +584,7 @@ export default async function DressPage({ params }: { params: Params }) {
             blackouts={productWideBlackouts}
             unavailable={unavailable}
             leadTimeDays={effectivePolicy.leadTimeDays}
+            bufferDaysBefore={effectivePolicy.bufferDaysBefore}
             minRentalDays={effectivePolicy.minRentalDays}
             maxRentalDays={effectivePolicy.maxRentalDays}
             productId={dress.id}

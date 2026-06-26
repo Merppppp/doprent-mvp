@@ -137,6 +137,13 @@ export const BOOKING_STATUS_META: Record<
     renterHint: "การเช่าชุดเสร็จสมบูรณ์ ขอบคุณที่ใช้บริการ",
     sellerHint: "ปิดรายการเช่าเรียบร้อย",
   },
+  not_returned: {
+    label: "ไม่ส่งคืนชุด",
+    tone: "danger",
+    terminal: true,
+    renterHint: "ร้านแจ้งว่ายังไม่ได้รับชุดคืน",
+    sellerHint: "ลูกค้าไม่ส่งคืนชุด — ดำเนินการเรื่องมัดจำ/คืนเงินตามนโยบายร้าน",
+  },
 };
 
 export type Actor = "renter" | "seller";
@@ -157,10 +164,11 @@ export const TRANSITIONS: Transition[] = [
   { from: "waiting_for_payment", to: "cancelled", actor: "renter" },
   { from: "waiting_for_payment", to: "payment_review", actor: "renter", requires: "slip_path" },
   { from: "slip_disputed", to: "payment_review", actor: "renter", requires: "slip_path" },
-  // renter cancel-after-payment (→ cancel_requested; requires admin approval)
+  // renter cancel-after-payment (→ cancel_requested; requires admin approval).
+  // Once the rental has started (renting) it can no longer be cancelled — the
+  // dress is already out, so it must run to return/completion.
   { from: "payment_review", to: "cancel_requested", actor: "renter" },
   { from: "confirmed", to: "cancel_requested", actor: "renter" },
-  { from: "renting", to: "cancel_requested", actor: "renter" },
   // seller
   { from: "booking_pending", to: "waiting_for_payment", actor: "seller", requires: "shipping_fee" },
   { from: "booking_pending", to: "rejected", actor: "seller" },
@@ -170,10 +178,11 @@ export const TRANSITIONS: Transition[] = [
   { from: "confirmed", to: "cancel_requested", actor: "seller" },
   { from: "confirmed", to: "renting", actor: "seller" },
   { from: "renting", to: "returned", actor: "seller" },
-  { from: "renting", to: "cancel_requested", actor: "seller" },
+  { from: "renting", to: "not_returned", actor: "seller" },
   // awaiting_return is reached automatically (sweep) at the rental's last day;
   // from there the seller confirms the physical return or escalates a cancel.
   { from: "awaiting_return", to: "returned", actor: "seller" },
+  { from: "awaiting_return", to: "not_returned", actor: "seller" },
   { from: "awaiting_return", to: "cancel_requested", actor: "seller" },
   { from: "returned", to: "completed", actor: "seller" },
 ];
