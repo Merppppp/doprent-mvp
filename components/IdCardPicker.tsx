@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { uploadIdCard } from "@/app/actions/id-cards";
 import type { IdCardItem } from "@/app/actions/id-cards";
+import { prepareImageFileForUpload } from "@/lib/image";
 
 type Props = {
   /** Existing ID cards from getUserIdCards() — newest first. */
@@ -33,8 +34,21 @@ export default function IdCardPicker({ initialCards, inputName = "id_card_path",
     setUploadError("");
     setUploading(true);
 
+    // Downscale to <=1920px + re-encode WebP/JPEG (reuses product-image
+    // compressor). An ID card stays fully legible and shrinks to well under the
+    // server cap, so high-res phone photos no longer get rejected.
+    let prepared: File;
+    try {
+      prepared = await prepareImageFileForUpload(file);
+    } catch (err) {
+      setUploading(false);
+      e.target.value = "";
+      setUploadError(err instanceof Error ? err.message : "ไม่สามารถเตรียมไฟล์รูปภาพได้");
+      return;
+    }
+
     const fd = new FormData();
-    fd.set("id_card", file);
+    fd.set("id_card", prepared);
     const res = await uploadIdCard(fd);
 
     setUploading(false);
