@@ -85,3 +85,13 @@ export async function getSignedPrivateUrl(key: string, expiresIn = 1800): Promis
     { expiresIn }
   );
 }
+
+/** Delete a private object from the private bucket by key. */
+export async function deletePrivateFromR2(key: string): Promise<void> {
+  await r2.send(
+    new DeleteObjectCommand({
+      Bucket: R2_PRIVATE_BUCKET,
+      Key: key,
+    })
+  );
+}

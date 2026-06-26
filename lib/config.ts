@@ -19,6 +19,12 @@ export const UPLOAD_MAX_BYTES = 2 * 1024 * 1024;
 /** 5 MB hard limit — payment-slip uploads in booking flow */
 export const BOOKING_SLIP_MAX_BYTES = 5 * 1024 * 1024;
 
+/** 5 MB hard limit — national ID card photo uploads */
+export const ID_CARD_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Maximum number of ID card photos stored per user (sliding window) */
+export const MAX_ID_CARDS_PER_USER = 3;
+
 // ---------------------------------------------------------------------------
 // Pagination page sizes
 // ---------------------------------------------------------------------------

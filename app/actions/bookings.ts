@@ -286,6 +286,12 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
     lineItems = [{ productId, variantId: variantIdRaw, qty: 1 }];
   }
 
+  // ID card path: mandatory for online bookings, optional for walk-in.
+  const idCardPath = String(formData.get("id_card_path") ?? "").trim() || null;
+  const bookingSource = String(formData.get("source") ?? "online").trim() || "online";
+  if (bookingSource === "online" && !idCardPath)
+    return { ok: false, error: "กรุณาแนบรูปถ่ายบัตรประชาชนก่อนจอง" };
+
   if (!addressId || !startDate || !endDate)
     return { ok: false, error: "ข้อมูลการจองไม่ครบ" };
   if (endDate < startDate) return { ok: false, error: "วันคืนชุดต้องไม่ก่อนวันรับ" };
@@ -297,6 +303,16 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
     });
     if (pendingCount >= 3)
       return { ok: false, error: "มีคำขอจองที่รอร้านอยู่ 3 รายการแล้ว รอร้านตอบก่อนนะ" };
+
+    // Validate that the provided id_card_path belongs to this user (security check).
+    if (idCardPath) {
+      const cardOwner = await db.userIdCard.findFirst({
+        where: { path: idCardPath, userId: user.id },
+        select: { id: true },
+      });
+      if (!cardOwner)
+        return { ok: false, error: "ภาพบัตรประชาชนไม่ถูกต้อง กรุณาเลือกใหม่" };
+    }
 
     // ── Load products for all line items ──────────────────────────────────────
     // We need: name, shopId, pricePerDay, priceTiers, deposit, status, available, policy, shop.
@@ -650,6 +666,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
               addressText: addr.addressLine,
               deliveryMethod,
               deliveryCarrier,
+              idCardPath: idCardPath ?? undefined,
               items: { create: itemCreateRows },
             },
             select: { id: true },
@@ -704,6 +721,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
           addressText: addr.addressLine,
           deliveryMethod,
           deliveryCarrier,
+          idCardPath: idCardPath ?? undefined,
           items: { create: itemCreateRows },
         },
         select: { id: true },

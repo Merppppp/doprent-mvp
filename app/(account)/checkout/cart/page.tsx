@@ -6,6 +6,7 @@ import { getMyAddresses } from "@/lib/booking-queries";
 import { db } from "@/lib/db";
 import { parseBusinessHours } from "@/lib/hours";
 import CartCheckoutForm from "@/components/CartCheckoutForm";
+import { getUserIdCards } from "@/app/actions/id-cards";
 
 export const dynamic = "force-dynamic";
 
@@ -30,12 +31,13 @@ export default async function CartCheckoutPage({ searchParams }: { searchParams:
     return <Fallback msg="ลิงก์การจองไม่สมบูรณ์ กรุณากลับไปที่ตะกร้า" href="/cart" />;
   }
 
-  const [addresses, shopRow] = await Promise.all([
+  const [addresses, shopRow, idCards] = await Promise.all([
     getMyAddresses(),
     db.shop.findUnique({
       where: { id: shopId },
       select: { name: true, hours: true, isOpen: true },
     }),
+    getUserIdCards(),
   ]);
 
   const shopHours = shopRow ? parseBusinessHours(shopRow.hours) : null;
@@ -65,6 +67,7 @@ export default async function CartCheckoutPage({ searchParams }: { searchParams:
         addresses={addresses}
         shopHours={shopHours}
         shopIsOpen={shopIsOpen}
+        idCards={idCards}
       />
     </div>
   );

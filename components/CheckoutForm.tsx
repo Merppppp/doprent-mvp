@@ -7,6 +7,8 @@ import { priceForNights } from "@/lib/pricing";
 import type { Address, PriceTier } from "@/lib/types";
 import { fmtThai } from "@/lib/date-th";
 import type { BusinessHours } from "@/lib/hours";
+import type { IdCardItem } from "@/app/actions/id-cards";
+import IdCardPicker from "@/components/IdCardPicker";
 
 type Props = {
   productId: string;
@@ -23,6 +25,8 @@ type Props = {
   variantId?: string | null;
   shopHours?: BusinessHours | null;
   shopIsOpen?: boolean;
+  /** ID card photos already uploaded by this user. */
+  idCards?: IdCardItem[];
 };
 
 /** Local "today" as YYYY-MM-DD (browser clock = the renter's wall clock). */
@@ -63,6 +67,7 @@ export default function CheckoutForm({
   variantId,
   shopHours,
   shopIsOpen,
+  idCards = [],
 }: Props) {
   const router = useRouter();
   const [addresses, setAddresses] = useState<Address[]>(initialAddresses);
@@ -73,6 +78,11 @@ export default function CheckoutForm({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  // ID card state — tracks which path is currently selected in IdCardPicker.
+  const [selectedIdCardPath, setSelectedIdCardPath] = useState<string>(
+    idCards[0]?.path ?? "",
+  );
 
   // Delivery state
   const [deliveryMethod, setDeliveryMethod] = useState<"express" | "standard" | null>(null);
@@ -178,6 +188,10 @@ export default function CheckoutForm({
       setError("กรุณาเลือกที่อยู่จัดส่ง");
       return;
     }
+    if (!selectedIdCardPath) {
+      setError("กรุณาแนบรูปถ่ายบัตรประชาชน");
+      return;
+    }
     setError("");
     setBusy(true);
     const fd = new FormData();
@@ -189,6 +203,7 @@ export default function CheckoutForm({
     if (endTime) fd.set("end_time", endTime);
     if (variantId) fd.set("variant_id", variantId);
     fd.set("delivery_method", deliveryMethod);
+    fd.set("id_card_path", selectedIdCardPath);
     const res = await createBooking(fd);
     if (!res.ok) {
       setBusy(false);
@@ -542,6 +557,21 @@ export default function CheckoutForm({
         )}
       </section>
 
+      {/* ═══ 4. ID card photo ═══ */}
+      <section>
+        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
+          <StepNum n={4} /> ภาพถ่ายบัตรประชาชน <Req />
+        </h2>
+        <p style={{ fontSize: 13, color: "var(--ink-3)", marginBottom: 12 }}>
+          ร้านต้องการบัตรประชาชนเพื่อยืนยันตัวตนผู้เช่า
+        </p>
+        <IdCardPicker
+          initialCards={idCards}
+          inputName="id_card_path"
+          onSelect={setSelectedIdCardPath}
+        />
+      </section>
+
       {error ? (
         <div
           style={{
@@ -569,12 +599,18 @@ export default function CheckoutForm({
           กรุณาเลือกหรือเพิ่มที่อยู่จัดส่ง
         </div>
       )}
+      {deliveryComplete && selectedId && !selectedIdCardPath && (
+        <div style={{ fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          กรุณาแนบรูปถ่ายบัตรประชาชน
+        </div>
+      )}
 
       <button
         type="button"
         className="btn btn-primary btn-lg"
         onClick={onConfirm}
-        disabled={busy || !deliveryComplete || !selectedId}
+        disabled={busy || !deliveryComplete || !selectedId || !selectedIdCardPath}
         style={{ padding: "14px 20px", fontSize: 15 }}
       >
         {busy ? "กำลังส่งคำขอ…" : "ยืนยันจอง"}

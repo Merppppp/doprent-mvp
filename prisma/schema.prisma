@@ -316,6 +316,7 @@ model User {
   shopSubscriptions ShopSubscription[]
   favorites         Favorite[]
   reviews           Review[]           @relation("UserReviews")
+  idCards           UserIdCard[]
 
   @@index([lastActiveAt(sort: Desc)])
   @@index([signupChannel])
@@ -844,6 +845,27 @@ model Favorite {
   @@map("favorites")
 }
 
+/// ภาพถ่ายบัตรประชาชนของผู้ใช้ — เก็บได้สูงสุด 3 รูปต่อคน (sliding window: เพิ่มรูปที่ 4 จะลบรูปเก่าสุดอัตโนมัติ)
+/// ใช้แนบกับการจองออนไลน์ (Booking.idCardPath) เพื่อให้ร้านยืนยันตัวตนผู้เช่า
+model UserIdCard {
+  /// Primary key (uuid)
+  id     String @id @default(uuid()) @db.Uuid
+  /// FK → users.id (Cascade)
+  userId String @map("user_id") @db.Uuid
+  /// R2 private bucket key (เช่น "id-cards/{userId}/{uuid}.jpg")
+  path   String
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_id_cards")
+}
+
 // ---------------------------------------------------------------------------
 // KYC
 // ---------------------------------------------------------------------------
@@ -1158,6 +1180,9 @@ model Booking {
   source       String? @map("source")
   /// หมายเหตุภายในร้าน (ไม่แสดงต่อลูกค้า)
   internalNote String? @map("internal_note")
+
+  /// snapshot path ของบัตรประชาชนที่ใช้ในการจองนี้ (private bucket key)
+  idCardPath String? @map("id_card_path")
 
   /// วิธีจัดส่ง: "express" (ส่งด่วนภายในวัน) | "standard" (ขนส่งพัสดุ)
   deliveryMethod  String? @map("delivery_method")
