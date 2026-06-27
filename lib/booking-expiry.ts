@@ -2,68 +2,74 @@ import { db } from "@/lib/db";
 import { AUTO_COMPLETE_AFTER_RETURN_DAYS } from "@/lib/bookings";
 import { notifyReturnDue, notifyReturnOverdue } from "@/lib/notifications";
 
+// ---------------------------------------------------------------------------
+// Job 1: Payment expiry (every 5 min)
+// ---------------------------------------------------------------------------
+
 /**
- * Lazy payment-expiry sweep: flips every booking that is still
- * `waiting_for_payment` past its `currentDueAt` to `payment_expired`.
+ * Flips `waiting_for_payment` bookings past their `currentDueAt` to
+ * `payment_expired` and releases the reserved unit.
  *
- * Also auto-transitions `confirmed` → `renting` when `start_date` has arrived
- * (only for paid bookings — status must be `confirmed`), and
- * `renting` → `awaiting_return` at 00:00 of the rental's last day (`end_date`),
- * so the seller sees a "รอคืนของ" prompt. The dress unit stays `rented`
- * (awaiting_return still blocks stock) until the seller confirms the return.
- *
- * Also auto-closes `returned` → `completed` once the settlement window
- * (AUTO_COMPLETE_AFTER_RETURN_DAYS since `returnedAt`) has elapsed, so finished
- * rentals don't sit open if the seller forgets to close them.
- *
- * Called opportunistically at the top of the booking list loaders
- * (/admin/bookings, /sell/bookings, /account/bookings) so users never see a
- * stale booking, and exposed via POST /api/cron/expire-payments for a real
- * scheduler later. The updateMany WHERE clause makes it idempotent and
- * race-safe — concurrent sweeps simply match zero rows.
- *
- * Returns the number of bookings affected.
+ * Idempotent — concurrent sweeps match zero rows.
  */
-export async function expireOverdueBookings(): Promise<number> {
+export async function expirePayments(): Promise<{ expired: number }> {
+  const now = new Date();
+
+  // Null the item unit linkage BEFORE the status flip so the WHERE clause
+  // (waiting_for_payment + overdue) still matches.
+  await db.bookingItem.updateMany({
+    where: { unitId: { not: null }, booking: { status: "waiting_for_payment", currentDueAt: { lt: now } } },
+    data: { unitId: null },
+  });
+
+  const expired = await db.booking.updateMany({
+    where: { status: "waiting_for_payment", currentDueAt: { lt: now } },
+    data: { status: "payment_expired", cancelledBy: "system" },
+  });
+
+  return { expired: expired.count };
+}
+
+// ---------------------------------------------------------------------------
+// Job 2: Daily lifecycle (once/day 00:05 Bangkok)
+// ---------------------------------------------------------------------------
+
+/**
+ * Date-based status transitions that only change at day boundaries:
+ *   - `confirmed` → `renting` (startDate arrived)
+ *   - `renting` → `awaiting_return` (endDate arrived)
+ *   - `returned` → `completed` (settlement window elapsed)
+ *
+ * Also marks units as `rented` when the rental physically starts.
+ * Idempotent — concurrent sweeps match zero rows.
+ */
+export async function advanceDailyLifecycle(): Promise<{
+  startedRenting: number;
+  awaitingReturn: number;
+  autoCompleted: number;
+}> {
   const now = new Date();
   const todayStart = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
   todayStart.setHours(0, 0, 0, 0);
 
-  // Units that are about to go physically out the door (confirmed → renting today).
+  // Units about to go physically out the door (confirmed → renting today).
   const startingItems = await db.bookingItem.findMany({
     where: { unitId: { not: null }, booking: { status: "confirmed", startDate: { lte: todayStart } } },
     select: { unitId: true },
   });
   const rentingUnitIds = startingItems.map((i) => i.unitId).filter((id): id is string => !!id);
 
-  // Auto-close bookings parked in `returned` past the settlement window.
   const completeCutoff = new Date(now.getTime() - AUTO_COMPLETE_AFTER_RETURN_DAYS * 24 * 3600 * 1000);
 
-  // Null the item unit linkage for expired bookings BEFORE the status flip so the
-  // WHERE clause (waiting_for_payment + overdue) still matches.
-  await db.bookingItem.updateMany({
-    where: { unitId: { not: null }, booking: { status: "waiting_for_payment", currentDueAt: { lt: now } } },
-    data: { unitId: null },
-  });
-
-  const [expired, startedRenting, awaitingReturn, autoCompleted] = await Promise.all([
-    // Forfeit the hold: a missed 3h payment window releases the reserved unit
-    // (unit was never physically out, so its own status stays 'available').
-    db.booking.updateMany({
-      where: { status: "waiting_for_payment", currentDueAt: { lt: now } },
-      data: { status: "payment_expired", cancelledBy: "system" },
-    }),
+  const [startedRenting, awaitingReturn, autoCompleted] = await Promise.all([
     db.booking.updateMany({
       where: { status: "confirmed", startDate: { lte: todayStart } },
       data: { status: "renting" },
     }),
-    // Last rental day has arrived: prompt the seller to receive the dress back.
-    // Unit stays 'rented' (still physically out) until the seller confirms.
     db.booking.updateMany({
       where: { status: "renting", endDate: { lte: todayStart } },
       data: { status: "awaiting_return" },
     }),
-    // Settlement window elapsed since the dress came back: auto-close the rental.
     db.booking.updateMany({
       where: { status: "returned", returnedAt: { lte: completeCutoff } },
       data: { status: "completed" },
@@ -78,7 +84,26 @@ export async function expireOverdueBookings(): Promise<number> {
     });
   }
 
-  return expired.count + startedRenting.count + awaitingReturn.count + autoCompleted.count;
+  return {
+    startedRenting: startedRenting.count,
+    awaitingReturn: awaitingReturn.count,
+    autoCompleted: autoCompleted.count,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Combined (backward-compat for lazy page-load sweep)
+// ---------------------------------------------------------------------------
+
+/**
+ * Runs ALL auto-transitions in one shot. Called opportunistically at the
+ * top of booking list loaders so users never see stale bookings.
+ * For scheduled cron, use the individual functions above instead.
+ */
+export async function expireOverdueBookings(): Promise<number> {
+  const { expired } = await expirePayments();
+  const { startedRenting, awaitingReturn, autoCompleted } = await advanceDailyLifecycle();
+  return expired + startedRenting + awaitingReturn + autoCompleted;
 }
 
 /** Today's date in Asia/Bangkok as a YYYY-MM-DD string. */
