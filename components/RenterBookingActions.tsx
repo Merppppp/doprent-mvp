@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { cancelBooking, uploadSlip, escalateDispute, requestCancelAfterPayment, submitReturnTracking } from "@/app/actions/bookings";
+import { cancelBooking, uploadSlip, escalateDispute, escalateReturnDispute, requestCancelAfterPayment, submitReturnTracking } from "@/app/actions/bookings";
 import { startProgress, doneProgress } from "@/lib/progress";
+import { useConfirm } from "@/components/ConfirmProvider";
 import type { BookingStatus } from "@/lib/types";
 
 type Props = {
@@ -16,9 +17,12 @@ type Props = {
   returnMethod?: string | null;
   /** Whether the renter has already submitted return tracking. */
   returnShipped?: boolean;
+  /** ISO string of the currentDueAt deadline (used for return dispute countdown). */
+  currentDueAt?: string | null;
 };
 
-export default function RenterBookingActions({ bookingId, status, canPay, disputeReason, disputeNote, returnMethod = null, returnShipped = false }: Props) {
+export default function RenterBookingActions({ bookingId, status, canPay, disputeReason, disputeNote, returnMethod = null, returnShipped = false, currentDueAt }: Props) {
+  const confirm = useConfirm();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -28,6 +32,7 @@ export default function RenterBookingActions({ bookingId, status, canPay, disput
   const inputRef = useRef<HTMLInputElement>(null);
   const [showEscalate, setShowEscalate] = useState(false);
   const [showCancelRequest, setShowCancelRequest] = useState(false);
+  const [showReturnDispute, setShowReturnDispute] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
   function handleFile(file: File) {
@@ -82,7 +87,6 @@ export default function RenterBookingActions({ bookingId, status, canPay, disput
       const res = await uploadSlip(bookingId, fd);
       if (!res.ok) {
         setError(res.error);
-        setBusy(false);
         return;
       }
       if (preview) URL.revokeObjectURL(preview);
@@ -91,14 +95,14 @@ export default function RenterBookingActions({ bookingId, status, canPay, disput
       router.refresh();
     } catch (err) {
       setError((err as Error).message);
-      setBusy(false);
     } finally {
+      setBusy(false);
       doneProgress();
     }
   }
 
   async function onCancel() {
-    if (!confirm("ยืนยันยกเลิกการจองนี้?")) return;
+    if (!(await confirm({ message: "ยืนยันยกเลิกการจองนี้?", variant: "danger", confirmLabel: "ยกเลิกการจอง" }))) return;
     setError("");
     setBusy(true);
     startProgress();
@@ -106,11 +110,11 @@ export default function RenterBookingActions({ bookingId, status, canPay, disput
       const res = await cancelBooking(bookingId);
       if (!res.ok) {
         setError(res.error);
-        setBusy(false);
         return;
       }
       router.refresh();
     } finally {
+      setBusy(false);
       doneProgress();
     }
   }
@@ -403,6 +407,52 @@ export default function RenterBookingActions({ bookingId, status, canPay, disput
         </div>
       ) : null}
 
+      {/* ── Return dispute: renter can dispute "not returned" ── */}
+      {status === "not_returned" && (
+        <div className="rounded-xl border border-[var(--danger)] bg-[var(--danger-soft)] p-4">
+          <div className="mb-1 text-sm font-bold text-[var(--danger)]">
+            ร้านแจ้งว่าคุณไม่ได้คืนสินค้า
+          </div>
+          <p className="mb-3 text-[13px] leading-relaxed text-[var(--ink-2)]">
+            หากคุณส่งคืนแล้ว สามารถโต้แย้งได้ภายใน 48 ชม. แอดมินจะตรวจสอบและตัดสินให้
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary w-full py-3 text-sm font-semibold"
+            onClick={() => setShowReturnDispute(true)}
+            disabled={busy}
+          >
+            โต้แย้ง · ฉันส่งคืนแล้ว
+          </button>
+        </div>
+      )}
+
+      {/* ── Return dispute waiting ── */}
+      {status === "return_disputed" && (
+        <div className="rounded-xl border border-[var(--warn)] bg-[var(--warn-soft)] p-4">
+          <div className="mb-1 text-sm font-bold text-[var(--warn)]">
+            รอแอดมินตรวจสอบข้อโต้แย้ง
+          </div>
+          {disputeNote ? (
+            <div className="my-2 rounded-lg bg-white/60 p-3 text-[13px] text-[var(--ink-2)]">
+              ข้อความของคุณ: {disputeNote}
+            </div>
+          ) : null}
+          {currentDueAt ? (
+            <p className="text-xs text-[var(--ink-3)]">
+              แอดมินจะตัดสินภายใน{" "}
+              {new Date(currentDueAt).toLocaleString("th-TH", {
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Asia/Bangkok",
+              })}
+            </p>
+          ) : null}
+        </div>
+      )}
+
       {canCancel ? (
         <button type="button" className="btn btn-outline" onClick={onCancel} disabled={busy}>
           ยกเลิกการจอง
@@ -461,11 +511,11 @@ export default function RenterBookingActions({ bookingId, status, canPay, disput
               const res = await escalateDispute(bookingId, note);
               if (!res.ok) {
                 setError(res.error);
-                setBusy(false);
                 return;
               }
               router.refresh();
             } finally {
+              setBusy(false);
               doneProgress();
             }
           }}
@@ -486,11 +536,36 @@ export default function RenterBookingActions({ bookingId, status, canPay, disput
               const res = await requestCancelAfterPayment(bookingId, reason);
               if (!res.ok) {
                 setError(res.error);
-                setBusy(false);
                 return;
               }
               router.refresh();
             } finally {
+              setBusy(false);
+              doneProgress();
+            }
+          }}
+        />
+      )}
+
+      {/* ── Return dispute modal ── */}
+      {showReturnDispute && (
+        <ReturnDisputeModal
+          busy={busy}
+          onClose={() => setShowReturnDispute(false)}
+          onSubmit={async (note) => {
+            setShowReturnDispute(false);
+            setBusy(true);
+            setError("");
+            startProgress();
+            try {
+              const res = await escalateReturnDispute(bookingId, note);
+              if (!res.ok) {
+                setError(res.error);
+                return;
+              }
+              router.refresh();
+            } finally {
+              setBusy(false);
               doneProgress();
             }
           }}
@@ -703,11 +778,11 @@ function ReturnTrackingForm({
       });
       if (!res.ok) {
         setError(res.error ?? "ส่งข้อมูลไม่สำเร็จ");
-        setBusy(false);
         return;
       }
       router.refresh();
     } finally {
+      setBusy(false);
       doneProgress();
     }
   }
@@ -791,6 +866,95 @@ function ReturnTrackingForm({
         >
           {parentBusy ? "กำลังส่ง..." : "ยืนยันส่งคืนสินค้า"}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ReturnDisputeModal({
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (note: string) => void;
+}) {
+  const [note, setNote] = useState("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          background: "var(--bg, #fff)",
+          borderRadius: 14,
+          width: "100%",
+          maxWidth: 420,
+          padding: "22px 20px 18px",
+          boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
+        }}
+      >
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+          โต้แย้งการไม่คืนของ
+        </h3>
+        <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginBottom: 14, lineHeight: 1.5 }}>
+          อธิบายว่าคุณได้คืนสินค้าอย่างไร เช่น ส่งคืนเมื่อไหร่ ผ่านช่องทางไหน มีเลขพัสดุอะไร — แอดมินจะตรวจสอบและตัดสินภายใน 48 ชม.
+        </p>
+        <textarea
+          ref={inputRef}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="เช่น ส่งคืนทาง Kerry เมื่อ 25/06 เลขพัสดุ TH123456..."
+          rows={4}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            fontSize: 14,
+            fontFamily: "inherit",
+            resize: "vertical",
+            background: "var(--surface)",
+            color: "var(--ink)",
+            boxSizing: "border-box",
+          }}
+        />
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={onClose}
+            style={{ flex: 1, padding: "10px 0" }}
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy || !note.trim()}
+            onClick={() => onSubmit(note.trim())}
+            style={{ flex: 1, padding: "10px 0", fontWeight: 600 }}
+          >
+            ส่งให้แอดมินตรวจสอบ
+          </button>
+        </div>
       </div>
     </div>
   );

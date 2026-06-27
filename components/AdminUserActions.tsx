@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import type { Role } from "@prisma/client";
 import { changeUserRole, setUserSuspension } from "@/app/actions/admin-users";
+import { usePrompt } from "@/components/ConfirmProvider";
 
 const ROLE_LABEL: Record<Role, string> = {
   customer: "ลูกค้า",
@@ -22,6 +23,7 @@ export default function AdminUserActions({
   /** The current admin's own row — actions are disabled to prevent self-lockout. */
   isSelf: boolean;
 }) {
+  const showPrompt = usePrompt();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -38,11 +40,11 @@ export default function AdminUserActions({
     });
   };
 
-  const onSuspend = () => {
+  const onSuspend = async () => {
     setError(null);
     let reason: string | undefined;
     if (!suspended) {
-      const input = window.prompt("เหตุผลในการระงับบัญชี (ไม่บังคับ):", "");
+      const input = await showPrompt({ message: "เหตุผลในการระงับบัญชี (ไม่บังคับ)", placeholder: "ระบุเหตุผล..." });
       if (input === null) return; // cancelled
       reason = input;
     }

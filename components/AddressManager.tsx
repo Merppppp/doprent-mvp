@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { addAddress, updateAddress, deleteAddress, setDefaultAddress } from "@/app/actions/bookings";
+import { useConfirm } from "@/components/ConfirmProvider";
 import type { Address } from "@/lib/types";
 
 type Props = { addresses: Address[] };
@@ -15,6 +16,7 @@ type Mode = { kind: "none" } | { kind: "add" } | { kind: "edit"; id: string };
  * persist and revalidate both /account/addresses and /checkout/address.
  */
 export default function AddressManager({ addresses: initial }: Props) {
+  const confirm = useConfirm();
   const [addresses, setAddresses] = useState<Address[]>(initial);
   const [mode, setMode] = useState<Mode>(initial.length === 0 ? { kind: "add" } : { kind: "none" });
   const [busy, setBusy] = useState(false);
@@ -62,7 +64,7 @@ export default function AddressManager({ addresses: initial }: Props) {
   }
 
   async function onDelete(id: string) {
-    if (!confirm("ลบที่อยู่นี้?")) return;
+    if (!(await confirm({ message: "ลบที่อยู่นี้?", variant: "danger", confirmLabel: "ลบ" }))) return;
     setError("");
     setBusy(true);
     const fd = new FormData();

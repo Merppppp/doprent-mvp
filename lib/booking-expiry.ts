@@ -1,6 +1,12 @@
 import { db } from "@/lib/db";
 import { AUTO_COMPLETE_AFTER_RETURN_DAYS } from "@/lib/bookings";
-import { notifyReturnDue, notifyReturnOverdue } from "@/lib/notifications";
+import {
+  notifyReturnDue,
+  notifyReturnOverdue,
+  notifySlipReviewReminder,
+  notifySlipAutoConfirmed,
+  notifyReturnDisputeResolved,
+} from "@/lib/notifications";
 
 // ---------------------------------------------------------------------------
 // Job 1: Payment expiry (every 5 min)
@@ -95,6 +101,77 @@ export async function advanceDailyLifecycle(): Promise<{
 // Combined (backward-compat for lazy page-load sweep)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Job 3: Auto-resolve return disputes (48h timeout)
+// ---------------------------------------------------------------------------
+
+/**
+ * Auto-resolves `return_disputed` bookings whose 48h window has elapsed.
+ * Resolves in the RENTER's favor (benefit of doubt if admin doesn't act).
+ * Also restores units from "lost" → "available".
+ */
+export async function autoResolveReturnDisputes(): Promise<{ resolved: number }> {
+  const now = new Date();
+
+  const candidates = await db.booking.findMany({
+    where: {
+      status: "return_disputed",
+      currentDueAt: { lt: now },
+    },
+    select: {
+      id: true,
+      renter: { select: { email: true } },
+      shop: { select: { owner: { select: { email: true } } } },
+      items: {
+        select: {
+          unitId: true,
+          product: { select: { name: true } },
+        },
+      },
+    },
+  });
+
+  if (candidates.length === 0) return { resolved: 0 };
+
+  for (const b of candidates) {
+    await db.$transaction(async (tx) => {
+      await tx.booking.updateMany({
+        where: { id: b.id, status: "return_disputed" },
+        data: {
+          status: "returned",
+          currentDueAt: null,
+          returnedAt: new Date(),
+          cancelReason: "ข้อโต้แย้งถูกพิจารณาอัตโนมัติ (ครบ 48 ชม.) — ตัดสินให้ผู้เช่า",
+        },
+      });
+
+      // Restore units from lost → available
+      const itemUnitIds = b.items.map((i) => i.unitId).filter((x): x is string => !!x);
+      if (itemUnitIds.length > 0) {
+        await tx.productUnit.updateMany({
+          where: { id: { in: itemUnitIds } },
+          data: { status: "available", lostFromBookingId: null, note: null },
+        });
+      }
+    });
+
+    // Fire-and-forget notifications
+    notifyReturnDisputeResolved({
+      renterEmail: b.renter?.email,
+      sellerEmail: b.shop?.owner?.email,
+      dressName: b.items[0]?.product?.name ?? "ชุดที่จอง",
+      bookingId: b.id,
+      resolution: "accept_return",
+    });
+  }
+
+  return { resolved: candidates.length };
+}
+
+// ---------------------------------------------------------------------------
+// Combined (backward-compat for lazy page-load sweep)
+// ---------------------------------------------------------------------------
+
 /**
  * Runs ALL auto-transitions in one shot. Called opportunistically at the
  * top of booking list loaders so users never see stale bookings.
@@ -103,7 +180,8 @@ export async function advanceDailyLifecycle(): Promise<{
 export async function expireOverdueBookings(): Promise<number> {
   const { expired } = await expirePayments();
   const { startedRenting, awaitingReturn, autoCompleted } = await advanceDailyLifecycle();
-  return expired + startedRenting + awaitingReturn + autoCompleted;
+  const { resolved } = await autoResolveReturnDisputes();
+  return expired + startedRenting + awaitingReturn + autoCompleted + resolved;
 }
 
 /** Today's date in Asia/Bangkok as a YYYY-MM-DD string. */
@@ -187,4 +265,101 @@ export async function sendReturnReminders(): Promise<{ due: number; overdue: num
   }
 
   return { due, overdue };
+}
+
+// ---------------------------------------------------------------------------
+// Slip auto-confirm (runs with payment-expiry every 5 min)
+// ---------------------------------------------------------------------------
+
+/**
+ * Auto-confirms payment slips that sellers haven't reviewed before the deadline.
+ * Sweeps `payment_review` bookings where `slipConfirmDueAt` has passed.
+ * Idempotent — concurrent sweeps match zero rows.
+ */
+export async function autoConfirmSlips(): Promise<{ autoConfirmed: number }> {
+  const now = new Date();
+
+  const candidates = await db.booking.findMany({
+    where: {
+      status: "payment_review",
+      slipConfirmDueAt: { lt: now },
+    },
+    select: {
+      id: true,
+      shop: { select: { owner: { select: { email: true } } } },
+      items: { take: 1, select: { product: { select: { name: true } } } },
+    },
+  });
+
+  if (candidates.length === 0) return { autoConfirmed: 0 };
+
+  // Bulk update all at once
+  await db.booking.updateMany({
+    where: {
+      id: { in: candidates.map((c) => c.id) },
+      status: "payment_review",
+    },
+    data: { status: "confirmed" },
+  });
+
+  // Send notifications (fire-and-forget)
+  for (const b of candidates) {
+    notifySlipAutoConfirmed({
+      sellerEmail: b.shop?.owner?.email,
+      dressName: b.items[0]?.product?.name ?? "ชุดที่เช่า",
+      bookingId: b.id,
+    });
+  }
+
+  return { autoConfirmed: candidates.length };
+}
+
+/**
+ * Sends reminders to sellers who haven't reviewed payment slips yet.
+ * Fires at the halfway point of the auto-confirm window.
+ * Guarded by `slipReminderSentAt` to prevent duplicates.
+ */
+export async function sendSlipReminders(): Promise<{ reminded: number }> {
+  const now = new Date();
+
+  const candidates = await db.booking.findMany({
+    where: {
+      status: "payment_review",
+      slipConfirmDueAt: { not: null },
+      slipReminderSentAt: null,
+      paymentReviewAt: { not: null },
+    },
+    select: {
+      id: true,
+      paymentReviewAt: true,
+      slipConfirmDueAt: true,
+      shop: { select: { owner: { select: { email: true } } } },
+      items: { take: 1, select: { product: { select: { name: true } } } },
+    },
+  });
+
+  let reminded = 0;
+  for (const b of candidates) {
+    if (!b.paymentReviewAt || !b.slipConfirmDueAt) continue;
+
+    // Send reminder at halfway point
+    const totalMs = b.slipConfirmDueAt.getTime() - b.paymentReviewAt.getTime();
+    const halfwayAt = new Date(b.paymentReviewAt.getTime() + totalMs / 2);
+
+    if (now >= halfwayAt) {
+      notifySlipReviewReminder({
+        sellerEmail: b.shop?.owner?.email,
+        dressName: b.items[0]?.product?.name ?? "ชุดที่เช่า",
+        bookingId: b.id,
+        deadline: b.slipConfirmDueAt,
+      });
+      await db.booking.update({
+        where: { id: b.id },
+        data: { slipReminderSentAt: now },
+      });
+      reminded++;
+    }
+  }
+
+  return { reminded };
 }

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { withActor } from "@/lib/db-context";
-import { uploadPrivateToR2, deletePrivateFromR2, getSignedPrivateUrl } from "@/lib/r2";
+import { uploadPrivateToR2, deletePrivateFromR2, privateImageUrl } from "@/lib/r2";
 import { detectSlipMime } from "@/lib/file-mime";
 import { ID_CARD_MAX_BYTES, MAX_ID_CARDS_PER_USER } from "@/lib/config";
 
@@ -93,12 +93,10 @@ export async function getUserIdCards(): Promise<IdCardItem[]> {
     select: { id: true, path: true, createdAt: true },
   });
 
-  return Promise.all(
-    rows.map(async (r) => ({
-      id: r.id,
-      path: r.path,
-      signedUrl: await getSignedPrivateUrl(r.path),
-      createdAt: r.createdAt.toISOString(),
-    })),
-  );
+  return rows.map((r) => ({
+    id: r.id,
+    path: r.path,
+    signedUrl: privateImageUrl(r.path),
+    createdAt: r.createdAt.toISOString(),
+  }));
 }

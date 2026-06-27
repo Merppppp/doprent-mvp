@@ -10,14 +10,20 @@ import {
   adminRejectSlip,
   recordRefund,
 } from "@/app/actions/admin";
+import { adminResolveReturnDispute } from "@/app/actions/bookings";
 import type { BookingStatus } from "@/lib/types";
 import { BOOKING_STATUS_META } from "@/lib/bookings";
+import { useConfirm, usePrompt } from "@/components/ConfirmProvider";
 
 type Props = {
   bookingId: string;
   status: BookingStatus;
   /** Passed in from the server page so the approve form and refund form render correctly. */
   refundStatus?: string | null;
+  /** Renter's dispute note (for return_disputed). */
+  disputeNote?: string | null;
+  /** Auto-resolve deadline ISO string (for return_disputed). */
+  currentDueAt?: string | null;
 };
 
 type ActionDef = {
@@ -67,7 +73,9 @@ const ACTIONS: Partial<Record<BookingStatus, ActionDef[]>> = {
   ],
 };
 
-export default function AdminBookingActions({ bookingId, status, refundStatus }: Props) {
+export default function AdminBookingActions({ bookingId, status, refundStatus, disputeNote, currentDueAt }: Props) {
+  const showConfirm = useConfirm();
+  const showPrompt = usePrompt();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -82,13 +90,16 @@ export default function AdminBookingActions({ bookingId, status, refundStatus }:
   async function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
     setError("");
     setBusy(true);
-    const res = await fn();
-    if (!res.ok) {
-      setError(res.error ?? "ทำรายการไม่สำเร็จ");
+    try {
+      const res = await fn();
+      if (!res.ok) {
+        setError(res.error ?? "ทำรายการไม่สำเร็จ");
+        return;
+      }
+      router.refresh();
+    } finally {
       setBusy(false);
-      return;
     }
-    router.refresh();
   }
 
   const actions = ACTIONS[status];
@@ -111,9 +122,9 @@ export default function AdminBookingActions({ bookingId, status, refundStatus }:
               ...(a.variant === "danger" ? { background: "var(--danger)", borderColor: "var(--danger)" } : {}),
             }}
             disabled={busy}
-            onClick={() => {
-              if (a.confirm && !confirm(a.confirm)) return;
-              const note = prompt("หมายเหตุ (ไม่บังคับ)") ?? undefined;
+            onClick={async () => {
+              if (a.confirm && !(await showConfirm(a.confirm))) return;
+              const note = (await showPrompt({ message: "หมายเหตุ (ไม่บังคับ)", placeholder: "ระบุหมายเหตุ..." })) ?? undefined;
               if (a.fn) {
                 run(() => a.fn!(bookingId));
               } else if (a.target) {
@@ -155,9 +166,9 @@ export default function AdminBookingActions({ bookingId, status, refundStatus }:
               className="btn flex-1 text-sm"
               style={{ padding: "10px 0", background: "var(--danger)", borderColor: "var(--danger)", color: "#fff" }}
               disabled={busy}
-              onClick={() => {
-                if (!confirm("อนุมัติยกเลิกการจองนี้?")) return;
-                const note = prompt("หมายเหตุ admin (ไม่บังคับ)") ?? undefined;
+              onClick={async () => {
+                if (!(await showConfirm({ message: "อนุมัติยกเลิกการจองนี้?", variant: "danger", confirmLabel: "อนุมัติยกเลิก" }))) return;
+                const note = (await showPrompt({ message: "หมายเหตุ admin (ไม่บังคับ)", placeholder: "ระบุหมายเหตุ..." })) ?? undefined;
                 const amt = approveRefundAmount ? Number(approveRefundAmount) : undefined;
                 const nt = approveRefundNote.trim() || undefined;
                 run(() => adminApproveCancel(bookingId, note, amt, nt));
@@ -170,13 +181,61 @@ export default function AdminBookingActions({ bookingId, status, refundStatus }:
               className="btn btn-outline flex-1 text-sm"
               style={{ padding: "10px 0" }}
               disabled={busy}
-              onClick={() => {
-                if (!confirm("คืนสถานะก่อนหน้า?")) return;
-                const note = prompt("หมายเหตุ (ไม่บังคับ)") ?? undefined;
+              onClick={async () => {
+                if (!(await showConfirm("คืนสถานะก่อนหน้า?"))) return;
+                const note = (await showPrompt({ message: "หมายเหตุ (ไม่บังคับ)", placeholder: "ระบุหมายเหตุ..." })) ?? undefined;
                 run(() => adminDenyCancel(bookingId, note));
               }}
             >
               ไม่อนุมัติ · คืนสถานะเดิม
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── return_disputed: admin resolves ── */}
+      {status === "return_disputed" ? (
+        <div className="rounded-xl border border-[var(--warn)] bg-[var(--warn-soft)] p-4 flex flex-col gap-3">
+          <div className="text-sm font-bold text-[var(--warn)]">ผู้เช่าโต้แย้งการไม่คืนของ</div>
+          {disputeNote ? (
+            <div className="rounded-lg bg-white/60 p-3 text-[13px] text-[var(--ink-2)]">
+              ข้อความผู้เช่า: {disputeNote}
+            </div>
+          ) : null}
+          {currentDueAt ? (
+            <p className="text-xs text-[var(--ink-3)]">
+              จะถูกตัดสินอัตโนมัติ (ให้ผู้เช่า) เมื่อ{" "}
+              {new Date(currentDueAt).toLocaleString("th-TH", {
+                day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok",
+              })}
+            </p>
+          ) : null}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="btn btn-primary flex-1 text-sm"
+              style={{ padding: "10px 0" }}
+              disabled={busy}
+              onClick={async () => {
+                if (!(await showConfirm({ message: "ยอมรับ — สินค้าคืนแล้ว? (ผู้เช่าถูก)", confirmLabel: "ยอมรับ" }))) return;
+                const note = (await showPrompt({ message: "หมายเหตุ (ไม่บังคับ)", placeholder: "ระบุหมายเหตุ..." })) ?? undefined;
+                run(() => adminResolveReturnDispute(bookingId, "accept_return", note));
+              }}
+            >
+              ยอมรับ (คืนแล้ว)
+            </button>
+            <button
+              type="button"
+              className="btn flex-1 text-sm"
+              style={{ padding: "10px 0", background: "var(--danger)", borderColor: "var(--danger)", color: "#fff" }}
+              disabled={busy}
+              onClick={async () => {
+                if (!(await showConfirm({ message: "ปฏิเสธ — สินค้ายังไม่คืน? (ร้านถูก, มัดจำถูกริบ)", variant: "danger", confirmLabel: "ปฏิเสธ" }))) return;
+                const note = (await showPrompt({ message: "หมายเหตุ (ไม่บังคับ)", placeholder: "ระบุหมายเหตุ..." })) ?? undefined;
+                run(() => adminResolveReturnDispute(bookingId, "reject_return", note));
+              }}
+            >
+              ปฏิเสธ (ไม่คืน)
             </button>
           </div>
         </div>
@@ -210,15 +269,18 @@ export default function AdminBookingActions({ bookingId, status, refundStatus }:
               if (!file) { setError("เลือกไฟล์ก่อน"); return; }
               setError("");
               setBusy(true);
-              const fd = new FormData();
-              fd.append("slip", file);
-              const res = await recordRefund(bookingId, fd);
-              if (!res.ok) {
-                setError(res.error ?? "ทำรายการไม่สำเร็จ");
+              try {
+                const fd = new FormData();
+                fd.append("slip", file);
+                const res = await recordRefund(bookingId, fd);
+                if (!res.ok) {
+                  setError(res.error ?? "ทำรายการไม่สำเร็จ");
+                  return;
+                }
+                router.refresh();
+              } finally {
                 setBusy(false);
-                return;
               }
-              router.refresh();
             }}
           >
             {busy ? "กำลังบันทึก…" : "ยืนยันบันทึกการคืนเงิน"}
@@ -259,12 +321,12 @@ export default function AdminBookingActions({ bookingId, status, refundStatus }:
             className="btn btn-outline"
             style={{ padding: "8px 14px", fontSize: 13 }}
             disabled={busy || !forceTarget}
-            onClick={() => {
+            onClick={async () => {
               const targetLabel = BOOKING_STATUS_META[forceTarget as BookingStatus]?.label ?? forceTarget;
-              if (!confirm(`บังคับเปลี่ยนจาก "${meta.label}" → "${targetLabel}"?`)) return;
-              const note = prompt("เหตุผล (บังคับกรอก)");
-              if (!note?.trim()) { setError("ต้องระบุเหตุผลสำหรับ override"); return; }
-              run(() => adminForceStatus(bookingId, forceTarget, note!.trim()));
+              if (!(await showConfirm({ message: `บังคับเปลี่ยนจาก "${meta.label}" → "${targetLabel}"?`, variant: "danger", confirmLabel: "บังคับเปลี่ยน" }))) return;
+              const note = await showPrompt({ message: "เหตุผล (บังคับกรอก)", placeholder: "ระบุเหตุผล...", required: true });
+              if (!note) return;
+              run(() => adminForceStatus(bookingId, forceTarget, note));
             }}
           >
             บังคับเปลี่ยน

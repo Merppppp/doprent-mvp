@@ -322,6 +322,54 @@ export function notifyRefundIssued(opts: {
   );
 }
 
+/** Remind seller to review payment slip before auto-confirm deadline. */
+export function notifySlipReviewReminder(opts: {
+  sellerEmail: string | null | undefined;
+  dressName: string;
+  bookingId: string;
+  deadline: Date;
+}) {
+  const deadlineStr = opts.deadline.toLocaleString("th-TH", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+    timeZone: "Asia/Bangkok",
+  });
+  fireEmail(
+    opts.sellerEmail,
+    `กรุณายืนยันสลิป — ${opts.dressName} — DopRent`,
+    emailShell({
+      title: "รอยืนยันสลิปการชำระเงิน",
+      bodyHtml: `
+        <p>มีสลิปรอตรวจสอบสำหรับการจองชุด <strong>${opts.dressName}</strong></p>
+        <p>หากไม่ดำเนินการภายใน <strong>${deadlineStr}</strong> ระบบจะยืนยันอัตโนมัติ</p>
+      `,
+      ctaLabel: "ตรวจสอบสลิป",
+      ctaUrl: `${baseUrl()}/sell/bookings/${opts.bookingId}`,
+    }),
+  );
+}
+
+/** Notify seller that payment was auto-confirmed by the system. */
+export function notifySlipAutoConfirmed(opts: {
+  sellerEmail: string | null | undefined;
+  dressName: string;
+  bookingId: string;
+}) {
+  fireEmail(
+    opts.sellerEmail,
+    `ยืนยันสลิปอัตโนมัติ — ${opts.dressName} — DopRent`,
+    emailShell({
+      title: "ระบบยืนยันสลิปอัตโนมัติแล้ว",
+      bodyHtml: `
+        <p>สลิปสำหรับการจองชุด <strong>${opts.dressName}</strong> ถูกยืนยันอัตโนมัติเนื่องจากไม่ได้ดำเนินการภายในเวลาที่กำหนด</p>
+        <p>กรุณาเตรียมจัดส่งสินค้าให้ลูกค้า</p>
+      `,
+      ctaLabel: "ดูรายการจอง",
+      ctaUrl: `${baseUrl()}/sell/bookings/${opts.bookingId}`,
+    }),
+  );
+}
+
 /** Notify admins of a dispute escalation.
  *  Sends a single email to the first admin, CC the rest. */
 export function notifyAdminDisputeEscalated(opts: {
@@ -350,5 +398,73 @@ export function notifyAdminDisputeEscalated(opts: {
     }),
     "notification",
     cc.length > 0 ? cc : undefined,
+  );
+}
+
+/** Notify admins that a renter disputed a "not returned" decision. */
+export function notifyAdminReturnDisputeEscalated(opts: {
+  adminEmails: string[];
+  dressName: string;
+  bookingId: string;
+  renterNote: string;
+}) {
+  const emails = opts.adminEmails.filter(Boolean);
+  if (emails.length === 0) return;
+  const [primary, ...cc] = emails;
+  fireEmail(
+    primary,
+    "ผู้เช่าโต้แย้งการไม่คืนของ — DopRent",
+    emailShell({
+      title: "ผู้เช่าโต้แย้งการไม่คืนของ — รอแอดมินตัดสิน",
+      bodyHtml: `
+        <p>ผู้เช่าโต้แย้งว่าได้คืนสินค้าแล้ว สำหรับชุด <strong>${opts.dressName}</strong></p>
+        <p style="padding:8px 12px;background:#f5f5f5;border-radius:6px;color:#555">
+          "${opts.renterNote}"
+        </p>
+        <p>กรุณาเข้าไปตรวจสอบและตัดสินให้ทั้งสองฝ่ายภายใน 48 ชม.</p>
+      `,
+      ctaLabel: "ดูรายการจอง",
+      ctaUrl: `${baseUrl()}/admin/bookings/${opts.bookingId}`,
+    }),
+    "notification",
+    cc.length > 0 ? cc : undefined,
+  );
+}
+
+/** Notify renter + seller of the return dispute resolution. */
+export function notifyReturnDisputeResolved(opts: {
+  renterEmail: string | null | undefined;
+  sellerEmail: string | null | undefined;
+  dressName: string;
+  bookingId: string;
+  resolution: "accept_return" | "reject_return";
+}) {
+  const accepted = opts.resolution === "accept_return";
+  const title = accepted
+    ? "แอดมินตัดสิน: สินค้าคืนแล้ว"
+    : "แอดมินตัดสิน: สินค้ายังไม่ได้คืน";
+  const body = accepted
+    ? `<p>แอดมินพิจารณาแล้วว่าชุด <strong>${opts.dressName}</strong> ได้คืนเรียบร้อยแล้ว</p>`
+    : `<p>แอดมินพิจารณาแล้วว่าชุด <strong>${opts.dressName}</strong> ยังไม่ได้คืน — มัดจำถูกริบ</p>`;
+
+  fireEmail(
+    opts.renterEmail,
+    `${title} — DopRent`,
+    emailShell({
+      title,
+      bodyHtml: body,
+      ctaLabel: "ดูรายการจอง",
+      ctaUrl: `${baseUrl()}/account/bookings/${opts.bookingId}`,
+    }),
+  );
+  fireEmail(
+    opts.sellerEmail,
+    `${title} — DopRent`,
+    emailShell({
+      title,
+      bodyHtml: body,
+      ctaLabel: "ดูรายการจอง",
+      ctaUrl: `${baseUrl()}/sell/bookings/${opts.bookingId}`,
+    }),
   );
 }

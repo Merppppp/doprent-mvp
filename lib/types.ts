@@ -109,8 +109,10 @@ export type BookingStatus =
   | "returned"
   /** ร้านตรวจรับชุดเรียบร้อย ปิดรายการเช่าสมบูรณ์ — terminal สุดท้าย */
   | "completed"
-  /** ลูกค้าไม่ส่งคืนชุด — terminal */
-  | "not_returned";
+  /** ลูกค้าไม่ส่งคืนชุด — ลูกค้ายังโต้แย้งได้ */
+  | "not_returned"
+  /** ผู้เช่าโต้แย้งกรณีไม่คืนของ — รอแอดมินตัดสิน */
+  | "return_disputed";
 
 /**
  * Public Occasion shape — mapper-output type (rev 3: assembled from the tag
@@ -359,6 +361,8 @@ export type Booking = {
   phone: string | null;
   address_text: string | null;
   current_due_at: string | null;
+  /** When the slip will be auto-confirmed if seller doesn't review (ISO string). */
+  slip_confirm_due_at: string | null;
   cancel_reason: string | null;
   cancel_from_status: string | null;
   dispute_note: string | null;

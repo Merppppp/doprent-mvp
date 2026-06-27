@@ -1233,6 +1233,11 @@ model Booking {
   /// เวลาที่เข้าสถานะ payment_review (ลูกค้าอัปสลิป) — ใช้นับชั่วโมงร้านเปิดเพื่อแสดง badge ด่วน
   /// รีเซตทุกครั้งที่ลูกค้าอัปสลิปใหม่ (เช่น หลัง slip_disputed)
   paymentReviewAt       DateTime? @map("payment_review_at") @db.Timestamptz(6)
+  /// เส้นตาย auto-confirm สลิป — เลยเวลานี้ระบบ confirm อัตโนมัติ (cron sweep)
+  /// คำนวณจาก 4 เงื่อนไข: same-day+เปิด(1h), same-day+ปิด(3h), >24h(24h), ≤24h(12h)
+  slipConfirmDueAt      DateTime? @map("slip_confirm_due_at") @db.Timestamptz(6)
+  /// เวลาที่ส่ง reminder ร้านให้ confirm สลิป (กันส่งซ้ำจาก cron)
+  slipReminderSentAt    DateTime? @map("slip_reminder_sent_at") @db.Timestamptz(6)
 
   /// สถานะการคืนเงิน: "none" (ไม่มี), "required" (แอดมินอนุมัติยกเลิกหลังจ่ายแล้ว — รอโอนคืน),
   /// "refunded" (โอนคืนแล้ว มีสลิปยืนยัน), "forfeited" (หักมัดจำ — ลูกค้าไม่คืนของ)
@@ -1674,8 +1679,10 @@ enum BookingStatus {
   returned
   /// ร้านตรวจรับชุดเรียบร้อย ปิดรายการเช่าสมบูรณ์ (terminal สุดท้าย)
   completed
-  /// ลูกค้าไม่ส่งคืนชุด (terminal — ร้านต้องดำเนินการเรื่องมัดจำ/คืนเงิน)
+  /// ลูกค้าไม่ส่งคืนชุด — ลูกค้ายังมีเวลาโต้แย้งได้ 48 ชม.
   not_returned
+  /// ผู้เช่าโต้แย้งกรณีไม่คืนของ — รอแอดมินตัดสิน (auto-resolve 48 ชม.)
+  return_disputed
 
   @@map("booking_status")
 }

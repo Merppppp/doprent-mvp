@@ -38,7 +38,7 @@ export const BOOKING_TABS: ReadonlyArray<{
   { key: "renting", label: "กำลังเช่า", statuses: ["renting"] },
   { key: "awaiting_return", label: "รอคืนของ", statuses: ["awaiting_return"] },
   { key: "returned", label: "รอตรวจคืน", statuses: ["returned"] },
-  { key: "completed", label: "จบงาน", statuses: ["completed"] },
+  { key: "completed", label: "จบงาน", statuses: ["completed", "not_returned", "return_disputed"] },
   { key: "cancelled_shop", label: "ยกเลิกโดยร้าน", statuses: ["rejected", "cancelled", "cancel_requested"] },
   { key: "cancelled_renter", label: "ยกเลิกโดยผู้เช่า", statuses: ["cancelled", "payment_expired"] },
 ];

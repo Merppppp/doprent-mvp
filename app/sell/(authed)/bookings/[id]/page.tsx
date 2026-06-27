@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { getBookingForView, currentUserIsSellerOf, getBookingTimeline, getBookingEffectivePolicy } from "@/lib/booking-queries";
 import { bookingShippingPlan, type ShippingLeg } from "@/lib/booking-policy";
-import { getSignedPrivateUrl } from "@/lib/r2";
+import { privateImageUrl } from "@/lib/r2";
 import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
 import { getTrustScore } from "@/lib/trust-score";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
@@ -38,19 +38,11 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
 
   const meta = BOOKING_STATUS_META[b.status];
 
-  // Slip is private — sign a short-lived URL for the seller (authorized above).
-  const slipUrl = b.slip_path ? await getSignedPrivateUrl(b.slip_path) : null;
-
-  // Sign the addr-change top-up slip URL (only for active sub-flow states)
-  const addrSlipUrl = b.addr_change_slip_path
-    ? await getSignedPrivateUrl(b.addr_change_slip_path)
-    : null;
-
-  // Sign the refund slip URL if one has been uploaded.
-  const refundSlipUrl = b.refund_slip_path ? await getSignedPrivateUrl(b.refund_slip_path) : null;
-
-  // Sign the ID card URL — visible to the seller from booking_pending onwards.
-  const idCardUrl = b.id_card_path ? await getSignedPrivateUrl(b.id_card_path) : null;
+  // Proxy URLs — avoids ORB/CORS issues on localhost and hides raw S3 URLs.
+  const slipUrl = b.slip_path ? privateImageUrl(b.slip_path) : null;
+  const addrSlipUrl = b.addr_change_slip_path ? privateImageUrl(b.addr_change_slip_path) : null;
+  const refundSlipUrl = b.refund_slip_path ? privateImageUrl(b.refund_slip_path) : null;
+  const idCardUrl = b.id_card_path ? privateImageUrl(b.id_card_path) : null;
 
   const renterTrust = await getTrustScore(b.renter_id);
   const timeline = await getBookingTimeline(b.id);
@@ -317,6 +309,25 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
           />
         ) : null}
 
+        {/* Return dispute info for seller */}
+        {b.status === "return_disputed" ? (
+          <div className={cardCls}>
+            <div className="mb-2 flex items-center gap-2">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--warn-soft)] text-[var(--warn)] text-xs">!</span>
+              <span className="text-sm font-semibold text-[var(--ink)]">ผู้เช่าโต้แย้งการไม่คืนของ</span>
+            </div>
+            {b.dispute_note ? (
+              <div className="mb-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 text-[13px] leading-relaxed text-[var(--ink-2)]">
+                <span className="text-[var(--ink-3)]">ข้อความผู้เช่า:</span> {b.dispute_note}
+              </div>
+            ) : null}
+            <div className="flex items-center gap-2 rounded-lg bg-[var(--warn-soft)] px-3 py-2.5 text-[13px] text-[var(--warn)]">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span className="font-medium">รอแอดมินตรวจสอบและตัดสิน</span>
+            </div>
+          </div>
+        ) : null}
+
         <SellerBookingActions
           bookingId={b.id}
           status={b.status}
@@ -331,6 +342,7 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
           } : null}
           firstProductId={b.items[0]?.product_id ?? null}
           depositAmount={b.deposit}
+          slipConfirmDueAt={b.slip_confirm_due_at}
         />
       </div>
 

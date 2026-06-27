@@ -14,7 +14,9 @@ import {
   commissionAmount,
   dueAt,
   findTransition,
+  paymentWindowHours,
   rentalDays,
+  slipAutoConfirmHours,
 } from "@/lib/bookings";
 import {
   resolveEffectivePolicy,
@@ -36,6 +38,8 @@ import {
   notifySlipDisputed,
   notifyAdminDisputeEscalated,
   notifyCancelRequested,
+  notifyAdminReturnDisputeEscalated,
+  notifyReturnDisputeResolved,
 } from "@/lib/notifications";
 import { FIRST_TOUCH_COOKIE, decodeAttribution } from "@/lib/attribution";
 import { parseBusinessHours } from "@/lib/hours";
@@ -919,6 +923,7 @@ export async function acceptBooking(
                     bufferDaysBefore: true,
                     shop: {
                       select: {
+                        isOpen: true, hours: true,
                         leadTimeDays: true,
                         minRentalDays: true,
                         maxRentalDays: true,
@@ -936,11 +941,23 @@ export async function acceptBooking(
         });
         if (!bk || bk.status !== "booking_pending") return { kind: "stale" };
 
+        // Dynamic payment window: same-day + shop open = 1h, else 3h
+        const startDateStr = bk.startDate.toISOString().slice(0, 10);
+        const firstShop = bk.items[0]?.product?.shop;
+        const parsedShopHours = parseBusinessHours(firstShop?.hours ?? null);
+        const acceptDow = new Date(`${todayBkk()}T00:00:00Z`).getUTCDay();
+        const shopOpenToday = parsedShopHours ? (parsedShopHours[acceptDow]?.open ?? false) : false;
+        const pwHours = paymentWindowHours({
+          startDate: startDateStr,
+          shopIsOpen: firstShop?.isOpen ?? true,
+          shopHoursToday: shopOpenToday,
+        });
+
         const acceptData = {
           shippingFee: Math.round(shippingFee),
           paymentMethod: channel,
           status: "waiting_for_payment" as const,
-          currentDueAt: new Date(dueAt()),
+          currentDueAt: new Date(dueAt(new Date(), pwHours)),
         };
 
         // Items that have a variant (and therefore need a serialized unit assigned).
@@ -1392,7 +1409,22 @@ const MAX_SLIP_SIZE = BOOKING_SLIP_MAX_BYTES;
 export async function uploadSlip(bookingId: string, formData: FormData): Promise<Result> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
-  const booking = await loadBooking(bookingId);
+  // Fetch booking with shop hours for dynamic auto-confirm window
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true, renterId: true, shopId: true, status: true, startDate: true,
+      shop: {
+        select: {
+          ownerId: true, isOpen: true, hours: true,
+          promptpayId: true, bankName: true, bankAccountNumber: true,
+          bankAccountName: true, defaultPaymentMethod: true,
+        },
+      },
+      renter: { select: { email: true } },
+      items: { select: { id: true, unitId: true, product: { select: { name: true } } } },
+    },
+  });
   if (!booking) return { ok: false, error: "ไม่พบการจอง" };
   if (booking.renterId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
   if (!findTransition(booking.status as BookingStatus, "payment_review", "renter"))
@@ -1417,12 +1449,34 @@ export async function uploadSlip(bookingId: string, formData: FormData): Promise
     return { ok: false, error: "อัปโหลดสลิปไม่สำเร็จ ลองใหม่อีกครั้ง" };
   }
 
+  // Compute dynamic auto-confirm deadline based on urgency
+  const now = new Date();
+  const parsedHours = parseBusinessHours(booking.shop?.hours ?? null);
+  const todayDow = new Date(`${todayBkk()}T00:00:00Z`).getUTCDay();
+  const shopHoursToday = parsedHours ? (parsedHours[todayDow]?.open ?? false) : false;
+  const startDateStr = booking.startDate.toISOString().slice(0, 10);
+  const confirmHours = slipAutoConfirmHours({
+    startDate: startDateStr,
+    shopIsOpen: booking.shop?.isOpen ?? true,
+    shopHoursToday,
+    now,
+  });
+  const slipConfirmDueAt = new Date(now.getTime() + confirmHours * 3600 * 1000);
+
   const from = booking.status as BookingStatus;
   try {
     const res = await withActor(user.id, () =>
       db.booking.updateMany({
         where: { id: bookingId, status: from, renterId: user.id },
-        data: { slipPath: key, status: "payment_review", disputeNote: null, cancelReason: null, paymentReviewAt: new Date() },
+        data: {
+          slipPath: key,
+          status: "payment_review",
+          disputeNote: null,
+          cancelReason: null,
+          paymentReviewAt: now,
+          slipConfirmDueAt,
+          slipReminderSentAt: null,
+        },
       }),
     );
     if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
@@ -1533,6 +1587,147 @@ export async function requestCancelAfterPayment(
   revalidatePath(`/account/bookings/${bookingId}`);
   revalidatePath("/sell/bookings");
   revalidatePath(`/sell/bookings/${bookingId}`);
+  return { ok: true };
+}
+
+/** Hours the renter has to escalate a return dispute before it becomes final. */
+const RETURN_DISPUTE_WINDOW_HOURS = 48;
+
+/**
+ * Renter escalates a "not returned" decision — sends counter-argument for admin.
+ * Sets currentDueAt to 48h from now for auto-resolve.
+ */
+export async function escalateReturnDispute(bookingId: string, note: string): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+  const booking = await loadBooking(bookingId);
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.renterId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
+  if (booking.status !== "not_returned")
+    return { ok: false, error: "สถานะไม่ถูกต้อง" };
+  if (!note.trim()) return { ok: false, error: "กรุณาใส่เหตุผลโต้แย้ง" };
+
+  const now = new Date();
+  const dueAt48h = new Date(now.getTime() + RETURN_DISPUTE_WINDOW_HOURS * 3600 * 1000);
+
+  let res;
+  try {
+    res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, status: "not_returned", renterId: user.id },
+        data: {
+          status: "return_disputed",
+          disputeNote: note.trim(),
+          currentDueAt: dueAt48h,
+        },
+      }),
+    );
+  } catch (e) {
+    console.error("[doprent] escalate return dispute error", e);
+    return { ok: false, error: "ส่งข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  // Notify admins
+  const admins = await db.user.findMany({
+    where: { role: "admin" },
+    select: { email: true },
+  });
+  notifyAdminReturnDisputeEscalated({
+    adminEmails: admins.map((a) => a.email).filter((e): e is string => !!e),
+    dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
+    bookingId,
+    renterNote: note.trim(),
+  });
+
+  revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
+  revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
+  revalidatePath("/admin/bookings");
+  revalidatePath(`/admin/bookings/${bookingId}`);
+  return { ok: true };
+}
+
+/**
+ * Admin resolves a return dispute.
+ *   accept_return → returned (admin sides with renter: items were returned)
+ *   reject_return → not_returned (admin sides with seller: items truly not returned)
+ */
+export async function adminResolveReturnDispute(
+  bookingId: string,
+  resolution: "accept_return" | "reject_return",
+  adminNote?: string,
+): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+  if (user.role !== "admin") return { ok: false, error: "ไม่มีสิทธิ์" };
+
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true, status: true,
+      renter: { select: { email: true } },
+      shop: { select: { owner: { select: { email: true } } } },
+      items: {
+        select: {
+          id: true, unitId: true,
+          product: { select: { name: true } },
+        },
+      },
+    },
+  });
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.status !== "return_disputed")
+    return { ok: false, error: "สถานะไม่ถูกต้อง" };
+
+  const newStatus: BookingStatus = resolution === "accept_return" ? "returned" : "not_returned";
+
+  try {
+    await withActor(user.id, () =>
+      db.$transaction(async (tx) => {
+        await tx.booking.updateMany({
+          where: { id: bookingId, status: "return_disputed" },
+          data: {
+            status: newStatus,
+            currentDueAt: null,
+            ...(adminNote?.trim() ? { cancelReason: adminNote.trim() } : {}),
+            ...(resolution === "accept_return" ? { returnedAt: new Date() } : {}),
+          },
+        });
+
+        // If admin sides with renter (accept_return → returned), restore units to available
+        if (resolution === "accept_return") {
+          const itemUnitIds = booking.items.map((i) => i.unitId).filter((x): x is string => !!x);
+          if (itemUnitIds.length > 0) {
+            await tx.productUnit.updateMany({
+              where: { id: { in: itemUnitIds } },
+              data: { status: "available", lostFromBookingId: null, note: null },
+            });
+          }
+        }
+      }),
+    );
+  } catch (e) {
+    console.error("[doprent] admin resolve return dispute error", e);
+    return { ok: false, error: "อัปเดตสถานะไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+
+  // Notify both parties
+  notifyReturnDisputeResolved({
+    renterEmail: booking.renter?.email,
+    sellerEmail: booking.shop?.owner?.email,
+    dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
+    bookingId,
+    resolution,
+  });
+
+  revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
+  revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
+  revalidatePath("/admin/bookings");
+  revalidatePath(`/admin/bookings/${bookingId}`);
   return { ok: true };
 }
 

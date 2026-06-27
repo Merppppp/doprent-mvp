@@ -14,6 +14,8 @@ import {
 import { startProgress, doneProgress } from "@/lib/progress";
 import type { BookingStatus } from "@/lib/types";
 import type { PaymentChannel } from "@/lib/payments";
+import SlipConfirmCountdown from "@/components/SlipConfirmCountdown";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 /** A channel the shop has configured, with a human-readable preview line. */
 export type ChannelOption = {
@@ -43,9 +45,11 @@ type Props = {
   firstProductId?: string | null;
   /** Deposit amount — used to cap the deduction field. */
   depositAmount?: number;
+  /** When the slip will be auto-confirmed (ISO string). Shown as countdown in payment_review. */
+  slipConfirmDueAt?: string | null;
 };
 
-export default function SellerBookingActions({ bookingId, status, channels = [], defaultMethod = null, deliveryMethod = null, returnShipped = false, returnTracking = null, firstProductId = null, depositAmount = 0 }: Props) {
+export default function SellerBookingActions({ bookingId, status, channels = [], defaultMethod = null, deliveryMethod = null, returnShipped = false, returnTracking = null, firstProductId = null, depositAmount = 0, slipConfirmDueAt = null }: Props) {
   const router = useRouter();
   const [fee, setFee] = useState("");
   const [carrier, setCarrier] = useState("");
@@ -68,7 +72,6 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
       const res = await fn();
       if (!res.ok) {
         setError(res.error ?? "ทำรายการไม่สำเร็จ");
-        setBusy(false);
         return;
       }
       if (onSuccess) {
@@ -77,6 +80,7 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
         router.refresh();
       }
     } finally {
+      setBusy(false);
       doneProgress();
     }
   }
@@ -185,6 +189,7 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
   if (status === "payment_review") {
     return (
       <div style={{ display: "grid", gap: 12 }}>
+        {slipConfirmDueAt && <SlipConfirmCountdown dueAt={slipConfirmDueAt} />}
         <button
           type="button"
           className="btn btn-primary btn-lg"
@@ -336,9 +341,12 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
             </div>
           </div>
         ) : (
-          <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink-2)]">
-            <span className="font-semibold text-[var(--ink)]">รอลูกค้าส่งคืนสินค้า</span>
-            <span> ลูกค้ายังไม่ได้กรอกข้อมูลการส่งคืน</span>
+          <div className="rounded-xl border border-[var(--line)] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <div className="flex items-center gap-2 mb-1">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span className="text-sm font-semibold text-[var(--ink)]">รอลูกค้าส่งคืนสินค้า</span>
+            </div>
+            <p className="text-[13px] text-[var(--ink-3)] ml-6">ลูกค้ายังไม่ได้กรอกข้อมูลการส่งคืน</p>
           </div>
         )}
 
@@ -598,14 +606,22 @@ function NotReturnedPanel({
   error: string;
   onSubmit: () => void;
 }) {
+  const confirm = useConfirm();
   return (
     <div className="grid gap-3">
       <button
         type="button"
-        className="btn btn-outline text-[var(--danger)] border-[var(--danger)]"
+        className="btn text-sm font-semibold"
+        style={{
+          padding: "12px 18px",
+          background: "var(--danger)",
+          borderColor: "var(--danger)",
+          color: "#fff",
+          borderRadius: 10,
+        }}
         disabled={busy}
-        onClick={() => {
-          if (confirm("ยืนยันว่าลูกค้าไม่ส่งคืนสินค้า? มัดจำจะถูกหักทั้งหมด")) {
+        onClick={async () => {
+          if (await confirm({ message: "ยืนยันว่าลูกค้าไม่ส่งคืนสินค้า? มัดจำจะถูกหักทั้งหมด", variant: "danger", confirmLabel: "ยืนยัน" })) {
             onSubmit();
           }
         }}

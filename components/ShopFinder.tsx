@@ -8,6 +8,7 @@ import { AREA_LIST, AREAS } from "@/lib/areas";
 import { formatKm, haversineKm } from "@/lib/geo";
 import { useUserLocation } from "./LocationProvider";
 import { fetchShopsPage } from "@/app/actions/shops";
+import { Spinner } from "@/components/Loading";
 import type { Color } from "@/lib/types";
 
 export type FinderShop = {
@@ -235,7 +236,7 @@ export default function ShopFinder({ shops, total, query, pageSize }: Props) {
             disabled={loading}
             style={{ ...primaryBtn, background: loading ? "var(--line)" : "var(--accent)", cursor: loading ? "wait" : "pointer" }}
           >
-            {loading ? "กำลังโหลด…" : "โหลดร้านเพิ่ม"}
+            {loading ? <><Spinner size={14} /> กำลังโหลด…</> : "โหลดร้านเพิ่ม"}
           </button>
           <span style={{ fontSize: 12.5, color: "var(--ink-3)" }}>
             แสดง {items.length} จาก {total} ร้าน

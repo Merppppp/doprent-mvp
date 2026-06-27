@@ -7,6 +7,7 @@ import {
   updateShopBanner,
   deleteShopBanner,
 } from "@/app/actions/seller-banners";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type BannerData = {
   id: string;
@@ -47,6 +48,7 @@ const STATUS_LABEL: Record<string, { text: string; color: string; bg: string }> 
 };
 
 export default function ShopBannerForm(props: Props) {
+  const confirm = useConfirm();
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -74,9 +76,9 @@ export default function ShopBannerForm(props: Props) {
     });
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!isEdit) return;
-    if (!confirm(`ยืนยันการลบแบนเนอร์ "${banner!.title}"?`)) return;
+    if (!(await confirm({ message: `ยืนยันการลบแบนเนอร์ "${banner!.title}"?`, variant: "danger", confirmLabel: "ลบ" }))) return;
     startDelete(async () => {
       const res = await deleteShopBanner(banner!.id);
       if (!res.ok) setError(res.error ?? "ลบไม่สำเร็จ");

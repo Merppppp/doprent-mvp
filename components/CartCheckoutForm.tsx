@@ -6,6 +6,7 @@ import { addAddress, updateAddress, createBooking } from "@/app/actions/bookings
 import { startProgress, doneProgress } from "@/lib/progress";
 import type { Address } from "@/lib/types";
 import type { BusinessHours } from "@/lib/hours";
+import { Spinner } from "@/components/Loading";
 import type { IdCardItem } from "@/app/actions/id-cards";
 import IdCardPicker from "@/components/IdCardPicker";
 import { fmtThai } from "@/lib/date-th";
@@ -187,8 +188,8 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
 
   if (!group) {
     return (
-      <div className="py-12 text-center text-ink-2 text-[14px]">
-        กำลังโหลดข้อมูลตะกร้า…
+      <div className="flex justify-center py-12">
+        <Spinner size={22} label="กำลังโหลดข้อมูลตะกร้า…" />
       </div>
     );
   }

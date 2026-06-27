@@ -57,6 +57,7 @@ type PrismaBookingWithJoins = {
   phone: string | null;
   addressText: string | null;
   currentDueAt: Date | null;
+  slipConfirmDueAt: Date | null;
   cancelReason: string | null;
   cancelFromStatus: string | null;
   disputeNote: string | null;
@@ -157,6 +158,7 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     phone: b.phone,
     address_text: b.addressText,
     current_due_at: b.currentDueAt ? b.currentDueAt.toISOString() : null,
+    slip_confirm_due_at: b.slipConfirmDueAt ? b.slipConfirmDueAt.toISOString() : null,
     cancel_reason: b.cancelReason,
     cancel_from_status: b.cancelFromStatus,
     dispute_note: b.disputeNote,

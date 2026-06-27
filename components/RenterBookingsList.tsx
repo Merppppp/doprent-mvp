@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useTransition, useRef } from "react";
 import Link from "next/link";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
+import { Spinner } from "@/components/Loading";
 import PaymentCountdown from "@/components/PaymentCountdown";
 import { fmtThaiShort } from "@/lib/date-th";
 import { RENTER_TABS, RENTER_PAGE_SIZE, type RenterTabKey } from "@/lib/renter-booking-tabs";
@@ -132,7 +133,7 @@ export default function RenterBookingsList({ initialRows, initialTotal, statusCo
 
       {/* ── Loading ── */}
       {isPending && rows.length === 0 && (
-        <div className="text-center py-10 text-[var(--ink-3)] text-[13px]">กำลังโหลด...</div>
+        <div className="flex justify-center py-10"><Spinner size={22} label="กำลังโหลด…" /></div>
       )}
 
       {/* ── Empty ── */}
@@ -245,7 +246,7 @@ export default function RenterBookingsList({ initialRows, initialTotal, statusCo
             disabled={isPending}
             className="inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-surface px-7 py-2.5 text-[13px] font-medium leading-none transition-[background,border-color,transform,box-shadow,color] duration-[var(--dur-1)] ease-[var(--ease)] will-change-transform hover:-translate-y-px hover:border-ink disabled:cursor-wait active:translate-y-px active:scale-[.985]"
           >
-            {isPending ? "กำลังโหลด..." : "ดูเพิ่มเติม"}
+            {isPending ? <><Spinner size={14} /> กำลังโหลด…</> : "ดูเพิ่มเติม"}
           </button>
         </div>
       )}

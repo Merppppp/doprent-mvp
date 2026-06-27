@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getBookingForView, getBookingTimeline } from "@/lib/booking-queries";
 import { amountDue, BOOKING_STATUS_META } from "@/lib/bookings";
 import { promptPayQrDataUrl } from "@/lib/payments";
-import { getSignedPrivateUrl } from "@/lib/r2";
+import { privateImageUrl } from "@/lib/r2";
 import { db } from "@/lib/db";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import RenterBookingActions from "@/components/RenterBookingActions";
@@ -46,9 +46,9 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
   });
 
   const timeline = await getBookingTimeline(b.id);
-  const slipUrl = b.slip_path ? await getSignedPrivateUrl(b.slip_path) : null;
-  const refundSlipUrl = b.refund_slip_path ? await getSignedPrivateUrl(b.refund_slip_path) : null;
-  const idCardUrl = b.id_card_path ? await getSignedPrivateUrl(b.id_card_path) : null;
+  const slipUrl = b.slip_path ? privateImageUrl(b.slip_path) : null;
+  const refundSlipUrl = b.refund_slip_path ? privateImageUrl(b.refund_slip_path) : null;
+  const idCardUrl = b.id_card_path ? privateImageUrl(b.id_card_path) : null;
 
   const isReviewable = b.status === "returned" || b.status === "completed";
   const canEditAddress = b.status === "booking_pending" || b.status === "waiting_for_payment";
@@ -392,6 +392,7 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
             disputeNote={b.dispute_note}
             returnMethod={b.return_method}
             returnShipped={!!b.return_shipped_at}
+            currentDueAt={b.current_due_at}
           />
         </div>
 

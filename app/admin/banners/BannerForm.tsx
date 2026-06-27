@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import RequiredMark from "@/components/RequiredMark";
 import { createBanner, updateBanner, deleteBanner, toggleBannerActive } from "@/app/actions/admin-banners";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type BannerData = {
   id: string;
@@ -20,6 +21,7 @@ type Props =
   | { mode: "edit"; banner: BannerData };
 
 export default function BannerForm(props: Props) {
+  const confirm = useConfirm();
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -48,9 +50,9 @@ export default function BannerForm(props: Props) {
     });
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!isEdit) return;
-    if (!confirm(`ยืนยันการลบแบนเนอร์ "${banner!.title}"?`)) return;
+    if (!(await confirm({ message: `ยืนยันการลบแบนเนอร์ "${banner!.title}"?`, variant: "danger", confirmLabel: "ลบ" }))) return;
     startDelete(async () => {
       const res = await deleteBanner(banner!.id);
       if (!res.ok) setError(res.error ?? "ลบไม่สำเร็จ");

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { Spinner } from "@/components/Loading";
 
 interface Props {
   code: string;
@@ -92,7 +93,7 @@ export default function StaffQRSection({ code, url, shopName }: Props) {
                 fontSize: 12,
               }}
             >
-              กำลังโหลด...
+              <Spinner size={18} />
             </div>
           )}
         </div>

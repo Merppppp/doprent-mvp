@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import KycRow from "./KycRow";
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 
 const STATUS_OPTS = ["pending", "approved", "rejected"] as const;
 type StatusOpt = (typeof STATUS_OPTS)[number];
+const PAGE_SIZE = 20;
 
 /**
  * Resolve a stored KYC doc reference to a viewable href.
@@ -30,17 +32,26 @@ function resolveKycDocHref(value: string | null): string | null {
 export default async function KycReviewPage({
   searchParams,
 }: {
-  searchParams: { status?: string };
+  searchParams: { status?: string; page?: string };
 }) {
   const activeStatus = (STATUS_OPTS as readonly string[]).includes(searchParams?.status ?? "")
     ? (searchParams!.status as StatusOpt)
     : "pending";
 
-  const rawRows = await db.kycSubmission.findMany({
-    where: { status: activeStatus },
-    orderBy: { createdAt: "desc" },
-    include: { shop: { select: { name: true, slug: true, areaLabel: true } } },
-  });
+  const page = Math.max(1, parseInt(searchParams?.page ?? "1", 10) || 1);
+  const skip = (page - 1) * PAGE_SIZE;
+  const where = { status: activeStatus };
+
+  const [rawRows, totalCount] = await Promise.all([
+    db.kycSubmission.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: PAGE_SIZE,
+      include: { shop: { select: { name: true, slug: true, areaLabel: true } } },
+    }),
+    db.kycSubmission.count({ where }),
+  ]);
 
   const rows = rawRows.map((r) => ({
     id: r.id, shop_id: r.shopId, business_type: r.businessType,
@@ -53,7 +64,12 @@ export default async function KycReviewPage({
     created_at: r.createdAt.toISOString(),
     shop: { name: r.shop.name, slug: r.shop.slug, area_label: r.shop.areaLabel },
   }));
-  const error = null as { message: string } | null;
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  function pageHref(p: number) {
+    return `/admin/kyc?status=${activeStatus}&page=${p}`;
+  }
 
   return (
     <div>
@@ -84,9 +100,7 @@ export default async function KycReviewPage({
         ))}
       </div>
 
-      {error ? (
-        <div style={{ color: "var(--danger)" }}>โหลดข้อมูลไม่สำเร็จ: {error.message}</div>
-      ) : rows.length === 0 ? (
+      {rows.length === 0 ? (
         <div
           style={{
             padding: 40,
@@ -100,12 +114,69 @@ export default async function KycReviewPage({
           ไม่มีรายการในสถานะ &ldquo;{activeStatus}&rdquo;
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {rows.map((r) => (
-            <KycRow key={r.id} kyc={r} />
-          ))}
-        </div>
+        <>
+          <div className="mb-3 flex items-center justify-between text-[13px] text-[var(--ink-3)]">
+            <span>แสดง {skip + 1}–{Math.min(skip + PAGE_SIZE, totalCount)} จาก {totalCount} รายการ</span>
+            {totalPages > 1 && <span>หน้า {page} / {totalPages}</span>}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {rows.map((r) => (
+              <KycRow key={r.id} kyc={r} />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <Pagination page={page} totalPages={totalPages} hrefFn={pageHref} />
+          )}
+        </>
       )}
     </div>
   );
+}
+
+function Pagination({ page, totalPages, hrefFn }: { page: number; totalPages: number; hrefFn: (p: number) => string }) {
+  return (
+    <div className="mt-4 flex items-center justify-center gap-1.5">
+      {page > 1 && (
+        <Link href={hrefFn(page - 1)} className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-[13px] font-medium text-[var(--ink-2)] hover:border-[var(--ink-3)]">
+          ← ก่อนหน้า
+        </Link>
+      )}
+      {paginationRange(page, totalPages).map((p, i) =>
+        p === "..." ? (
+          <span key={`dot-${i}`} className="px-1.5 text-[13px] text-[var(--ink-3)]">…</span>
+        ) : (
+          <Link key={p} href={hrefFn(p as number)}
+            className={`rounded-md border px-3 py-1.5 text-[13px] font-medium ${
+              p === page
+                ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--on-dark)]"
+                : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink-2)] hover:border-[var(--ink-3)]"
+            }`}
+          >
+            {p}
+          </Link>
+        ),
+      )}
+      {page < totalPages && (
+        <Link href={hrefFn(page + 1)} className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-[13px] font-medium text-[var(--ink-2)] hover:border-[var(--ink-3)]">
+          ถัดไป →
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function paginationRange(current: number, total: number): (number | "...")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "...")[] = [];
+  const near = new Set([1, 2, current - 1, current, current + 1, total - 1, total]);
+  let prev = 0;
+  for (const p of [...near].sort((a, b) => a - b)) {
+    if (p < 1 || p > total) continue;
+    if (p - prev > 1) pages.push("...");
+    pages.push(p);
+    prev = p;
+  }
+  return pages;
 }

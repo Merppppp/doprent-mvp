@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
+import { Spinner } from "@/components/Loading";
 import TrustBadge from "@/components/TrustBadge";
 import { ProductArt } from "@/components/ProductArt";
 import {
@@ -182,14 +183,12 @@ export default function SellerBookingsList({
 
   function onSelect(next: Selection) {
     setSel(next);
-    setItems([]);
     applyFilter(next, sinceDays);
   }
 
   function onDays(next: number | null) {
     if (next === sinceDays) return;
     setSinceDays(next);
-    setItems([]);
     applyFilter(sel, next);
   }
 
@@ -561,10 +560,10 @@ export default function SellerBookingsList({
           ════════════════════════════════════════════════════════════════════ */}
       {items.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 0", color: "var(--ink-2)" }}>
-          {loading ? "กำลังโหลด…" : "ไม่มีการจองในหมวดนี้"}
+          {loading ? <Spinner size={22} label="กำลังโหลด…" /> : "ไม่มีการจองในหมวดนี้"}
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "grid", gap: 12, opacity: loading ? 0.45 : 1, transition: "opacity 0.15s", pointerEvents: loading ? "none" : "auto" }}>
           {items.map((b, i) => {
             const startUrgency = daysUntil(b.start_date);
             return (
@@ -663,7 +662,7 @@ export default function SellerBookingsList({
       {hasMore ? (
         <div ref={sentinelRef} style={{ marginTop: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
           <button type="button" onClick={loadMore} disabled={loading} style={loadBtn(loading)}>
-            {loading ? "กำลังโหลด…" : "โหลดเพิ่ม"}
+            {loading ? <><Spinner size={14} /> กำลังโหลด…</> : "โหลดเพิ่ม"}
           </button>
           <span style={{ fontSize: 12.5, color: "var(--ink-3)" }}>
             แสดง {items.length} จาก {total} รายการ
