@@ -12,13 +12,14 @@ const transporter = nodemailer.createTransport({
 });
 
 /** Generic mail sender — reuse for any transactional email (notifications, reset, ...). */
-export async function sendEmail(opts: { to: string; subject: string; html: string; category?: string }) {
+export async function sendEmail(opts: { to: string; cc?: string | string[]; subject: string; html: string; category?: string }) {
   let success = true;
   let error: string | undefined;
   try {
     await transporter.sendMail({
       from: process.env.EMAIL_FROM ?? "noreply@doprent.com",
       to: opts.to,
+      ...(opts.cc ? { cc: opts.cc } : {}),
       subject: opts.subject,
       html: opts.html,
     });
@@ -27,8 +28,9 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
     error = e?.message ?? String(e);
     throw e;
   } finally {
+    const recipients = [opts.to, ...(Array.isArray(opts.cc) ? opts.cc : opts.cc ? [opts.cc] : [])].join(", ");
     base.emailLog
-      .create({ data: { to: opts.to, subject: opts.subject, category: opts.category ?? "other", success, error } })
+      .create({ data: { to: recipients, subject: opts.subject, category: opts.category ?? "other", success, error } })
       .catch(() => {});
   }
 }

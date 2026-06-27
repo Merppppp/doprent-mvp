@@ -41,11 +41,27 @@ function emailShell(opts: {
   `;
 }
 
-/** Fire-and-forget send: never throws, logs failures. */
-function fireEmail(to: string | null | undefined, subject: string, html: string, category = "notification") {
+/** Simple serial queue to avoid Resend's 2 req/s rate limit.
+ *  Each email waits for the previous one + a 600ms gap. */
+let emailQueue: Promise<void> = Promise.resolve();
+
+/** Fire-and-forget send: never throws, logs failures.
+ *  Queued serially with 600ms gap to respect Resend's 2 req/s rate limit. */
+function fireEmail(
+  to: string | null | undefined,
+  subject: string,
+  html: string,
+  category = "notification",
+  cc?: string | string[],
+) {
   if (!to) return;
-  void sendEmail({ to, subject, html, category }).catch((e) => {
-    console.error("[doprent] notification email error", e);
+  emailQueue = emailQueue.then(async () => {
+    try {
+      await sendEmail({ to, subject, html, category, ...(cc ? { cc } : {}) });
+    } catch (e) {
+      console.error("[doprent] notification email error", e);
+    }
+    await new Promise((r) => setTimeout(r, 600));
   });
 }
 
@@ -226,17 +242,21 @@ export function notifyReturnOverdue(opts: ReturnNotifyOpts) {
 
 /* --------------------------- cancel + refund notifications ------------------- */
 
-/** Notify admin that a renter or seller has requested a cancel and approval is needed. */
+/** Notify admins that a renter or seller has requested a cancel and approval is needed.
+ *  Sends a single email to the first admin, CC the rest. */
 export function notifyCancelRequested(opts: {
-  adminEmail: string | null | undefined;
+  adminEmails: string[];
   dressName: string;
   bookingId: string;
   requestedBy: "renter" | "shop";
   reason?: string | null;
 }) {
+  const emails = opts.adminEmails.filter(Boolean);
+  if (emails.length === 0) return;
+  const [primary, ...cc] = emails;
   const byLabel = opts.requestedBy === "renter" ? "ผู้เช่า" : "ร้านค้า";
   fireEmail(
-    opts.adminEmail,
+    primary,
     `${byLabel}ขอยกเลิกการจอง รอแอดมินอนุมัติ — DopRent`,
     emailShell({
       title: `${byLabel}ขอยกเลิกการจอง`,
@@ -248,6 +268,8 @@ export function notifyCancelRequested(opts: {
       ctaLabel: "ดูรายการจอง",
       ctaUrl: `${baseUrl()}/admin/bookings/${opts.bookingId}`,
     }),
+    "notification",
+    cc.length > 0 ? cc : undefined,
   );
 }
 
@@ -300,14 +322,19 @@ export function notifyRefundIssued(opts: {
   );
 }
 
+/** Notify admins of a dispute escalation.
+ *  Sends a single email to the first admin, CC the rest. */
 export function notifyAdminDisputeEscalated(opts: {
-  adminEmail: string | null | undefined;
+  adminEmails: string[];
   dressName: string;
   bookingId: string;
   renterNote: string;
 }) {
+  const emails = opts.adminEmails.filter(Boolean);
+  if (emails.length === 0) return;
+  const [primary, ...cc] = emails;
   fireEmail(
-    opts.adminEmail,
+    primary,
     "ผู้เช่าโต้แย้งสลิป รอตัดสิน — DopRent",
     emailShell({
       title: "ผู้เช่าโต้แย้งสลิป — รอแอดมินตัดสิน",
@@ -321,5 +348,7 @@ export function notifyAdminDisputeEscalated(opts: {
       ctaLabel: "ดูรายการจอง",
       ctaUrl: `${baseUrl()}/admin/bookings/${opts.bookingId}`,
     }),
+    "notification",
+    cc.length > 0 ? cc : undefined,
   );
 }

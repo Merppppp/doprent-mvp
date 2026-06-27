@@ -831,6 +831,8 @@ export async function editBookingAddress(
 
   revalidatePath(`/account/bookings/${bookingId}`);
   revalidatePath("/account/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
+  revalidatePath("/sell/bookings");
   return { ok: true };
 }
 
@@ -1113,7 +1115,9 @@ export async function acceptBooking(
   }
 
   revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
   revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
   return { ok: true };
 }
 
@@ -1357,21 +1361,21 @@ async function sellerSimpleMove(
   else if (to === "confirmed") notifyBookingConfirmed(renterNotify);
   else if (to === "slip_disputed") notifySlipDisputed(renterNotify);
   else if (to === "cancel_requested") {
-    // Notify admin a shop-side cancel is waiting for approval.
+    // Notify all admins (single email with CC) that a shop-side cancel is waiting.
     const admins = await db.user.findMany({ where: { role: "admin" }, select: { email: true } });
-    for (const admin of admins) {
-      notifyCancelRequested({
-        adminEmail: admin.email,
-        dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
-        bookingId,
-        requestedBy: "shop",
-        reason,
-      });
-    }
+    notifyCancelRequested({
+      adminEmails: admins.map((a) => a.email).filter((e): e is string => !!e),
+      dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
+      bookingId,
+      requestedBy: "shop",
+      reason,
+    });
   }
 
   revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
   revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
   return { ok: true };
 }
 
@@ -1427,7 +1431,9 @@ export async function uploadSlip(bookingId: string, formData: FormData): Promise
     return { ok: false, error: "อัปเดตสถานะไม่สำเร็จ ลองใหม่อีกครั้ง" };
   }
   revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
   revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
   return { ok: true };
 }
 
@@ -1466,7 +1472,9 @@ export async function cancelBooking(bookingId: string): Promise<Result> {
   }
   if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
   revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
   revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
   return { ok: true };
 }
 
@@ -1508,24 +1516,23 @@ export async function requestCancelAfterPayment(
   }
   if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
 
-  // Fire-and-forget: notify all admins a cancel is waiting for their approval.
+  // Fire-and-forget: notify all admins (single email with CC).
   const admins = await db.user.findMany({
     where: { role: "admin" },
     select: { email: true },
   });
-  for (const admin of admins) {
-    notifyCancelRequested({
-      adminEmail: admin.email,
-      dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
-      bookingId,
-      requestedBy: "renter",
-      reason: reason.trim(),
-    });
-  }
+  notifyCancelRequested({
+    adminEmails: admins.map((a) => a.email).filter((e): e is string => !!e),
+    dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
+    bookingId,
+    requestedBy: "renter",
+    reason: reason.trim(),
+  });
 
   revalidatePath("/account/bookings");
   revalidatePath(`/account/bookings/${bookingId}`);
   revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
   return { ok: true };
 }
 
@@ -1558,17 +1565,17 @@ export async function escalateDispute(bookingId: string, note: string): Promise<
     where: { role: "admin" },
     select: { email: true },
   });
-  for (const admin of admins) {
-    notifyAdminDisputeEscalated({
-      adminEmail: admin.email,
-      dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
-      bookingId,
-      renterNote: note.trim(),
-    });
-  }
+  notifyAdminDisputeEscalated({
+    adminEmails: admins.map((a) => a.email).filter((e): e is string => !!e),
+    dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
+    bookingId,
+    renterNote: note.trim(),
+  });
 
   revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
   revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
   return { ok: true };
 }
 

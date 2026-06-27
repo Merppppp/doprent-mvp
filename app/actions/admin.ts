@@ -10,7 +10,7 @@ import { dueAt } from "@/lib/bookings";
 import { uploadPrivateToR2 } from "@/lib/r2";
 import { detectSlipMime } from "@/lib/file-mime";
 import { BOOKING_SLIP_MAX_BYTES } from "@/lib/config";
-import { notifyBookingCancelled, notifyRefundIssued, notifyCancelRequested } from "@/lib/notifications";
+import { notifyBookingCancelled, notifyRefundIssued } from "@/lib/notifications";
 import type { BookingStatus } from "@/lib/types";
 
 async function requireAdmin(): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
@@ -193,7 +193,9 @@ function revalidateBookingPaths(bookingId: string) {
   revalidatePath("/admin/bookings");
   revalidatePath(`/admin/bookings/${bookingId}`);
   revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
   revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
 }
 
 export async function adminApproveCancel(
