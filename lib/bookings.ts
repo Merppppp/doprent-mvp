@@ -155,6 +155,13 @@ export const BOOKING_STATUS_META: Record<
     renterHint: "ส่งข้อโต้แย้งแล้ว รอแอดมินตรวจสอบ",
     sellerHint: "ผู้เช่าโต้แย้งว่าได้คืนสินค้าแล้ว รอแอดมินตัดสิน",
   },
+  deposit_disputed: {
+    label: "โต้แย้งมัดจำ",
+    tone: "warn",
+    terminal: false,
+    renterHint: "ส่งข้อโต้แย้งมัดจำแล้ว รอแอดมินตรวจสอบ",
+    sellerHint: "ผู้เช่าโต้แย้งการตัดสินมัดจำ รอแอดมินตัดสิน",
+  },
 };
 
 export type Actor = "renter" | "seller";
@@ -189,17 +196,21 @@ export const TRANSITIONS: Transition[] = [
   { from: "confirmed", to: "cancel_requested", actor: "seller" },
   { from: "confirmed", to: "renting", actor: "seller" },
   { from: "renting", to: "returned", actor: "seller" },
+  // deposit = 0 + complete → can still go directly to completed
   { from: "renting", to: "completed", actor: "seller" },
   { from: "renting", to: "not_returned", actor: "seller" },
   // awaiting_return is reached automatically (sweep) at the rental's last day;
   // from there the seller confirms the physical return or escalates a cancel.
   { from: "awaiting_return", to: "returned", actor: "seller" },
+  // deposit = 0 + complete → can still go directly to completed
   { from: "awaiting_return", to: "completed", actor: "seller" },
   { from: "awaiting_return", to: "not_returned", actor: "seller" },
   { from: "awaiting_return", to: "cancel_requested", actor: "seller" },
   { from: "returned", to: "completed", actor: "seller" },
   // return dispute: renter escalates not_returned
   { from: "not_returned", to: "return_disputed", actor: "renter" },
+  // deposit dispute: renter escalates deposit decision (partial/forfeit)
+  { from: "returned", to: "deposit_disputed", actor: "renter" },
 ];
 
 export function findTransition(
@@ -218,6 +229,10 @@ export const ACTIVE_STATUSES: BookingStatus[] = [
   "confirmed",
   "renting",
   "awaiting_return",
+  "returned",
+  "not_returned",
+  "return_disputed",
+  "deposit_disputed",
 ];
 
 export function isActive(status: BookingStatus): boolean {

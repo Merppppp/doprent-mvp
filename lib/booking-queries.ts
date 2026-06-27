@@ -78,6 +78,15 @@ type PrismaBookingWithJoins = {
   returnDamageNote: string | null;
   deductionAmount: number | null;
   idCardPath: string | null;
+  // deposit refund
+  refundBankName: string | null;
+  refundAccountNumber: string | null;
+  refundAccountName: string | null;
+  depositDecision: string | null;
+  depositDisputeNote: string | null;
+  refundSlipDueAt: Date | null;
+  refundVerifiedAt: Date | null;
+  nextAvailableDate: Date | null;
   createdAt: Date;
   updatedAt: Date;
   items: Array<{
@@ -179,6 +188,15 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     return_damage_note: b.returnDamageNote ?? null,
     deduction_amount: b.deductionAmount ?? null,
     id_card_path: b.idCardPath ?? null,
+    // deposit refund
+    refund_bank_name: b.refundBankName ?? null,
+    refund_account_number: b.refundAccountNumber ?? null,
+    refund_account_name: b.refundAccountName ?? null,
+    deposit_decision: b.depositDecision ?? null,
+    deposit_dispute_note: b.depositDisputeNote ?? null,
+    refund_slip_due_at: b.refundSlipDueAt ? b.refundSlipDueAt.toISOString() : null,
+    refund_verified_at: b.refundVerifiedAt ? b.refundVerifiedAt.toISOString() : null,
+    next_available_date: b.nextAvailableDate ? ymd(b.nextAvailableDate) : null,
     created_at: b.createdAt.toISOString(),
     updated_at: b.updatedAt.toISOString(),
     dress_name: first?.product?.name ?? null,
@@ -215,6 +233,25 @@ export async function getMyAddresses(): Promise<Address[]> {
     recipient_name: a.recipientName,
     phone: a.phone,
     address_text: a.addressLine,
+    is_default: a.isDefault,
+    created_at: a.createdAt.toISOString(),
+  }));
+}
+
+export async function getMyBankAccounts(): Promise<import("@/lib/types").BankAccount[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+  const rows = await db.bankAccount.findMany({
+    where: { userId: user.id },
+    orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+  });
+  return rows.map((a) => ({
+    id: a.id,
+    user_id: a.userId,
+    label: a.label,
+    bank_name: a.bankName,
+    account_number: a.accountNumber,
+    account_name: a.accountName,
     is_default: a.isDefault,
     created_at: a.createdAt.toISOString(),
   }));

@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addAddress, updateAddress, createBooking } from "@/app/actions/bookings";
+import { addAddress, updateAddress, addBankAccount, createBooking } from "@/app/actions/bookings";
 import { startProgress, doneProgress } from "@/lib/progress";
 import { priceForNights } from "@/lib/pricing";
-import type { Address, PriceTier } from "@/lib/types";
+import type { Address, BankAccount, PriceTier } from "@/lib/types";
 import { fmtThai } from "@/lib/date-th";
 import type { BusinessHours } from "@/lib/hours";
 import type { IdCardItem } from "@/app/actions/id-cards";
@@ -23,6 +23,7 @@ type Props = {
   priceTiers?: PriceTier[] | null;
   deposit: number;
   addresses: Address[];
+  bankAccounts: BankAccount[];
   variantId?: string | null;
   /** Shipping methods chosen on the calendar page (display only here). */
   outboundMethod: "express" | "standard";
@@ -44,6 +45,7 @@ export default function CheckoutForm({
   priceTiers,
   deposit,
   addresses: initialAddresses,
+  bankAccounts: initialBankAccounts,
   variantId,
   outboundMethod,
   returnMethod,
@@ -57,6 +59,14 @@ export default function CheckoutForm({
   );
   const [showAdd, setShowAdd] = useState(initialAddresses.length === 0);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Bank account selection (deposit refund)
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(initialBankAccounts);
+  const [selectedBankId, setSelectedBankId] = useState<string>(
+    initialBankAccounts.find((b) => b.is_default)?.id ?? initialBankAccounts[0]?.id ?? ""
+  );
+  const [showAddBank, setShowAddBank] = useState(initialBankAccounts.length === 0);
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [selectedIdCardPath, setSelectedIdCardPath] = useState<string>(
@@ -123,9 +133,41 @@ export default function CheckoutForm({
     setEditingId(null);
   }
 
+  async function onAddBank(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError("");
+    setBusy(true);
+    startProgress();
+    const fd = new FormData(e.currentTarget);
+    const res = await addBankAccount(fd);
+    doneProgress();
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    const newBank: BankAccount = {
+      id: res.id,
+      user_id: "",
+      label: String(fd.get("label") ?? "บัญชีหลัก"),
+      bank_name: String(fd.get("bank_name") ?? ""),
+      account_number: String(fd.get("account_number") ?? ""),
+      account_name: String(fd.get("account_name") ?? ""),
+      is_default: bankAccounts.length === 0,
+      created_at: new Date().toISOString(),
+    };
+    setBankAccounts((prev) => [...prev, newBank]);
+    setSelectedBankId(res.id);
+    setShowAddBank(false);
+  }
+
   async function onConfirm() {
     if (!selectedId) {
       setError("กรุณาเลือกที่อยู่จัดส่ง");
+      return;
+    }
+    if (!selectedBankId) {
+      setError("กรุณาเลือกบัญชีธนาคารสำหรับรับเงินมัดจำคืน");
       return;
     }
     if (!selectedIdCardPath) {
@@ -138,6 +180,7 @@ export default function CheckoutForm({
     const fd = new FormData();
     fd.set("product_id", productId);
     fd.set("address_id", selectedId);
+    fd.set("bank_account_id", selectedBankId);
     fd.set("start_date", startDate);
     fd.set("end_date", endDate);
     if (startTime) fd.set("start_time", startTime);
@@ -406,6 +449,114 @@ export default function CheckoutForm({
         )}
       </section>
 
+      {/* ═══ 2. Bank account selection (deposit refund) ═══ */}
+      <section>
+        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
+          <StepNum n={2} /> บัญชีรับเงินมัดจำคืน <Req />
+        </h2>
+        <p style={{ fontSize: 13, color: "var(--ink-3)", marginBottom: 10 }}>
+          เลือกบัญชีธนาคารที่ร้านจะโอนคืนมัดจำเมื่อส่งคืนชุดเรียบร้อย
+        </p>
+        <div style={{ display: "grid", gap: 8 }}>
+          {bankAccounts.map((b) => (
+            <label
+              key={b.id}
+              style={{
+                display: "flex",
+                gap: 10,
+                padding: 14,
+                border: `1px solid ${selectedBankId === b.id ? "var(--accent)" : "var(--line)"}`,
+                borderRadius: 10,
+                cursor: "pointer",
+                background: selectedBankId === b.id ? "var(--accent-soft)" : "var(--surface)",
+              }}
+            >
+              <input
+                type="radio"
+                name="bank"
+                checked={selectedBankId === b.id}
+                onChange={() => setSelectedBankId(b.id)}
+                style={{ marginTop: 3 }}
+              />
+              <span style={{ fontSize: 14, lineHeight: 1.5 }}>
+                <b>{b.account_name}</b> · {bankLabel(b.bank_name)}
+                {b.is_default ? (
+                  <span style={{ color: "var(--accent-2)", fontSize: 12 }}> (ค่าเริ่มต้น)</span>
+                ) : null}
+                <br />
+                <span style={{ color: "var(--ink-2)" }}>{maskBankNum(b.account_number)}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+
+        {showAddBank ? (
+          <form
+            onSubmit={onAddBank}
+            style={{
+              marginTop: 12,
+              padding: 16,
+              border: "1px solid var(--line)",
+              borderRadius: 10,
+              display: "grid",
+              gap: 10,
+              background: "var(--surface)",
+            }}
+          >
+            <div>
+              <label htmlFor="new-bank-name" style={addressLabelStyle}>ธนาคาร <Req /></label>
+              <select id="new-bank-name" name="bank_name" className="input" required defaultValue="">
+                <option value="" disabled>เลือกธนาคาร</option>
+                {THAI_BANKS_CHECKOUT.map((b) => (
+                  <option key={b.value} value={b.value}>{b.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="new-account-number" style={addressLabelStyle}>เลขบัญชี <Req /></label>
+              <input
+                id="new-account-number"
+                name="account_number"
+                placeholder="เช่น 0123456789"
+                className="input"
+                inputMode="numeric"
+                pattern="[0-9]{10,15}"
+                title="เลขบัญชี 10-15 หลัก"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="new-account-name" style={addressLabelStyle}>ชื่อบัญชี <Req /></label>
+              <input id="new-account-name" name="account_name" placeholder="เช่น สมชาย ใจดี" className="input" required />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="submit" className="btn btn-dark" disabled={busy}>
+                บันทึกบัญชี
+              </button>
+              {bankAccounts.length > 0 ? (
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setShowAddBank(false)}
+                  disabled={busy}
+                >
+                  ยกเลิก
+                </button>
+              ) : null}
+            </div>
+          </form>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() => setShowAddBank(true)}
+            style={{ marginTop: 12 }}
+          >
+            ＋ เพิ่มบัญชีใหม่
+          </button>
+        )}
+      </section>
+
       {/* ═══ 3. Price summary ═══ */}
       <section
         style={{
@@ -417,7 +568,7 @@ export default function CheckoutForm({
         }}
       >
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
-          <StepNum n={2} /> สรุปการจอง
+          <StepNum n={3} /> สรุปการจอง
         </h2>
         <Row label={`ค่าเช่า (฿${effPerDay.toLocaleString()} × ${days} วัน)`} value={`฿${rental.toLocaleString()}`} />
         <Row label="ค่ามัดจำ" value={`฿${deposit.toLocaleString()}`} />
@@ -435,10 +586,10 @@ export default function CheckoutForm({
         </div>
       </section>
 
-      {/* ═══ 3. ID card photo ═══ */}
+      {/* ═══ 4. ID card photo ═══ */}
       <section>
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
-          <StepNum n={3} /> ภาพถ่ายบัตรประชาชน <Req />
+          <StepNum n={4} /> ภาพถ่ายบัตรประชาชน <Req />
         </h2>
         <p style={{ fontSize: 13, color: "var(--ink-3)", marginBottom: 12 }}>
           ร้านต้องการบัตรประชาชนเพื่อยืนยันตัวตนผู้เช่า
@@ -471,7 +622,13 @@ export default function CheckoutForm({
           กรุณาเลือกหรือเพิ่มที่อยู่จัดส่ง
         </div>
       )}
-      {selectedId && !selectedIdCardPath && (
+      {selectedId && !selectedBankId && (
+        <div style={{ fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          กรุณาเลือกหรือเพิ่มบัญชีธนาคาร
+        </div>
+      )}
+      {selectedId && selectedBankId && !selectedIdCardPath && (
         <div style={{ fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
           กรุณาแนบรูปถ่ายบัตรประชาชน
@@ -482,13 +639,41 @@ export default function CheckoutForm({
         type="button"
         className="btn btn-primary btn-lg"
         onClick={onConfirm}
-        disabled={busy || !selectedId || !selectedIdCardPath}
+        disabled={busy || !selectedId || !selectedBankId || !selectedIdCardPath}
         style={{ padding: "14px 20px", fontSize: 15 }}
       >
         {busy ? "กำลังส่งคำขอ…" : "ยืนยันจอง"}
       </button>
     </div>
   );
+}
+
+const THAI_BANKS_CHECKOUT = [
+  { value: "PROMPTPAY", label: "พร้อมเพย์ (PromptPay)" },
+  { value: "KBANK", label: "กสิกรไทย (KBANK)" },
+  { value: "BBL", label: "กรุงเทพ (BBL)" },
+  { value: "SCB", label: "ไทยพาณิชย์ (SCB)" },
+  { value: "KTB", label: "กรุงไทย (KTB)" },
+  { value: "BAY", label: "กรุงศรี (BAY)" },
+  { value: "TTB", label: "ทหารไทยธนชาต (TTB)" },
+  { value: "GSB", label: "ออมสิน (GSB)" },
+  { value: "BAAC", label: "ธ.ก.ส. (BAAC)" },
+  { value: "KKP", label: "เกียรตินาคินภัทร (KKP)" },
+  { value: "TISCO", label: "ทิสโก้ (TISCO)" },
+  { value: "CIMB", label: "ซีไอเอ็มบี (CIMB)" },
+  { value: "UOB", label: "ยูโอบี (UOB)" },
+  { value: "LHBANK", label: "แลนด์ แอนด์ เฮ้าส์ (LH Bank)" },
+  { value: "OTHER", label: "อื่นๆ" },
+] as const;
+
+function bankLabel(value: string): string {
+  return THAI_BANKS_CHECKOUT.find((b) => b.value === value)?.label ?? value;
+}
+
+function maskBankNum(num: string): string {
+  const digits = num.replace(/\D/g, "");
+  if (digits.length < 4) return num;
+  return "xxx-x-" + digits.slice(-4);
 }
 
 const addressLabelStyle: React.CSSProperties = {

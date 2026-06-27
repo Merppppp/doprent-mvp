@@ -112,7 +112,9 @@ export type BookingStatus =
   /** ลูกค้าไม่ส่งคืนชุด — ลูกค้ายังโต้แย้งได้ */
   | "not_returned"
   /** ผู้เช่าโต้แย้งกรณีไม่คืนของ — รอแอดมินตัดสิน */
-  | "return_disputed";
+  | "return_disputed"
+  /** ผู้เช่าโต้แย้งการตัดสินมัดจำ — รอแอดมินตัดสิน */
+  | "deposit_disputed";
 
 /**
  * Public Occasion shape — mapper-output type (rev 3: assembled from the tag
@@ -315,6 +317,17 @@ export type Address = {
   created_at: string;
 };
 
+export type BankAccount = {
+  id: string;
+  user_id: string;
+  label: string;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  is_default: boolean;
+  created_at: string;
+};
+
 export type Booking = {
   id: string;
   renter_id: string;
@@ -381,6 +394,21 @@ export type Booking = {
   addr_change_slip_path: string | null;
   /** Shop's reason when an address-change request is rejected. */
   addr_change_reason: string | null;
+  // -- Deposit refund --
+  /** Renter's bank account snapshot for deposit refund. */
+  refund_bank_name: string | null;
+  refund_account_number: string | null;
+  refund_account_name: string | null;
+  /** Seller's deposit decision: "full_refund" / "partial_refund" / "forfeit". */
+  deposit_decision: string | null;
+  /** Renter's reason for disputing the deposit decision. */
+  deposit_dispute_note: string | null;
+  /** Deadline for renter to verify the refund slip (ISO string, 24h). */
+  refund_slip_due_at: string | null;
+  /** When the renter confirmed receipt of the refund (ISO string). */
+  refund_verified_at: string | null;
+  /** วันที่สินค้าพร้อมเช่าใหม่ (ร้านกำหนดตอนรับคืน) */
+  next_available_date: string | null;
   created_at: string;
   updated_at: string;
 };

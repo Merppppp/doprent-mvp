@@ -311,6 +311,7 @@ model User {
   kycSubmissions    KycSubmission[]
   lineClicks        LineClick[]
   addresses         Address[]
+  bankAccounts      BankAccount[]
   bookings          Booking[]
   pageViews         PageView[]
   shopSubscriptions ShopSubscription[]
@@ -1112,6 +1113,33 @@ model Address {
   @@map("addresses")
 }
 
+/// บัญชีธนาคารของผู้ใช้ (ใช้รับเงินมัดจำคืน — pattern เดียวกับ Address)
+model BankAccount {
+  /// Primary key (uuid)
+  id            String   @id @default(uuid()) @db.Uuid
+  /// FK → users.id (Cascade — ลบ user → ลบบัญชีทั้งหมด)
+  userId        String   @map("user_id") @db.Uuid
+  /// ป้ายชื่อ (เช่น "บัญชีส่วนตัว", "บัญชีเงินเดือน")
+  label         String   @default("บัญชีหลัก")
+  /// ชื่อธนาคาร (เช่น "กสิกร", "กรุงเทพ", "ไทยพาณิชย์")
+  bankName      String   @map("bank_name")
+  /// เลขบัญชี
+  accountNumber String   @map("account_number")
+  /// ชื่อบัญชี (ตรงกับหน้าสมุดบัญชี)
+  accountName   String   @map("account_name")
+  /// บัญชีหลัก (default) ของผู้ใช้
+  isDefault     Boolean  @default(false) @map("is_default")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([userId])
+  @@map("bank_accounts")
+}
+
 /// การจอง — state machine 9 สถานะ, snapshot ราคา/ค่าคอม/ที่อยู่ ณ เวลาจอง
 model Booking {
   /// Primary key (uuid)
@@ -1251,17 +1279,38 @@ model Booking {
   /// path ไฟล์สลิปยืนยันการคืนเงิน (private bucket — key รูปแบบ refunds/<bookingId>/<uuid>.<ext>)
   refundSlipPath String?   @map("refund_slip_path")
 
+  // -- Deposit refund: bank account snapshot + decision tracking --
+  /// FK → bank_accounts.id (บัญชีรับมัดจำคืนของผู้เช่า — snapshot ค่าด้านล่าง)
+  bankAccountId      String?   @map("bank_account_id") @db.Uuid
+  /// snapshot ชื่อธนาคาร ณ เวลาจอง
+  refundBankName     String?   @map("refund_bank_name")
+  /// snapshot เลขบัญชี ณ เวลาจอง
+  refundAccountNumber String?  @map("refund_account_number")
+  /// snapshot ชื่อบัญชี ณ เวลาจอง
+  refundAccountName  String?   @map("refund_account_name")
+  /// ร้านตัดสินมัดจำ: "full_refund" / "partial_refund" / "forfeit"
+  depositDecision    String?   @map("deposit_decision")
+  /// ข้อโต้แย้งมัดจำจากผู้เช่า (แยกจาก disputeNote ของ slip)
+  depositDisputeNote String?   @map("deposit_dispute_note")
+  /// เส้นตาย renter verify สลิปคืนเงิน (24 ชม. หลังร้านอัปโหลด)
+  refundSlipDueAt    DateTime? @map("refund_slip_due_at") @db.Timestamptz(6)
+  /// เวลาที่ renter ยืนยันรับเงินคืนแล้ว
+  refundVerifiedAt   DateTime? @map("refund_verified_at") @db.Timestamptz(6)
+  /// วันที่สินค้าพร้อมเช่าใหม่ (ร้านกำหนดตอนรับคืน — default = endDate + buffer + cleaning)
+  nextAvailableDate  DateTime? @map("next_available_date") @db.Date
+
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedBy String?  @map("updated_by") @db.Uuid
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  renter    User            @relation(fields: [renterId], references: [id], onDelete: Cascade)
-  shop      Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  address   Address?        @relation(fields: [addressId], references: [id], onDelete: SetNull)
-  review    Review?
-  items     BookingItem[]
-  lostUnits ProductUnit[]   @relation("LostUnits")
+  renter      User            @relation(fields: [renterId], references: [id], onDelete: Cascade)
+  shop        Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  address     Address?        @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  bankAccount BankAccount?    @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  review      Review?
+  items       BookingItem[]
+  lostUnits   ProductUnit[]   @relation("LostUnits")
 
   @@index([renterId])
   @@index([shopId])
@@ -1683,6 +1732,8 @@ enum BookingStatus {
   not_returned
   /// ผู้เช่าโต้แย้งกรณีไม่คืนของ — รอแอดมินตัดสิน (auto-resolve 48 ชม.)
   return_disputed
+  /// ผู้เช่าโต้แย้งการตัดสินมัดจำ — รอแอดมินตัดสิน (auto-resolve 48 ชม.)
+  deposit_disputed
 
   @@map("booking_status")
 }

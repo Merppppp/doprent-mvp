@@ -11,6 +11,7 @@ const NAV: NavItem[] = [
   { href: "/account/bookings", label: "การจองของฉัน", icon: "M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" },
   { href: "/account/profile", label: "โปรไฟล์", icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" },
   { href: "/account/addresses", label: "ที่อยู่จัดส่ง", icon: "M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" },
+  { href: "/account/bank-accounts", label: "บัญชีธนาคาร", icon: "M3 3h18v4H3zM3 7v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7M7 12h4" },
   { href: "/account/billing", label: "ข้อมูลใบกำกับภาษี", icon: "M1 4h22v16H1zM1 10h22" },
   { href: "/account/password", label: "รหัสผ่าน", icon: "M3 11h18v11H3zM7 11V7a5 5 0 0 1 10 0v4" },
 ];

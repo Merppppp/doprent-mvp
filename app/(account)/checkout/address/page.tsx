@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getMyAddresses } from "@/lib/booking-queries";
+import { getMyAddresses, getMyBankAccounts } from "@/lib/booking-queries";
 import { rentalDays } from "@/lib/bookings";
 import { hasMultipleRates, normalizeTiers, startingPerDay } from "@/lib/pricing";
 import { parseBusinessHours } from "@/lib/hours";
@@ -96,8 +96,9 @@ export default async function CheckoutAddressPage({
   const days = rentalDays(start, end);
   const image =
     Array.isArray(dress.images) && dress.images.length > 0 ? String(dress.images[0]) : null;
-  const [addresses, idCards] = await Promise.all([
+  const [addresses, bankAccounts, idCards] = await Promise.all([
     getMyAddresses(),
+    getMyBankAccounts(),
     getUserIdCards(),
   ]);
 
@@ -162,6 +163,7 @@ export default async function CheckoutAddressPage({
         priceTiers={normalizeTiers(dress.price_tiers)}
         deposit={Number(dress.deposit) || 0}
         addresses={addresses}
+        bankAccounts={bankAccounts}
         variantId={variantId}
         outboundMethod={outboundMethod}
         returnMethod={returnMethod}

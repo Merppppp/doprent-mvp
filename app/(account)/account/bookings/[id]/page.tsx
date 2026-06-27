@@ -393,6 +393,13 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
             returnMethod={b.return_method}
             returnShipped={!!b.return_shipped_at}
             currentDueAt={b.current_due_at}
+            depositDecision={b.deposit_decision}
+            depositDisputeNote={b.deposit_dispute_note}
+            refundStatus={b.refund_status}
+            refundAmount={b.refund_amount}
+            depositAmount={b.deposit}
+            refundSlipPath={b.refund_slip_path}
+            refundSlipUrl={refundSlipUrl}
           />
         </div>
 

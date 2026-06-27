@@ -16,6 +16,7 @@ import { PAYMENT_CHANNEL_LABEL } from "@/lib/payments";
 import { fmtRentalWindow, fmtThaiLong } from "@/lib/date-th";
 import { sizeLabel } from "@/lib/types";
 import CopyAddressButton from "@/components/CopyAddressButton";
+import SlipConfirmCountdown from "@/components/SlipConfirmCountdown";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +88,12 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
           <BookingStatusBadge status={b.status} />
         </div>
         <p className="mb-5 text-sm text-[var(--ink-2)]">{meta.sellerHint}</p>
+
+        {b.status === "payment_review" && b.slip_confirm_due_at ? (
+          <div className="mb-5">
+            <SlipConfirmCountdown dueAt={b.slip_confirm_due_at} />
+          </div>
+        ) : null}
 
         {!PRINT_HIDDEN_STATUSES.has(b.status) ? (
           <div className="mb-5 flex flex-wrap gap-2.5">
@@ -343,6 +350,13 @@ export default async function SellerBookingDetail({ params }: { params: { id: st
           firstProductId={b.items[0]?.product_id ?? null}
           depositAmount={b.deposit}
           slipConfirmDueAt={b.slip_confirm_due_at}
+          refundStatus={b.refund_status}
+          refundBankName={b.refund_bank_name}
+          refundAccountNumber={b.refund_account_number}
+          refundAccountName={b.refund_account_name}
+          endDate={b.end_date}
+          depositDecision={b.deposit_decision}
+          refundSlipPath={b.refund_slip_path}
         />
       </div>
 

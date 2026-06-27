@@ -468,3 +468,178 @@ export function notifyReturnDisputeResolved(opts: {
     }),
   );
 }
+
+/* --------------------------- deposit notifications --------------------------- */
+
+/** Seller decided partial_refund or forfeit: renter can dispute within 48h. */
+export function notifyDepositDecision(opts: {
+  renterEmail: string | null | undefined;
+  dressName: string;
+  bookingId: string;
+  depositDecision: string;
+  refundAmount: number;
+  deposit: number;
+}) {
+  const decisionLabel =
+    opts.depositDecision === "partial_refund"
+      ? `คืนบางส่วน (${opts.refundAmount.toLocaleString()} บาท จาก ${opts.deposit.toLocaleString()} บาท)`
+      : "ริบมัดจำทั้งหมด";
+  fireEmail(
+    opts.renterEmail,
+    "ร้านแจ้งผลมัดจำ — DopRent",
+    emailShell({
+      title: "ร้านแจ้งผลมัดจำ",
+      bodyHtml: `
+        <p>ร้านตรวจสอบชุด <strong>${opts.dressName}</strong> แล้ว ผลการพิจารณามัดจำ: <strong>${decisionLabel}</strong></p>
+        <p>หากไม่เห็นด้วย คุณสามารถโต้แย้งได้ภายใน 48 ชม.</p>
+      `,
+      ctaLabel: "ดูรายละเอียดและโต้แย้ง",
+      ctaUrl: `${baseUrl()}/account/bookings/${opts.bookingId}`,
+    }),
+  );
+}
+
+/** Renter disputed deposit decision: notify admins + seller. */
+export function notifyDepositDisputed(opts: {
+  adminEmails: string[];
+  sellerEmail: string | null | undefined;
+  dressName: string;
+  bookingId: string;
+  disputeNote: string;
+}) {
+  const emails = opts.adminEmails.filter(Boolean);
+  if (emails.length > 0) {
+    const [primary, ...cc] = emails;
+    fireEmail(
+      primary,
+      "ผู้เช่าโต้แย้งมัดจำ รอตัดสิน — DopRent",
+      emailShell({
+        title: "ผู้เช่าโต้แย้งมัดจำ — รอแอดมินตัดสิน",
+        bodyHtml: `
+          <p>ผู้เช่าโต้แย้งผลการพิจารณามัดจำของชุด <strong>${opts.dressName}</strong></p>
+          <p style="padding:8px 12px;background:#f5f5f5;border-radius:6px;color:#555">
+            "${opts.disputeNote}"
+          </p>
+          <p>กรุณาเข้าไปตรวจสอบและตัดสินให้ทั้งสองฝ่ายภายใน 48 ชม.</p>
+        `,
+        ctaLabel: "ดูรายการจอง",
+        ctaUrl: `${baseUrl()}/admin/bookings/${opts.bookingId}`,
+      }),
+      "notification",
+      cc.length > 0 ? cc : undefined,
+    );
+  }
+  fireEmail(
+    opts.sellerEmail,
+    "ผู้เช่าโต้แย้งมัดจำ — DopRent",
+    emailShell({
+      title: "ผู้เช่าโต้แย้งมัดจำ",
+      bodyHtml: `
+        <p>ผู้เช่าโต้แย้งผลการพิจารณามัดจำของชุด <strong>${opts.dressName}</strong></p>
+        <p>แอดมินจะพิจารณาตัดสินภายใน 48 ชม.</p>
+      `,
+      ctaLabel: "ดูรายการจอง",
+      ctaUrl: `${baseUrl()}/sell/bookings/${opts.bookingId}`,
+    }),
+  );
+}
+
+/** Admin resolved deposit dispute: notify both parties. */
+export function notifyDepositDisputeResolved(opts: {
+  renterEmail: string | null | undefined;
+  sellerEmail: string | null | undefined;
+  dressName: string;
+  bookingId: string;
+  resolution: "side_with_renter" | "side_with_seller" | "adjust";
+  refundAmount: number;
+}) {
+  const resLabel =
+    opts.resolution === "side_with_renter"
+      ? "ตัดสินให้ผู้เช่า — คืนมัดจำเต็มจำนวน"
+      : opts.resolution === "side_with_seller"
+        ? "ตัดสินให้ร้าน — คงผลเดิม"
+        : `ปรับยอดคืนมัดจำเป็น ${opts.refundAmount.toLocaleString()} บาท`;
+  const title = "แอดมินตัดสินเรื่องมัดจำแล้ว";
+
+  fireEmail(
+    opts.renterEmail,
+    `${title} — DopRent`,
+    emailShell({
+      title,
+      bodyHtml: `
+        <p>แอดมินตัดสินเรื่องมัดจำชุด <strong>${opts.dressName}</strong> แล้ว</p>
+        <p>ผลการตัดสิน: <strong>${resLabel}</strong></p>
+      `,
+      ctaLabel: "ดูรายละเอียด",
+      ctaUrl: `${baseUrl()}/account/bookings/${opts.bookingId}`,
+    }),
+  );
+  fireEmail(
+    opts.sellerEmail,
+    `${title} — DopRent`,
+    emailShell({
+      title,
+      bodyHtml: `
+        <p>แอดมินตัดสินเรื่องมัดจำชุด <strong>${opts.dressName}</strong> แล้ว</p>
+        <p>ผลการตัดสิน: <strong>${resLabel}</strong></p>
+      `,
+      ctaLabel: "ดูรายการจอง",
+      ctaUrl: `${baseUrl()}/sell/bookings/${opts.bookingId}`,
+    }),
+  );
+}
+
+/** Seller uploaded refund slip: notify renter to verify. */
+export function notifyRefundSlipUploaded(opts: {
+  renterEmail: string | null | undefined;
+  dressName: string;
+  bookingId: string;
+  refundAmount: number;
+}) {
+  fireEmail(
+    opts.renterEmail,
+    "ร้านอัปโหลดสลิปคืนมัดจำแล้ว — DopRent",
+    emailShell({
+      title: "ร้านอัปโหลดสลิปคืนมัดจำแล้ว",
+      bodyHtml: `
+        <p>ร้านได้โอนคืนมัดจำ ${opts.refundAmount.toLocaleString()} บาท สำหรับชุด <strong>${opts.dressName}</strong> และอัปโหลดสลิปแล้ว</p>
+        <p>กรุณาตรวจสอบและยืนยันการรับเงินภายใน 24 ชม. (หากไม่ดำเนินการ ระบบจะยืนยันอัตโนมัติ)</p>
+      `,
+      ctaLabel: "ตรวจสอบสลิปคืนเงิน",
+      ctaUrl: `${baseUrl()}/account/bookings/${opts.bookingId}`,
+    }),
+  );
+}
+
+/** 24h auto-completed refund verification: notify both parties. */
+export function notifyRefundAutoCompleted(opts: {
+  renterEmail: string | null | undefined;
+  sellerEmail: string | null | undefined;
+  dressName: string;
+  bookingId: string;
+}) {
+  fireEmail(
+    opts.renterEmail,
+    "คืนมัดจำเสร็จสมบูรณ์ — DopRent",
+    emailShell({
+      title: "คืนมัดจำเสร็จสมบูรณ์",
+      bodyHtml: `
+        <p>การคืนมัดจำสำหรับชุด <strong>${opts.dressName}</strong> ได้รับการยืนยันอัตโนมัติ (ครบ 24 ชม.) การจองเสร็จสมบูรณ์แล้ว</p>
+      `,
+      ctaLabel: "ดูรายละเอียด",
+      ctaUrl: `${baseUrl()}/account/bookings/${opts.bookingId}`,
+    }),
+  );
+  fireEmail(
+    opts.sellerEmail,
+    "คืนมัดจำเสร็จสมบูรณ์ — DopRent",
+    emailShell({
+      title: "คืนมัดจำเสร็จสมบูรณ์",
+      bodyHtml: `
+        <p>การคืนมัดจำสำหรับชุด <strong>${opts.dressName}</strong> ได้รับการยืนยันอัตโนมัติ (ครบ 24 ชม.) การจองเสร็จสมบูรณ์แล้ว</p>
+      `,
+      ctaLabel: "ดูรายการจอง",
+      ctaUrl: `${baseUrl()}/sell/bookings/${opts.bookingId}`,
+    }),
+  );
+}

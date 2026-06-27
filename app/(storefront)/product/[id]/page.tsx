@@ -598,6 +598,7 @@ export default async function DressPage({ params }: { params: Params }) {
             leadTimeDays={effectivePolicy.leadTimeDays}
             bufferDaysBefore={effectivePolicy.bufferDaysBefore}
             bufferDaysAfter={effectivePolicy.bufferDaysAfter}
+            cleaningDays={effectivePolicy.cleaningDays}
             minRentalDays={effectivePolicy.minRentalDays}
             maxRentalDays={effectivePolicy.maxRentalDays}
             productId={dress.id}

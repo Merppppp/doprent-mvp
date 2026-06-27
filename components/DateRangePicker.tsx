@@ -49,8 +49,10 @@ type Props = {
    * the server's oversell guard does, so a range can't pass here yet be rejected.
    */
   bufferDaysBefore?: number;
-  /** Cleaning/preparation days always reserved AFTER the end date. */
+  /** One-way standard return transit days (same as bufferDaysBefore for symmetry). */
   bufferDaysAfter?: number;
+  /** Cleaning/preparation days always reserved AFTER the end date, regardless of shipping method. */
+  cleaningDays?: number;
   /** Minimum rental length in days. */
   minRentalDays?: number;
   /** Maximum rental length in days; null = unlimited. */
@@ -178,6 +180,7 @@ export default function DateRangePicker({
   leadTimeDays = 0,
   bufferDaysBefore = 0,
   bufferDaysAfter = 0,
+  cleaningDays = 1,
   minRentalDays = 1,
   maxRentalDays = null,
   productId,
@@ -230,8 +233,10 @@ export default function DateRangePicker({
   const [returnMethod, setReturnMethod] = useState<ShipMethod>("standard");
 
   // Method-aware buffer windows (mirror lib/booking-policy.shippingBuffers).
+  //   before = outbound express → 0, else transitBefore
+  //   after  = cleaning + (return express → 0, else transitAfter)
   const windowBefore = outboundMethod === "express" ? 0 : bufferDaysBefore;
-  const windowAfter = (returnMethod === "express" ? 0 : bufferDaysBefore) + bufferDaysAfter;
+  const windowAfter = cleaningDays + (returnMethod === "express" ? 0 : bufferDaysAfter);
 
   // Effective unavailable set: merge product-level + variant-specific unavailable dates
   const effectiveUnavailable = useMemo(() => {
@@ -326,6 +331,15 @@ export default function DateRangePicker({
   const standardOutboundDisabled = sameDayStart;
   const expressOutboundDisabled = sameDayStart && !expressTodayOk;
 
+  // Return standard disabled: if the after-buffer (cleaning + transit) would collide
+  // with a booked date, standard return is not possible — the dress won't arrive in time.
+  const standardReturnDisabled = useMemo(() => {
+    if (!start || !end) return false;
+    const afterWindowStandard = cleaningDays + bufferDaysAfter; // cleaning + return transit
+    const postDates = bufferDatesAfter(end, afterWindowStandard);
+    return postDates.some((d) => allUnavailableSet.has(d));
+  }, [start, end, cleaningDays, bufferDaysAfter, allUnavailableSet]);
+
   // If a same-day pickup makes the current outbound choice impossible, nudge the
   // user to the only valid option (or surface the no-delivery error below).
   useEffect(() => {
@@ -333,6 +347,13 @@ export default function DateRangePicker({
       setOutboundMethod("express");
     }
   }, [standardOutboundDisabled, expressOutboundDisabled, outboundMethod]);
+
+  // If return standard becomes impossible, nudge to express.
+  useEffect(() => {
+    if (standardReturnDisabled && returnMethod === "standard") {
+      setReturnMethod("express");
+    }
+  }, [standardReturnDisabled, returnMethod]);
 
   const deliveryError = useMemo<string | null>(() => {
     if (!start || !end) return null;
@@ -528,11 +549,10 @@ export default function DateRangePicker({
       />
 
       {hasVariants && selectedVariant ? (
-        <div className="mt-1.5 flex items-center justify-center gap-1 text-[11px] text-ink-3">
+        <div className="mt-1.5 flex items-center justify-center text-[11px] text-ink-3">
           <span className="inline-block rounded bg-bg-hover px-1.5 py-0.5 font-semibold text-ink-2">
             ไซซ์ {sizeLabel(selectedVariant.size)}
           </span>
-          <span>เลขเล็กบนวัน = จำนวนคงเหลือของไซซ์นี้</span>
         </div>
       ) : null}
 
@@ -541,24 +561,45 @@ export default function DateRangePicker({
       </div>
 
       {/* ── Shipping method (both legs) — chosen here so the buffer is known ── */}
-      {start && end ? (
-        <div className="mt-3 grid gap-3 rounded-lg border border-line bg-surface p-3">
-          <DeliveryToggle
-            label="ตอนร้านจัดส่งของ (ขาไป)"
-            value={outboundMethod}
-            onChange={setOutboundMethod}
-            expressDisabled={expressOutboundDisabled}
-            standardDisabled={standardOutboundDisabled}
-            transitDays={bufferDaysBefore}
-          />
-          <DeliveryToggle
-            label="ตอนส่งคืนสินค้า (ขากลับ)"
-            value={returnMethod}
-            onChange={setReturnMethod}
-            transitDays={bufferDaysBefore}
-          />
-        </div>
-      ) : null}
+      {start && end ? (() => {
+        // Compute contextual hints for outbound
+        const outboundShipByDate = bufferDaysBefore > 0
+          ? (() => { const d = new Date(start + "T00:00:00"); d.setDate(d.getDate() - bufferDaysBefore); return fmtThai(isoOf(d)); })()
+          : "";
+        const outboundStdHint = bufferDaysBefore > 0
+          ? `ร้านจัดส่งภายใน ${outboundShipByDate}`
+          : "ขนส่งทั่วไป";
+        // Compute contextual hints for return
+        const returnArrivalDate = bufferDaysBefore > 0
+          ? (() => { const d = new Date(end + "T00:00:00"); d.setDate(d.getDate() + bufferDaysBefore); return fmtThai(isoOf(d)); })()
+          : "";
+        const returnStdHint = bufferDaysBefore > 0
+          ? `ส่งคืนภายใน ${fmtThai(end)} · ถึงร้าน ~${returnArrivalDate}`
+          : "ขนส่งทั่วไป";
+        const returnStdDisabledHint = standardReturnDisabled
+          ? "ส่งพัสดุไม่ได้ เนื่องจากสินค้าอาจส่งถึงไม่ทันช่วงที่มีลูกค้าท่านอื่นจองต่อ"
+          : undefined;
+        return (
+          <div className="mt-3 grid gap-3 rounded-lg border border-line bg-surface p-3">
+            <DeliveryToggle
+              label="ตอนร้านจัดส่งของ (ขาไป)"
+              value={outboundMethod}
+              onChange={setOutboundMethod}
+              expressDisabled={expressOutboundDisabled}
+              standardDisabled={standardOutboundDisabled}
+              standardHint={outboundStdHint}
+            />
+            <DeliveryToggle
+              label="ตอนส่งคืนสินค้า (ขากลับ)"
+              value={returnMethod}
+              onChange={setReturnMethod}
+              standardDisabled={standardReturnDisabled}
+              standardHint={returnStdHint}
+              standardDisabledHint={returnStdDisabledHint}
+            />
+          </div>
+        );
+      })() : null}
 
       {/* Same-day delivery gating warning */}
       {deliveryError ? (
@@ -862,11 +903,6 @@ function Calendar({
                 }}
               >
                 <span>{day}</span>
-                {showRemaining ? (
-                  <span className={`text-[9px] font-semibold leading-none ${rem === 1 ? "text-warn" : "text-success"}`}>
-                    {rem}
-                  </span>
-                ) : null}
               </button>
             </div>
           );
@@ -884,24 +920,25 @@ function DeliveryToggle({
   onChange,
   expressDisabled = false,
   standardDisabled = false,
-  transitDays = 0,
+  standardHint,
+  standardDisabledHint,
 }: {
   label: string;
   value: "express" | "standard";
   onChange: (v: "express" | "standard") => void;
   expressDisabled?: boolean;
   standardDisabled?: boolean;
-  /** One-way standard transit estimate, shown as a hint. */
-  transitDays?: number;
+  /** Custom hint text for the standard option (replaces the default "+N วันขนส่ง"). */
+  standardHint?: string;
+  /** Tooltip/hint shown when standard is disabled (explains why). */
+  standardDisabledHint?: string;
 }) {
+  const stdHint = standardDisabled && standardDisabledHint
+    ? standardDisabledHint
+    : standardHint ?? "ขนส่งทั่วไป";
   const options: { key: "express" | "standard"; title: string; hint: string; disabled: boolean }[] = [
     { key: "express", title: "ส่งด่วน", hint: "ภายในวัน", disabled: expressDisabled },
-    {
-      key: "standard",
-      title: "ส่งพัสดุ",
-      hint: transitDays > 0 ? `+${transitDays} วันขนส่ง` : "ขนส่งทั่วไป",
-      disabled: standardDisabled,
-    },
+    { key: "standard", title: "ส่งพัสดุ", hint: stdHint, disabled: standardDisabled },
   ];
   return (
     <div className="grid gap-1.5">
@@ -915,6 +952,7 @@ function DeliveryToggle({
               type="button"
               disabled={o.disabled}
               onClick={() => onChange(o.key)}
+              title={o.disabled && o.key === "standard" && standardDisabledHint ? standardDisabledHint : undefined}
               className={`flex flex-col items-start rounded-lg border-2 px-3 py-2 text-left transition-colors ${
                 selected
                   ? "border-[var(--accent)] bg-[var(--accent-soft)]"
@@ -926,7 +964,7 @@ function DeliveryToggle({
               <span className={`text-[13px] font-semibold ${selected ? "text-[var(--accent)]" : "text-ink"}`}>
                 {o.title}
               </span>
-              <span className={`text-[11px] ${selected ? "text-[var(--accent-2)]" : "text-ink-3"}`}>{o.hint}</span>
+              <span className={`text-[11px] leading-snug ${selected ? "text-[var(--accent-2)]" : o.disabled ? "text-danger" : "text-ink-3"}`}>{o.hint}</span>
             </button>
           );
         })}

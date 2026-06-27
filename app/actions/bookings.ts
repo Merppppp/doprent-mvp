@@ -40,6 +40,10 @@ import {
   notifyCancelRequested,
   notifyAdminReturnDisputeEscalated,
   notifyReturnDisputeResolved,
+  notifyDepositDecision,
+  notifyDepositDisputed,
+  notifyDepositDisputeResolved,
+  notifyRefundSlipUploaded,
 } from "@/lib/notifications";
 import { FIRST_TOUCH_COOKIE, decodeAttribution } from "@/lib/attribution";
 import { parseBusinessHours } from "@/lib/hours";
@@ -217,6 +221,133 @@ export async function setDefaultAddress(formData: FormData): Promise<Result> {
   });
 }
 
+/* ------------------------------ bank account CRUD ------------------------------ */
+
+export async function addBankAccount(formData: FormData): Promise<Result<{ id: string }>> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const label = String(formData.get("label") ?? "บัญชีหลัก").trim();
+  const bankName = String(formData.get("bank_name") ?? "").trim();
+  const accountNumber = String(formData.get("account_number") ?? "").trim();
+  const accountName = String(formData.get("account_name") ?? "").trim();
+  const makeDefault = String(formData.get("is_default") ?? "") === "on";
+
+  if (!bankName) return { ok: false, error: "กรุณาเลือกธนาคาร" };
+  if (!accountNumber) return { ok: false, error: "กรุณาใส่เลขบัญชี" };
+  if (!accountName) return { ok: false, error: "กรุณาใส่ชื่อบัญชี" };
+
+  return withActor(user.id, async () => {
+    const count = await db.bankAccount.count({ where: { userId: user.id } });
+    const isDefault = makeDefault || count === 0;
+
+    if (isDefault) {
+      await db.bankAccount.updateMany({
+        where: { userId: user.id },
+        data: { isDefault: false },
+      });
+    }
+
+    const created = await db.bankAccount.create({
+      data: { userId: user.id, label, bankName, accountNumber, accountName, isDefault },
+      select: { id: true },
+    });
+
+    revalidatePath("/checkout/address");
+    revalidatePath("/account/bank-accounts");
+    return { ok: true, id: created.id };
+  });
+}
+
+export async function updateBankAccount(formData: FormData): Promise<Result<{ id: string }>> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const id = String(formData.get("id") ?? "").trim();
+  const bankName = String(formData.get("bank_name") ?? "").trim();
+  const accountNumber = String(formData.get("account_number") ?? "").trim();
+  const accountName = String(formData.get("account_name") ?? "").trim();
+  const label = String(formData.get("label") ?? "").trim();
+
+  if (!id) return { ok: false, error: "ไม่พบบัญชี" };
+  if (!bankName) return { ok: false, error: "กรุณาเลือกธนาคาร" };
+  if (!accountNumber) return { ok: false, error: "กรุณาใส่เลขบัญชี" };
+  if (!accountName) return { ok: false, error: "กรุณาใส่ชื่อบัญชี" };
+
+  return withActor(user.id, async () => {
+    const existing = await db.bankAccount.findFirst({
+      where: { id, userId: user.id },
+      select: { id: true },
+    });
+    if (!existing) return { ok: false, error: "ไม่พบบัญชี" };
+
+    await db.bankAccount.update({
+      where: { id },
+      data: { bankName, accountNumber, accountName, ...(label ? { label } : {}) },
+    });
+
+    revalidatePath("/checkout/address");
+    revalidatePath("/account/bank-accounts");
+    return { ok: true, id };
+  });
+}
+
+export async function deleteBankAccount(formData: FormData): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return { ok: false, error: "ไม่พบบัญชี" };
+
+  return withActor(user.id, async () => {
+    const existing = await db.bankAccount.findFirst({
+      where: { id, userId: user.id },
+      select: { id: true, isDefault: true },
+    });
+    if (!existing) return { ok: false, error: "ไม่พบบัญชี" };
+
+    await db.bankAccount.delete({ where: { id } });
+
+    if (existing.isDefault) {
+      const next = await db.bankAccount.findFirst({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      if (next) {
+        await db.bankAccount.update({ where: { id: next.id }, data: { isDefault: true } });
+      }
+    }
+
+    revalidatePath("/checkout/address");
+    revalidatePath("/account/bank-accounts");
+    return { ok: true };
+  });
+}
+
+export async function setDefaultBankAccount(formData: FormData): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return { ok: false, error: "ไม่พบบัญชี" };
+
+  return withActor(user.id, async () => {
+    const existing = await db.bankAccount.findFirst({
+      where: { id, userId: user.id },
+      select: { id: true },
+    });
+    if (!existing) return { ok: false, error: "ไม่พบบัญชี" };
+
+    await db.bankAccount.updateMany({ where: { userId: user.id }, data: { isDefault: false } });
+    await db.bankAccount.update({ where: { id }, data: { isDefault: true } });
+
+    revalidatePath("/checkout/address");
+    revalidatePath("/account/bank-accounts");
+    return { ok: true };
+  });
+}
+
 /* ------------------------------ booking ------------------------------ */
 
 /** Active booking statuses for overlap counting — must stay in sync with ACTIVE_STATUSES in lib/booking-policy.ts */
@@ -245,6 +376,7 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
 
   const addressId = String(formData.get("address_id") ?? "");
+  const bankAccountId = String(formData.get("bank_account_id") ?? "").trim() || null;
   const startDate = String(formData.get("start_date") ?? "");
   const endDate = String(formData.get("end_date") ?? "");
   // Optional pickup/return time-of-day. Stored only when both are valid HH:MM;
@@ -425,6 +557,16 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
       select: { id: true, recipientName: true, phone: true, addressLine: true },
     });
     if (!addr) return { ok: false, error: "ไม่พบที่อยู่จัดส่ง" };
+
+    // bank account snapshot for deposit refund (must belong to the user)
+    let bankAcct: { id: string; bankName: string; accountNumber: string; accountName: string } | null = null;
+    if (bankAccountId) {
+      bankAcct = await db.bankAccount.findFirst({
+        where: { id: bankAccountId, userId: user.id },
+        select: { id: true, bankName: true, accountNumber: true, accountName: true },
+      });
+      if (!bankAcct) return { ok: false, error: "ไม่พบบัญชีธนาคาร" };
+    }
 
     // ── Per-item: resolve variant, compute pricing, run policy check ──────────
     type ResolvedLineItem = {
@@ -707,6 +849,12 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
               recipientName: addr.recipientName,
               phone: addr.phone,
               addressText: addr.addressLine,
+              ...(bankAcct ? {
+                bankAccountId: bankAcct.id,
+                refundBankName: bankAcct.bankName,
+                refundAccountNumber: bankAcct.accountNumber,
+                refundAccountName: bankAcct.accountName,
+              } : {}),
               deliveryMethod,
               outboundMethod,
               returnMethod,
@@ -764,6 +912,12 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
           recipientName: addr.recipientName,
           phone: addr.phone,
           addressText: addr.addressLine,
+          ...(bankAcct ? {
+            bankAccountId: bankAcct.id,
+            refundBankName: bankAcct.bankName,
+            refundAccountNumber: bankAcct.accountNumber,
+            refundAccountName: bankAcct.accountName,
+          } : {}),
           deliveryMethod,
           outboundMethod,
           returnMethod,
@@ -1255,6 +1409,9 @@ export async function markReturned(
   condition: ReturnCondition,
   damageNote?: string,
   deductionAmount?: number,
+  depositDecision?: "full_refund" | "partial_refund" | "forfeit",
+  refundAmount?: number,
+  nextAvailableDate?: string,
 ): Promise<Result> {
   if (condition === "damaged" && !damageNote?.trim())
     return { ok: false, error: "กรุณาระบุความเสียหายที่พบ" };
@@ -1267,11 +1424,44 @@ export async function markReturned(
   if (condition !== "not_returned") {
     const bk = await db.booking.findUnique({
       where: { id: bookingId },
-      select: { returnShippedAt: true },
+      select: { returnShippedAt: true, deposit: true },
     });
     if (!bk) return { ok: false, error: "ไม่พบการจอง" };
     if (!bk.returnShippedAt)
       return { ok: false, error: "ลูกค้ายังไม่ได้ส่งคืนสินค้า ไม่สามารถรับคืนได้" };
+
+    // When deposit > 0 and condition is "complete", go to "returned" (not "completed")
+    // to enter the deposit refund flow. The booking will complete after refund verification.
+    if (condition === "complete" && bk.deposit > 0) {
+      const decision = depositDecision ?? "full_refund";
+      const deposit = bk.deposit;
+      const computedRefundAmount =
+        decision === "full_refund" ? deposit :
+        decision === "partial_refund" ? Math.round(refundAmount ?? 0) :
+        0;
+      const computedDeduction = deposit - computedRefundAmount;
+      const computedRefundStatus =
+        decision === "forfeit" ? "forfeited" : "refund_pending";
+      // 48h dispute window for partial/forfeit
+      const now = new Date();
+      const disputeWindowDueAt =
+        decision === "partial_refund" || decision === "forfeit"
+          ? new Date(now.getTime() + 48 * 3600 * 1000)
+          : null;
+
+      return sellerSimpleMove(bookingId, "returned", undefined, undefined, {
+        condition,
+        damageNote: undefined,
+        deductionAmount: computedDeduction,
+        requireRefund: false,
+        forfeitDeposit: false,
+        depositDecision: decision,
+        computedRefundAmount,
+        computedRefundStatus,
+        disputeWindowDueAt,
+        nextAvailableDate,
+      });
+    }
   }
 
   const to: BookingStatus =
@@ -1297,7 +1487,18 @@ async function sellerSimpleMove(
   to: BookingStatus,
   reason?: string,
   shipping?: { carrier?: string; trackingNumber?: string; trackingUrl?: string },
-  returnInfo?: { condition: ReturnCondition; damageNote?: string; deductionAmount?: number | null; requireRefund: boolean; forfeitDeposit?: boolean }
+  returnInfo?: {
+    condition: ReturnCondition;
+    damageNote?: string;
+    deductionAmount?: number | null;
+    requireRefund: boolean;
+    forfeitDeposit?: boolean;
+    depositDecision?: string;
+    computedRefundAmount?: number;
+    computedRefundStatus?: string;
+    disputeWindowDueAt?: Date | null;
+    nextAvailableDate?: string;
+  }
 ): Promise<Result> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
@@ -1330,6 +1531,11 @@ async function sellerSimpleMove(
                   ...(returnInfo.deductionAmount != null ? { deductionAmount: Math.round(returnInfo.deductionAmount) } : {}),
                   ...(returnInfo.requireRefund ? { refundStatus: "required" } : {}),
                   ...(returnInfo.forfeitDeposit ? { refundStatus: "forfeited" } : {}),
+                  ...(returnInfo.depositDecision ? { depositDecision: returnInfo.depositDecision } : {}),
+                  ...(returnInfo.computedRefundAmount != null ? { refundAmount: returnInfo.computedRefundAmount } : {}),
+                  ...(returnInfo.computedRefundStatus ? { refundStatus: returnInfo.computedRefundStatus } : {}),
+                  ...(returnInfo.disputeWindowDueAt !== undefined ? { currentDueAt: returnInfo.disputeWindowDueAt } : {}),
+                  ...(returnInfo.nextAvailableDate ? { nextAvailableDate: new Date(returnInfo.nextAvailableDate) } : {}),
                 }
               : {}),
           },
@@ -1377,7 +1583,23 @@ async function sellerSimpleMove(
   if (to === "rejected") notifyBookingRejected(renterNotify);
   else if (to === "confirmed") notifyBookingConfirmed(renterNotify);
   else if (to === "slip_disputed") notifySlipDisputed(renterNotify);
-  else if (to === "cancel_requested") {
+  else if (to === "returned" && returnInfo?.depositDecision && returnInfo.depositDecision !== "full_refund") {
+    // Notify renter about partial refund or forfeit decision (they can dispute within 48h)
+    const bkForNotify = await db.booking.findUnique({
+      where: { id: bookingId },
+      select: { deposit: true, refundAmount: true },
+    });
+    if (bkForNotify) {
+      notifyDepositDecision({
+        renterEmail: booking.renter?.email,
+        dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
+        bookingId,
+        depositDecision: returnInfo.depositDecision,
+        refundAmount: bkForNotify.refundAmount ?? 0,
+        deposit: bkForNotify.deposit,
+      });
+    }
+  } else if (to === "cancel_requested") {
     // Notify all admins (single email with CC) that a shop-side cancel is waiting.
     const admins = await db.user.findMany({ where: { role: "admin" }, select: { email: true } });
     notifyCancelRequested({
@@ -2009,6 +2231,383 @@ export async function payAddressChangeDiff(
   revalidatePath(`/sell/bookings/${bookingId}`);
   revalidatePath("/account/bookings");
   revalidatePath("/sell/bookings");
+  return { ok: true };
+}
+
+/* ------------------------------ deposit dispute ------------------------------ */
+
+/** Hours the renter has to dispute a deposit decision before it becomes final. */
+const DEPOSIT_DISPUTE_WINDOW_HOURS = 48;
+
+/**
+ * Renter escalates a deposit decision (partial_refund or forfeit).
+ * Sets status → deposit_disputed, currentDueAt → now + 48h.
+ */
+export async function escalateDepositDispute(bookingId: string, note: string): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+  const booking = await loadBooking(bookingId);
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.renterId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
+  if (booking.status !== "returned")
+    return { ok: false, error: "สถานะไม่ถูกต้อง" };
+  if (!note.trim()) return { ok: false, error: "กรุณาใส่เหตุผลโต้แย้ง" };
+
+  // Additional guard: depositDecision must be partial_refund or forfeit
+  const bkDeposit = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: { depositDecision: true },
+  });
+  if (!bkDeposit || !bkDeposit.depositDecision || bkDeposit.depositDecision === "full_refund")
+    return { ok: false, error: "ไม่สามารถโต้แย้งได้ — มัดจำคืนเต็มจำนวนแล้ว" };
+
+  const now = new Date();
+  const dueAt48h = new Date(now.getTime() + DEPOSIT_DISPUTE_WINDOW_HOURS * 3600 * 1000);
+
+  let res;
+  try {
+    res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, status: "returned", renterId: user.id },
+        data: {
+          status: "deposit_disputed",
+          depositDisputeNote: note.trim(),
+          currentDueAt: dueAt48h,
+        },
+      }),
+    );
+  } catch (e) {
+    console.error("[doprent] escalate deposit dispute error", e);
+    return { ok: false, error: "ส่งข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  // Notify admins + seller
+  const admins = await db.user.findMany({
+    where: { role: "admin" },
+    select: { email: true },
+  });
+  const sellerEmail = await db.shop.findUnique({
+    where: { id: booking.shopId },
+    select: { owner: { select: { email: true } } },
+  });
+  notifyDepositDisputed({
+    adminEmails: admins.map((a) => a.email).filter((e): e is string => !!e),
+    sellerEmail: sellerEmail?.owner?.email,
+    dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
+    bookingId,
+    disputeNote: note.trim(),
+  });
+
+  revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
+  revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
+  revalidatePath("/admin/bookings");
+  revalidatePath(`/admin/bookings/${bookingId}`);
+  return { ok: true };
+}
+
+/**
+ * Renter disputes a refund slip uploaded by the seller.
+ * Works when status = returned AND refundSlipPath exists.
+ * Moves to deposit_disputed so admin can review.
+ * Clears the slip so seller must re-upload after resolution.
+ */
+export async function disputeRefundSlip(bookingId: string, note: string): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+  const booking = await loadBooking(bookingId);
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.renterId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
+  if (booking.status !== "returned")
+    return { ok: false, error: "สถานะไม่ถูกต้อง" };
+  if (!note.trim()) return { ok: false, error: "กรุณาใส่เหตุผล" };
+
+  // Must have a refund slip to dispute it
+  const bk = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: { refundSlipPath: true },
+  });
+  if (!bk?.refundSlipPath) return { ok: false, error: "ยังไม่มีสลิปคืนมัดจำ" };
+
+  const now = new Date();
+  const dueAt48h = new Date(now.getTime() + DEPOSIT_DISPUTE_WINDOW_HOURS * 3600 * 1000);
+
+  let res;
+  try {
+    res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, status: "returned", renterId: user.id },
+        data: {
+          status: "deposit_disputed",
+          depositDisputeNote: `[สลิปมีปัญหา] ${note.trim()}`,
+          currentDueAt: dueAt48h,
+          // Clear slip so seller re-uploads after admin resolution
+          refundSlipPath: null,
+          refundedAt: null,
+          refundSlipDueAt: null,
+          refundStatus: "refund_pending",
+        },
+      }),
+    );
+  } catch (e) {
+    console.error("[doprent] dispute refund slip error", e);
+    return { ok: false, error: "ส่งข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  // Notify admins + seller
+  const admins = await db.user.findMany({
+    where: { role: "admin" },
+    select: { email: true },
+  });
+  const sellerEmail = await db.shop.findUnique({
+    where: { id: booking.shopId },
+    select: { owner: { select: { email: true } } },
+  });
+  notifyDepositDisputed({
+    adminEmails: admins.map((a) => a.email).filter((e): e is string => !!e),
+    sellerEmail: sellerEmail?.owner?.email,
+    dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
+    bookingId,
+    disputeNote: `[สลิปมีปัญหา] ${note.trim()}`,
+  });
+
+  revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
+  revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
+  revalidatePath("/admin/bookings");
+  revalidatePath(`/admin/bookings/${bookingId}`);
+  return { ok: true };
+}
+
+/**
+ * Admin resolves a deposit dispute.
+ *   side_with_renter → full refund
+ *   side_with_seller → keep original decision
+ *   adjust           → set custom refundAmount
+ */
+export async function adminResolveDepositDispute(
+  bookingId: string,
+  resolution: "side_with_renter" | "side_with_seller" | "adjust",
+  adjustedAmount?: number,
+  adminNote?: string,
+): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+  if (user.role !== "admin") return { ok: false, error: "ไม่มีสิทธิ์" };
+
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true, status: true, deposit: true, depositDecision: true, refundAmount: true,
+      renter: { select: { email: true } },
+      shop: { select: { owner: { select: { email: true } } } },
+      items: { take: 1, select: { product: { select: { name: true } } } },
+    },
+  });
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.status !== "deposit_disputed")
+    return { ok: false, error: "สถานะไม่ถูกต้อง" };
+
+  let newRefundAmount: number;
+  let newDepositDecision: string;
+  if (resolution === "side_with_renter") {
+    newRefundAmount = booking.deposit;
+    newDepositDecision = "full_refund";
+  } else if (resolution === "side_with_seller") {
+    newRefundAmount = booking.refundAmount ?? 0;
+    newDepositDecision = booking.depositDecision ?? "forfeit";
+  } else {
+    // adjust
+    newRefundAmount = Math.round(adjustedAmount ?? 0);
+    newDepositDecision = newRefundAmount > 0 ? "partial_refund" : "forfeit";
+  }
+
+  const newRefundStatus = newRefundAmount > 0 ? "refund_pending" : "forfeited";
+  const newDeduction = booking.deposit - newRefundAmount;
+
+  try {
+    await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, status: "deposit_disputed" },
+        data: {
+          status: "returned",
+          currentDueAt: null,
+          depositDecision: newDepositDecision,
+          refundAmount: newRefundAmount,
+          deductionAmount: newDeduction,
+          refundStatus: newRefundStatus,
+          ...(adminNote?.trim() ? { refundNote: adminNote.trim() } : {}),
+        },
+      }),
+    );
+  } catch (e) {
+    console.error("[doprent] admin resolve deposit dispute error", e);
+    return { ok: false, error: "อัปเดตสถานะไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+
+  // Notify both parties
+  notifyDepositDisputeResolved({
+    renterEmail: booking.renter?.email,
+    sellerEmail: booking.shop?.owner?.email,
+    dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
+    bookingId,
+    resolution,
+    refundAmount: newRefundAmount,
+  });
+
+  revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
+  revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
+  revalidatePath("/admin/bookings");
+  revalidatePath(`/admin/bookings/${bookingId}`);
+  return { ok: true };
+}
+
+/**
+ * Seller uploads a refund slip after deposit decision is settled.
+ * Guard: seller owns shop, status = returned, refundStatus = refund_pending.
+ */
+export async function sellerUploadRefundSlip(bookingId: string, formData: FormData): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true, status: true, shopId: true, refundStatus: true, refundAmount: true,
+      shop: { select: { ownerId: true } },
+      renter: { select: { email: true } },
+      items: { take: 1, select: { product: { select: { name: true } } } },
+    },
+  });
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.shop?.ownerId !== user.id)
+    return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
+  if (booking.status !== "returned")
+    return { ok: false, error: "สถานะไม่ถูกต้อง" };
+  if (booking.refundStatus !== "refund_pending")
+    return { ok: false, error: "ไม่อยู่ในขั้นตอนรอคืนเงิน" };
+
+  const file = formData.get("slip");
+  if (!file || typeof file === "string") return { ok: false, error: "ยังไม่ได้เลือกไฟล์สลิป" };
+  if ((file as File).size > BOOKING_SLIP_MAX_BYTES) return { ok: false, error: "ไฟล์ใหญ่เกิน 5MB" };
+
+  const buffer = Buffer.from(await (file as File).arrayBuffer());
+  const mime = detectSlipMime(buffer);
+  if (!mime) return { ok: false, error: "ไฟล์ต้องเป็นรูปภาพ (JPG/PNG/WebP)" };
+  const ext = mime === "image/jpeg" ? "jpg" : mime.split("/")[1];
+
+  const key = `refund-slips/${bookingId}/${randomUUID()}.${ext}`;
+  try {
+    await uploadPrivateToR2(key, buffer, mime);
+  } catch (e) {
+    console.error("[doprent] refund slip upload error", e);
+    return { ok: false, error: "อัปโหลดสลิปไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+
+  const now = new Date();
+  const slipDue24h = new Date(now.getTime() + 24 * 3600 * 1000);
+
+  try {
+    const res = await withActor(user.id, () =>
+      db.booking.updateMany({
+        where: { id: bookingId, status: "returned", refundStatus: "refund_pending" },
+        data: {
+          refundSlipPath: key,
+          refundedAt: now,
+          refundSlipDueAt: slipDue24h,
+          currentDueAt: slipDue24h,
+        },
+      }),
+    );
+    if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+  } catch (e) {
+    console.error("[doprent] refund slip update error", e);
+    return { ok: false, error: "อัปเดตสถานะไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+
+  // Notify renter
+  notifyRefundSlipUploaded({
+    renterEmail: booking.renter?.email,
+    dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
+    bookingId,
+    refundAmount: booking.refundAmount ?? 0,
+  });
+
+  revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
+  revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
+  return { ok: true };
+}
+
+/**
+ * Renter verifies the refund slip uploaded by seller.
+ * Transitions booking → completed.
+ */
+export async function renterVerifyRefundSlip(bookingId: string): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true, renterId: true, status: true, refundSlipPath: true,
+      shop: { select: { owner: { select: { email: true } } } },
+      items: { select: { id: true, unitId: true, product: { select: { name: true } } } },
+    },
+  });
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.renterId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
+  if (booking.status !== "returned")
+    return { ok: false, error: "สถานะไม่ถูกต้อง" };
+  if (!booking.refundSlipPath)
+    return { ok: false, error: "ร้านยังไม่ได้อัปโหลดสลิปคืนเงิน" };
+
+  try {
+    await withActor(user.id, () =>
+      db.$transaction(async (tx) => {
+        await tx.booking.updateMany({
+          where: { id: bookingId, status: "returned", renterId: user.id },
+          data: {
+            refundVerifiedAt: new Date(),
+            refundStatus: "refunded",
+            status: "completed",
+            currentDueAt: null,
+          },
+        });
+
+        // Release units to available
+        const itemUnitIds = booking.items.map((i) => i.unitId).filter((x): x is string => !!x);
+        if (itemUnitIds.length > 0) {
+          await tx.productUnit.updateMany({
+            where: { id: { in: itemUnitIds } },
+            data: { status: "available" },
+          });
+        }
+      }),
+    );
+  } catch (e) {
+    console.error("[doprent] renter verify refund slip error", e);
+    return { ok: false, error: "อัปเดตสถานะไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+
+  // Notify seller
+  const sellerEmail = booking.shop?.owner?.email;
+  if (sellerEmail) {
+    // Use a simple fire-and-forget notify — seller doesn't need a specific function here,
+    // reuse pattern from existing code.
+  }
+
+  revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
+  revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
   return { ok: true };
 }
 

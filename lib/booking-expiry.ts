@@ -1,11 +1,12 @@
 import { db } from "@/lib/db";
-import { AUTO_COMPLETE_AFTER_RETURN_DAYS } from "@/lib/bookings";
 import {
   notifyReturnDue,
   notifyReturnOverdue,
   notifySlipReviewReminder,
   notifySlipAutoConfirmed,
   notifyReturnDisputeResolved,
+  notifyDepositDisputeResolved,
+  notifyRefundAutoCompleted,
 } from "@/lib/notifications";
 
 // ---------------------------------------------------------------------------
@@ -52,7 +53,6 @@ export async function expirePayments(): Promise<{ expired: number }> {
 export async function advanceDailyLifecycle(): Promise<{
   startedRenting: number;
   awaitingReturn: number;
-  autoCompleted: number;
 }> {
   const now = new Date();
   const todayStart = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
@@ -65,9 +65,7 @@ export async function advanceDailyLifecycle(): Promise<{
   });
   const rentingUnitIds = startingItems.map((i) => i.unitId).filter((id): id is string => !!id);
 
-  const completeCutoff = new Date(now.getTime() - AUTO_COMPLETE_AFTER_RETURN_DAYS * 24 * 3600 * 1000);
-
-  const [startedRenting, awaitingReturn, autoCompleted] = await Promise.all([
+  const [startedRenting, awaitingReturn] = await Promise.all([
     db.booking.updateMany({
       where: { status: "confirmed", startDate: { lte: todayStart } },
       data: { status: "renting" },
@@ -75,10 +73,6 @@ export async function advanceDailyLifecycle(): Promise<{
     db.booking.updateMany({
       where: { status: "renting", endDate: { lte: todayStart } },
       data: { status: "awaiting_return" },
-    }),
-    db.booking.updateMany({
-      where: { status: "returned", returnedAt: { lte: completeCutoff } },
-      data: { status: "completed" },
     }),
   ]);
 
@@ -93,7 +87,6 @@ export async function advanceDailyLifecycle(): Promise<{
   return {
     startedRenting: startedRenting.count,
     awaitingReturn: awaitingReturn.count,
-    autoCompleted: autoCompleted.count,
   };
 }
 
@@ -169,6 +162,157 @@ export async function autoResolveReturnDisputes(): Promise<{ resolved: number }>
 }
 
 // ---------------------------------------------------------------------------
+// Job 4: Auto-resolve deposit disputes (48h timeout)
+// ---------------------------------------------------------------------------
+
+/**
+ * Auto-resolves `deposit_disputed` bookings whose 48h window has elapsed.
+ * Resolves in the RENTER's favor (benefit of doubt if admin doesn't act).
+ */
+export async function autoResolveDepositDisputes(): Promise<{ resolved: number }> {
+  const now = new Date();
+
+  const candidates = await db.booking.findMany({
+    where: {
+      status: "deposit_disputed",
+      currentDueAt: { lt: now },
+    },
+    select: {
+      id: true,
+      deposit: true,
+      renter: { select: { email: true } },
+      shop: { select: { owner: { select: { email: true } } } },
+      items: { take: 1, select: { product: { select: { name: true } } } },
+    },
+  });
+
+  if (candidates.length === 0) return { resolved: 0 };
+
+  for (const b of candidates) {
+    await db.$transaction(async (tx) => {
+      await tx.booking.updateMany({
+        where: { id: b.id, status: "deposit_disputed" },
+        data: {
+          status: "returned",
+          currentDueAt: null,
+          depositDecision: "full_refund",
+          refundAmount: b.deposit,
+          deductionAmount: 0,
+          refundStatus: "refund_pending",
+          refundNote: "ข้อโต้แย้งมัดจำถูกพิจารณาอัตโนมัติ (ครบ 48 ชม.) — ตัดสินให้ผู้เช่า",
+        },
+      });
+    });
+
+    // Fire-and-forget notifications
+    notifyDepositDisputeResolved({
+      renterEmail: b.renter?.email,
+      sellerEmail: b.shop?.owner?.email,
+      dressName: b.items[0]?.product?.name ?? "ชุดที่จอง",
+      bookingId: b.id,
+      resolution: "side_with_renter",
+      refundAmount: b.deposit,
+    });
+  }
+
+  return { resolved: candidates.length };
+}
+
+// ---------------------------------------------------------------------------
+// Job 5: Auto-complete refund verification (24h after slip upload)
+// ---------------------------------------------------------------------------
+
+/**
+ * Auto-completes returned bookings where the refund slip was uploaded
+ * but the renter didn't verify within 24h.
+ * Transitions → completed, restores units.
+ */
+export async function autoCompleteRefundVerification(): Promise<{ autoCompleted: number }> {
+  const now = new Date();
+
+  const candidates = await db.booking.findMany({
+    where: {
+      status: "returned",
+      refundSlipDueAt: { lt: now },
+      refundSlipPath: { not: null },
+      refundVerifiedAt: null,
+    },
+    select: {
+      id: true,
+      renter: { select: { email: true } },
+      shop: { select: { owner: { select: { email: true } } } },
+      items: {
+        select: {
+          unitId: true,
+          product: { select: { name: true } },
+        },
+      },
+    },
+  });
+
+  if (candidates.length === 0) return { autoCompleted: 0 };
+
+  for (const b of candidates) {
+    await db.$transaction(async (tx) => {
+      await tx.booking.updateMany({
+        where: { id: b.id, status: "returned" },
+        data: {
+          status: "completed",
+          refundStatus: "refunded",
+          refundVerifiedAt: now,
+          currentDueAt: null,
+        },
+      });
+
+      // Restore units to available
+      const itemUnitIds = b.items.map((i) => i.unitId).filter((x): x is string => !!x);
+      if (itemUnitIds.length > 0) {
+        await tx.productUnit.updateMany({
+          where: { id: { in: itemUnitIds } },
+          data: { status: "available" },
+        });
+      }
+    });
+
+    // Fire-and-forget notifications
+    notifyRefundAutoCompleted({
+      renterEmail: b.renter?.email,
+      sellerEmail: b.shop?.owner?.email,
+      dressName: b.items[0]?.product?.name ?? "ชุดที่จอง",
+      bookingId: b.id,
+    });
+  }
+
+  return { autoCompleted: candidates.length };
+}
+
+// ---------------------------------------------------------------------------
+// Job 6: Auto-complete forfeited deposits (after dispute window)
+// ---------------------------------------------------------------------------
+
+/**
+ * Auto-completes returned bookings where deposit was forfeited and the
+ * 48h dispute window has passed without a dispute being raised.
+ */
+export async function autoCompleteForfeit(): Promise<{ autoCompleted: number }> {
+  const now = new Date();
+
+  const result = await db.booking.updateMany({
+    where: {
+      status: "returned",
+      refundStatus: "forfeited",
+      currentDueAt: { lt: now },
+    },
+    data: {
+      status: "completed",
+      currentDueAt: null,
+    },
+  });
+
+  return { autoCompleted: result.count };
+}
+
+// ---------------------------------------------------------------------------
 // Combined (backward-compat for lazy page-load sweep)
 // ---------------------------------------------------------------------------
 
@@ -179,9 +323,12 @@ export async function autoResolveReturnDisputes(): Promise<{ resolved: number }>
  */
 export async function expireOverdueBookings(): Promise<number> {
   const { expired } = await expirePayments();
-  const { startedRenting, awaitingReturn, autoCompleted } = await advanceDailyLifecycle();
+  const { startedRenting, awaitingReturn } = await advanceDailyLifecycle();
   const { resolved } = await autoResolveReturnDisputes();
-  return expired + startedRenting + awaitingReturn + autoCompleted + resolved;
+  const { resolved: depositResolved } = await autoResolveDepositDisputes();
+  const { autoCompleted: refundCompleted } = await autoCompleteRefundVerification();
+  const { autoCompleted: forfeitCompleted } = await autoCompleteForfeit();
+  return expired + startedRenting + awaitingReturn + resolved + depositResolved + refundCompleted + forfeitCompleted;
 }
 
 /** Today's date in Asia/Bangkok as a YYYY-MM-DD string. */

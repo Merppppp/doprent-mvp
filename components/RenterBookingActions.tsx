@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { cancelBooking, uploadSlip, escalateDispute, escalateReturnDispute, requestCancelAfterPayment, submitReturnTracking } from "@/app/actions/bookings";
+import { cancelBooking, uploadSlip, escalateDispute, escalateReturnDispute, escalateDepositDispute, disputeRefundSlip, requestCancelAfterPayment, submitReturnTracking, renterVerifyRefundSlip } from "@/app/actions/bookings";
 import { startProgress, doneProgress } from "@/lib/progress";
 import { useConfirm } from "@/components/ConfirmProvider";
 import type { BookingStatus } from "@/lib/types";
@@ -19,9 +19,23 @@ type Props = {
   returnShipped?: boolean;
   /** ISO string of the currentDueAt deadline (used for return dispute countdown). */
   currentDueAt?: string | null;
+  /** Deposit decision from seller (for dispute UI). */
+  depositDecision?: string | null;
+  /** Deposit dispute note (already submitted). */
+  depositDisputeNote?: string | null;
+  /** Refund status (for refund slip verification). */
+  refundStatus?: string | null;
+  /** Refund amount (display to renter). */
+  refundAmount?: number | null;
+  /** Deposit total. */
+  depositAmount?: number;
+  /** Refund slip path (seller uploaded). */
+  refundSlipPath?: string | null;
+  /** Signed URL for the refund slip image. */
+  refundSlipUrl?: string | null;
 };
 
-export default function RenterBookingActions({ bookingId, status, canPay, disputeReason, disputeNote, returnMethod = null, returnShipped = false, currentDueAt }: Props) {
+export default function RenterBookingActions({ bookingId, status, canPay, disputeReason, disputeNote, returnMethod = null, returnShipped = false, currentDueAt, depositDecision = null, depositDisputeNote = null, refundStatus = null, refundAmount = null, depositAmount = 0, refundSlipPath = null, refundSlipUrl = null }: Props) {
   const confirm = useConfirm();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -33,6 +47,8 @@ export default function RenterBookingActions({ bookingId, status, canPay, disput
   const [showEscalate, setShowEscalate] = useState(false);
   const [showCancelRequest, setShowCancelRequest] = useState(false);
   const [showReturnDispute, setShowReturnDispute] = useState(false);
+  const [showDepositDispute, setShowDepositDispute] = useState(false);
+  const [showRefundSlipDispute, setShowRefundSlipDispute] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
   function handleFile(file: File) {
@@ -453,6 +469,153 @@ export default function RenterBookingActions({ bookingId, status, canPay, disput
         </div>
       )}
 
+      {/* ── Deposit dispute: renter can dispute partial/forfeit in "returned" status ── */}
+      {status === "returned" && depositDecision && (depositDecision === "partial_refund" || depositDecision === "forfeit") && !depositDisputeNote && (
+        <div className="rounded-xl border border-[var(--warn)] bg-[var(--warn-soft)] p-4">
+          <div className="mb-1 text-sm font-bold text-[var(--warn)]">
+            {depositDecision === "forfeit" ? "ร้านริบมัดจำทั้งหมด" : "ร้านคืนมัดจำบางส่วน"}
+          </div>
+          <p className="mb-1 text-[13px] text-[var(--ink-2)]">
+            {depositDecision === "forfeit"
+              ? `มัดจำ ${depositAmount.toLocaleString()} ฿ ถูกริบทั้งหมด`
+              : `ร้านคืน ${(refundAmount ?? 0).toLocaleString()} ฿ จากมัดจำ ${depositAmount.toLocaleString()} ฿`}
+          </p>
+          <p className="mb-3 text-[12px] text-[var(--ink-3)]">
+            หากคุณไม่เห็นด้วย สามารถโต้แย้งได้ภายใน 48 ชม. แอดมินจะตรวจสอบและตัดสินให้
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary w-full py-3 text-sm font-semibold"
+            onClick={() => setShowDepositDispute(true)}
+            disabled={busy}
+          >
+            โต้แย้งการตัดสินมัดจำ
+          </button>
+        </div>
+      )}
+
+      {/* ── Deposit dispute already submitted ── */}
+      {status === "returned" && depositDisputeNote && (
+        <div className="rounded-xl border border-[var(--info)] bg-[var(--info-soft)] p-4">
+          <div className="mb-1 text-sm font-bold text-[var(--info)]">ส่งข้อโต้แย้งมัดจำแล้ว</div>
+          <div className="my-2 rounded-lg bg-white/60 p-3 text-[13px] text-[var(--ink-2)]">
+            ข้อความของคุณ: {depositDisputeNote}
+          </div>
+          <p className="text-xs text-[var(--ink-3)]">รอแอดมินตรวจสอบและตัดสินให้</p>
+        </div>
+      )}
+
+      {/* ── Deposit disputed status (waiting for admin) ── */}
+      {status === "deposit_disputed" && (
+        <div className="rounded-xl border border-[var(--warn)] bg-[var(--warn-soft)] p-4">
+          <div className="mb-1 text-sm font-bold text-[var(--warn)]">
+            รอแอดมินตรวจสอบข้อโต้แย้งมัดจำ
+          </div>
+          {depositDisputeNote ? (
+            <div className="my-2 rounded-lg bg-white/60 p-3 text-[13px] text-[var(--ink-2)]">
+              ข้อความของคุณ: {depositDisputeNote}
+            </div>
+          ) : null}
+          {currentDueAt ? (
+            <p className="text-xs text-[var(--ink-3)]">
+              แอดมินจะตัดสินภายใน{" "}
+              {new Date(currentDueAt).toLocaleString("th-TH", {
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Asia/Bangkok",
+              })}
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      {/* ── Refund slip verification (seller uploaded, renter verifies) ── */}
+      {status === "returned" && refundSlipPath && (
+        <div className="rounded-xl border border-[var(--success)] bg-[var(--success-soft)] p-4">
+          <div className="mb-2 text-sm font-bold text-[var(--success)]">
+            ร้านโอนคืนมัดจำแล้ว
+          </div>
+          <p className="mb-2 text-[13px] text-[var(--ink-2)]">
+            จำนวน {(refundAmount ?? 0).toLocaleString()} ฿ — ตรวจสอบสลิปแล้วกดยืนยัน
+          </p>
+          {refundSlipUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={refundSlipUrl}
+              alt="สลิปคืนมัดจำ"
+              className="mb-3 max-w-full rounded-lg border border-[var(--line)]"
+              style={{ maxHeight: 280, objectFit: "contain" }}
+            />
+          )}
+          <div className="flex gap-2.5">
+            <button
+              type="button"
+              className="btn btn-outline flex-1 py-3 text-sm font-semibold text-[var(--danger)] border-[var(--danger)]"
+              disabled={busy}
+              onClick={() => setShowRefundSlipDispute(true)}
+            >
+              สลิปมีปัญหา
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary flex-1 py-3 text-sm font-semibold"
+              disabled={busy}
+              onClick={async () => {
+                if (!(await confirm({ message: "ยืนยันว่าได้รับเงินคืนมัดจำแล้ว?", confirmLabel: "ยืนยันรับเงิน" }))) return;
+                setBusy(true);
+                setError("");
+                startProgress();
+                try {
+                  const res = await renterVerifyRefundSlip(bookingId);
+                  if (!res.ok) { setError(res.error); return; }
+                  router.refresh();
+                } finally {
+                  setBusy(false);
+                  doneProgress();
+                }
+              }}
+            >
+              {busy ? "กำลังยืนยัน..." : "ยืนยันรับเงิน"}
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] text-[var(--ink-3)]">
+            หากไม่ยืนยันภายใน 24 ชม. ระบบจะปิดรายการโดยอัตโนมัติ
+          </p>
+        </div>
+      )}
+
+      {/* ── Refund slip dispute modal ── */}
+      {showRefundSlipDispute && (
+        <RefundSlipDisputeModal
+          busy={busy}
+          onClose={() => setShowRefundSlipDispute(false)}
+          onSubmit={async (reason) => {
+            setShowRefundSlipDispute(false);
+            setBusy(true);
+            setError("");
+            startProgress();
+            try {
+              const res = await disputeRefundSlip(bookingId, reason);
+              if (!res.ok) { setError(res.error); return; }
+              router.refresh();
+            } finally {
+              setBusy(false);
+              doneProgress();
+            }
+          }}
+        />
+      )}
+
+      {/* ── Full refund waiting (refund_pending, no slip yet) ── */}
+      {status === "returned" && refundStatus === "refund_pending" && !refundSlipPath && depositDecision === "full_refund" && (
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink-2)]">
+          <span className="font-semibold text-[var(--ink)]">รอร้านโอนคืนมัดจำ</span>
+          <span> {(refundAmount ?? depositAmount).toLocaleString()} ฿</span>
+        </div>
+      )}
+
       {canCancel ? (
         <button type="button" className="btn btn-outline" onClick={onCancel} disabled={busy}>
           ยกเลิกการจอง
@@ -559,6 +722,31 @@ export default function RenterBookingActions({ bookingId, status, canPay, disput
             startProgress();
             try {
               const res = await escalateReturnDispute(bookingId, note);
+              if (!res.ok) {
+                setError(res.error);
+                return;
+              }
+              router.refresh();
+            } finally {
+              setBusy(false);
+              doneProgress();
+            }
+          }}
+        />
+      )}
+
+      {/* ── Deposit dispute modal ── */}
+      {showDepositDispute && (
+        <DepositDisputeModal
+          busy={busy}
+          onClose={() => setShowDepositDispute(false)}
+          onSubmit={async (note) => {
+            setShowDepositDispute(false);
+            setBusy(true);
+            setError("");
+            startProgress();
+            try {
+              const res = await escalateDepositDispute(bookingId, note);
               if (!res.ok) {
                 setError(res.error);
                 return;
@@ -960,6 +1148,95 @@ function ReturnDisputeModal({
   );
 }
 
+function DepositDisputeModal({
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (note: string) => void;
+}) {
+  const [note, setNote] = useState("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          background: "var(--bg, #fff)",
+          borderRadius: 14,
+          width: "100%",
+          maxWidth: 420,
+          padding: "22px 20px 18px",
+          boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
+        }}
+      >
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+          โต้แย้งการตัดสินมัดจำ
+        </h3>
+        <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginBottom: 14, lineHeight: 1.5 }}>
+          อธิบายเหตุผลว่าทำไมคุณไม่เห็นด้วยกับการหักมัดจำ แอดมินจะตรวจสอบและตัดสินภายใน 48 ชม.
+        </p>
+        <textarea
+          ref={inputRef}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="เช่น ส่งคืนสินค้าสภาพดี ไม่มีความเสียหาย, ร้านหักมากเกินไป..."
+          rows={4}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            fontSize: 14,
+            fontFamily: "inherit",
+            resize: "vertical",
+            background: "var(--surface)",
+            color: "var(--ink)",
+            boxSizing: "border-box",
+          }}
+        />
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={onClose}
+            style={{ flex: 1, padding: "10px 0" }}
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy || !note.trim()}
+            onClick={() => onSubmit(note.trim())}
+            style={{ flex: 1, padding: "10px 0", fontWeight: 600 }}
+          >
+            ส่งให้แอดมินตรวจสอบ
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EscalateModal({
   busy,
   onClose,
@@ -1042,6 +1319,95 @@ function EscalateModal({
             style={{ flex: 1, padding: "10px 0", fontWeight: 600 }}
           >
             ส่งให้แอดมิน
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RefundSlipDisputeModal({
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (note: string) => void;
+}) {
+  const [note, setNote] = useState("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          background: "var(--bg, #fff)",
+          borderRadius: 14,
+          width: "100%",
+          maxWidth: 420,
+          padding: "22px 20px 18px",
+          boxShadow: "0 8px 30px rgba(0,0,0,0.18)",
+        }}
+      >
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+          สลิปคืนมัดจำมีปัญหา
+        </h3>
+        <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginBottom: 14, lineHeight: 1.5 }}>
+          อธิบายปัญหาของสลิปคืนมัดจำ เช่น ยอดไม่ตรง ชื่อบัญชีไม่ตรง หรือสลิปปลอม แอดมินจะตรวจสอบและตัดสินภายใน 48 ชม.
+        </p>
+        <textarea
+          ref={inputRef}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="เช่น ยอดเงินที่โอนไม่ตรงกับจำนวนมัดจำ, ชื่อบัญชีผู้รับไม่ตรง..."
+          rows={4}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            fontSize: 14,
+            fontFamily: "inherit",
+            resize: "vertical",
+            background: "var(--surface)",
+            color: "var(--ink)",
+            boxSizing: "border-box",
+          }}
+        />
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={onClose}
+            style={{ flex: 1, padding: "10px 0" }}
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy || !note.trim()}
+            onClick={() => onSubmit(note.trim())}
+            style={{ flex: 1, padding: "10px 0", fontWeight: 600 }}
+          >
+            ส่งให้แอดมินตรวจสอบ
           </button>
         </div>
       </div>

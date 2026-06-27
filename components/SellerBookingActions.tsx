@@ -10,6 +10,7 @@ import {
   markCompleted,
   markReturned,
   rejectBooking,
+  sellerUploadRefundSlip,
 } from "@/app/actions/bookings";
 import { startProgress, doneProgress } from "@/lib/progress";
 import type { BookingStatus } from "@/lib/types";
@@ -47,9 +48,21 @@ type Props = {
   depositAmount?: number;
   /** When the slip will be auto-confirmed (ISO string). Shown as countdown in payment_review. */
   slipConfirmDueAt?: string | null;
+  /** Refund status for the returned state — drives refund slip upload UI. */
+  refundStatus?: string | null;
+  /** Renter's bank account snapshot (displayed when seller needs to upload refund slip). */
+  refundBankName?: string | null;
+  refundAccountNumber?: string | null;
+  refundAccountName?: string | null;
+  /** Booking end date — used to compute default nextAvailableDate. */
+  endDate?: string | null;
+  /** Deposit decision made by seller (for display in returned state). */
+  depositDecision?: string | null;
+  /** Whether refund slip has been uploaded. */
+  refundSlipPath?: string | null;
 };
 
-export default function SellerBookingActions({ bookingId, status, channels = [], defaultMethod = null, deliveryMethod = null, returnShipped = false, returnTracking = null, firstProductId = null, depositAmount = 0, slipConfirmDueAt = null }: Props) {
+export default function SellerBookingActions({ bookingId, status, channels = [], defaultMethod = null, deliveryMethod = null, returnShipped = false, returnTracking = null, firstProductId = null, depositAmount = 0, slipConfirmDueAt = null, refundStatus = null, refundBankName = null, refundAccountNumber = null, refundAccountName = null, endDate = null, depositDecision = null, refundSlipPath = null }: Props) {
   const router = useRouter();
   const [fee, setFee] = useState("");
   const [carrier, setCarrier] = useState("");
@@ -355,14 +368,15 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
             busy={busy}
             error={error}
             depositAmount={depositAmount}
-            onSubmit={(condition, note, deduction) => {
+            endDate={endDate}
+            onSubmit={(condition, note, deduction, depDecision, refAmt, nextDate) => {
               const redirectToUnits = condition === "not_returned" && firstProductId
                 ? () => router.push(`/sell/products/${firstProductId}/units`)
                 : undefined;
-              run(() => markReturned(bookingId, condition, note, deduction), redirectToUnits);
+              run(() => markReturned(bookingId, condition, note, deduction, depDecision, refAmt, nextDate), redirectToUnits);
             }}
           />
-        ) : (
+        ) : endDate && new Date(endDate) <= new Date() ? (
           <NotReturnedPanel
             busy={busy}
             error={error}
@@ -373,12 +387,50 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
               run(() => markReturned(bookingId, "not_returned"), redirectToUnits);
             }}
           />
-        )}
+        ) : null}
       </div>
     );
   }
 
   if (status === "returned") {
+    // Refund pending — seller needs to upload refund slip
+    if (refundStatus === "refund_pending" && !refundSlipPath) {
+      return (
+        <div className="grid gap-3">
+          {/* Renter bank account info */}
+          {refundAccountName && (
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
+              <div className="mb-2 text-sm font-semibold text-[var(--ink)]">บัญชีลูกค้าสำหรับคืนมัดจำ</div>
+              <div className="grid gap-1 text-sm text-[var(--ink-2)]">
+                <div>ชื่อบัญชี: <span className="font-medium text-[var(--ink)]">{refundAccountName}</span></div>
+                {refundBankName && <div>ธนาคาร: <span className="font-medium text-[var(--ink)]">{refundBankName}</span></div>}
+                {refundAccountNumber && <div>เลขบัญชี: <span className="font-medium text-[var(--ink)]">{refundAccountNumber}</span></div>}
+              </div>
+            </div>
+          )}
+          <RefundSlipUpload
+            bookingId={bookingId}
+            busy={busy}
+            error={error}
+            run={run}
+          />
+        </div>
+      );
+    }
+
+    // Refund slip uploaded — waiting for renter verification
+    if (refundSlipPath) {
+      return (
+        <div className="grid gap-3">
+          <div className="flex items-center gap-2 rounded-lg bg-[var(--accent-soft)] px-3 py-2.5 text-[13px] text-[var(--accent)]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span className="font-medium">อัปโหลดสลิปคืนมัดจำแล้ว รอลูกค้ายืนยัน (24 ชม.)</span>
+          </div>
+        </div>
+      );
+    }
+
+    // Forfeited or no refund needed — just close
     return (
       <div style={{ display: "grid", gap: 12 }}>
         <button
@@ -391,6 +443,17 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
           ปิดรายการ
         </button>
         {error ? <Err msg={error} /> : null}
+      </div>
+    );
+  }
+
+  if (status === "deposit_disputed") {
+    return (
+      <div className="grid gap-3">
+        <div className="flex items-center gap-2 rounded-lg bg-[var(--warn-soft)] px-3 py-2.5 text-[13px] text-[var(--warn)]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          <span className="font-medium">ลูกค้าโต้แย้งการตัดสินมัดจำ รอแอดมินตัดสิน</span>
+        </div>
       </div>
     );
   }
@@ -488,37 +551,85 @@ function DisputeModal({
 }
 
 type ReturnChoice = "complete" | "damaged" | "not_returned";
+type DepositDecision = "full_refund" | "partial_refund" | "forfeit";
+
+/** Compute a default nextAvailableDate: endDate + 3 days (transit + cleaning). */
+function defaultNextAvailable(endDate: string | null): string {
+  if (!endDate) return "";
+  const d = new Date(endDate + "T00:00:00+07:00");
+  d.setDate(d.getDate() + 3);
+  return d.toISOString().slice(0, 10);
+}
 
 function ReturnPanel({
   busy,
   error,
   depositAmount = 0,
+  endDate = null,
   onSubmit,
 }: {
   busy: boolean;
   error: string;
   depositAmount?: number;
-  onSubmit: (condition: ReturnChoice, damageNote?: string, deductionAmount?: number) => void;
+  endDate?: string | null;
+  onSubmit: (
+    condition: ReturnChoice,
+    damageNote?: string,
+    deductionAmount?: number,
+    depositDecision?: DepositDecision,
+    refundAmount?: number,
+    nextAvailableDate?: string,
+  ) => void;
 }) {
   const [choice, setChoice] = useState<ReturnChoice>("complete");
   const [note, setNote] = useState("");
-  const [deduction, setDeduction] = useState("");
+  // Deposit decision (shown for all conditions when deposit > 0, except not_returned)
+  const [depDecision, setDepDecision] = useState<DepositDecision>("full_refund");
+  const [partialAmount, setPartialAmount] = useState("");
+  // Next available date — seller can override
+  const [nextDate, setNextDate] = useState(defaultNextAvailable(endDate));
+
+  const hasDeposit = depositAmount > 0;
 
   const options: { value: ReturnChoice; label: string; hint: string }[] = [
-    { value: "complete", label: "คืนของแบบสมบูรณ์", hint: "ได้รับชุดคืนครบถ้วน สภาพดี — จบรายการทันที" },
+    { value: "complete", label: "คืนของแบบสมบูรณ์", hint: "ได้รับชุดคืนครบถ้วน สภาพดี" },
     { value: "damaged", label: "มีความเสียหาย", hint: "ได้รับชุดคืนแต่มีความเสียหาย — ระบุรายละเอียด" },
     { value: "not_returned", label: "ลูกค้าไม่ส่งคืนของ", hint: "ยังไม่ได้รับชุดคืน — หักมัดจำทั้งหมด" },
   ];
 
-  const deductionNum = Number(deduction);
-  const deductionValid = choice !== "damaged" || deduction === "" || (Number.isFinite(deductionNum) && deductionNum >= 0 && deductionNum <= depositAmount);
-  const canSubmit = !busy && (choice !== "damaged" || (note.trim().length > 0 && deductionValid));
+  const partialNum = Number(partialAmount);
+  const partialValid = depDecision !== "partial_refund" || (partialAmount !== "" && Number.isFinite(partialNum) && partialNum >= 1 && partialNum < depositAmount);
+  const damageNoteOk = choice !== "damaged" || note.trim().length > 0;
+  const canSubmit = !busy && damageNoteOk && partialValid;
+
+  // Compute refund amount based on decision
+  function computeRefundAmount(): number | undefined {
+    if (!hasDeposit) return undefined;
+    if (choice === "not_returned") return 0;
+    switch (depDecision) {
+      case "full_refund": return depositAmount;
+      case "partial_refund": return partialNum;
+      case "forfeit": return 0;
+    }
+  }
+
+  // Compute deduction amount
+  function computeDeduction(): number | undefined {
+    if (!hasDeposit) return undefined;
+    if (choice === "not_returned") return depositAmount;
+    switch (depDecision) {
+      case "full_refund": return 0;
+      case "partial_refund": return depositAmount - partialNum;
+      case "forfeit": return depositAmount;
+    }
+  }
 
   const inputCls =
     "mt-1.5 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-[15px] text-[var(--ink)] outline-none focus:border-[var(--accent)]";
 
   return (
     <div className="grid gap-3">
+      {/* Condition selector */}
       <div className="grid gap-2">
         {options.map((opt) => {
           const active = choice === opt.value;
@@ -535,7 +646,7 @@ function ReturnPanel({
                 type="radio"
                 name="return-condition"
                 checked={active}
-                onChange={() => setChoice(opt.value)}
+                onChange={() => { setChoice(opt.value); if (opt.value === "complete") setDepDecision("full_refund"); }}
                 style={{ width: 16, height: 16, marginTop: 2, cursor: "pointer" }}
               />
               <span>
@@ -547,35 +658,108 @@ function ReturnPanel({
         })}
       </div>
 
+      {/* Damage note (damaged only) */}
       {choice === "damaged" ? (
-        <>
-          <label className="text-sm font-semibold">
-            ระบุความเสียหายที่พบ <span className="text-[var(--danger)]">*</span>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="เช่น มีรอยเปื้อน / ตะเข็บขาด / ซิปเสีย"
-              rows={3}
-              maxLength={1000}
-              className={inputCls}
-            />
-          </label>
-          <label className="text-sm font-semibold">
-            จำนวนมัดจำที่จะหัก (฿) <span className="text-xs font-normal text-[var(--ink-3)]">มัดจำทั้งหมด {depositAmount.toLocaleString()} ฿</span>
-            <input
-              type="number"
-              min={0}
-              max={depositAmount}
-              value={deduction}
-              onChange={(e) => setDeduction(e.target.value)}
-              placeholder="0"
-              className={inputCls}
-            />
-            {deduction !== "" && !deductionValid ? (
-              <p className="mt-1 text-xs text-[var(--danger)]">จำนวนต้องอยู่ระหว่าง 0 ถึง {depositAmount.toLocaleString()} ฿</p>
-            ) : null}
-          </label>
-        </>
+        <label className="text-sm font-semibold">
+          ระบุความเสียหายที่พบ <span className="text-[var(--danger)]">*</span>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="เช่น มีรอยเปื้อน / ตะเข็บขาด / ซิปเสีย"
+            rows={3}
+            maxLength={1000}
+            className={inputCls}
+          />
+        </label>
+      ) : null}
+
+      {/* Deposit decision (all conditions except not_returned, when deposit > 0) */}
+      {hasDeposit && choice !== "not_returned" ? (
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
+          <div className="mb-2 text-sm font-semibold text-[var(--ink)]">
+            การคืนมัดจำ <span className="text-xs font-normal text-[var(--ink-3)]">(มัดจำ {depositAmount.toLocaleString()} ฿)</span>
+          </div>
+          <div className="grid gap-2">
+            {([
+              { value: "full_refund" as const, label: "คืนมัดจำเต็มจำนวน", hint: `คืน ${depositAmount.toLocaleString()} ฿` },
+              { value: "partial_refund" as const, label: "คืนบางส่วน", hint: "ระบุจำนวนที่จะคืน" },
+              { value: "forfeit" as const, label: "ริบมัดจำทั้งหมด", hint: "หักมัดจำ 100%" },
+            ]).map((opt) => {
+              const active = depDecision === opt.value;
+              return (
+                <label
+                  key={opt.value}
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5"
+                  style={{
+                    borderColor: active ? "var(--accent)" : "var(--line)",
+                    background: active ? "var(--accent-soft)" : "var(--bg)",
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="deposit-decision"
+                    checked={active}
+                    onChange={() => setDepDecision(opt.value)}
+                    style={{ width: 14, height: 14, marginTop: 2, cursor: "pointer" }}
+                  />
+                  <span>
+                    <span className="block text-[13px] font-semibold text-[var(--ink)]">{opt.label}</span>
+                    <span className="block text-[11px] text-[var(--ink-3)]">{opt.hint}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+
+          {depDecision === "partial_refund" ? (
+            <label className="mt-2 block text-sm font-semibold">
+              จำนวนที่จะคืน (฿)
+              <input
+                type="number"
+                min={1}
+                max={depositAmount - 1}
+                value={partialAmount}
+                onChange={(e) => setPartialAmount(e.target.value)}
+                placeholder={`1 ถึง ${(depositAmount - 1).toLocaleString()}`}
+                className={inputCls}
+              />
+              {partialAmount !== "" && !partialValid ? (
+                <p className="mt-1 text-xs text-[var(--danger)]">จำนวนต้องอยู่ระหว่าง 1 ถึง {(depositAmount - 1).toLocaleString()} ฿</p>
+              ) : null}
+            </label>
+          ) : null}
+
+          {(depDecision === "partial_refund" || depDecision === "forfeit") ? (
+            <p className="mt-2 text-[11px] text-[var(--warn)]">
+              ลูกค้าสามารถโต้แย้งได้ภายใน 48 ชม. หลังบันทึก
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Not returned = auto-forfeit info */}
+      {hasDeposit && choice === "not_returned" ? (
+        <div className="rounded-lg bg-[var(--danger-soft)] px-3 py-2.5 text-[13px] text-[var(--danger)]">
+          มัดจำ {depositAmount.toLocaleString()} ฿ จะถูกหักทั้งหมด · ลูกค้าสามารถโต้แย้งได้ภายใน 48 ชม.
+        </div>
+      ) : null}
+
+      {/* Next available date (for complete/damaged only) */}
+      {choice !== "not_returned" ? (
+        <label className="text-sm font-semibold">
+          วันที่สินค้าพร้อมให้เช่าอีกครั้ง
+          <span className="ml-1 text-xs font-normal text-[var(--ink-3)]">(เปลี่ยนได้)</span>
+          <input
+            type="date"
+            value={nextDate}
+            onChange={(e) => setNextDate(e.target.value)}
+            min={new Date().toISOString().slice(0, 10)}
+            className={inputCls}
+          />
+          <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+            ปฏิทินจะบล็อกวันก่อนวันนี้ไม่ให้จอง (ค่าเริ่มต้น = วันสิ้นสุดเช่า + 3 วัน)
+          </p>
+        </label>
       ) : null}
 
       <button
@@ -585,7 +769,10 @@ function ReturnPanel({
         onClick={() => onSubmit(
           choice,
           choice === "damaged" ? note.trim() : undefined,
-          choice === "damaged" && deduction !== "" ? deductionNum : undefined,
+          computeDeduction(),
+          hasDeposit && choice !== "not_returned" ? depDecision : (choice === "not_returned" ? "forfeit" : undefined),
+          computeRefundAmount(),
+          choice !== "not_returned" && nextDate ? nextDate : undefined,
         )}
         style={{ padding: "13px 18px" }}
       >
@@ -633,17 +820,135 @@ function NotReturnedPanel({
   );
 }
 
+/** Refund slip upload form — seller uploads proof of deposit refund transfer. */
+function RefundSlipUpload({
+  bookingId,
+  busy,
+  error,
+  run,
+}: {
+  bookingId: string;
+  busy: boolean;
+  error: string;
+  run: (fn: () => Promise<{ ok: boolean; error?: string }>, onSuccess?: () => void) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pendingFile = useRef<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  function handleFile(file: File) {
+    if (!file.type.startsWith("image/")) return;
+    pendingFile.current = file;
+    setPreview(URL.createObjectURL(file));
+  }
+
+  function onFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) handleFile(f);
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) handleFile(f);
+  }
+
+  function cancelPreview() {
+    pendingFile.current = null;
+    setPreview(null);
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
+  function confirmUpload() {
+    const file = pendingFile.current;
+    if (!file) return;
+    const fd = new FormData();
+    fd.set("slip", file);
+    run(() => sellerUploadRefundSlip(bookingId, fd));
+  }
+
+  return (
+    <div className="grid gap-3">
+      <div className="text-sm font-semibold text-[var(--ink)]">อัปโหลดสลิปคืนมัดจำ</div>
+      <p className="text-xs text-[var(--ink-3)]">
+        โอนเงินตามบัญชีข้างบน แล้วอัปโหลดสลิปเป็นหลักฐาน ลูกค้าจะมีเวลา 24 ชม. ยืนยัน
+      </p>
+
+      {!preview ? (
+        <div
+          onDrop={onDrop}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onClick={() => inputRef.current?.click()}
+          className={`rounded-xl border-2 border-dashed py-7 px-4 text-center cursor-pointer transition-colors ${dragOver ? "border-[var(--accent)] bg-[var(--accent-soft,rgba(0,128,128,0.04))]" : "border-[var(--line)] bg-white"}`}
+        >
+          <div className="mb-2">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="inline-block">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </div>
+          <div className="text-[13px] text-[var(--ink-2)] leading-relaxed">
+            ลากไฟล์มาวางที่นี่ หรือกดเพื่อเลือกรูป
+          </div>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            onChange={onFileSelect}
+            disabled={busy}
+            className="hidden"
+          />
+        </div>
+      ) : (
+        <div className="rounded-[10px] border border-[var(--line)] bg-white p-3">
+          <div className="text-[13px] font-semibold text-[var(--ink-2)] mb-2">
+            ตรวจสอบสลิปก่อนส่ง
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview}
+            alt="สลิปคืนมัดจำ"
+            className="w-full max-h-[320px] object-contain rounded-lg bg-[var(--bg)]"
+          />
+          <div className="text-center text-[11.5px] text-[var(--ink-3)] mt-1">
+            กดที่รูปเพื่อดูขนาดเต็ม
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2.5">
+        {preview ? (
+          <button
+            type="button"
+            className="btn btn-outline flex-1 py-2.5"
+            onClick={cancelPreview}
+            disabled={busy}
+          >
+            เลือกรูปใหม่
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="btn btn-primary flex-1 py-2.5 font-semibold"
+          onClick={confirmUpload}
+          disabled={busy || !preview}
+          style={{ opacity: preview ? 1 : 0.5 }}
+        >
+          {busy ? "กำลังส่ง…" : "ยืนยันส่งสลิป"}
+        </button>
+      </div>
+      {error ? <Err msg={error} /> : null}
+    </div>
+  );
+}
+
 function Err({ msg }: { msg: string }) {
   return (
-    <div
-      style={{
-        padding: "10px 14px",
-        background: "var(--danger-soft)",
-        color: "var(--danger)",
-        borderRadius: 8,
-        fontSize: 13.5,
-      }}
-    >
+    <div className="rounded-lg bg-[var(--danger-soft)] px-3.5 py-2.5 text-[13.5px] text-[var(--danger)]">
       {msg}
     </div>
   );

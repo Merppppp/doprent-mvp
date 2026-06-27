@@ -27,6 +27,7 @@ const ALLOWED_PREFIXES = [
   "id-cards/",
   "addr-change-slips/",
   "refunds/",
+  "refund-slips/",
   "kyc/",
   "bankbook/",
 ];
