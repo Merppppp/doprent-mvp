@@ -84,15 +84,15 @@ steps:
       - >-
         ssh -o StrictHostKeyChecking=no deploy@157.85.101.85 "
           echo '$$GHCR_TOKEN' | docker login ghcr.io -u '$$GHCR_USERNAME' --password-stdin &&
-          if docker service inspect doprent-mvp-prod_app >/dev/null 2>&1; then
+          if docker service inspect doprent-prod_app >/dev/null 2>&1; then
             echo 'Service exists — updating image...';
-            docker service update --image ghcr.io/doprent/doprent-mvp:$${IMAGE_TAG} doprent-mvp-prod_app --with-registry-auth;
+            docker service update --image ghcr.io/doprent/doprent-mvp:$${IMAGE_TAG} doprent-prod_app --with-registry-auth;
           else
             echo 'First deploy — creating stack...';
             cd /opt/doprent/doprent-server &&
             set -a && source envs/prod.env && set +a &&
             export IMAGE_TAG=$${IMAGE_TAG} &&
-            docker stack deploy -c stacks/app-template.yml doprent-mvp-prod --with-registry-auth;
+            docker stack deploy -c stacks/app-template.yml doprent-prod --with-registry-auth;
           fi
         "
 
