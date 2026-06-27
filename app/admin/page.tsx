@@ -89,7 +89,7 @@ function Stat({ label, value, href, accent }: { label: string; value: number; hr
       style={{
         padding: 18,
         background: "var(--surface)",
-        border: `1px solid ${accent && value > 0 ? "var(--info)" : "var(--line)"}`,
+        border: `1px solid ${accent && value > 0 ? "var(--accent)" : "var(--line)"}`,
         borderRadius: 8,
       }}
     >
@@ -99,7 +99,7 @@ function Stat({ label, value, href, accent }: { label: string; value: number; hr
           fontSize: 28,
           fontWeight: 700,
           letterSpacing: "-0.02em",
-          color: accent && value > 0 ? "var(--info)" : "var(--ink)",
+          color: accent && value > 0 ? "var(--accent)" : "var(--ink)",
         }}
       >
         {value}

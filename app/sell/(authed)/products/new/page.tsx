@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { listTagGroups, listTagRequestsForShop } from "@/lib/tags";
 import { getTagGroupsForProductType } from "@/lib/tag-groups";
 import type { BoundTagGroup } from "@/lib/tag-groups";
+import { parseBusinessHours } from "@/lib/hours";
 import ProductForm from "../ProductForm";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ export default async function NewProductPage() {
 
   const raw = await db.shop.findFirst({
     where: { ownerId: user.id },
-    select: { id: true, slug: true, name: true, lineUrl: true, kycStatus: true, promptpayId: true, bankAccountNumber: true },
+    select: { id: true, slug: true, name: true, lineUrl: true, kycStatus: true, promptpayId: true, bankAccountNumber: true, hours: true },
   });
   if (!raw) redirect("/sell/signup");
   if (raw.kycStatus === "none" || raw.kycStatus === "rejected") {
@@ -30,6 +31,8 @@ export default async function NewProductPage() {
 
   // Check payment channel (guard — also hard-blocked in createProduct action)
   const hasPaymentChannel = !!(raw.promptpayId || raw.bankAccountNumber);
+  // Check business hours (guard — also hard-blocked in createProduct action)
+  const hasHours = !!parseBusinessHours(raw.hours);
 
   // Fetch all active product types + tag-group sections for each
   const [productTypesRaw, tagGroups, tagRequestsRaw] = await Promise.all([
@@ -75,16 +78,16 @@ export default async function NewProductPage() {
         <div
           style={{
             padding: "16px 18px",
-            background: "#FFFBEB",
-            border: "1px solid #F59E0B",
+            background: "var(--warn-soft)",
+            border: "1px solid var(--warn)",
             borderRadius: 8,
             marginBottom: 24,
           }}
         >
-          <div style={{ fontWeight: 600, fontSize: 14, color: "#92400E", marginBottom: 6 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, color: "var(--warn-ink)", marginBottom: 6 }}>
             ⚠️ ยังไม่มีช่องทางรับชำระเงิน
           </div>
-          <div style={{ fontSize: 13, color: "#78350F", lineHeight: 1.6 }}>
+          <div style={{ fontSize: 13, color: "var(--warn-ink)", lineHeight: 1.6 }}>
             ต้องตั้งค่า PromptPay หรือบัญชีธนาคารก่อนจึงจะลงขายสินค้าได้
           </div>
           <a
@@ -95,14 +98,49 @@ export default async function NewProductPage() {
               padding: "8px 14px",
               fontSize: 13,
               fontWeight: 600,
-              border: "1px solid #F59E0B",
+              border: "1px solid var(--warn)",
               borderRadius: 6,
-              color: "#92400E",
-              background: "#FEF3C7",
+              color: "var(--warn-ink)",
+              background: "var(--warn-soft)",
               textDecoration: "none",
             }}
           >
             ไปตั้งค่าช่องทางรับเงิน →
+          </a>
+        </div>
+      )}
+      {!hasHours && (
+        <div
+          style={{
+            padding: "16px 18px",
+            background: "var(--warn-soft)",
+            border: "1px solid var(--warn)",
+            borderRadius: 8,
+            marginBottom: 24,
+          }}
+        >
+          <div style={{ fontWeight: 600, fontSize: 14, color: "var(--warn-ink)", marginBottom: 6 }}>
+            ⚠️ ยังไม่ได้ตั้งเวลาทำการของร้าน
+          </div>
+          <div style={{ fontSize: 13, color: "var(--warn-ink)", lineHeight: 1.6 }}>
+            ต้องตั้งค่าเวลาทำการก่อนจึงจะลงขายสินค้าได้ (ใช้กำหนดปฏิทินจองและเวลาส่งด่วน)
+          </div>
+          <a
+            href="/sell/edit"
+            style={{
+              display: "inline-block",
+              marginTop: 10,
+              padding: "8px 14px",
+              fontSize: 13,
+              fontWeight: 600,
+              border: "1px solid var(--warn)",
+              borderRadius: 6,
+              color: "var(--warn-ink)",
+              background: "var(--warn-soft)",
+              textDecoration: "none",
+            }}
+          >
+            ไปตั้งค่าเวลาทำการ →
           </a>
         </div>
       )}

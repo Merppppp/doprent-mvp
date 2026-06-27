@@ -254,6 +254,10 @@ model User {
   fullName       String?   @map("full_name")
   /// LINE id ของผู้ใช้ (ติดต่อกลับ)
   lineId         String?   @map("line_id")
+  /// เบอร์โทรติดต่อ (ไม่บังคับ)
+  phone          String?   @map("phone")
+  /// วันเกิด (date-only, ไม่บังคับ)
+  birthDate      DateTime? @map("birth_date") @db.Date
   /// บทบาทในระบบ
   role           Role      @default(customer)
   /// URL รูปโปรไฟล์ (จาก OAuth)
@@ -290,6 +294,12 @@ model User {
   /// version string ของ T&C ที่ยอมรับ (e.g. "2026-06-15")
   termsVersion    String?   @map("terms_version")
 
+  // -- Account suspension (admin moderation) --
+  /// เวลาที่บัญชีถูกระงับโดยแอดมิน (NULL = ใช้งานปกติ)
+  suspendedAt     DateTime? @map("suspended_at") @db.Timestamptz(6)
+  /// เหตุผลที่ระงับบัญชี (ไม่บังคับ)
+  suspendedReason String?   @map("suspended_reason")
+
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedBy String?  @map("updated_by") @db.Uuid
@@ -301,11 +311,13 @@ model User {
   kycSubmissions    KycSubmission[]
   lineClicks        LineClick[]
   addresses         Address[]
+  bankAccounts      BankAccount[]
   bookings          Booking[]
   pageViews         PageView[]
   shopSubscriptions ShopSubscription[]
   favorites         Favorite[]
-  reviews           Review[]          @relation("UserReviews")
+  reviews           Review[]           @relation("UserReviews")
+  idCards           UserIdCard[]
 
   @@index([lastActiveAt(sort: Desc)])
   @@index([signupChannel])
@@ -412,105 +424,109 @@ model VerificationToken {
 /// ร้านให้เช่าสินค้า (เดิม boutiques) — 1 ร้านมีเจ้าของ 1 คน (owner), มีสินค้าหลายรายการ
 model Shop {
   /// Primary key (uuid)
-  id               String    @id @default(uuid()) @db.Uuid
+  id                   String         @id @default(uuid()) @db.Uuid
   /// slug สำหรับ URL (UNIQUE)
-  slug             String    @unique
+  slug                 String         @unique
   /// ชื่อร้าน
-  name             String
+  name                 String
   /// FK → users.id เจ้าของร้าน (SetNull เมื่อ user ถูกลบ)
-  ownerId          String?   @map("owner_id") @db.Uuid
+  ownerId              String?        @map("owner_id") @db.Uuid
   /// ชื่อเจ้าของร้านที่แสดงผล (กรอกเอง — ไม่ใช่ snapshot ของ users.full_name)
-  ownerName        String?   @map("owner_name")
+  ownerName            String?        @map("owner_name")
   /// FK → areas.id ย่านที่ตั้งร้าน (เดิมอ้างด้วย area key string)
-  areaId           String?   @map("area_id") @db.Uuid
+  areaId               String?        @map("area_id") @db.Uuid
   /// ป้ายชื่อย่านที่แสดงผล (รองรับย่านอิสระที่ไม่อยู่ใน areas)
-  areaLabel        String    @map("area_label")
+  areaLabel            String         @map("area_label")
   /// ที่อยู่แบบข้อความเต็ม (legacy/รวม)
-  address          String?
+  address              String?
   /// บ้านเลขที่
-  houseNo          String?   @map("house_no")
+  houseNo              String?        @map("house_no")
   /// ถนน/ซอย
-  street           String?
+  street               String?
   /// แขวง/ตำบล
-  subdistrict      String?
+  subdistrict          String?
   /// เขต/อำเภอ
-  district         String?
+  district             String?
   /// จังหวัด
-  province         String    @default("กรุงเทพมหานคร")
+  province             String         @default("กรุงเทพมหานคร")
   /// รหัสไปรษณีย์
-  postalCode       String?   @map("postal_code")
+  postalCode           String?        @map("postal_code")
   /// ละติจูดที่ตั้งร้าน
-  lat              Decimal?  @db.Decimal(9, 6)
+  lat                  Decimal?       @db.Decimal(9, 6)
   /// ลองจิจูดที่ตั้งร้าน
-  lng              Decimal?  @db.Decimal(9, 6)
+  lng                  Decimal?       @db.Decimal(9, 6)
   /// เวลาทำการ (ข้อความอิสระ)
-  hours            String?
+  hours                String?
   /// LINE OA deep-link ของร้าน (CTA หลัก)
-  lineUrl          String    @map("line_url")
+  lineUrl              String         @map("line_url")
   /// Instagram handle/URL
-  instagram        String?
+  instagram            String?
   /// Facebook page URL/handle
-  facebook         String?
+  facebook             String?
   /// X (Twitter) handle/URL
-  twitter          String?
+  twitter              String?
   /// TikTok handle/URL
-  tiktok           String?
+  tiktok               String?
   /// PromptPay id รับเงิน (เบอร์/เลขบัตร ปชช.)
-  promptpayId         String?   @map("promptpay_id")
+  promptpayId          String?        @map("promptpay_id")
   /// ชื่อธนาคาร สำหรับรับโอนเงิน (ไม่บังคับ)
-  bankName            String?   @map("bank_name")
+  bankName             String?        @map("bank_name")
   /// เลขบัญชีธนาคาร
-  bankAccountNumber   String?   @map("bank_account_number")
+  bankAccountNumber    String?        @map("bank_account_number")
   /// ชื่อบัญชีธนาคาร
-  bankAccountName     String?   @map("bank_account_name")
+  bankAccountName      String?        @map("bank_account_name")
   /// คีย์รูปหน้าสมุดบัญชี (PRIVATE bucket) — แนบเมื่อกรอกเลขบัญชี, admin ตรวจผ่าน signedUrl
-  bankbookImagePath   String?   @map("bankbook_image_path")
+  bankbookImagePath    String?        @map("bankbook_image_path")
   /// ช่องทางรับเงินเริ่มต้นของร้าน (ใช้เป็น default ตอนยอมรับการจอง เมื่อกรอกทั้ง PromptPay + บัญชี)
   defaultPaymentMethod PaymentMethod? @map("default_payment_method")
   /// ปีที่เปิดร้าน
-  sinceYear        Int?      @map("since_year")
+  sinceYear            Int?           @map("since_year")
   /// โทนสี cover การ์ดร้าน
-  coverColor       Color     @default(rose) @map("cover_color")
+  coverColor           Color          @default(rose) @map("cover_color")
   /// URL รูป logo ร้าน (PUBLIC bucket — แสดงบนการ์ดร้าน; null = ใช้ gradient cover_color)
-  logoUrl          String?   @map("logo_url")
+  logoUrl              String?        @map("logo_url")
   /// ป้าย tag การตลาดสั้น ๆ
-  tag              String?
+  tag                  String?
   /// เรื่องราว/คำแนะนำร้าน
-  story            String?
+  story                String?
   /// ข้อมูลการจัดส่ง
-  deliveryInfo     String?   @map("delivery_info")
+  deliveryInfo         String?        @map("delivery_info")
   /// ร้านแนะนำ (คัดโดย admin)
-  featured         Boolean   @default(false)
+  featured             Boolean        @default(false)
   /// ระดับแผนโฆษณาปัจจุบันของร้าน (MVP default: full = ไม่จำกัด ไม่มีแพ็กเกจ UI)
-  adsTier          PlanTier  @default(full) @map("ads_tier")
+  adsTier              PlanTier       @default(full) @map("ads_tier")
   /// ผ่านการยืนยันตัวตนแล้ว (badge)
-  verified         Boolean   @default(false)
+  verified             Boolean        @default(false)
   /// สถานะ workflow การเผยแพร่ร้าน
-  status           Status    @default(live)
+  status               Status         @default(live)
   /// เหตุผลเมื่อถูก reject
-  rejectReason     String?   @map("reject_reason")
+  rejectReason         String?        @map("reject_reason")
   /// สถานะ KYC ล่าสุด (rollup จาก kyc_submissions เพื่อ gate ฟีเจอร์เร็ว ๆ)
-  kycStatus        KycStatus @default(none) @map("kyc_status")
+  kycStatus            KycStatus      @default(none) @map("kyc_status")
   /// จำนวนวันล่วงหน้าขั้นต่ำที่ผู้เช่าต้องจอง (วันรับ >= วันนี้ + leadTimeDays)
-  leadTimeDays     Int       @default(0) @map("lead_time_days")
+  leadTimeDays         Int            @default(0) @map("lead_time_days")
   /// จำนวนวันเช่าขั้นต่ำต่อครั้ง
-  minRentalDays    Int       @default(1) @map("min_rental_days")
+  minRentalDays        Int            @default(1) @map("min_rental_days")
   /// จำนวนวันเช่าสูงสุดต่อครั้ง (null = ไม่จำกัด)
-  maxRentalDays    Int?      @map("max_rental_days")
+  maxRentalDays        Int?           @map("max_rental_days")
   /// จำนวนวันที่ผู้เช่าต้องคืนสินค้าหลังวันสิ้นสุดการเช่า (แสดงต่อผู้เช่า)
-  returnWindowDays Int       @default(2) @map("return_window_days")
-  /// จำนวนวันบัฟเฟอร์หลังการเช่าแต่ละครั้ง (ช่วงเตรียม/ทำความสะอาด — บล็อกช่วง [start, end+bufferDaysAfter])
-  bufferDaysAfter  Int       @default(2) @map("buffer_days_after")
+  returnWindowDays     Int            @default(2) @map("return_window_days")
+  /// จำนวนวันบัฟเฟอร์หลังการเช่าแต่ละครั้ง (เผื่อเวลาขนส่งพัสดุกลับร้าน); ส่งด่วน (express) ไม่ใช้บัฟเฟอร์นี้
+  bufferDaysAfter      Int            @default(2) @map("buffer_days_after")
+  /// จำนวนวันบัฟเฟอร์ก่อนวันเริ่มเช่า (เผื่อเวลาขนส่งพัสดุไปถึงผู้เช่า); ส่งด่วน (express) ไม่ใช้บัฟเฟอร์นี้
+  bufferDaysBefore     Int            @default(2) @map("buffer_days_before")
+  /// จำนวนวันเตรียมของ/ซักรีด หลังคืนของแต่ละครั้ง (บล็อกเสมอ ไม่ว่าจะ express หรือ standard)
+  cleaningDays         Int            @default(1) @map("cleaning_days")
   /// วันปิดทำการประจำสัปดาห์ (0=อาทิตย์..6=เสาร์) — ซ้ำทุกสัปดาห์
-  closedWeekdays   Int[]     @default([]) @map("closed_weekdays")
+  closedWeekdays       Int[]          @default([]) @map("closed_weekdays")
   /// คะแนนเฉลี่ยรีวิวทั้งหมดของร้าน (NULL = ยังไม่มีรีวิว) — อัปเดตโดย recomputeShopRating()
-  ratingAvg        Decimal?  @map("rating_avg") @db.Decimal(3, 2)
+  ratingAvg            Decimal?       @map("rating_avg") @db.Decimal(3, 2)
   /// จำนวนรีวิวที่มองเห็น (status=visible) ของร้าน — อัปเดตโดย recomputeShopRating()
-  ratingCount      Int       @default(0) @map("rating_count")
+  ratingCount          Int            @default(0) @map("rating_count")
   /// เปิด/ปิดร้านชั่วคราว (seller-controlled toggle) — false = แสดง 'ปิดชั่วคราว' บนหน้าร้านสาธารณะ
-  isOpen           Boolean   @default(true) @map("is_open")
+  isOpen               Boolean        @default(true) @map("is_open")
   /// opaque code ฝังใน QR สำหรับพนักงานเข้าระบบ — immutable หลัง allocate
-  staffLoginCode   String?   @unique @map("staff_login_code")
+  staffLoginCode       String?        @unique @map("staff_login_code")
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -540,21 +556,21 @@ model Shop {
 
 /// พนักงานร้าน — login ด้วย username + PIN, scoped ต่อ 1 ร้าน
 model ShopStaff {
-  id            String   @id @default(uuid()) @db.Uuid
-  shopId        String   @map("shop_id") @db.Uuid
+  id                String    @id @default(uuid()) @db.Uuid
+  shopId            String    @map("shop_id") @db.Uuid
   /// login handle — unique per shop (scoped via staffLoginCode at login)
-  username      String
-  displayName   String   @map("display_name")
+  username          String
+  displayName       String    @map("display_name")
   /// bcrypt hash ของ PIN — ห้ามเก็บ plaintext
-  pinHash       String   @map("pin_hash")
+  pinHash           String    @map("pin_hash")
   /// permission flags
-  canManageBookings  Boolean @default(true)  @map("can_manage_bookings")
-  canManageProducts  Boolean @default(false) @map("can_manage_products")
-  isActive      Boolean  @default(true) @map("is_active")
+  canManageBookings Boolean   @default(true) @map("can_manage_bookings")
+  canManageProducts Boolean   @default(false) @map("can_manage_products")
+  isActive          Boolean   @default(true) @map("is_active")
   /// brute-force guard
-  failedAttempts Int     @default(0) @map("failed_attempts")
-  lockedUntil   DateTime? @map("locked_until") @db.Timestamptz(6)
-  lastLoginAt   DateTime? @map("last_login_at") @db.Timestamptz(6)
+  failedAttempts    Int       @default(0) @map("failed_attempts")
+  lockedUntil       DateTime? @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt       DateTime? @map("last_login_at") @db.Timestamptz(6)
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -563,8 +579,8 @@ model ShopStaff {
 
   shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  @@index([shopId])
   @@unique([shopId, username])
+  @@index([shopId])
   @@map("shop_staff")
 }
 
@@ -631,6 +647,10 @@ model Product {
   returnWindowDays Int?                     @map("return_window_days")
   /// override: จำนวนวันบัฟเฟอร์หลังเช่า (ใช้เมื่อ policyOverride = true; null = ใช้ค่าของร้าน)
   bufferDaysAfter  Int?                     @map("buffer_days_after")
+  /// override: จำนวนวันบัฟเฟอร์ก่อนเริ่มเช่า (ใช้เมื่อ policyOverride = true; null = ใช้ค่าของร้าน)
+  bufferDaysBefore Int?                     @map("buffer_days_before")
+  /// override: จำนวนวันเตรียมของ/ซักรีด (ใช้เมื่อ policyOverride = true; null = ใช้ค่าของร้าน)
+  cleaningDays     Int?                     @map("cleaning_days")
   /// full-text search vector (จัดการผ่าน raw SQL/trigger)
   searchVector     Unsupported("tsvector")? @map("search_vector")
 
@@ -647,7 +667,7 @@ model Product {
   productTags ProductTag[]
   blackouts   ProductBlackoutDate[]
   lineClicks  LineClick[]
-  bookings    Booking[]
+  items       BookingItem[]
   favoritedBy Favorite[]
   variants    ProductVariant[]
 
@@ -768,13 +788,48 @@ model ProductVariant {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   product    Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
-  bookings   Booking[]
+  items      BookingItem[]
   priceTiers ProductPriceTier[]
   blackouts  ProductBlackoutDate[]
+  units      ProductUnit[]
 
   @@unique([productId, size])
   @@index([productId])
   @@map("product_variants")
+}
+
+/// หน่วยทางกายภาพรายตัวของ variant (serialized inventory) — ชุดไซซ์เดียวกันมีได้หลายตัว
+/// แต่ละตัวมีรหัสของตัวเอง (code) + สถานะของตัวเอง ร้านจัดการได้ว่าตัวไหนติดซ่อม/ปลดระวาง
+/// stock ที่เช่าได้จริง = จำนวน unit ที่ status = available
+model ProductUnit {
+  /// Primary key (uuid)
+  id        String     @id @default(uuid()) @db.Uuid
+  /// FK → product_variants.id (Cascade — ลบ variant แล้ว unit หายตาม)
+  variantId String     @map("variant_id") @db.Uuid
+  /// รหัสประจำตัวหน่วย — UNIQUE ต่อ variant (เช่น <slug>-<size>-001)
+  code      String
+  /// สถานะของหน่วย: available=พร้อมเช่า, rented=ออกไปกับลูกค้า, repair=ติดซ่อม, retired=ปลดระวาง
+  status    UnitStatus @default(available)
+  /// หมายเหตุของร้าน (เหตุผลที่ซ่อม/ปลดระวาง/สูญหาย ฯลฯ)
+  note      String?
+  /// FK → bookings.id — เก็บว่าหน่วยนี้สูญหายจาก order ไหน (null = ไม่ได้สูญหาย)
+  lostFromBookingId String? @map("lost_from_booking_id") @db.Uuid
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  variant        ProductVariant        @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  items          BookingItem[]
+  blackouts      ProductBlackoutDate[]
+  lostFromBooking Booking?             @relation("LostUnits", fields: [lostFromBookingId], references: [id], onDelete: SetNull)
+
+  @@unique([variantId, code])
+  @@index([variantId])
+  @@index([status])
+  @@index([lostFromBookingId])
+  @@map("product_units")
 }
 
 /// สินค้าที่ผู้ใช้บันทึกไว้ (wishlist — เดิม saved_dresses / users.saved_dress_ids uuid[])
@@ -797,6 +852,27 @@ model Favorite {
   @@unique([userId, productId])
   @@index([productId])
   @@map("favorites")
+}
+
+/// ภาพถ่ายบัตรประชาชนของผู้ใช้ — เก็บได้สูงสุด 3 รูปต่อคน (sliding window: เพิ่มรูปที่ 4 จะลบรูปเก่าสุดอัตโนมัติ)
+/// ใช้แนบกับการจองออนไลน์ (Booking.idCardPath) เพื่อให้ร้านยืนยันตัวตนผู้เช่า
+model UserIdCard {
+  /// Primary key (uuid)
+  id     String @id @default(uuid()) @db.Uuid
+  /// FK → users.id (Cascade)
+  userId String @map("user_id") @db.Uuid
+  /// R2 private bucket key (เช่น "id-cards/{userId}/{uuid}.jpg")
+  path   String
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_id_cards")
 }
 
 // ---------------------------------------------------------------------------
@@ -1037,6 +1113,33 @@ model Address {
   @@map("addresses")
 }
 
+/// บัญชีธนาคารของผู้ใช้ (ใช้รับเงินมัดจำคืน — pattern เดียวกับ Address)
+model BankAccount {
+  /// Primary key (uuid)
+  id            String   @id @default(uuid()) @db.Uuid
+  /// FK → users.id (Cascade — ลบ user → ลบบัญชีทั้งหมด)
+  userId        String   @map("user_id") @db.Uuid
+  /// ป้ายชื่อ (เช่น "บัญชีส่วนตัว", "บัญชีเงินเดือน")
+  label         String   @default("บัญชีหลัก")
+  /// ชื่อธนาคาร (เช่น "กสิกร", "กรุงเทพ", "ไทยพาณิชย์")
+  bankName      String   @map("bank_name")
+  /// เลขบัญชี
+  accountNumber String   @map("account_number")
+  /// ชื่อบัญชี (ตรงกับหน้าสมุดบัญชี)
+  accountName   String   @map("account_name")
+  /// บัญชีหลัก (default) ของผู้ใช้
+  isDefault     Boolean  @default(false) @map("is_default")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([userId])
+  @@map("bank_accounts")
+}
+
 /// การจอง — state machine 9 สถานะ, snapshot ราคา/ค่าคอม/ที่อยู่ ณ เวลาจอง
 model Booking {
   /// Primary key (uuid)
@@ -1045,14 +1148,14 @@ model Booking {
   renterId         String         @map("renter_id") @db.Uuid
   /// FK → shops.id (Cascade)
   shopId           String         @map("shop_id") @db.Uuid
-  /// FK → products.id (Cascade)
-  productId        String         @map("product_id") @db.Uuid
-  /// FK → product_variants.id ไซซ์ที่จอง (nullable — null = legacy booking ก่อนมี ProductVariant)
-  variantId        String?        @map("variant_id") @db.Uuid
   /// วันเริ่มเช่า
   startDate        DateTime       @map("start_date") @db.Date
   /// วันคืนสินค้า
   endDate          DateTime       @map("end_date") @db.Date
+  /// เวลารับชุด "HH:MM" (null = ทั้งวัน). Logistics only — ไม่กระทบราคา/สต็อก
+  startTime        String?        @map("start_time")
+  /// เวลาคืนชุด "HH:MM" (null = ทั้งวัน)
+  endTime          String?        @map("end_time")
   /// ค่าเช่ารวม snapshot ณ เวลาจอง (บาท)
   rentalTotal      Int            @map("rental_total")
   /// ค่ามัดจำ snapshot (บาท)
@@ -1089,7 +1192,7 @@ model Booking {
   cancelledBy      String?        @map("cancelled_by")
 
   /// ข้อความโต้แย้งจากผู้เช่า (เมื่อร้านแจ้งสลิปไม่ถูกต้อง ผู้เช่าส่งเหตุผลกลับให้แอดมินตัดสิน)
-  disputeNote      String?        @map("dispute_note")
+  disputeNote String? @map("dispute_note")
 
   /// สถานะคำขอแก้ที่อยู่หลังชำระเงิน (post-payment): null/none → requested → approved → paid_review → done | rejected.
   /// ไม่กระทบ booking.status หลัก (sub-flow คุมด้วยคอลัมน์ชุดนี้ล้วน ๆ)
@@ -1110,35 +1213,138 @@ model Booking {
   addrChangeReason     String? @map("addr_change_reason")
 
   /// แหล่งที่มาของการจอง: "online" = ลูกค้าจองผ่านเว็บ, "walk_in" = ร้านจองให้ลูกค้าหน้าร้าน
-  source               String? @map("source")
+  source       String? @map("source")
   /// หมายเหตุภายในร้าน (ไม่แสดงต่อลูกค้า)
-  internalNote         String? @map("internal_note")
+  internalNote String? @map("internal_note")
+
+  /// snapshot path ของบัตรประชาชนที่ใช้ในการจองนี้ (private bucket key)
+  idCardPath String? @map("id_card_path")
 
   /// วิธีจัดส่ง: "express" (ส่งด่วนภายในวัน) | "standard" (ขนส่งพัสดุ)
-  deliveryMethod       String? @map("delivery_method")
+  /// คงไว้เพื่อ back-compat — มีค่าเท่ากับ outboundMethod (ขาร้านส่งให้ลูกค้า)
+  deliveryMethod  String? @map("delivery_method")
+  /// วิธีจัดส่งขาไป (ร้าน→ลูกค้า): "express" | "standard" — ใช้คำนวณ buffer ก่อนเริ่มเช่า
+  outboundMethod  String? @map("outbound_method")
+  /// วิธีส่งคืนขากลับ (ลูกค้า→ร้าน): "express" | "standard" — ใช้คำนวณ buffer หลังจบเช่า
+  returnMethod    String? @map("return_method")
   /// ผู้ให้บริการขนส่ง (standard): "flash" | "kerry" | "jt" | "thaipost" | "other:<provider>"
-  deliveryCarrier      String? @map("delivery_carrier")
+  deliveryCarrier String? @map("delivery_carrier")
   /// ช่วงเวลารับของสำหรับส่งด่วน เช่น "14:00-18:00"
-  expressSlot          String? @map("express_slot")
+  expressSlot     String? @map("express_slot")
+  /// เลขพัสดุ/เลขติดตามการจัดส่ง (กรอกตอนร้านส่งชุด)
+  trackingNumber  String? @map("tracking_number")
+  /// ลิงก์ติดตามการจัดส่ง (กรอกตอนร้านส่งชุด)
+  trackingUrl     String? @map("tracking_url")
+
+  /// ── ข้อมูลการส่งคืนจากลูกค้า (ขากลับ) ──
+  /// ผู้ให้บริการขนส่งที่ลูกค้าใช้ส่งคืน
+  returnCarrier        String?   @map("return_carrier")
+  /// เลขพัสดุขากลับ
+  returnTrackingNumber String?   @map("return_tracking_number")
+  /// ลิงก์ติดตามขากลับ
+  returnTrackingUrl    String?   @map("return_tracking_url")
+  /// เวลาที่ลูกค้ากดส่งข้อมูลการส่งคืน (null = ยังไม่ได้ส่ง)
+  returnShippedAt      DateTime? @map("return_shipped_at") @db.Timestamptz(6)
+
+  /// เวลาที่ส่งแจ้งเตือน "ถึงกำหนดคืน" แล้ว (กันส่งซ้ำจาก cron sweep)
+  returnReminderSentAt  DateTime? @map("return_reminder_sent_at") @db.Timestamptz(6)
+  /// เวลาที่ส่งแจ้งเตือน "เกินกำหนดคืน" แล้ว (กันส่งซ้ำจาก cron sweep)
+  overdueReminderSentAt DateTime? @map("overdue_reminder_sent_at") @db.Timestamptz(6)
+  /// เวลาที่ร้านกดรับคืนชุด (เข้าสถานะ returned) — ใช้เป็นจุดเริ่มนับ auto-complete
+  returnedAt            DateTime? @map("returned_at") @db.Timestamptz(6)
+  /// สภาพชุดตอนรับคืน: "complete" (สมบูรณ์), "damaged" (มีความเสียหาย), "not_returned" (ไม่ส่งคืน)
+  returnCondition       String?   @map("return_condition")
+  /// รายละเอียดความเสียหายที่ร้านระบุ (เมื่อ returnCondition = "damaged")
+  returnDamageNote      String?   @map("return_damage_note")
+  /// จำนวนมัดจำที่หัก (บาท) — ร้านกรอกตอนบันทึก damaged (null = ยังไม่ระบุ, 0 = ไม่หัก)
+  deductionAmount       Int?      @map("deduction_amount")
+  /// เวลาที่เข้าสถานะ payment_review (ลูกค้าอัปสลิป) — ใช้นับชั่วโมงร้านเปิดเพื่อแสดง badge ด่วน
+  /// รีเซตทุกครั้งที่ลูกค้าอัปสลิปใหม่ (เช่น หลัง slip_disputed)
+  paymentReviewAt       DateTime? @map("payment_review_at") @db.Timestamptz(6)
+  /// เส้นตาย auto-confirm สลิป — เลยเวลานี้ระบบ confirm อัตโนมัติ (cron sweep)
+  /// คำนวณจาก 4 เงื่อนไข: same-day+เปิด(1h), same-day+ปิด(3h), >24h(24h), ≤24h(12h)
+  slipConfirmDueAt      DateTime? @map("slip_confirm_due_at") @db.Timestamptz(6)
+  /// เวลาที่ส่ง reminder ร้านให้ confirm สลิป (กันส่งซ้ำจาก cron)
+  slipReminderSentAt    DateTime? @map("slip_reminder_sent_at") @db.Timestamptz(6)
+
+  /// สถานะการคืนเงิน: "none" (ไม่มี), "required" (แอดมินอนุมัติยกเลิกหลังจ่ายแล้ว — รอโอนคืน),
+  /// "refunded" (โอนคืนแล้ว มีสลิปยืนยัน), "forfeited" (หักมัดจำ — ลูกค้าไม่คืนของ)
+  refundStatus   String?   @default("none") @map("refund_status")
+  /// จำนวนเงินที่คืน (บาท) — กรอกโดยแอดมินตอนอนุมัติยกเลิก หรือตอนบันทึกการคืนเงิน
+  refundAmount   Int?      @map("refund_amount")
+  /// เวลาที่บันทึกว่าโอนคืนเสร็จแล้ว (admin อัปสลิปคืน)
+  refundedAt     DateTime? @map("refunded_at") @db.Timestamptz(6)
+  /// หมายเหตุการคืนเงิน (แอดมิน)
+  refundNote     String?   @map("refund_note")
+  /// path ไฟล์สลิปยืนยันการคืนเงิน (private bucket — key รูปแบบ refunds/<bookingId>/<uuid>.<ext>)
+  refundSlipPath String?   @map("refund_slip_path")
+
+  // -- Deposit refund: bank account snapshot + decision tracking --
+  /// FK → bank_accounts.id (บัญชีรับมัดจำคืนของผู้เช่า — snapshot ค่าด้านล่าง)
+  bankAccountId      String?   @map("bank_account_id") @db.Uuid
+  /// snapshot ชื่อธนาคาร ณ เวลาจอง
+  refundBankName     String?   @map("refund_bank_name")
+  /// snapshot เลขบัญชี ณ เวลาจอง
+  refundAccountNumber String?  @map("refund_account_number")
+  /// snapshot ชื่อบัญชี ณ เวลาจอง
+  refundAccountName  String?   @map("refund_account_name")
+  /// ร้านตัดสินมัดจำ: "full_refund" / "partial_refund" / "forfeit"
+  depositDecision    String?   @map("deposit_decision")
+  /// ข้อโต้แย้งมัดจำจากผู้เช่า (แยกจาก disputeNote ของ slip)
+  depositDisputeNote String?   @map("deposit_dispute_note")
+  /// เส้นตาย renter verify สลิปคืนเงิน (24 ชม. หลังร้านอัปโหลด)
+  refundSlipDueAt    DateTime? @map("refund_slip_due_at") @db.Timestamptz(6)
+  /// เวลาที่ renter ยืนยันรับเงินคืนแล้ว
+  refundVerifiedAt   DateTime? @map("refund_verified_at") @db.Timestamptz(6)
+  /// วันที่สินค้าพร้อมเช่าใหม่ (ร้านกำหนดตอนรับคืน — default = endDate + buffer + cleaning)
+  nextAvailableDate  DateTime? @map("next_available_date") @db.Date
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedBy String?  @map("updated_by") @db.Uuid
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  renter  User            @relation(fields: [renterId], references: [id], onDelete: Cascade)
-  shop    Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  address Address?        @relation(fields: [addressId], references: [id], onDelete: SetNull)
-  review  Review?
+  renter      User            @relation(fields: [renterId], references: [id], onDelete: Cascade)
+  shop        Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  address     Address?        @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  bankAccount BankAccount?    @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  review      Review?
+  items       BookingItem[]
+  lostUnits   ProductUnit[]   @relation("LostUnits")
 
   @@index([renterId])
   @@index([shopId])
-  @@index([productId])
   @@index([status])
   @@index([createdAt(sort: Desc)])
   @@map("bookings")
+}
+
+/// บรรทัดรายการสินค้าในหนึ่งการจอง (order line item). Booking เป็น header;
+/// หนึ่ง booking มีได้หลายรายการ (ร้านเดียวกัน + ช่วงวันเดียวกัน). Phase 1: additive — flat fields บน Booking ยังเป็น source of truth.
+model BookingItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  bookingId   String  @map("booking_id") @db.Uuid
+  productId   String  @map("product_id") @db.Uuid
+  variantId   String? @map("variant_id") @db.Uuid
+  unitId      String? @map("unit_id") @db.Uuid
+  /// ค่าเช่า snapshot ของรายการนี้ (บาท)
+  rentalTotal Int     @map("rental_total")
+  /// ค่ามัดจำ snapshot ของรายการนี้ (บาท)
+  deposit     Int     @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  booking Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  unit    ProductUnit?    @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([unitId])
+  @@map("booking_items")
 }
 
 // ---------------------------------------------------------------------------
@@ -1153,6 +1359,8 @@ model ProductBlackoutDate {
   productId String   @map("product_id") @db.Uuid
   /// FK → product_variants.id (nullable — null = ปิดทุก variant ของสินค้านี้)
   variantId String?  @map("variant_id") @db.Uuid
+  /// FK → product_units.id (nullable — set = ปิดเฉพาะหน่วยรหัสนี้ในวันนั้น)
+  unitId    String?  @map("unit_id") @db.Uuid
   /// วันที่ปิดจอง
   date      DateTime @db.Date
 
@@ -1163,10 +1371,12 @@ model ProductBlackoutDate {
 
   product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  unit    ProductUnit?    @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
-  @@unique([productId, variantId, date])
+  @@unique([productId, variantId, unitId, date])
   @@index([productId])
   @@index([variantId])
+  @@index([unitId])
   @@index([date])
   @@map("product_blackout_dates")
 }
@@ -1320,23 +1530,23 @@ enum ReviewStatus {
 /// 1 การจองรีวิวได้ 1 ครั้ง; admin ซ่อนได้; ร้านตอบกลับได้ 1 ครั้ง
 model Review {
   /// Primary key (uuid)
-  id              String        @id @default(uuid()) @db.Uuid
+  id              String       @id @default(uuid()) @db.Uuid
   /// FK → users.id ผู้เขียนรีวิว (SetNull — ลบผู้ใช้แล้วรีวิวยังอยู่แต่ไม่มีชื่อ)
-  reviewerId      String?       @map("reviewer_id") @db.Uuid
+  reviewerId      String?      @map("reviewer_id") @db.Uuid
   /// FK → shops.id ร้านที่รีวิว (Cascade — ลบร้านแล้วรีวิวหายตาม)
-  shopId          String        @map("shop_id") @db.Uuid
+  shopId          String       @map("shop_id") @db.Uuid
   /// FK → bookings.id การจองที่รีวิว (SetNull — ลบ booking แล้วรีวิวยังอยู่)
-  bookingId       String?       @map("booking_id") @db.Uuid
+  bookingId       String?      @map("booking_id") @db.Uuid
   /// คะแนน 1-5 ดาว
   rating          Int
   /// ความเห็น (ไม่บังคับ, ≤ 1000 ตัวอักษร)
   comment         String?
   /// สถานะการแสดงผล (visible = แสดง, hidden = admin ซ่อน)
-  status          ReviewStatus  @default(visible)
+  status          ReviewStatus @default(visible)
   /// ข้อความตอบกลับของร้าน (ไม่บังคับ)
-  sellerReply     String?       @map("seller_reply")
+  sellerReply     String?      @map("seller_reply")
   /// เวลาที่ร้านตอบกลับ
-  sellerRepliedAt DateTime?     @map("seller_replied_at") @db.Timestamptz(6)
+  sellerRepliedAt DateTime?    @map("seller_replied_at") @db.Timestamptz(6)
 
   /// uuid ผู้สร้าง record (NULL = system/seed)
   createdBy String?  @map("created_by") @db.Uuid
@@ -1466,6 +1676,9 @@ enum Status {
   live
   rejected
   draft
+  /// soft-deleted by the seller — hidden from storefront & seller list, but the
+  /// row is kept so historical bookings (FK onDelete: Cascade) are preserved.
+  archived
 
   @@map("listing_status")
 }
@@ -1504,6 +1717,8 @@ enum BookingStatus {
   payment_review
   confirmed
   renting
+  /// ถึงวันสุดท้ายของการเช่าแล้ว รอผู้เช่าคืนชุด (auto จาก renting ตอน 00:00 ของวันคืน)
+  awaiting_return
   cancel_requested
   slip_disputed
   rejected
@@ -1513,8 +1728,30 @@ enum BookingStatus {
   returned
   /// ร้านตรวจรับชุดเรียบร้อย ปิดรายการเช่าสมบูรณ์ (terminal สุดท้าย)
   completed
+  /// ลูกค้าไม่ส่งคืนชุด — ลูกค้ายังมีเวลาโต้แย้งได้ 48 ชม.
+  not_returned
+  /// ผู้เช่าโต้แย้งกรณีไม่คืนของ — รอแอดมินตัดสิน (auto-resolve 48 ชม.)
+  return_disputed
+  /// ผู้เช่าโต้แย้งการตัดสินมัดจำ — รอแอดมินตัดสิน (auto-resolve 48 ชม.)
+  deposit_disputed
 
   @@map("booking_status")
+}
+
+/// สถานะของหน่วยสินค้ารายตัว (ProductUnit)
+enum UnitStatus {
+  /// พร้อมเช่า — นับเป็น stock
+  available
+  /// ออกไปกับลูกค้า (กำลังเช่า)
+  rented
+  /// ติดซ่อม/ไม่พร้อมเช่าชั่วคราว — ไม่นับเป็น stock
+  repair
+  /// ปลดระวาง — ไม่นับเป็น stock ถาวร
+  retired
+  /// สูญหาย — ลูกค้าไม่คืน, ไม่นับเป็น stock, มี link กลับไปหา booking
+  lost
+
+  @@map("unit_status")
 }
 
 /// สถานะ subscription

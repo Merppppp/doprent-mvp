@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Logo from "@/components/Logo";
 
 function Icon({ d }: { d: string }) {
   return (
@@ -67,6 +68,11 @@ const NAV: NavItem[] = [
     icon: <Icon d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" />,
   },
   {
+    href: "/admin/users",
+    label: "ผู้ใช้",
+    icon: <Icon d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />,
+  },
+  {
     href: "/admin/shops",
     label: "Shops",
     icon: <Icon d="M4 9l1-5h14l1 5M4 9a3 3 0 006 0 3 3 0 006 0 3 3 0 006 0M5 9v11h14V9M9 20v-6h6v6" />,
@@ -120,10 +126,9 @@ export default function AdminSidebar() {
         <button className="seller-hamburger" onClick={() => setDrawerOpen(true)} aria-label="เปิดเมนู">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
         </button>
-        <div className="seller-brand">
-          <div className="seller-brand-logo" style={{ background: "var(--cobalt, #3b82f6)" }}>A</div>
-          <div><b>DopRent</b></div>
-        </div>
+        <Link href="/" className="seller-brand">
+          <Logo size={20} />
+        </Link>
       </div>
 
       {/* ── Backdrop ── */}
@@ -135,13 +140,12 @@ export default function AdminSidebar() {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
         </button>
 
-        <div className="seller-brand">
-          <div className="seller-brand-logo" style={{ background: "var(--cobalt, #3b82f6)" }}>A</div>
+        <Link href="/" className="seller-brand">
           <div>
-            <b>DopRent</b>
+            <Logo size={22} />
             <small>Admin Console</small>
           </div>
-        </div>
+        </Link>
 
         <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV.map((item) => {

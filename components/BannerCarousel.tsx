@@ -495,7 +495,7 @@ const BC_CSS = `
 }
 .bc-badge--verified{
   background:rgba(74,107,90,0.5); /* sage green, translucent over blur */
-  color:#fff;
+  color:var(--on-dark);
   border-color:rgba(154,196,173,0.45);
 }
 .bc-badge--area{
@@ -506,7 +506,7 @@ const BC_CSS = `
 /* Shop name */
 .bc-name{
   font-size:clamp(26px,4.5vw,52px);font-weight:700;
-  color:#fff;letter-spacing:-0.02em;line-height:1.1;margin:0;
+  color:var(--on-dark);letter-spacing:-0.02em;line-height:1.1;margin:0;
   text-shadow:0 2px 16px rgba(0,0,0,0.18);
 }
 
@@ -521,9 +521,9 @@ const BC_CSS = `
 .bc-cta{
   display:inline-flex;align-items:center;gap:7px;
   padding:12px 22px;border-radius:999px;
-  background:#fff;
+  background:var(--on-dark);
   border:none;
-  color:#1a1815;font-size:14.5px;font-weight:600;
+  color:var(--ink);font-size:14.5px;font-weight:600;
   text-decoration:none;letter-spacing:.01em;
   transition:background .2s ease,transform .2s ease;
   margin-top:4px;
@@ -540,7 +540,7 @@ const BC_CSS = `
   background:rgba(255,255,255,0.16);
   backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
   border:1.5px solid rgba(255,255,255,0.3);
-  color:#fff;cursor:pointer;
+  color:var(--on-dark);cursor:pointer;
   display:grid;place-items:center;
   transition:opacity .2s ease,background .2s ease;
   opacity:0;
@@ -569,7 +569,7 @@ const BC_CSS = `
 .bc-dots .swiper-pagination-bullet-active{
   width:28px;
   background:rgba(46,156,101,0.9);
-  border-color:rgba(46,156,101,1);
+  border-color:var(--accent);
 }
 
 /* Reduce motion */

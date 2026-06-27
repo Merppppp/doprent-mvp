@@ -75,7 +75,7 @@ export async function resolveTagSelections(
     const valid = new Map(g.tags.map((t) => [t.key, t.id]));
     for (const k of picked) {
       const id = valid.get(k);
-      if (!id) return { ok: false, error: `แท็กไม่ถูกต้องในกลุ่ม "${g.groupLabel}"` };
+      if (!id) return { ok: false, error: `แท็ก "${k}" ไม่ถูกต้องหรือถูกปิดใช้งานแล้วในกลุ่ม "${g.groupLabel}"` };
       tagIds.push(id);
     }
   }

@@ -24,6 +24,8 @@ import { db } from "@/lib/db";
 import {
   resolveEffectivePolicy,
   computeUnavailableDates,
+  computeDailyBookedCounts,
+  BOOKING_BLOCKING_STATUSES,
 } from "@/lib/booking-policy";
 import { parseBusinessHours } from "@/lib/hours";
 
@@ -91,7 +93,8 @@ export default async function DressPage({ params }: { params: Params }) {
       minRentalDays: true,
       maxRentalDays: true,
       returnWindowDays: true,
-      bufferDaysAfter: true,
+      bufferDaysAfter: true, cleaningDays: true,
+      bufferDaysBefore: true,
       closedWeekdays: true,
       closedDates: { select: { date: true } },
     },
@@ -107,19 +110,33 @@ export default async function DressPage({ params }: { params: Params }) {
           minRentalDays: true,
           maxRentalDays: true,
           returnWindowDays: true,
-          bufferDaysAfter: true,
+          bufferDaysAfter: true, cleaningDays: true,
+          bufferDaysBefore: true,
         },
       })
     : null;
 
   const [activeBookings, productVariants, productPriceTiers] = await Promise.all([
-    db.booking.findMany({
+    db.bookingItem.findMany({
       where: {
         productId: dress.id,
-        status: { in: ["booking_pending", "waiting_for_payment", "payment_review", "confirmed"] },
+        booking: { status: { in: ["booking_pending", "waiting_for_payment", "payment_review", "confirmed", "renting", "awaiting_return"] } },
       },
-      select: { startDate: true, endDate: true, status: true, variantId: true },
-    }),
+      select: {
+        productId: true,
+        variantId: true,
+        booking: { select: { startDate: true, endDate: true, status: true, outboundMethod: true, returnMethod: true } },
+      },
+    }).then((itemRows) =>
+      itemRows.map((it) => ({
+        startDate: it.booking.startDate,
+        endDate: it.booking.endDate,
+        status: it.booking.status,
+        outboundMethod: it.booking.outboundMethod,
+        returnMethod: it.booking.returnMethod,
+        variantId: it.variantId,
+      })),
+    ),
     db.productVariant.findMany({
       where: { productId: dress.id },
       orderBy: [{ size: "asc" }],
@@ -133,6 +150,30 @@ export default async function DressPage({ params }: { params: Params }) {
   ]);
 
   const hasPerVariantPriceTiers = productPriceTiers.some((t) => t.variantId !== null);
+
+  // Rentable capacity per variant = physical units NOT marked repair/retired.
+  // Once a variant has ANY serialized units, the unit count is authoritative
+  // (so marking every unit repair correctly yields 0 capacity). Only variants
+  // with no units at all fall back to the legacy quantity column.
+  const allUnitCounts = await db.productUnit.groupBy({
+    by: ["variantId"],
+    where: { variantId: { in: productVariants.map((v) => v.id) } },
+    _count: { _all: true },
+  });
+  const rentableUnitCounts = await db.productUnit.groupBy({
+    by: ["variantId"],
+    where: {
+      variantId: { in: productVariants.map((v) => v.id) },
+      status: { in: ["available", "rented"] },
+    },
+    _count: { _all: true },
+  });
+  const variantsWithUnits = new Set(allUnitCounts.map((u) => u.variantId));
+  const rentableByVariant = new Map<string, number>(
+    rentableUnitCounts.map((u) => [u.variantId, u._count._all]),
+  );
+  const capacityOf = (v: { id: string; quantity: number }) =>
+    variantsWithUnits.has(v.id) ? (rentableByVariant.get(v.id) ?? 0) : v.quantity;
 
   const rangeStart = new Date().toISOString().slice(0, 10);
   // Scan 180 days ahead for the calendar
@@ -150,6 +191,8 @@ export default async function DressPage({ params }: { params: Params }) {
           maxRentalDays: shopWithPolicy.maxRentalDays,
           returnWindowDays: shopWithPolicy.returnWindowDays,
           bufferDaysAfter: shopWithPolicy.bufferDaysAfter,
+          bufferDaysBefore: shopWithPolicy.bufferDaysBefore,
+          cleaningDays: shopWithPolicy.cleaningDays,
           closedWeekdays: shopWithPolicy.closedWeekdays,
         },
         productPolicyRow ?? {
@@ -159,6 +202,8 @@ export default async function DressPage({ params }: { params: Params }) {
           maxRentalDays: null,
           returnWindowDays: null,
           bufferDaysAfter: null,
+          bufferDaysBefore: null,
+          cleaningDays: null,
         },
       )
     : {
@@ -167,6 +212,8 @@ export default async function DressPage({ params }: { params: Params }) {
         maxRentalDays: null,
         returnWindowDays: 2,
         bufferDaysAfter: 2,
+        bufferDaysBefore: 2,
+        cleaningDays: 1,
         closedWeekdays: [] as number[],
       };
 
@@ -175,27 +222,53 @@ export default async function DressPage({ params }: { params: Params }) {
   const todayDow = new Date().getDay(); // 0=Sun
   const todayHours = businessHours?.[todayDow] ?? null;
   const shopClosingTime = todayHours?.open ? todayHours.to : null;
+  // Whether the shop has real weekly hours set. Lets the picker distinguish
+  // "hours unknown" (→ allow same-day express, fail-open) from "closed today"
+  // (shopClosingTime null but hours configured → block). Mirrors createBooking.
+  const shopHoursConfigured = businessHours != null;
 
   // Separate product-wide blackouts (variantId null) from variant-specific ones
   const productWideBlackouts = blackouts.filter((b) => b.variantId === null).map((b) => b.date);
+  // Whole-size closures only (unitId null). Per-code closures must NOT land here —
+  // they shut one physical unit, not the entire size.
   const variantBlackoutMap = new Map<string, string[]>();
+  // variantId → { ymd: closedUnitCount } for per-code closures, which shave one
+  // unit off that day's remaining stock rather than blocking the whole size.
+  const unitBlackoutCounts = new Map<string, Record<string, number>>();
   for (const b of blackouts) {
-    if (b.variantId) {
+    if (!b.variantId) continue;
+    if (b.unitId === null) {
       const arr = variantBlackoutMap.get(b.variantId) ?? [];
       arr.push(b.date);
       variantBlackoutMap.set(b.variantId, arr);
+    } else {
+      const counts = unitBlackoutCounts.get(b.variantId) ?? {};
+      counts[b.date] = (counts[b.date] ?? 0) + 1;
+      unitBlackoutCounts.set(b.variantId, counts);
     }
   }
 
+  // Product-level base layer = closures that apply to EVERY size (product-wide
+  // blackouts + shop-closed days + closed weekdays). When the product has size
+  // variants, bookings are NOT folded in here: each size's stock is evaluated
+  // per-variant below with its own capacity. Folding all-variant bookings into a
+  // quantity=1 base would mark a date "full" after a single booking even when
+  // other units of that size are free, and the variant overlay can only ADD
+  // dates (DateRangePicker merges, never subtracts) — so it could never recover.
+  const hasVariants = productVariants.length > 0;
   const unavailableSet = shopWithPolicy
     ? computeUnavailableDates({
         blackouts: productWideBlackouts,
         shopClosedDates: shopWithPolicy.closedDates.map((d) => d.date.toISOString().slice(0, 10)),
-        bookings: activeBookings.map((b) => ({
-          startDate: b.startDate,
-          endDate: b.endDate,
-          status: b.status,
-        })),
+        bookings: hasVariants
+          ? []
+          : activeBookings.map((b) => ({
+              startDate: b.startDate,
+              endDate: b.endDate,
+              status: b.status,
+              outboundMethod: b.outboundMethod,
+              returnMethod: b.returnMethod,
+            })),
         effectivePolicy,
         rangeStart,
         rangeEnd,
@@ -207,9 +280,10 @@ export default async function DressPage({ params }: { params: Params }) {
   // Build per-variant unavailable date sets (variant-aware stock check).
   // Product-wide blackouts + variant-specific blackouts + closed days are common base.
   // Per-variant: additionally block dates where that variant's booking count >= quantity.
-  const ACTIVE_STATUSES_DETAIL = new Set(["booking_pending", "waiting_for_payment", "payment_review", "confirmed", "renting"]);
+  const ACTIVE_STATUSES_DETAIL = new Set(["booking_pending", "waiting_for_payment", "payment_review", "confirmed", "renting", "awaiting_return"]);
 
   const variantOptions: VariantOption[] = productVariants.map((v) => {
+    const capacity = capacityOf(v);
     const variantBookings = activeBookings.filter(
       (b) => ACTIVE_STATUSES_DETAIL.has(b.status) && (b.variantId === v.id || b.variantId === null),
     );
@@ -222,17 +296,38 @@ export default async function DressPage({ params }: { params: Params }) {
     const variantUnavailableSet = computeUnavailableDates({
       blackouts: variantSpecificBlackouts,
       shopClosedDates: shopWithPolicy?.closedDates.map((d) => d.date.toISOString().slice(0, 10)) ?? [],
-      bookings: variantBookings.map((b) => ({ startDate: b.startDate, endDate: b.endDate, status: b.status })),
+      bookings: variantBookings.map((b) => ({ startDate: b.startDate, endDate: b.endDate, status: b.status, outboundMethod: b.outboundMethod, returnMethod: b.returnMethod })),
       effectivePolicy,
       rangeStart,
       rangeEnd,
-      quantity: v.quantity,
+      quantity: capacity,
     });
+
+    // Per-day booked count (same blocking statuses + buffer as the calendar),
+    // so the picker can show "เหลือ X ตัว" for the selected range.
+    const dailyBooked = computeDailyBookedCounts({
+      bookings: variantBookings.map((b) => ({ startDate: b.startDate, endDate: b.endDate, status: b.status, outboundMethod: b.outboundMethod, returnMethod: b.returnMethod })),
+      bufferDaysAfter: effectivePolicy.bufferDaysAfter,
+      bufferDaysBefore: effectivePolicy.bufferDaysBefore,
+      effectivePolicy,
+      statuses: BOOKING_BLOCKING_STATUSES,
+    });
+
+    // A unit the seller closed on a day counts against that day's stock just like
+    // a booking does, so "เหลือ X ตัว" reflects the real free count.
+    const closedCounts = unitBlackoutCounts.get(v.id);
+    if (closedCounts) {
+      for (const [ymd, n] of Object.entries(closedCounts)) {
+        dailyBooked[ymd] = (dailyBooked[ymd] ?? 0) + n;
+        // If closures + holds exhaust the size on this day, hard-block it too.
+        if (dailyBooked[ymd] >= capacity) variantUnavailableSet.add(ymd);
+      }
+    }
 
     return {
       id: v.id,
       size: v.size,
-      quantity: v.quantity,
+      quantity: capacity,
       pricePerDay: v.pricePerDay,
       deposit: v.deposit,
       available: v.available,
@@ -241,6 +336,7 @@ export default async function DressPage({ params }: { params: Params }) {
       unavailable: Array.from(variantUnavailableSet)
         .filter((d) => !unavailableSet.has(d))
         .sort(),
+      dailyBooked,
     };
   });
 
@@ -449,6 +545,29 @@ export default async function DressPage({ params }: { params: Params }) {
             </div>
           )}
 
+          {/* Shop business hours — show only today's open–close, right where
+              renters pick dates. Only shown when the seller has configured
+              hours (never fabricated when unset). */}
+          {businessHours ? (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 12,
+                border: "1px solid var(--line)",
+                borderRadius: 8,
+                padding: "10px 12px",
+                marginBottom: 18,
+                fontSize: 13,
+              }}
+            >
+              <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>เวลาทำการ</span>
+              <span style={{ color: "var(--ink-1)" }}>
+                {todayHours && todayHours.open ? `${todayHours.from}–${todayHours.to}` : "ปิด"}
+              </span>
+            </div>
+          ) : null}
+
           {/* Boutique social channels — clickable icons sit just below the
               shop card (outside the card's <Link> to avoid nested anchors). */}
           {boutique && (boutique.instagram || boutique.facebook || boutique.twitter || boutique.tiktok) ? (
@@ -477,6 +596,9 @@ export default async function DressPage({ params }: { params: Params }) {
             blackouts={productWideBlackouts}
             unavailable={unavailable}
             leadTimeDays={effectivePolicy.leadTimeDays}
+            bufferDaysBefore={effectivePolicy.bufferDaysBefore}
+            bufferDaysAfter={effectivePolicy.bufferDaysAfter}
+            cleaningDays={effectivePolicy.cleaningDays}
             minRentalDays={effectivePolicy.minRentalDays}
             maxRentalDays={effectivePolicy.maxRentalDays}
             productId={dress.id}
@@ -486,7 +608,12 @@ export default async function DressPage({ params }: { params: Params }) {
             loginNext={`/product/${dress.slug}`}
             variants={variantOptions.length > 0 ? variantOptions : undefined}
             shopClosingTime={shopClosingTime}
+            shopHoursConfigured={shopHoursConfigured}
             shopIsOpen={boutique?.is_open ?? null}
+            shopName={dress.shop_name}
+            productName={dress.name}
+            productSlug={dress.slug}
+            productImage={dress.images?.[0] ?? null}
           />
         </div>
       </div>

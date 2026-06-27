@@ -13,7 +13,7 @@ export default function StarRating({ avg, count, size = "md" }: Props) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
       {[1, 2, 3, 4, 5].map((s) => (
-        <span key={s} style={{ fontSize, color: s <= filled ? "#F5A623" : "var(--line)", lineHeight: 1 }}>
+        <span key={s} style={{ fontSize, color: s <= filled ? "var(--gold)" : "var(--line)", lineHeight: 1 }}>
           ★
         </span>
       ))}

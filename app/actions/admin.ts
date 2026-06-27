@@ -1,11 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { base, db } from "@/lib/db";
 import { withActor } from "@/lib/db-context";
 import { dueAt } from "@/lib/bookings";
+import { uploadPrivateToR2 } from "@/lib/r2";
+import { detectSlipMime } from "@/lib/file-mime";
+import { BOOKING_SLIP_MAX_BYTES } from "@/lib/config";
+import { notifyBookingCancelled, notifyRefundIssued } from "@/lib/notifications";
 import type { BookingStatus } from "@/lib/types";
 
 async function requireAdmin(): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
@@ -188,33 +193,93 @@ function revalidateBookingPaths(bookingId: string) {
   revalidatePath("/admin/bookings");
   revalidatePath(`/admin/bookings/${bookingId}`);
   revalidatePath("/account/bookings");
+  revalidatePath(`/account/bookings/${bookingId}`);
   revalidatePath("/sell/bookings");
+  revalidatePath(`/sell/bookings/${bookingId}`);
 }
 
-export async function adminApproveCancel(bookingId: string, note?: string): Promise<{ ok: boolean; error?: string }> {
+export async function adminApproveCancel(
+  bookingId: string,
+  note?: string,
+  refundAmount?: number,
+  refundNote?: string,
+): Promise<{ ok: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth;
 
   const booking = await db.booking.findUnique({
     where: { id: bookingId },
-    select: { status: true, cancelReason: true, cancelFromStatus: true },
+    select: {
+      status: true,
+      cancelReason: true,
+      cancelFromStatus: true,
+      cancelledBy: true,
+      renter: { select: { email: true } },
+      items: { select: { id: true, unitId: true, product: { select: { name: true } } } },
+    },
   });
   if (!booking) return { ok: false, error: "ไม่พบการจอง" };
   if (booking.status !== "cancel_requested")
     return { ok: false, error: "การจองนี้ไม่ได้อยู่ในสถานะรอยกเลิก" };
 
+  // Statuses that imply the renter already paid → refund is required.
+  const paidStatuses: (BookingStatus | string)[] = [
+    "payment_review",
+    "confirmed",
+    "renting",
+    "awaiting_return",
+  ];
+  const refundRequired = paidStatuses.includes(booking.cancelFromStatus ?? "");
+  const refundStatus = refundRequired ? "required" : "none";
+
+  // Preserve who originally requested — shop/renter; fall back to "admin".
+  const cancelledBy = booking.cancelledBy ?? "admin";
+
   return withActor(auth.userId, async () => {
-    const res = await db.booking.updateMany({
-      where: { id: bookingId, status: "cancel_requested" },
-      data: { status: "cancelled", cancelledBy: "shop" },
+    // Atomic: cancel the booking AND release the unit in one transaction.
+    const res = await db.$transaction(async (tx) => {
+      const moved = await tx.booking.updateMany({
+        where: { id: bookingId, status: "cancel_requested" },
+        data: {
+          status: "cancelled",
+          cancelledBy,
+          refundStatus,
+          ...(refundRequired && refundAmount != null ? { refundAmount } : {}),
+          ...(refundNote ? { refundNote } : {}),
+        },
+      });
+      // Release the held units back to available stock.
+      if (moved.count > 0) {
+        const unitIds = booking.items.map((i) => i.unitId).filter((x): x is string => !!x);
+        if (unitIds.length > 0) {
+          await tx.productUnit.updateMany({
+            where: { id: { in: unitIds } },
+            data: { status: "available" },
+          });
+        }
+        await tx.bookingItem.updateMany({ where: { bookingId }, data: { unitId: null } });
+      }
+      return moved;
     });
     if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
 
     await logAdminAction(auth.userId, "approve_booking_cancel", "booking", bookingId, note ?? null, {
+      cancelledBy,
       sellerReason: booking.cancelReason,
       fromStatus: booking.cancelFromStatus,
-      refundRequired: booking.cancelFromStatus === "confirmed",
+      refundRequired,
+      refundAmount: refundAmount ?? null,
     });
+
+    // Notify the renter their booking was cancelled (+ refund status).
+    notifyBookingCancelled({
+      renterEmail: booking.renter?.email,
+      dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
+      bookingId,
+      refundRequired,
+      refundAmount: refundAmount ?? null,
+    });
+
     revalidateBookingPaths(bookingId);
     return { ok: true };
   });
@@ -248,6 +313,91 @@ export async function adminDenyCancel(bookingId: string, note?: string): Promise
       sellerReason: booking.cancelReason,
       revertedTo: revertTo,
     });
+    revalidateBookingPaths(bookingId);
+    return { ok: true };
+  });
+}
+
+/**
+ * Admin records that a refund has been issued for a cancelled booking.
+ * Validates booking.refundStatus === "required", uploads the proof-of-refund
+ * slip to the private bucket, then marks refundStatus = "refunded".
+ * Decision: admin-only (keeps refund audit trail in one role; seller cannot
+ * self-declare a refund they did not make).
+ */
+export async function recordRefund(
+  bookingId: string,
+  formData: FormData,
+): Promise<{ ok: boolean; error?: string }> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth;
+
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      refundStatus: true,
+      renter: { select: { email: true } },
+      items: { orderBy: { createdAt: "asc" as const }, take: 1, select: { product: { select: { name: true } } } },
+    },
+  });
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.refundStatus !== "required")
+    return { ok: false, error: "การจองนี้ไม่อยู่ในสถานะรอคืนเงิน" };
+
+  // Validate + upload refund slip (same MIME / size rules as payment slips).
+  const file = formData.get("slip");
+  if (!file || typeof file === "string") return { ok: false, error: "ยังไม่ได้เลือกไฟล์สลิป" };
+  if ((file as File).size > BOOKING_SLIP_MAX_BYTES) return { ok: false, error: "ไฟล์ใหญ่เกิน 5MB" };
+
+  const buffer = Buffer.from(await (file as File).arrayBuffer());
+  const mime = detectSlipMime(buffer);
+  if (!mime) return { ok: false, error: "ไฟล์ต้องเป็นรูปภาพ (JPG/PNG/WebP)" };
+  const ext = mime === "image/jpeg" ? "jpg" : mime.split("/")[1];
+
+  const key = `refunds/${bookingId}/${randomUUID()}.${ext}`;
+  try {
+    await uploadPrivateToR2(key, buffer, mime);
+  } catch (e) {
+    console.error("[doprent] refund slip upload error", e);
+    return { ok: false, error: "อัปโหลดสลิปคืนเงินไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+
+  // Parse optional refund amount override from the form.
+  const rawAmount = formData.get("refund_amount");
+  const parsedAmount = rawAmount ? Number(rawAmount) : null;
+  const refundAmountUpdate =
+    parsedAmount != null && Number.isFinite(parsedAmount) && parsedAmount > 0
+      ? { refundAmount: Math.round(parsedAmount) }
+      : {};
+
+  return withActor(auth.userId, async () => {
+    await db.booking.update({
+      where: { id: bookingId },
+      data: {
+        refundStatus: "refunded",
+        refundedAt: new Date(),
+        refundSlipPath: key,
+        ...refundAmountUpdate,
+      },
+    });
+
+    await logAdminAction(auth.userId, "record_refund", "booking", bookingId, null, {
+      refundSlipPath: key,
+      ...refundAmountUpdate,
+    });
+
+    // Notify renter.
+    const rawFinal = await db.booking.findUnique({
+      where: { id: bookingId },
+      select: { refundAmount: true },
+    });
+    notifyRefundIssued({
+      renterEmail: booking.renter?.email,
+      dressName: booking.items[0]?.product?.name ?? "ชุดที่จอง",
+      bookingId,
+      refundAmount: rawFinal?.refundAmount ?? null,
+    });
+
     revalidateBookingPaths(bookingId);
     return { ok: true };
   });
@@ -340,6 +490,7 @@ export async function adminForceStatus(
       data: {
         status: targetStatus as BookingStatus,
         ...(targetStatus === "waiting_for_payment" ? { currentDueAt: new Date(dueAt()) } : {}),
+        ...(targetStatus === "payment_review" ? { paymentReviewAt: new Date() } : {}),
       },
     });
 

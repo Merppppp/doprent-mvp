@@ -35,7 +35,7 @@ export default function LocaleToggle({
   const isInline = variant === "footer-inline";
   const isDark = variant === "dropdown" || variant === "footer" || isInline;
   const isTopBar = variant === "navbar-top";
-  const activeColor = isDark ? "var(--ink)" : "#fff";
+  const activeColor = isDark ? "var(--ink)" : "var(--on-dark)";
   const mutedColor = isDark ? "var(--ink-3)" : "rgba(255,255,255,0.4)";
   const dividerColor = isDark ? "var(--ink-3)" : "rgba(255,255,255,0.3)";
 

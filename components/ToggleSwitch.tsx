@@ -127,7 +127,7 @@ export default function ToggleSwitch({
             width: 20,
             height: 20,
             borderRadius: "50%",
-            background: "#fff",
+            background: "var(--on-dark)",
             boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
             transition: "left 0.2s ease",
           }}

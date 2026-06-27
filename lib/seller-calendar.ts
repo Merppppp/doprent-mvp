@@ -98,28 +98,49 @@ export async function getSellerCalendarData(): Promise<SellerCalendarData | null
   const windowEnd = new Date(now.getFullYear(), now.getMonth() + 7, 0);
 
   // ── 1. Active bookings ───────────────────────────────────────────────────
-  const rawBookings = await db.booking.findMany({
-    where: {
-      shopId: shop.id,
-      status: { in: ACTIVE_STATUSES },
-      // Overlap: booking overlaps window if startDate <= windowEnd AND endDate >= windowStart
-      startDate: { lte: windowEnd },
-      endDate: { gte: windowStart },
-    },
-    select: {
-      id: true,
-      productId: true,
-      variantId: true,
-      startDate: true,
-      endDate: true,
-      status: true,
-      recipientName: true,
-      product: { select: { name: true } },
-      renter: { select: { fullName: true } },
-      variant: { select: { size: true } },
-    },
-    orderBy: { startDate: "asc" },
-  });
+  const rawBookings = await db.bookingItem
+    .findMany({
+      where: {
+        booking: {
+          shopId: shop.id,
+          status: { in: ACTIVE_STATUSES },
+          // Overlap: booking overlaps window if startDate <= windowEnd AND endDate >= windowStart
+          startDate: { lte: windowEnd },
+          endDate: { gte: windowStart },
+        },
+      },
+      select: {
+        productId: true,
+        variantId: true,
+        booking: {
+          select: {
+            id: true,
+            startDate: true,
+            endDate: true,
+            status: true,
+            recipientName: true,
+            renter: { select: { fullName: true } },
+          },
+        },
+        product: { select: { name: true } },
+        variant: { select: { size: true } },
+      },
+      orderBy: { booking: { startDate: "asc" } },
+    })
+    .then((itemRows) =>
+      itemRows.map((it) => ({
+        id: it.booking.id,
+        productId: it.productId,
+        variantId: it.variantId,
+        startDate: it.booking.startDate,
+        endDate: it.booking.endDate,
+        status: it.booking.status,
+        recipientName: it.booking.recipientName,
+        renter: it.booking.renter,
+        product: it.product,
+        variant: it.variant,
+      })),
+    );
 
   // ── 2. All products (for filter dropdown + blackout join) ────────────────
   const rawProducts = await db.product.findMany({

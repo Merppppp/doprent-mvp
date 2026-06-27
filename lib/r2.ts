@@ -30,6 +30,11 @@ export const r2 = new S3Client({
     accessKeyId: (process.env.S3_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY_ID)!,
     secretAccessKey: (process.env.S3_SECRET_ACCESS_KEY || process.env.R2_SECRET_ACCESS_KEY)!,
   },
+  // Disable automatic checksum headers — MinIO rejects the
+  // `x-amz-checksum-mode=ENABLED` query param that AWS SDK v3 appends to
+  // presigned GetObject URLs (SignatureDoesNotMatch).
+  requestChecksumCalculation: "WHEN_REQUIRED",
+  responseChecksumValidation: "WHEN_REQUIRED",
 });
 
 export const R2_BUCKET = (process.env.S3_BUCKET || process.env.R2_BUCKET_NAME)!;
@@ -84,4 +89,26 @@ export async function getSignedPrivateUrl(key: string, expiresIn = 1800): Promis
     new GetObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: key }),
     { expiresIn }
   );
+}
+
+/** Delete a private object from the private bucket by key. */
+export async function deletePrivateFromR2(key: string): Promise<void> {
+  await r2.send(
+    new DeleteObjectCommand({
+      Bucket: R2_PRIVATE_BUCKET,
+      Key: key,
+    })
+  );
+}
+
+/**
+ * Return a URL the browser can use to load a private image.
+ *
+ * Instead of exposing a raw presigned S3 URL (which triggers ORB / CORS
+ * blocks when the S3 host differs from the page origin), we proxy through
+ * `/api/private-image?key=…`.  The proxy fetches from S3 server-side so
+ * the browser only ever talks to the same origin.
+ */
+export function privateImageUrl(key: string): string {
+  return `/api/private-image?key=${encodeURIComponent(key)}`;
 }

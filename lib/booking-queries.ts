@@ -1,16 +1,25 @@
 import { db, base } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import type { Address, BookingDetail, BookingStatus } from "@/lib/types";
+import type { Address, BookingDetail, BookingItemDetail, BookingStatus } from "@/lib/types";
 import { ymdUtc } from "@/lib/date-th";
-import { BOOKING_STATUS_META } from "@/lib/bookings";
+import { BOOKING_STATUS_META, PAYMENT_REVIEW_ESCALATE_OPEN_HOURS } from "@/lib/bookings";
+import { parseBusinessHours, defaultBusinessHours, paymentReviewEscalated } from "@/lib/hours";
+import { resolveEffectivePolicy, type EffectivePolicy } from "@/lib/booking-policy";
 
-/** Prisma include that hydrates the product + shop fields a BookingDetail needs. */
+/** Prisma include that hydrates the items[] + shop fields a BookingDetail needs. */
 const BOOKING_INCLUDE = {
-  product: {
+  items: {
+    orderBy: { createdAt: "asc" as const },
     select: {
-      name: true,
-      slug: true,
-      images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } },
+      id: true,
+      productId: true,
+      variantId: true,
+      unitId: true,
+      rentalTotal: true,
+      deposit: true,
+      product: { select: { name: true, slug: true, images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } } } },
+      variant: { select: { size: true, quantity: true } },
+      unit: { select: { code: true } },
     },
   },
   shop: { select: { name: true, slug: true, lineUrl: true, promptpayId: true, bankName: true, bankAccountNumber: true, bankAccountName: true, defaultPaymentMethod: true, instagram: true, facebook: true, twitter: true, tiktok: true } },
@@ -20,9 +29,10 @@ type PrismaBookingWithJoins = {
   id: string;
   renterId: string;
   shopId: string;
-  productId: string;
   startDate: Date;
   endDate: Date;
+  startTime: string | null;
+  endTime: string | null;
   rentalTotal: number;
   deposit: number;
   shippingFee: number | null;
@@ -32,11 +42,22 @@ type PrismaBookingWithJoins = {
   status: string;
   slipPath: string | null;
   paymentMethod: "promptpay" | "bank" | null;
+  deliveryMethod: string | null;
+  outboundMethod: string | null;
+  returnMethod: string | null;
+  deliveryCarrier: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  returnCarrier: string | null;
+  returnTrackingNumber: string | null;
+  returnTrackingUrl: string | null;
+  returnShippedAt: Date | null;
   addressId: string | null;
   recipientName: string | null;
   phone: string | null;
   addressText: string | null;
   currentDueAt: Date | null;
+  slipConfirmDueAt: Date | null;
   cancelReason: string | null;
   cancelFromStatus: string | null;
   disputeNote: string | null;
@@ -48,9 +69,37 @@ type PrismaBookingWithJoins = {
   addrChangeDiff: number | null;
   addrChangeSlipPath: string | null;
   addrChangeReason: string | null;
+  refundStatus: string | null;
+  refundAmount: number | null;
+  refundedAt: Date | null;
+  refundNote: string | null;
+  refundSlipPath: string | null;
+  returnCondition: string | null;
+  returnDamageNote: string | null;
+  deductionAmount: number | null;
+  idCardPath: string | null;
+  // deposit refund
+  refundBankName: string | null;
+  refundAccountNumber: string | null;
+  refundAccountName: string | null;
+  depositDecision: string | null;
+  depositDisputeNote: string | null;
+  refundSlipDueAt: Date | null;
+  refundVerifiedAt: Date | null;
+  nextAvailableDate: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  product?: { name: string | null; slug: string | null; images: Array<{ url: string }> } | null;
+  items: Array<{
+    id: string;
+    productId: string;
+    variantId: string | null;
+    unitId: string | null;
+    rentalTotal: number;
+    deposit: number;
+    product: { name: string | null; slug: string | null; images: Array<{ url: string }> } | null;
+    variant: { size: string; quantity: number } | null;
+    unit: { code: string } | null;
+  }>;
   shop?: {
     name: string | null;
     slug: string | null;
@@ -71,14 +120,29 @@ const ymd = ymdUtc;
 
 /** Map a Prisma booking (camelCase + joins) to the snake_case BookingDetail UI shape. */
 export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
-  const images = (b.product?.images ?? []).map((img) => img.url);
+  const first = b.items[0];
+  const mappedItems: BookingItemDetail[] = b.items.map((item) => ({
+    id: item.id,
+    product_id: item.productId,
+    product_name: item.product?.name ?? null,
+    product_slug: item.product?.slug ?? null,
+    product_image: item.product?.images?.[0]?.url ?? null,
+    variant_id: item.variantId ?? null,
+    size: item.variant?.size ?? null,
+    unit_id: item.unitId ?? null,
+    unit_code: item.unit?.code ?? null,
+    rental_total: item.rentalTotal,
+    deposit: item.deposit,
+  }));
   return {
     id: b.id,
     renter_id: b.renterId,
     boutique_id: b.shopId,
-    dress_id: b.productId,
+    dress_id: first?.productId ?? null,
     start_date: ymd(b.startDate),
     end_date: ymd(b.endDate),
+    start_time: b.startTime ?? null,
+    end_time: b.endTime ?? null,
     rental_total: b.rentalTotal,
     deposit: b.deposit,
     shipping_fee: b.shippingFee,
@@ -88,11 +152,22 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     status: b.status as BookingDetail["status"],
     slip_path: b.slipPath,
     payment_method: b.paymentMethod,
+    delivery_method: b.deliveryMethod ?? null,
+    outbound_method: b.outboundMethod ?? b.deliveryMethod ?? null,
+    return_method: b.returnMethod ?? b.deliveryMethod ?? null,
+    delivery_carrier: b.deliveryCarrier ?? null,
+    tracking_number: b.trackingNumber ?? null,
+    tracking_url: b.trackingUrl ?? null,
+    return_carrier: b.returnCarrier ?? null,
+    return_tracking_number: b.returnTrackingNumber ?? null,
+    return_tracking_url: b.returnTrackingUrl ?? null,
+    return_shipped_at: b.returnShippedAt ? b.returnShippedAt.toISOString() : null,
     address_id: b.addressId,
     recipient_name: b.recipientName,
     phone: b.phone,
     address_text: b.addressText,
     current_due_at: b.currentDueAt ? b.currentDueAt.toISOString() : null,
+    slip_confirm_due_at: b.slipConfirmDueAt ? b.slipConfirmDueAt.toISOString() : null,
     cancel_reason: b.cancelReason,
     cancel_from_status: b.cancelFromStatus,
     dispute_note: b.disputeNote,
@@ -104,11 +179,31 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     addr_change_diff: b.addrChangeDiff,
     addr_change_slip_path: b.addrChangeSlipPath,
     addr_change_reason: b.addrChangeReason,
+    refund_status: b.refundStatus ?? null,
+    refund_amount: b.refundAmount ?? null,
+    refunded_at: b.refundedAt ? b.refundedAt.toISOString() : null,
+    refund_note: b.refundNote ?? null,
+    refund_slip_path: b.refundSlipPath ?? null,
+    return_condition: b.returnCondition ?? null,
+    return_damage_note: b.returnDamageNote ?? null,
+    deduction_amount: b.deductionAmount ?? null,
+    id_card_path: b.idCardPath ?? null,
+    // deposit refund
+    refund_bank_name: b.refundBankName ?? null,
+    refund_account_number: b.refundAccountNumber ?? null,
+    refund_account_name: b.refundAccountName ?? null,
+    deposit_decision: b.depositDecision ?? null,
+    deposit_dispute_note: b.depositDisputeNote ?? null,
+    refund_slip_due_at: b.refundSlipDueAt ? b.refundSlipDueAt.toISOString() : null,
+    refund_verified_at: b.refundVerifiedAt ? b.refundVerifiedAt.toISOString() : null,
+    next_available_date: b.nextAvailableDate ? ymd(b.nextAvailableDate) : null,
     created_at: b.createdAt.toISOString(),
     updated_at: b.updatedAt.toISOString(),
-    dress_name: b.product?.name ?? null,
-    dress_slug: b.product?.slug ?? null,
-    dress_image: images[0] ?? null,
+    dress_name: first?.product?.name ?? null,
+    dress_slug: first?.product?.slug ?? null,
+    dress_image: first?.product?.images?.[0]?.url ?? null,
+    dress_size: first?.variant?.size ?? null,
+    dress_variant_qty: first?.variant?.quantity ?? null,
     boutique_name: b.shop?.name ?? null,
     boutique_slug: b.shop?.slug ?? null,
     boutique_line_url: b.shop?.lineUrl ?? null,
@@ -121,6 +216,7 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     boutique_facebook: b.shop?.facebook ?? null,
     boutique_twitter: b.shop?.twitter ?? null,
     boutique_tiktok: b.shop?.tiktok ?? null,
+    items: mappedItems,
   };
 }
 
@@ -137,6 +233,25 @@ export async function getMyAddresses(): Promise<Address[]> {
     recipient_name: a.recipientName,
     phone: a.phone,
     address_text: a.addressLine,
+    is_default: a.isDefault,
+    created_at: a.createdAt.toISOString(),
+  }));
+}
+
+export async function getMyBankAccounts(): Promise<import("@/lib/types").BankAccount[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+  const rows = await db.bankAccount.findMany({
+    where: { userId: user.id },
+    orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+  });
+  return rows.map((a) => ({
+    id: a.id,
+    user_id: a.userId,
+    label: a.label,
+    bank_name: a.bankName,
+    account_number: a.accountNumber,
+    account_name: a.accountName,
     is_default: a.isDefault,
     created_at: a.createdAt.toISOString(),
   }));
@@ -186,6 +301,7 @@ export type SellerBookingCard = {
   id: string;
   dress_name: string | null;
   dress_image: string | null;
+  dress_size: string | null;
   recipient_name: string | null;
   renter_id: string;
   start_date: string;
@@ -194,6 +310,11 @@ export type SellerBookingCard = {
   status: BookingStatus;
   source: string | null;
   created_at: string;
+  /** True when status is payment_review and ≥ PAYMENT_REVIEW_ESCALATE_OPEN_HOURS of
+   *  shop-open time have elapsed since the renter uploaded their slip. */
+  slip_review_urgent: boolean;
+  /** Phase 2: number of BookingItems (for "+N ชุด" display in future UI). */
+  item_count: number;
 };
 
 /**
@@ -226,7 +347,9 @@ export async function getSellerBookingsPage(
     where.createdAt = { gte: new Date(Date.now() - opts.sinceDays * 86400 * 1000) };
   }
 
-  const [total, rows] = await Promise.all([
+  // We need the shop's business hours once to compute the slip-review urgency flag.
+  // Fetch it alongside the rows (single extra query, not N+1).
+  const [total, rows, shopRow] = await Promise.all([
     db.booking.count({ where }),
     db.booking.findMany({
       where,
@@ -245,31 +368,52 @@ export async function getSellerBookingsPage(
         source: true,
         recipientName: true,
         createdAt: true,
-        product: {
+        paymentReviewAt: true,
+        items: {
+          orderBy: { createdAt: "asc" as const },
           select: {
-            name: true,
-            images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+            id: true,
+            product: {
+              select: {
+                name: true,
+                images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } },
+              },
+            },
+            variant: { select: { size: true } },
           },
         },
       },
     }),
+    db.shop.findUnique({ where: { id: shopId }, select: { hours: true } }),
   ]);
+
+  const businessHours = parseBusinessHours(shopRow?.hours ?? null) ?? defaultBusinessHours();
+  const now = new Date();
 
   return {
     total,
-    rows: rows.map((b) => ({
-      id: b.id,
-      dress_name: b.product?.name ?? null,
-      dress_image: b.product?.images[0]?.url ?? null,
-      recipient_name: b.recipientName,
-      renter_id: b.renterId,
-      start_date: ymd(b.startDate),
-      end_date: ymd(b.endDate),
-      amount_due: b.rentalTotal + b.deposit + (b.shippingFee ?? 0),
-      status: b.status as BookingStatus,
-      source: b.source,
-      created_at: b.createdAt.toISOString(),
-    })),
+    rows: rows.map((b) => {
+      const first = b.items[0];
+      return {
+        id: b.id,
+        dress_name: first?.product?.name ?? null,
+        dress_image: first?.product?.images[0]?.url ?? null,
+        dress_size: first?.variant?.size ?? null,
+        recipient_name: b.recipientName,
+        renter_id: b.renterId,
+        start_date: ymd(b.startDate),
+        end_date: ymd(b.endDate),
+        amount_due: b.rentalTotal + b.deposit + (b.shippingFee ?? 0),
+        status: b.status as BookingStatus,
+        source: b.source,
+        created_at: b.createdAt.toISOString(),
+        slip_review_urgent:
+          b.status === "payment_review"
+            ? paymentReviewEscalated(b.paymentReviewAt, businessHours, PAYMENT_REVIEW_ESCALATE_OPEN_HOURS, now)
+            : false,
+        item_count: b.items.length,
+      };
+    }),
   };
 }
 
@@ -283,11 +427,18 @@ export async function getBookingForView(id: string): Promise<BookingDetail | nul
   const b = await db.booking.findUnique({
     where: { id },
     include: {
-      product: {
+      items: {
+        orderBy: { createdAt: "asc" as const },
         select: {
-          name: true,
-          slug: true,
-          images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } },
+          id: true,
+          productId: true,
+          variantId: true,
+          unitId: true,
+          rentalTotal: true,
+          deposit: true,
+          product: { select: { name: true, slug: true, images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } } } },
+          variant: { select: { size: true, quantity: true } },
+          unit: { select: { code: true } },
         },
       },
       shop: {
@@ -300,6 +451,47 @@ export async function getBookingForView(id: string): Promise<BookingDetail | nul
   const isSeller = b.shop?.ownerId === user.id;
   if (!isRenter && !isSeller && user.role !== "admin") return null;
   return toBookingDetail(b as unknown as PrismaBookingWithJoins);
+}
+
+/**
+ * The effective booking policy (shop base + first product's override) that
+ * governs a booking — used to compute shipping/transit windows for display.
+ * Returns null when the booking or its shop is missing.
+ */
+export async function getBookingEffectivePolicy(bookingId: string): Promise<EffectivePolicy | null> {
+  const b = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      shopId: true,
+      items: { take: 1, orderBy: { createdAt: "asc" as const }, select: { productId: true } },
+    },
+  });
+  if (!b) return null;
+  const shop = await db.shop.findUnique({
+    where: { id: b.shopId },
+    select: {
+      leadTimeDays: true, minRentalDays: true, maxRentalDays: true, returnWindowDays: true,
+      bufferDaysAfter: true, bufferDaysBefore: true, cleaningDays: true, closedWeekdays: true,
+    },
+  });
+  if (!shop) return null;
+  const productId = b.items[0]?.productId;
+  const product = productId
+    ? await db.product.findUnique({
+        where: { id: productId },
+        select: {
+          policyOverride: true, leadTimeDays: true, minRentalDays: true, maxRentalDays: true,
+          returnWindowDays: true, bufferDaysAfter: true, bufferDaysBefore: true, cleaningDays: true,
+        },
+      })
+    : null;
+  return resolveEffectivePolicy(
+    shop,
+    product ?? {
+      policyOverride: false, leadTimeDays: null, minRentalDays: null, maxRentalDays: null,
+      returnWindowDays: null, bufferDaysAfter: null, bufferDaysBefore: null, cleaningDays: null,
+    },
+  );
 }
 
 /** Counts for the nav notification badges:
@@ -365,6 +557,7 @@ export type RenterBookingCard = {
   id: string;
   dress_name: string | null;
   dress_image: string | null;
+  dress_size: string | null;
   dress_slug: string | null;
   shop_name: string | null;
   shop_slug: string | null;
@@ -376,6 +569,10 @@ export type RenterBookingCard = {
   shipping_fee: number | null;
   status: BookingStatus;
   created_at: string;
+  /** Payment deadline (ISO) — drives the waiting_for_payment countdown. */
+  current_due_at: string | null;
+  /** Phase 2: number of BookingItems (for "+N ชุด" display in future UI). */
+  item_count: number;
 };
 
 export async function getRenterBookingsPage(
@@ -397,7 +594,7 @@ export async function getRenterBookingsPage(
   if (opts.search && opts.search.trim()) {
     const q = opts.search.trim();
     where.OR = [
-      { product: { name: { contains: q, mode: "insensitive" } } },
+      { items: { some: { product: { name: { contains: q, mode: "insensitive" } } } } },
       { shop: { name: { contains: q, mode: "insensitive" } } },
     ];
   }
@@ -418,11 +615,19 @@ export async function getRenterBookingsPage(
         shippingFee: true,
         status: true,
         createdAt: true,
-        product: {
+        currentDueAt: true,
+        items: {
+          orderBy: { createdAt: "asc" as const },
           select: {
-            name: true,
-            slug: true,
-            images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+            id: true,
+            product: {
+              select: {
+                name: true,
+                slug: true,
+                images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { url: true } },
+              },
+            },
+            variant: { select: { size: true } },
           },
         },
         shop: {
@@ -434,22 +639,28 @@ export async function getRenterBookingsPage(
 
   return {
     total,
-    rows: rows.map((b) => ({
-      id: b.id,
-      dress_name: b.product?.name ?? null,
-      dress_image: b.product?.images[0]?.url ?? null,
-      dress_slug: b.product?.slug ?? null,
-      shop_name: b.shop?.name ?? null,
-      shop_slug: b.shop?.slug ?? null,
-      shop_line_url: b.shop?.lineUrl ?? null,
-      start_date: ymd(b.startDate),
-      end_date: ymd(b.endDate),
-      rental_total: b.rentalTotal,
-      deposit: b.deposit,
-      shipping_fee: b.shippingFee,
-      status: b.status as BookingStatus,
-      created_at: b.createdAt.toISOString(),
-    })),
+    rows: rows.map((b) => {
+      const first = b.items[0];
+      return {
+        id: b.id,
+        dress_name: first?.product?.name ?? null,
+        dress_image: first?.product?.images[0]?.url ?? null,
+        dress_size: first?.variant?.size ?? null,
+        dress_slug: first?.product?.slug ?? null,
+        shop_name: b.shop?.name ?? null,
+        shop_slug: b.shop?.slug ?? null,
+        shop_line_url: b.shop?.lineUrl ?? null,
+        start_date: ymd(b.startDate),
+        end_date: ymd(b.endDate),
+        rental_total: b.rentalTotal,
+        deposit: b.deposit,
+        shipping_fee: b.shippingFee,
+        status: b.status as BookingStatus,
+        created_at: b.createdAt.toISOString(),
+        current_due_at: b.currentDueAt ? b.currentDueAt.toISOString() : null,
+        item_count: b.items.length,
+      };
+    }),
   };
 }
 
@@ -481,32 +692,89 @@ export type BookingEvent = {
   status: string;
   label: string;
   at: string;
+  note?: string | null;
 };
 
 export async function getBookingTimeline(bookingId: string): Promise<BookingEvent[]> {
-  const logs = await base.auditLog.findMany({
-    where: { entityType: "Booking", entityId: bookingId, action: "UPDATE" },
-    orderBy: { createdAt: "asc" },
-    select: { before: true, after: true, createdAt: true },
-  });
+  // Fetch both formats:
+  // 1) New format: entityId = bookingId (single-entity updateMany after db.ts fix)
+  // 2) Old format: entityId = null, bulk updateMany with where.id in after payload
+  const [logs, booking] = await Promise.all([
+    base.auditLog.findMany({
+      where: {
+        entityType: "Booking",
+        action: "UPDATE",
+        OR: [
+          { entityId: bookingId },
+          { entityId: null },
+        ],
+      },
+      orderBy: { createdAt: "asc" },
+      select: { entityId: true, before: true, after: true, createdAt: true },
+    }),
+    db.booking.findUnique({
+      where: { id: bookingId },
+      select: { returnShippedAt: true },
+    }),
+  ]);
 
   const events: BookingEvent[] = [];
 
   for (const log of logs) {
-    const before = log.before as Record<string, unknown> | null;
     const after = log.after as Record<string, unknown> | null;
     if (!after) continue;
 
-    const oldStatus = before?.status as string | undefined;
-    const newStatus = after.status as string | undefined;
+    let oldStatus: string | undefined;
+    let newStatus: string | undefined;
+    let cancelReason: string | undefined;
+
+    if (log.entityId === bookingId) {
+      // New format: direct before/after with status field
+      const before = log.before as Record<string, unknown> | null;
+      oldStatus = before?.status as string | undefined;
+      newStatus = after.status as string | undefined;
+      cancelReason = after.cancelReason as string | undefined;
+    } else if (after.bulk === "updateMany") {
+      // Old format: { bulk, count, where: { id, status, ... }, data: { status, ... } }
+      const where = after.where as Record<string, unknown> | undefined;
+      const data = after.data as Record<string, unknown> | undefined;
+      if (!where || !data) continue;
+      if (where.id !== bookingId) continue;
+      oldStatus = where.status as string | undefined;
+      newStatus = data.status as string | undefined;
+      cancelReason = data.cancelReason as string | undefined;
+    } else {
+      continue;
+    }
+
     if (!newStatus || newStatus === oldStatus) continue;
 
     const meta = BOOKING_STATUS_META[newStatus as BookingStatus];
+    const note = newStatus === "slip_disputed" ? (cancelReason ?? null) : null;
     events.push({
       status: newStatus,
       label: meta?.label ?? newStatus,
       at: log.createdAt.toISOString(),
+      note,
     });
+  }
+
+  // Inject "ลูกค้าส่งคืนสินค้า" event from returnShippedAt (not a status change,
+  // so it doesn't appear in the audit log — add it chronologically).
+  if (booking?.returnShippedAt) {
+    const returnShippedIso = booking.returnShippedAt.toISOString();
+    const evt: BookingEvent = {
+      status: "return_shipped",
+      label: "ลูกค้าส่งคืนสินค้า",
+      at: returnShippedIso,
+    };
+    // Insert in chronological order
+    const idx = events.findIndex((e) => e.at > returnShippedIso);
+    if (idx === -1) {
+      events.push(evt);
+    } else {
+      events.splice(idx, 0, evt);
+    }
   }
 
   return events;

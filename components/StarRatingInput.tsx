@@ -27,7 +27,7 @@ export default function StarRatingInput({ name = "rating", defaultValue = 0, onC
             cursor: "pointer",
             padding: 0,
             fontSize: 28,
-            color: s <= (hover || value) ? "#F5A623" : "var(--line)",
+            color: s <= (hover || value) ? "var(--gold)" : "var(--line)",
             lineHeight: 1,
           }}
         >

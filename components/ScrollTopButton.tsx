@@ -19,7 +19,7 @@ export default function ScrollTopButton({ threshold = 600 }: { threshold?: numbe
       type="button"
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       aria-label="กลับขึ้นด้านบน"
-      className="fixed bottom-6 right-6 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full bg-ink text-cream shadow-lg transition hover:bg-ink/90 md:bottom-8 md:right-8"
+      className="fixed bottom-6 right-6 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full bg-ink text-cream shadow-lg transition hover:bg-[oklch(0.32_0.014_85)] md:bottom-8 md:right-8"
     >
       <svg
         viewBox="0 0 24 24"

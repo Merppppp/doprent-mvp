@@ -74,6 +74,19 @@ export default function RouteProgress() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, searchParams]);
 
+  // Listen for manual progress triggers from server actions / buttons.
+  useEffect(() => {
+    const onStart = () => start();
+    const onDone = () => done();
+    window.addEventListener("progress:start", onStart);
+    window.addEventListener("progress:done", onDone);
+    return () => {
+      window.removeEventListener("progress:start", onStart);
+      window.removeEventListener("progress:done", onDone);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Wire up navigation start signals once.
   useEffect(() => {
     function sameDestination(url: URL): boolean {

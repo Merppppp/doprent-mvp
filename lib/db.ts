@@ -221,15 +221,29 @@ function createExtendedDb() {
           created: false,
           updated: true,
         });
+        // When the where clause targets a single entity by id, read the
+        // before-image so the audit row carries entityId + full before/after —
+        // this is critical for timeline queries that filter by entityId.
+        const where = (args as any).where ?? {};
+        const singleId = typeof where.id === "string" ? where.id : null;
+        const before = singleId ? await readBefore(model, { id: singleId }) : null;
         const result = await query(args);
-        // ONE audit row, entityId null, filter + payload in `after` — no
-        // before-images (would be N+1). Documented trade-off.
-        await writeAudit(model, "UPDATE", null, actorId, null, {
-          bulk: "updateMany",
-          count: (result as any)?.count,
-          where: (args as any).where ?? null,
-          data: (args as any).data,
-        });
+        if (singleId && (result as any)?.count === 1) {
+          // Single-entity updateMany: write a proper audit row with entityId +
+          // a merged after-image (before-image patched with the data fields).
+          const after = before
+            ? { ...(before as Record<string, unknown>), ...((args as any).data ?? {}) }
+            : (args as any).data;
+          await writeAudit(model, "UPDATE", singleId, actorId, before, after);
+        } else {
+          // True bulk: one audit row, entityId null (documented trade-off).
+          await writeAudit(model, "UPDATE", null, actorId, null, {
+            bulk: "updateMany",
+            count: (result as any)?.count,
+            where,
+            data: (args as any).data,
+          });
+        }
         return result;
       },
 

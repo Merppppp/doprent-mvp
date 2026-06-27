@@ -45,7 +45,7 @@ export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn
                 gap: 4,
                 background: "rgba(0,0,0,0.55)",
                 backdropFilter: "blur(6px)",
-                color: "#fff",
+                color: "var(--on-dark)",
                 fontSize: 10,
                 fontWeight: 600,
                 padding: "3px 7px",
@@ -58,7 +58,7 @@ export default function ProductCard({ product, variant = 0, savedSet, isLoggedIn
                   width: 6,
                   height: 6,
                   borderRadius: "50%",
-                  background: "#06c755",
+                  background: "var(--success)",
                   flexShrink: 0,
                 }}
               />

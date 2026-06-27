@@ -45,21 +45,26 @@ export async function listPendingTagRequests() {
 }
 
 /** Recently reviewed tag requests (approved/rejected, last 50) */
-export async function listReviewedTagRequests() {
-  return db.tagRequest.findMany({
-    where: { status: { in: ["approved", "rejected"] } },
-    orderBy: { reviewedAt: "desc" },
-    take: 50,
-    select: {
-      id: true,
-      requestedLabel: true,
-      requestedKey: true,
-      status: true,
-      reviewNotes: true,
-      reviewedAt: true,
-      createdAt: true,
-      tagGroup: { select: { id: true, label: true, key: true } },
-      shop: { select: { id: true, name: true, slug: true } },
-    },
-  });
+export async function listReviewedTagRequests(skip = 0, take = 20) {
+  const [rows, total] = await Promise.all([
+    db.tagRequest.findMany({
+      where: { status: { in: ["approved", "rejected"] } },
+      orderBy: { reviewedAt: "desc" },
+      skip,
+      take,
+      select: {
+        id: true,
+        requestedLabel: true,
+        requestedKey: true,
+        status: true,
+        reviewNotes: true,
+        reviewedAt: true,
+        createdAt: true,
+        tagGroup: { select: { id: true, label: true, key: true } },
+        shop: { select: { id: true, name: true, slug: true } },
+      },
+    }),
+    db.tagRequest.count({ where: { status: { in: ["approved", "rejected"] } } }),
+  ]);
+  return { rows, total };
 }

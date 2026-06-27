@@ -9,6 +9,7 @@ import PageViewTracker from "@/components/PageViewTracker";
 import ClarityAnalytics from "@/components/ClarityAnalytics";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 import LocationProvider from "@/components/LocationProvider";
+import ConfirmProvider from "@/components/ConfirmProvider";
 import "./globals.css";
 
 // Self-hosted fonts via next/font (downloaded at build time, served from our own
@@ -114,6 +115,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Suspense fallback={null}>
           <RouteProgress />
         </Suspense>
+        <ConfirmProvider>
         <LocationProvider>
           <Header />
           <div id="main" className="flex-1 overflow-y-auto">
@@ -125,6 +127,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ClarityAnalytics />
           <GoogleAnalytics />
         </LocationProvider>
+        </ConfirmProvider>
       </body>
     </html>
   );

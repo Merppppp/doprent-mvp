@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { listBlackouts } from "@/lib/products";
+import { ACTIVE_STATUSES, BOOKING_STATUS_META } from "@/lib/bookings";
 import AvailabilityCalendar from "@/components/AvailabilityCalendar";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,10 @@ export default async function ProductCalendarPage({ params }: { params: { id: st
         variants: {
           where: { available: true },
           orderBy: { size: "asc" },
-          select: { id: true, size: true },
+          select: {
+            id: true, size: true, quantity: true,
+            units: { orderBy: { code: "asc" }, select: { id: true, code: true, status: true } },
+          },
         },
       },
     }),
@@ -43,6 +47,97 @@ export default async function ProductCalendarPage({ params }: { params: { id: st
   if (!productRaw || productRaw.shopId !== shopRaw.id) notFound();
 
   const allBlackouts = await listBlackouts(productRaw.id, "all");
+
+  // Real customer bookings that hold this product's inventory, over a 13-month
+  // window (current month back-edge → +12 months) so the calendar overlay covers
+  // anything a seller can realistically navigate to.
+  const windowStart = new Date();
+  windowStart.setUTCDate(1);
+  windowStart.setUTCHours(0, 0, 0, 0);
+  const windowEnd = new Date(windowStart);
+  windowEnd.setUTCFullYear(windowEnd.getUTCFullYear() + 1);
+
+  const bookings = await db.bookingItem
+    .findMany({
+      where: {
+        productId: productRaw.id,
+        variantId: { not: null },
+        booking: {
+          status: { in: ACTIVE_STATUSES },
+          startDate: { lte: windowEnd },
+          endDate: { gte: windowStart },
+        },
+      },
+      orderBy: { booking: { startDate: "asc" } },
+      select: {
+        variantId: true,
+        unit: { select: { code: true } },
+        booking: {
+          select: {
+            startDate: true,
+            endDate: true,
+            status: true,
+            recipientName: true,
+          },
+        },
+      },
+    })
+    .then((itemRows) =>
+      itemRows.map((it) => ({
+        variantId: it.variantId,
+        startDate: it.booking.startDate,
+        endDate: it.booking.endDate,
+        status: it.booking.status,
+        recipientName: it.booking.recipientName,
+        unit: it.unit,
+      })),
+    );
+
+  const ymd = (d: Date) => d.toISOString().slice(0, 10);
+
+  // variantId → { "YYYY-MM-DD": bookedCount } for the at-a-glance day chips. A
+  // booking occupies every day in its inclusive [startDate, endDate] span.
+  const bookedByVariant: Record<string, Record<string, number>> = {};
+  // variantId → list of individual bookings (with assigned unit code) so the
+  // popup can show exactly which physical unit is out and to whom.
+  const bookingsByVariant: Record<
+    string,
+    Array<{ start: string; end: string; code: string | null; statusLabel: string; tone: string; name: string | null }>
+  > = {};
+
+  for (const b of bookings) {
+    if (!b.variantId) continue;
+    const map = (bookedByVariant[b.variantId] ??= {});
+    const cur = new Date(b.startDate);
+    const last = new Date(b.endDate);
+    while (cur <= last) {
+      const key = ymd(cur);
+      map[key] = (map[key] ?? 0) + 1;
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    const meta = BOOKING_STATUS_META[b.status];
+    (bookingsByVariant[b.variantId] ??= []).push({
+      start: ymd(b.startDate),
+      end: ymd(b.endDate),
+      code: b.unit?.code ?? null,
+      statusLabel: meta?.label ?? b.status,
+      tone: meta?.tone ?? "neutral",
+      name: b.recipientName,
+    });
+  }
+
+  // variantId → every physical unit (code + status). The popup uses this to show
+  // exactly which unit codes are free vs booked on a given day. repair/retired
+  // units are listed too but don't count toward rentable capacity.
+  const unitsByVariant: Record<string, Array<{ id: string; code: string; status: string }>> = {};
+  // Capacity = real rentable unit count (available + rented), not the loosely-kept
+  // `quantity` field, so the calendar reflects actual on-hand inventory.
+  const capacityByVariant: Record<string, number> = {};
+  for (const v of productRaw.variants) {
+    unitsByVariant[v.id] = v.units.map((u) => ({ id: u.id, code: u.code, status: u.status }));
+    const rentable = v.units.filter((u) => u.status === "available" || u.status === "rented").length;
+    capacityByVariant[v.id] = rentable > 0 ? rentable : v.quantity;
+  }
 
   const variants = productRaw.variants.map((v) => ({
     id: v.id,
@@ -57,8 +152,15 @@ export default async function ProductCalendarPage({ params }: { params: { id: st
   const variantBlackouts: Record<string, string[]> = {};
   for (const v of variants) {
     variantBlackouts[v.id] = allBlackouts
-      .filter((b) => b.variantId === v.id)
+      .filter((b) => b.variantId === v.id && b.unitId === null)
       .map((b) => b.date);
+  }
+
+  // unitId → blocked dates: per-code closures (variantId set + unitId set).
+  const unitBlackouts: Record<string, string[]> = {};
+  for (const b of allBlackouts) {
+    if (b.unitId === null) continue;
+    (unitBlackouts[b.unitId] ??= []).push(b.date);
   }
 
   return (
@@ -76,11 +178,18 @@ export default async function ProductCalendarPage({ params }: { params: { id: st
           variants={variants}
           initialProductBlackouts={productWideBlackouts}
           initialVariantBlackouts={variantBlackouts}
+          bookedByVariant={bookedByVariant}
+          capacityByVariant={capacityByVariant}
+          bookingsByVariant={bookingsByVariant}
+          unitsByVariant={unitsByVariant}
+          initialUnitBlackouts={unitBlackouts}
         />
       </div>
       <div style={{ marginTop: 20, fontSize: 13, color: "var(--ink-3)", lineHeight: 1.6 }}>
         <b>ทุกไซซ์</b> = ปิดทั้งสินค้า (ลูกค้าเลือกไซซ์ไหนก็จองวันนี้ไม่ได้)<br />
-        <b>ไซซ์เฉพาะ</b> = ปิดเฉพาะไซซ์นั้น (ไซซ์อื่นยังจองได้)
+        <b>ไซซ์เฉพาะ</b> = ปิดเฉพาะไซซ์นั้น (ไซซ์อื่นยังจองได้)<br />
+        <b>ป้ายไซซ์บนวัน</b> = ไซซ์ที่ <b>ลูกค้าจองจริง</b> วันนั้น (แดง = ไซซ์นั้นเต็ม)<br />
+        <b>แท็บไซซ์ด้านบน</b> = เลือกดูทีละไซซ์ จะเห็น <b>จำนวนคงเหลือรายวัน</b> ของไซซ์นั้น · กดที่วันเพื่อดูรหัสตัว/สถานะ/ชื่อลูกค้า
       </div>
     </div>
   );

@@ -99,6 +99,7 @@ export type BookingStatus =
   | "payment_review"
   | "confirmed"
   | "renting"
+  | "awaiting_return"
   | "cancel_requested"
   | "slip_disputed"
   | "rejected"
@@ -107,7 +108,13 @@ export type BookingStatus =
   /** ผู้เช่าคืนชุดแล้ว รอร้านตรวจรับ — ระยะกลางของการปิดรายการ */
   | "returned"
   /** ร้านตรวจรับชุดเรียบร้อย ปิดรายการเช่าสมบูรณ์ — terminal สุดท้าย */
-  | "completed";
+  | "completed"
+  /** ลูกค้าไม่ส่งคืนชุด — ลูกค้ายังโต้แย้งได้ */
+  | "not_returned"
+  /** ผู้เช่าโต้แย้งกรณีไม่คืนของ — รอแอดมินตัดสิน */
+  | "return_disputed"
+  /** ผู้เช่าโต้แย้งการตัดสินมัดจำ — รอแอดมินตัดสิน */
+  | "deposit_disputed";
 
 /**
  * Public Occasion shape — mapper-output type (rev 3: assembled from the tag
@@ -310,6 +317,17 @@ export type Address = {
   created_at: string;
 };
 
+export type BankAccount = {
+  id: string;
+  user_id: string;
+  label: string;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  is_default: boolean;
+  created_at: string;
+};
+
 export type Booking = {
   id: string;
   renter_id: string;
@@ -317,6 +335,8 @@ export type Booking = {
   dress_id: string;
   start_date: string; // YYYY-MM-DD
   end_date: string; // YYYY-MM-DD
+  start_time: string | null; // "HH:MM"; null = full day
+  end_time: string | null; // "HH:MM"; null = full day
   rental_total: number;
   deposit: number;
   shipping_fee: number | null; // null until seller sets on accept
@@ -329,11 +349,33 @@ export type Booking = {
   slip_path: string | null;
   /** Channel the shop chose to collect through (snapshot at accept). */
   payment_method: "promptpay" | "bank" | null;
+  /** Delivery method the renter picked at checkout ("standard" | "express"). Mirrors outbound_method. */
+  delivery_method: string | null;
+  /** Outbound shipping (shop→customer) — drives before-rental buffer. */
+  outbound_method: string | null;
+  /** Return shipping (customer→shop) — drives after-rental buffer. */
+  return_method: string | null;
+  /** Carrier the shop handed a standard parcel to (set when shipping). */
+  delivery_carrier: string | null;
+  /** Parcel tracking number the shop entered when shipping. */
+  tracking_number: string | null;
+  /** Tracking URL the shop entered when shipping. */
+  tracking_url: string | null;
+  /** Return carrier the renter used when shipping back. */
+  return_carrier: string | null;
+  /** Return parcel tracking number. */
+  return_tracking_number: string | null;
+  /** Return tracking URL. */
+  return_tracking_url: string | null;
+  /** When the renter submitted return tracking (ISO string). Null = not yet shipped back. */
+  return_shipped_at: string | null;
   address_id: string | null;
   recipient_name: string | null; // snapshot at booking time
   phone: string | null;
   address_text: string | null;
   current_due_at: string | null;
+  /** When the slip will be auto-confirmed if seller doesn't review (ISO string). */
+  slip_confirm_due_at: string | null;
   cancel_reason: string | null;
   cancel_from_status: string | null;
   dispute_note: string | null;
@@ -352,8 +394,38 @@ export type Booking = {
   addr_change_slip_path: string | null;
   /** Shop's reason when an address-change request is rejected. */
   addr_change_reason: string | null;
+  // -- Deposit refund --
+  /** Renter's bank account snapshot for deposit refund. */
+  refund_bank_name: string | null;
+  refund_account_number: string | null;
+  refund_account_name: string | null;
+  /** Seller's deposit decision: "full_refund" / "partial_refund" / "forfeit". */
+  deposit_decision: string | null;
+  /** Renter's reason for disputing the deposit decision. */
+  deposit_dispute_note: string | null;
+  /** Deadline for renter to verify the refund slip (ISO string, 24h). */
+  refund_slip_due_at: string | null;
+  /** When the renter confirmed receipt of the refund (ISO string). */
+  refund_verified_at: string | null;
+  /** วันที่สินค้าพร้อมเช่าใหม่ (ร้านกำหนดตอนรับคืน) */
+  next_available_date: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/** One item row from BookingItem — sourced from booking.items[] in Phase 2. */
+export type BookingItemDetail = {
+  id: string;
+  product_id: string;
+  product_name: string | null;
+  product_slug: string | null;
+  product_image: string | null;
+  variant_id: string | null;
+  size: string | null;
+  unit_id: string | null;
+  unit_code: string | null;
+  rental_total: number;
+  deposit: number;
 };
 
 /** Booking joined with dress + boutique for list/detail rendering. */
@@ -361,6 +433,10 @@ export type BookingDetail = Booking & {
   dress_name: string | null;
   dress_slug: string | null;
   dress_image: string | null;
+  /** Size of the booked variant (e.g. "M"). Null for legacy bookings with no variantId. */
+  dress_size: string | null;
+  /** Total stock of the booked variant. Null for legacy bookings. */
+  dress_variant_qty: number | null;
   boutique_name: string | null;
   boutique_slug: string | null;
   boutique_line_url: string | null;
@@ -374,6 +450,22 @@ export type BookingDetail = Booking & {
   boutique_facebook: string | null;
   boutique_twitter: string | null;
   boutique_tiktok: string | null;
+  /** Refund tracking — populated from the booking's refund_* columns. */
+  refund_status: string | null;
+  refund_amount: number | null;
+  refunded_at: string | null;
+  refund_note: string | null;
+  refund_slip_path: string | null;
+  /** สภาพชุดตอนรับคืน: "complete" | "damaged" | "not_returned". Null = ยังไม่ได้รับคืน. */
+  return_condition: string | null;
+  /** รายละเอียดความเสียหายที่ร้านระบุ (เมื่อ return_condition = "damaged"). */
+  return_damage_note: string | null;
+  /** จำนวนมัดจำที่หัก (บาท) — ร้านกรอกตอน damaged. */
+  deduction_amount: number | null;
+  /** Private R2 key ของภาพบัตรประชาชนที่ใช้ในการจองนี้ (null = ไม่ได้แนบ). */
+  id_card_path: string | null;
+  /** Phase 2: item rows sourced from BookingItem child table. */
+  items: BookingItemDetail[];
 };
 
 export type Profile = {

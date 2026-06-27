@@ -149,7 +149,7 @@ export default function UserMenu({
             {isAdmin ? (
               <span
                 style={{
-                  background: "var(--info)",
+                  background: "var(--accent)",
                   color: "var(--on-dark)",
                   fontSize: 10,
                   padding: "2px 6px",
@@ -234,7 +234,7 @@ export default function UserMenu({
                 padding: "8px 16px 4px",
                 fontSize: 11,
                 fontWeight: 600,
-                color: "var(--info)",
+                color: "var(--accent)",
                 letterSpacing: "0.04em",
                 textTransform: "uppercase",
               }}
@@ -243,7 +243,7 @@ export default function UserMenu({
             </div>
             <Link
               href="/admin"
-              style={{ ...menuItemStyle, color: "var(--info)", fontWeight: 500 }}
+              style={{ ...menuItemStyle, color: "var(--accent)", fontWeight: 500 }}
             >
               Admin Dashboard
             </Link>

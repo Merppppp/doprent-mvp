@@ -274,7 +274,7 @@ export default function BrowseFilters(props: BrowseFiltersProps) {
                 width: 18,
                 height: 18,
                 borderRadius: 999,
-                background: "#fff",
+                background: "var(--on-dark)",
                 boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
                 transition: "left 0.2s",
               }}

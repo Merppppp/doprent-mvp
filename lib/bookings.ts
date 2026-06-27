@@ -1,9 +1,33 @@
 import type { Booking, BookingStatus } from "@/lib/types";
 
-/** Hours a renter has to pay after the seller accepts. Enforced lazily by
- *  expireOverdueBookings() (lib/booking-expiry.ts) on the booking list pages
- *  and via POST /api/cron/expire-payments for scheduled sweeps. */
-export const PAYMENT_WINDOW_HOURS = 24;
+/** Hours a renter has to pay (deposit + shipping) after the seller accepts.
+ *  Past this window the booking forfeits its hold and the reserved unit is
+ *  released back to stock. Enforced lazily by expireOverdueBookings()
+ *  (lib/booking-expiry.ts) on the booking list pages and via
+ *  POST /api/cron/expire-payments for scheduled sweeps. */
+export const PAYMENT_WINDOW_HOURS = 3;
+
+/** Payment window for same-day bookings where the shop is currently open.
+ *  Shorter because both parties agreed to expedited processing. */
+export const PAYMENT_WINDOW_HOURS_SAMEDAY = 1;
+
+/** Days a booking may sit in `returned` (seller received the dress back, deposit
+ *  not yet settled) before the system auto-closes it to `completed`. A safety
+ *  net so deposits/records don't sit in limbo if the seller forgets to close.
+ *  Overridable via env. Enforced by expireOverdueBookings() (lib/booking-expiry.ts). */
+export const AUTO_COMPLETE_AFTER_RETURN_DAYS = (() => {
+  const raw = Number(process.env.AUTO_COMPLETE_AFTER_RETURN_DAYS);
+  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : 7;
+})();
+
+/** Hours of shop-OPEN time that may elapse after a renter uploads their payment
+ *  slip (booking enters `payment_review`) before the seller sees a red "ด่วน"
+ *  escalation badge. Counts only hours the shop is actually open per its configured
+ *  weekly schedule — the timer pauses while the shop is closed. Overridable via env. */
+export const PAYMENT_REVIEW_ESCALATE_OPEN_HOURS = (() => {
+  const raw = Number(process.env.PAYMENT_REVIEW_ESCALATE_OPEN_HOURS);
+  return Number.isFinite(raw) && raw >= 0 ? raw : 4;
+})();
 
 /**
  * Platform commission rate applied to rental_total. Overridable via env so the
@@ -61,12 +85,19 @@ export const BOOKING_STATUS_META: Record<
     renterHint: "คุณกำลังเช่าชุดอยู่ ส่งคืนตามกำหนด",
     sellerHint: "ลูกค้ากำลังเช่าชุดอยู่ รอรับคืนเมื่อครบกำหนด",
   },
-  cancel_requested: {
-    label: "ร้านขอยกเลิก (รอแอดมิน)",
+  awaiting_return: {
+    label: "รอคืนของ",
     tone: "warn",
     terminal: false,
-    renterHint: "ร้านขอยกเลิก แอดมินกำลังตรวจสอบ",
-    sellerHint: "ส่งคำขอยกเลิกให้แอดมินแล้ว",
+    renterHint: "ครบกำหนดเช่าแล้ว กรุณาส่งชุดคืนร้าน",
+    sellerHint: "ครบกำหนดเช่าแล้ว รอรับชุดคืนจากลูกค้า เมื่อได้รับแล้วกดยืนยัน",
+  },
+  cancel_requested: {
+    label: "รอแอดมินอนุมัติยกเลิก",
+    tone: "warn",
+    terminal: false,
+    renterHint: "ส่งคำขอยกเลิกแล้ว รอแอดมินอนุมัติ",
+    sellerHint: "ส่งคำขอยกเลิกแล้ว รอแอดมินอนุมัติ",
   },
   slip_disputed: {
     label: "สลิปมีปัญหา",
@@ -110,6 +141,27 @@ export const BOOKING_STATUS_META: Record<
     renterHint: "การเช่าชุดเสร็จสมบูรณ์ ขอบคุณที่ใช้บริการ",
     sellerHint: "ปิดรายการเช่าเรียบร้อย",
   },
+  not_returned: {
+    label: "ไม่ส่งคืนชุด",
+    tone: "danger",
+    terminal: false,
+    renterHint: "ร้านแจ้งว่ายังไม่ได้รับชุดคืน — คุณสามารถโต้แย้งได้ภายใน 48 ชม.",
+    sellerHint: "แจ้งลูกค้าไม่คืนของแล้ว — ลูกค้ายังสามารถโต้แย้งได้ภายใน 48 ชม.",
+  },
+  return_disputed: {
+    label: "โต้แย้งการไม่คืน",
+    tone: "warn",
+    terminal: false,
+    renterHint: "ส่งข้อโต้แย้งแล้ว รอแอดมินตรวจสอบ",
+    sellerHint: "ผู้เช่าโต้แย้งว่าได้คืนสินค้าแล้ว รอแอดมินตัดสิน",
+  },
+  deposit_disputed: {
+    label: "โต้แย้งมัดจำ",
+    tone: "warn",
+    terminal: false,
+    renterHint: "ส่งข้อโต้แย้งมัดจำแล้ว รอแอดมินตรวจสอบ",
+    sellerHint: "ผู้เช่าโต้แย้งการตัดสินมัดจำ รอแอดมินตัดสิน",
+  },
 };
 
 export type Actor = "renter" | "seller";
@@ -130,6 +182,11 @@ export const TRANSITIONS: Transition[] = [
   { from: "waiting_for_payment", to: "cancelled", actor: "renter" },
   { from: "waiting_for_payment", to: "payment_review", actor: "renter", requires: "slip_path" },
   { from: "slip_disputed", to: "payment_review", actor: "renter", requires: "slip_path" },
+  // renter cancel-after-payment (→ cancel_requested; requires admin approval).
+  // Once the rental has started (renting) it can no longer be cancelled — the
+  // dress is already out, so it must run to return/completion.
+  { from: "payment_review", to: "cancel_requested", actor: "renter" },
+  { from: "confirmed", to: "cancel_requested", actor: "renter" },
   // seller
   { from: "booking_pending", to: "waiting_for_payment", actor: "seller", requires: "shipping_fee" },
   { from: "booking_pending", to: "rejected", actor: "seller" },
@@ -139,8 +196,21 @@ export const TRANSITIONS: Transition[] = [
   { from: "confirmed", to: "cancel_requested", actor: "seller" },
   { from: "confirmed", to: "renting", actor: "seller" },
   { from: "renting", to: "returned", actor: "seller" },
-  { from: "renting", to: "cancel_requested", actor: "seller" },
+  // deposit = 0 + complete → can still go directly to completed
+  { from: "renting", to: "completed", actor: "seller" },
+  { from: "renting", to: "not_returned", actor: "seller" },
+  // awaiting_return is reached automatically (sweep) at the rental's last day;
+  // from there the seller confirms the physical return or escalates a cancel.
+  { from: "awaiting_return", to: "returned", actor: "seller" },
+  // deposit = 0 + complete → can still go directly to completed
+  { from: "awaiting_return", to: "completed", actor: "seller" },
+  { from: "awaiting_return", to: "not_returned", actor: "seller" },
+  { from: "awaiting_return", to: "cancel_requested", actor: "seller" },
   { from: "returned", to: "completed", actor: "seller" },
+  // return dispute: renter escalates not_returned
+  { from: "not_returned", to: "return_disputed", actor: "renter" },
+  // deposit dispute: renter escalates deposit decision (partial/forfeit)
+  { from: "returned", to: "deposit_disputed", actor: "renter" },
 ];
 
 export function findTransition(
@@ -158,6 +228,11 @@ export const ACTIVE_STATUSES: BookingStatus[] = [
   "payment_review",
   "confirmed",
   "renting",
+  "awaiting_return",
+  "returned",
+  "not_returned",
+  "return_disputed",
+  "deposit_disputed",
 ];
 
 export function isActive(status: BookingStatus): boolean {
@@ -169,8 +244,68 @@ export function amountDue(b: Pick<Booking, "rental_total" | "deposit" | "shippin
   return b.rental_total + b.deposit + (b.shipping_fee ?? 0);
 }
 
-export function dueAt(from: Date = new Date()): string {
-  return new Date(from.getTime() + PAYMENT_WINDOW_HOURS * 3600 * 1000).toISOString();
+export function dueAt(from: Date = new Date(), hours: number = PAYMENT_WINDOW_HOURS): string {
+  return new Date(from.getTime() + hours * 3600 * 1000).toISOString();
+}
+
+// ---------------------------------------------------------------------------
+// Slip auto-confirm — dynamic timeout based on urgency
+// ---------------------------------------------------------------------------
+
+/**
+ * Determine the auto-confirm window (hours) for a payment slip, based on
+ * how urgent the booking is:
+ *
+ * | # | Condition                                  | Hours |
+ * |---|--------------------------------------------|-------|
+ * | 1 | startDate === today + shop is open          |   1   |
+ * | 2 | startDate === today + shop is NOT open      |   3   |
+ * | 3 | startDate > today + > 24h until start       |  24   |
+ * | 4 | startDate > today + ≤ 24h until start       |  12   |
+ */
+export function slipAutoConfirmHours(opts: {
+  startDate: string;          // YYYY-MM-DD
+  shopIsOpen: boolean;        // shop.isOpen flag (ปิดร้านชั่วคราว)
+  shopHoursToday: boolean;    // true if shop schedule says open today
+  now?: Date;
+}): number {
+  const { startDate, shopIsOpen, shopHoursToday, now = new Date() } = opts;
+  const todayStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+
+  if (startDate === todayStr) {
+    // Same-day: check if shop is currently open
+    return (shopIsOpen && shopHoursToday) ? 1 : 3;
+  }
+
+  // Future date: check hours until startDate midnight Bangkok
+  const startMidnight = new Date(`${startDate}T00:00:00+07:00`);
+  const hoursUntilStart = (startMidnight.getTime() - now.getTime()) / 3600000;
+
+  return hoursUntilStart > 24 ? 24 : 12;
+}
+
+/** Reminder offset: send at halfway through the auto-confirm window. */
+export function slipReminderOffsetHours(autoConfirmHours: number): number {
+  if (autoConfirmHours <= 1) return 0.5;    // 30 min for 1h window
+  if (autoConfirmHours <= 3) return 1.5;    // 1.5h for 3h window
+  if (autoConfirmHours <= 12) return 2;     // 2h for 12h window (+6h second)
+  return 2;                                  // 2h for 24h window (+12h second)
+}
+
+/**
+ * Determine the payment window (hours) for a booking at accept time.
+ * Same-day + shop open = 1h, everything else = 3h.
+ */
+export function paymentWindowHours(opts: {
+  startDate: string;
+  shopIsOpen: boolean;
+  shopHoursToday: boolean;
+}): number {
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+  if (opts.startDate === todayStr && opts.shopIsOpen && opts.shopHoursToday) {
+    return PAYMENT_WINDOW_HOURS_SAMEDAY;
+  }
+  return PAYMENT_WINDOW_HOURS;
 }
 
 /** Inclusive day count between two YYYY-MM-DD dates (>= 1). */

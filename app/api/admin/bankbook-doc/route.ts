@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { getSignedPrivateUrl } from "@/lib/r2";
+import { r2, R2_PRIVATE_BUCKET } from "@/lib/r2";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 
 /**
- * Admin-only resolver for private bankbook (passbook cover) images.
+ * Admin-only proxy for private bankbook (passbook cover) images.
  *
  * GET /api/admin/bankbook-doc?key=bankbook/<uuid>.<ext>
- * → 302 redirect to a short-lived (15 min) presigned GET URL on the
- *   private bucket.
+ * → streams the object bytes (avoids ORB/CORS cross-origin blocks).
  *
- * Only keys under the `bankbook/` prefix are signable here — path traversal,
+ * Only keys under the `bankbook/` prefix are allowed — path traversal,
  * arbitrary objects, and other prefixes are all rejected.
  */
-
-const EXPIRES_IN = 60 * 15; // 15 minutes
 
 // Strict allowlist: bankbook/<safe-filename>.<ext> — no extra slashes, no ".."
 const BANKBOOK_KEY_RE = /^bankbook\/[A-Za-z0-9_-]+\.[A-Za-z0-9]{1,5}$/;
@@ -32,6 +30,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid key" }, { status: 400 });
   }
 
-  const signedUrl = await getSignedPrivateUrl(key, EXPIRES_IN);
-  return NextResponse.redirect(signedUrl, 302);
+  try {
+    const res = await r2.send(
+      new GetObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: key }),
+    );
+    if (!res.Body) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const bodyBytes = Buffer.from(await res.Body.transformToByteArray());
+    return new NextResponse(bodyBytes, {
+      status: 200,
+      headers: {
+        "Content-Type": res.ContentType || "application/octet-stream",
+        "Cache-Control": "private, max-age=900",
+        "Content-Length": String(bodyBytes.length),
+      },
+    });
+  } catch (err: unknown) {
+    const code = (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+    if (code === 404) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    console.error("[bankbook-doc] S3 error:", err);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
 }

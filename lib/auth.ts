@@ -32,7 +32,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const [dbUser, favorites] = await Promise.all([
     db.user.findUnique({
       where: { id: session.user.id },
-      select: { fullName: true, role: true },
+      select: { fullName: true, role: true, suspendedAt: true },
     }),
     db.favorite.findMany({
       where: { userId: session.user.id },
@@ -40,6 +40,9 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     }),
   ]);
   if (!dbUser) return null;
+  // Suspended accounts are treated as logged-out everywhere: no authed access
+  // to account/seller/admin, and the header shows the signed-out state.
+  if (dbUser.suspendedAt) return null;
 
   return {
     id: session.user.id,

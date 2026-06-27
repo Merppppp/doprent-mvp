@@ -4,9 +4,9 @@ import { requireShopAccess } from "@/lib/shop-access";
 import { getSellerBookingsPage, type SellerBookingCard } from "@/lib/booking-queries";
 import { getTrustScores, type TrustScore } from "@/lib/trust-score";
 import {
-  statusesForTab,
-  cancelledByForTab,
-  type BookingTabKey,
+  statusesForFilter,
+  cancelledByForFilter,
+  type BookingFilterKey,
   SELLER_BOOKINGS_PAGE_SIZE,
 } from "@/lib/seller-booking-tabs";
 
@@ -25,15 +25,15 @@ export type SellerBookingsPageResult = {
  * client only ever supplies the filter/skip — never a shopId.
  */
 export async function fetchSellerBookingsPage(
-  tab: BookingTabKey,
+  key: BookingFilterKey,
   sinceDays: number | null,
   skip: number,
 ): Promise<SellerBookingsPageResult> {
   const { shopId } = await requireShopAccess({ need: "bookings" });
 
   const { rows, total } = await getSellerBookingsPage(shopId, {
-    statuses: statusesForTab(tab),
-    cancelledBy: cancelledByForTab(tab),
+    statuses: statusesForFilter(key),
+    cancelledBy: cancelledByForFilter(key),
     sinceDays,
     skip: Math.max(0, Math.trunc(skip)),
     take: SELLER_BOOKINGS_PAGE_SIZE,

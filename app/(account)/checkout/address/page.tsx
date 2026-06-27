@@ -3,11 +3,12 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getMyAddresses } from "@/lib/booking-queries";
+import { getMyAddresses, getMyBankAccounts } from "@/lib/booking-queries";
 import { rentalDays } from "@/lib/bookings";
 import { hasMultipleRates, normalizeTiers, startingPerDay } from "@/lib/pricing";
 import { parseBusinessHours } from "@/lib/hours";
 import CheckoutForm from "@/components/CheckoutForm";
+import { getUserIdCards } from "@/app/actions/id-cards";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,12 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-type SP = { product?: string; dress?: string; start?: string; end?: string; variant?: string };
+type SP = { product?: string; dress?: string; start?: string; end?: string; variant?: string; startTime?: string; endTime?: string; outbound?: string; return?: string };
+
+const isShipMethod = (s: string | undefined): s is "express" | "standard" =>
+  s === "express" || s === "standard";
+
+const isHHMM = (s: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 
 export default async function CheckoutAddressPage({
   searchParams,
@@ -28,8 +34,17 @@ export default async function CheckoutAddressPage({
   const start = searchParams.start ?? "";
   const end = searchParams.end ?? "";
   const variantId = searchParams.variant ?? null;
+  // Optional pickup/return time-of-day. Only honoured when both are valid HH:MM;
+  // otherwise the booking is treated as full-day (null times).
+  const startTime = searchParams.startTime && isHHMM(searchParams.startTime) ? searchParams.startTime : null;
+  const endTime = searchParams.endTime && isHHMM(searchParams.endTime) ? searchParams.endTime : null;
+  const timeQuery = startTime && endTime ? `&startTime=${startTime}&endTime=${endTime}` : "";
+  // Shipping methods picked on the calendar page. Default to standard (worst case).
+  const outboundMethod = isShipMethod(searchParams.outbound) ? searchParams.outbound : "standard";
+  const returnMethod = isShipMethod(searchParams.return) ? searchParams.return : "standard";
+  const shipQuery = `&outbound=${outboundMethod}&return=${returnMethod}`;
 
-  const backHref = `/checkout/address?product=${productId}&start=${start}&end=${end}${variantId ? `&variant=${variantId}` : ""}`;
+  const backHref = `/checkout/address?product=${productId}&start=${start}&end=${end}${variantId ? `&variant=${variantId}` : ""}${timeQuery}${shipQuery}`;
 
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(backHref)}`);
@@ -81,7 +96,11 @@ export default async function CheckoutAddressPage({
   const days = rentalDays(start, end);
   const image =
     Array.isArray(dress.images) && dress.images.length > 0 ? String(dress.images[0]) : null;
-  const addresses = await getMyAddresses();
+  const [addresses, bankAccounts, idCards] = await Promise.all([
+    getMyAddresses(),
+    getMyBankAccounts(),
+    getUserIdCards(),
+  ]);
 
   return (
     <div className="container" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 640 }}>
@@ -137,14 +156,20 @@ export default async function CheckoutAddressPage({
         productId={dress.id}
         startDate={start}
         endDate={end}
+        startTime={startTime}
+        endTime={endTime}
         days={days}
         pricePerDay={Number(dress.price_per_day)}
         priceTiers={normalizeTiers(dress.price_tiers)}
         deposit={Number(dress.deposit) || 0}
         addresses={addresses}
+        bankAccounts={bankAccounts}
         variantId={variantId}
+        outboundMethod={outboundMethod}
+        returnMethod={returnMethod}
         shopHours={shopHours}
         shopIsOpen={dress.shop_is_open}
+        idCards={idCards}
       />
     </div>
   );
