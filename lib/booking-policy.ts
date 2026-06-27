@@ -87,6 +87,57 @@ export function shippingBuffers(
   return { before, after };
 }
 
+/** One shipping leg, resolved for display (seller booking view). */
+export type ShippingLeg = {
+  method: "express" | "standard";
+  /**
+   * YYYY-MM-DD the shipment must go out:
+   *  • outbound → ship by this date so it arrives by the rental start
+   *    (express = the rental start date itself, same-day)
+   *  • return  → the date the customer sends the dress back (rental end date)
+   */
+  shipBy: string;
+  /** Transit days for this leg (0 for express). */
+  transitDays: number;
+  /** True when the leg is express (same-day, no transit reserved). */
+  sameDay: boolean;
+};
+
+/**
+ * Resolve when each leg of a booking must ship, from the effective policy +
+ * the chosen methods. Pure — caller loads the policy (resolveEffectivePolicy)
+ * and passes YYYY-MM-DD date strings. Mirrors `shippingBuffers`: express
+ * collapses its transit to 0; standard reserves the policy's buffer days.
+ */
+export function bookingShippingPlan(
+  policy: EffectivePolicy,
+  startDate: string,
+  endDate: string,
+  outboundMethod: ShippingMethod,
+  returnMethod: ShippingMethod,
+): { outbound: ShippingLeg; return: ShippingLeg } {
+  const transitBefore = policy.bufferDaysBefore ?? 2;
+  const transitAfter = policy.bufferDaysAfter ?? 2;
+  const outExpress = outboundMethod === "express";
+  const retExpress = returnMethod === "express";
+  return {
+    outbound: {
+      method: outExpress ? "express" : "standard",
+      transitDays: outExpress ? 0 : transitBefore,
+      shipBy: outExpress ? startDate : addDays(startDate, -transitBefore),
+      sameDay: outExpress,
+    },
+    return: {
+      // Customer sends the dress back on the rental end date; express arrives
+      // same-day, standard takes transitAfter days to reach the shop.
+      method: retExpress ? "express" : "standard",
+      transitDays: retExpress ? 0 : transitAfter,
+      shipBy: endDate,
+      sameDay: retExpress,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Active-status set — must stay in sync with BookingStatus enum + TRANSITIONS
 // ---------------------------------------------------------------------------

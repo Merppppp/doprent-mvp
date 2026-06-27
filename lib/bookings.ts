@@ -178,10 +178,12 @@ export const TRANSITIONS: Transition[] = [
   { from: "confirmed", to: "cancel_requested", actor: "seller" },
   { from: "confirmed", to: "renting", actor: "seller" },
   { from: "renting", to: "returned", actor: "seller" },
+  { from: "renting", to: "completed", actor: "seller" },
   { from: "renting", to: "not_returned", actor: "seller" },
   // awaiting_return is reached automatically (sweep) at the rental's last day;
   // from there the seller confirms the physical return or escalates a cancel.
   { from: "awaiting_return", to: "returned", actor: "seller" },
+  { from: "awaiting_return", to: "completed", actor: "seller" },
   { from: "awaiting_return", to: "not_returned", actor: "seller" },
   { from: "awaiting_return", to: "cancel_requested", actor: "seller" },
   { from: "returned", to: "completed", actor: "seller" },

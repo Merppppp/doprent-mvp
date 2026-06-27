@@ -145,9 +145,9 @@ export default function SellSidebar({
         <button className="seller-hamburger" onClick={() => setDrawerOpen(true)} aria-label="เปิดเมนู">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
         </button>
-        <div className="seller-brand">
+        <Link href="/" className="seller-brand">
           <Logo size={20} />
-        </div>
+        </Link>
       </div>
 
       {/* ── Backdrop ── */}
@@ -159,12 +159,12 @@ export default function SellSidebar({
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
         </button>
 
-        <div className="seller-brand">
+        <Link href="/" className="seller-brand">
           <div>
             <Logo size={22} />
             <small>แดชบอร์ดร้าน</small>
           </div>
-        </div>
+        </Link>
 
         {shop && (
           <>

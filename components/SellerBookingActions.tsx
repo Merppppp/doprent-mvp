@@ -11,6 +11,7 @@ import {
   markReturned,
   rejectBooking,
 } from "@/app/actions/bookings";
+import { startProgress, doneProgress } from "@/lib/progress";
 import type { BookingStatus } from "@/lib/types";
 import type { PaymentChannel } from "@/lib/payments";
 
@@ -30,9 +31,21 @@ type Props = {
   defaultMethod?: PaymentChannel | null;
   /** "standard" | "express" — drives the carrier prompt on the ship step. */
   deliveryMethod?: string | null;
+  /** Whether the renter has submitted return tracking info. */
+  returnShipped?: boolean;
+  /** Return tracking info from the renter (display to seller). */
+  returnTracking?: {
+    carrier: string | null;
+    trackingNumber: string | null;
+    trackingUrl: string | null;
+  } | null;
+  /** First product slug — used for redirect after not_returned. */
+  firstProductId?: string | null;
+  /** Deposit amount — used to cap the deduction field. */
+  depositAmount?: number;
 };
 
-export default function SellerBookingActions({ bookingId, status, channels = [], defaultMethod = null, deliveryMethod = null }: Props) {
+export default function SellerBookingActions({ bookingId, status, channels = [], defaultMethod = null, deliveryMethod = null, returnShipped = false, returnTracking = null, firstProductId = null, depositAmount = 0 }: Props) {
   const router = useRouter();
   const [fee, setFee] = useState("");
   const [carrier, setCarrier] = useState("");
@@ -47,16 +60,25 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
     canChoose ? (defaultMethod ?? channels[0]?.method ?? null) : null,
   );
 
-  async function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
+  async function run(fn: () => Promise<{ ok: boolean; error?: string }>, onSuccess?: () => void) {
     setError("");
     setBusy(true);
-    const res = await fn();
-    if (!res.ok) {
-      setError(res.error ?? "ทำรายการไม่สำเร็จ");
-      setBusy(false);
-      return;
+    startProgress();
+    try {
+      const res = await fn();
+      if (!res.ok) {
+        setError(res.error ?? "ทำรายการไม่สำเร็จ");
+        setBusy(false);
+        return;
+      }
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.refresh();
+      }
+    } finally {
+      doneProgress();
     }
-    router.refresh();
   }
 
   if (status === "booking_pending") {
@@ -196,34 +218,37 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
   }
 
   if (status === "confirmed") {
+    const isExpress = deliveryMethod === "express";
     const isStandard = deliveryMethod === "standard";
-    const isShipping = deliveryMethod === "standard" || deliveryMethod === "express";
+    const isShipping = isStandard || isExpress;
+
+    // Express: tracking URL required
+    // Standard: carrier + tracking number required, URL optional
     const carrierOk = !isStandard || carrier.trim().length > 0;
-    // For any shipping method the seller must record how the renter can track
-    // the parcel — at least a tracking number or a tracking URL.
-    const trackingOk = !isShipping || trackingNumber.trim().length > 0 || trackingUrl.trim().length > 0;
-    const urlOk = trackingUrl.trim().length === 0 || /^https?:\/\//i.test(trackingUrl.trim());
+    const trackingNumberOk = !isStandard || trackingNumber.trim().length > 0;
+    const trackingUrlOk = !isExpress || (trackingUrl.trim().length > 0 && /^https?:\/\//i.test(trackingUrl.trim()));
+    const optionalUrlOk = !isStandard || trackingUrl.trim().length === 0 || /^https?:\/\//i.test(trackingUrl.trim());
+    const allValid = carrierOk && trackingNumberOk && trackingUrlOk && optionalUrlOk;
+
     const inputCls =
       "mt-1.5 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-[15px] text-[var(--ink)] outline-none focus:border-[var(--accent)]";
     return (
       <div className="grid gap-3">
         {isStandard ? (
-          <label className="text-sm font-semibold">
-            ผู้ให้บริการขนส่ง
-            <input
-              type="text"
-              value={carrier}
-              onChange={(e) => setCarrier(e.target.value)}
-              placeholder="เช่น Flash Express, Kerry, ไปรษณีย์ไทย"
-              maxLength={80}
-              className={inputCls}
-            />
-          </label>
-        ) : null}
-        {isShipping ? (
           <>
             <label className="text-sm font-semibold">
-              เลขพัสดุ / เลขติดตาม
+              ผู้ให้บริการขนส่ง <span className="text-[var(--danger)]">*</span>
+              <input
+                type="text"
+                value={carrier}
+                onChange={(e) => setCarrier(e.target.value)}
+                placeholder="เช่น Flash Express, Kerry, ไปรษณีย์ไทย"
+                maxLength={80}
+                className={inputCls}
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              เลขพัสดุ <span className="text-[var(--danger)]">*</span>
               <input
                 type="text"
                 value={trackingNumber}
@@ -234,7 +259,7 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
               />
             </label>
             <label className="text-sm font-semibold">
-              ลิงก์ติดตามการจัดส่ง (ถ้ามี)
+              ลิงก์ติดตามการจัดส่ง <span className="text-xs font-normal text-[var(--ink-3)]">(ถ้ามี)</span>
               <input
                 type="url"
                 value={trackingUrl}
@@ -244,27 +269,42 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
                 className={inputCls}
               />
             </label>
-            <p className="text-xs text-[var(--ink-3)]">กรอกเลขพัสดุหรือลิงก์ติดตามอย่างน้อยหนึ่งอย่าง เพื่อให้ผู้เช่าติดตามพัสดุได้</p>
           </>
         ) : null}
-        {/* Validation hints — show which field is blocking the button */}
-        {!carrierOk ? (
+        {isExpress ? (
+          <label className="text-sm font-semibold">
+            ลิงก์ติดตามการจัดส่ง <span className="text-[var(--danger)]">*</span>
+            <input
+              type="url"
+              value={trackingUrl}
+              onChange={(e) => setTrackingUrl(e.target.value)}
+              placeholder="https://..."
+              maxLength={500}
+              className={inputCls}
+            />
+            <p className="mt-1 text-xs font-normal text-[var(--ink-3)]">ส่งด่วน — แปะลิงก์ติดตามเพื่อให้ผู้เช่าติดตามสถานะได้</p>
+          </label>
+        ) : null}
+        {/* Validation hints */}
+        {isStandard && !carrierOk ? (
           <p className="text-xs text-[var(--danger)]">กรุณากรอกชื่อผู้ให้บริการขนส่ง</p>
-        ) : !trackingOk ? (
-          <p className="text-xs text-[var(--danger)]">กรุณากรอกเลขพัสดุหรือลิงก์ติดตามอย่างน้อยหนึ่งอย่าง</p>
-        ) : !urlOk ? (
+        ) : isStandard && !trackingNumberOk ? (
+          <p className="text-xs text-[var(--danger)]">กรุณากรอกเลขพัสดุ</p>
+        ) : isStandard && !optionalUrlOk ? (
           <p className="text-xs text-[var(--danger)]">ลิงก์ติดตามต้องขึ้นต้นด้วย http:// หรือ https://</p>
+        ) : isExpress && !trackingUrlOk ? (
+          <p className="text-xs text-[var(--danger)]">กรุณาแปะลิงก์ติดตาม (เริ่มด้วย http:// หรือ https://)</p>
         ) : null}
         <button
           type="button"
           className="btn btn-primary btn-lg"
-          disabled={busy || !carrierOk || !trackingOk || !urlOk}
+          disabled={busy || !allValid}
           onClick={() =>
             run(() =>
               markRenting(bookingId, {
                 carrier: isStandard ? carrier.trim() : undefined,
-                trackingNumber: isShipping ? trackingNumber.trim() || undefined : undefined,
-                trackingUrl: isShipping ? trackingUrl.trim() || undefined : undefined,
+                trackingNumber: isStandard && trackingNumber.trim() ? trackingNumber.trim() : undefined,
+                trackingUrl: isShipping && trackingUrl.trim() ? trackingUrl.trim() : undefined,
               }),
             )
           }
@@ -278,11 +318,55 @@ export default function SellerBookingActions({ bookingId, status, channels = [],
 
   if (status === "renting" || status === "awaiting_return") {
     return (
-      <ReturnPanel
-        busy={busy}
-        error={error}
-        onSubmit={(condition, note) => run(() => markReturned(bookingId, condition, note))}
-      />
+      <div className="grid gap-3">
+        {returnShipped && returnTracking ? (
+          <div className="rounded-xl border border-[var(--success)] bg-[var(--success-soft)] px-4 py-3">
+            <div className="mb-1 text-sm font-semibold text-[var(--success)]">ลูกค้าส่งคืนแล้ว</div>
+            <div className="grid gap-1 text-sm text-[var(--ink-2)]">
+              {returnTracking.carrier ? <div>ขนส่ง: <span className="font-medium text-[var(--ink)]">{returnTracking.carrier}</span></div> : null}
+              {returnTracking.trackingNumber ? <div>เลขพัสดุ: <span className="font-medium text-[var(--ink)]">{returnTracking.trackingNumber}</span></div> : null}
+              {returnTracking.trackingUrl ? (
+                <div>
+                  ลิงก์:{" "}
+                  <a href={returnTracking.trackingUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-[var(--accent)] underline break-all">
+                    {returnTracking.trackingUrl}
+                  </a>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink-2)]">
+            <span className="font-semibold text-[var(--ink)]">รอลูกค้าส่งคืนสินค้า</span>
+            <span> ลูกค้ายังไม่ได้กรอกข้อมูลการส่งคืน</span>
+          </div>
+        )}
+
+        {returnShipped ? (
+          <ReturnPanel
+            busy={busy}
+            error={error}
+            depositAmount={depositAmount}
+            onSubmit={(condition, note, deduction) => {
+              const redirectToUnits = condition === "not_returned" && firstProductId
+                ? () => router.push(`/sell/products/${firstProductId}/units`)
+                : undefined;
+              run(() => markReturned(bookingId, condition, note, deduction), redirectToUnits);
+            }}
+          />
+        ) : (
+          <NotReturnedPanel
+            busy={busy}
+            error={error}
+            onSubmit={() => {
+              const redirectToUnits = firstProductId
+                ? () => router.push(`/sell/products/${firstProductId}/units`)
+                : undefined;
+              run(() => markReturned(bookingId, "not_returned"), redirectToUnits);
+            }}
+          />
+        )}
+      </div>
     );
   }
 
@@ -400,22 +484,30 @@ type ReturnChoice = "complete" | "damaged" | "not_returned";
 function ReturnPanel({
   busy,
   error,
+  depositAmount = 0,
   onSubmit,
 }: {
   busy: boolean;
   error: string;
-  onSubmit: (condition: ReturnChoice, damageNote?: string) => void;
+  depositAmount?: number;
+  onSubmit: (condition: ReturnChoice, damageNote?: string, deductionAmount?: number) => void;
 }) {
   const [choice, setChoice] = useState<ReturnChoice>("complete");
   const [note, setNote] = useState("");
+  const [deduction, setDeduction] = useState("");
 
   const options: { value: ReturnChoice; label: string; hint: string }[] = [
-    { value: "complete", label: "คืนของแบบสมบูรณ์", hint: "ได้รับชุดคืนครบถ้วน สภาพดี" },
+    { value: "complete", label: "คืนของแบบสมบูรณ์", hint: "ได้รับชุดคืนครบถ้วน สภาพดี — จบรายการทันที" },
     { value: "damaged", label: "มีความเสียหาย", hint: "ได้รับชุดคืนแต่มีความเสียหาย — ระบุรายละเอียด" },
-    { value: "not_returned", label: "ลูกค้าไม่ส่งคืนของ", hint: "ยังไม่ได้รับชุดคืน" },
+    { value: "not_returned", label: "ลูกค้าไม่ส่งคืนของ", hint: "ยังไม่ได้รับชุดคืน — หักมัดจำทั้งหมด" },
   ];
 
-  const canSubmit = !busy && (choice !== "damaged" || note.trim().length > 0);
+  const deductionNum = Number(deduction);
+  const deductionValid = choice !== "damaged" || deduction === "" || (Number.isFinite(deductionNum) && deductionNum >= 0 && deductionNum <= depositAmount);
+  const canSubmit = !busy && (choice !== "damaged" || (note.trim().length > 0 && deductionValid));
+
+  const inputCls =
+    "mt-1.5 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-[15px] text-[var(--ink)] outline-none focus:border-[var(--accent)]";
 
   return (
     <div className="grid gap-3">
@@ -448,27 +540,77 @@ function ReturnPanel({
       </div>
 
       {choice === "damaged" ? (
-        <label className="text-sm font-semibold">
-          ระบุความเสียหายที่พบ
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="เช่น มีรอยเปื้อน / ตะเข็บขาด / ซิปเสีย"
-            rows={3}
-            maxLength={1000}
-            className="mt-1.5 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-[15px] text-[var(--ink)] outline-none focus:border-[var(--accent)]"
-          />
-        </label>
+        <>
+          <label className="text-sm font-semibold">
+            ระบุความเสียหายที่พบ <span className="text-[var(--danger)]">*</span>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="เช่น มีรอยเปื้อน / ตะเข็บขาด / ซิปเสีย"
+              rows={3}
+              maxLength={1000}
+              className={inputCls}
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            จำนวนมัดจำที่จะหัก (฿) <span className="text-xs font-normal text-[var(--ink-3)]">มัดจำทั้งหมด {depositAmount.toLocaleString()} ฿</span>
+            <input
+              type="number"
+              min={0}
+              max={depositAmount}
+              value={deduction}
+              onChange={(e) => setDeduction(e.target.value)}
+              placeholder="0"
+              className={inputCls}
+            />
+            {deduction !== "" && !deductionValid ? (
+              <p className="mt-1 text-xs text-[var(--danger)]">จำนวนต้องอยู่ระหว่าง 0 ถึง {depositAmount.toLocaleString()} ฿</p>
+            ) : null}
+          </label>
+        </>
       ) : null}
 
       <button
         type="button"
         className="btn btn-primary btn-lg"
         disabled={!canSubmit}
-        onClick={() => onSubmit(choice, choice === "damaged" ? note.trim() : undefined)}
+        onClick={() => onSubmit(
+          choice,
+          choice === "damaged" ? note.trim() : undefined,
+          choice === "damaged" && deduction !== "" ? deductionNum : undefined,
+        )}
         style={{ padding: "13px 18px" }}
       >
         บันทึกการรับคืน
+      </button>
+      {error ? <Err msg={error} /> : null}
+    </div>
+  );
+}
+
+/** Minimal panel for marking "not returned" when the renter hasn't shipped yet. */
+function NotReturnedPanel({
+  busy,
+  error,
+  onSubmit,
+}: {
+  busy: boolean;
+  error: string;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="grid gap-3">
+      <button
+        type="button"
+        className="btn btn-outline text-[var(--danger)] border-[var(--danger)]"
+        disabled={busy}
+        onClick={() => {
+          if (confirm("ยืนยันว่าลูกค้าไม่ส่งคืนสินค้า? มัดจำจะถูกหักทั้งหมด")) {
+            onSubmit();
+          }
+        }}
+      >
+        ลูกค้าไม่ส่งคืนของ · หักมัดจำทั้งหมด
       </button>
       {error ? <Err msg={error} /> : null}
     </div>

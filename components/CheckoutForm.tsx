@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addAddress, updateAddress, createBooking } from "@/app/actions/bookings";
+import { startProgress, doneProgress } from "@/lib/progress";
 import { priceForNights } from "@/lib/pricing";
 import type { Address, PriceTier } from "@/lib/types";
 import { fmtThai } from "@/lib/date-th";
@@ -68,8 +69,10 @@ export default function CheckoutForm({
     e.preventDefault();
     setError("");
     setBusy(true);
+    startProgress();
     const fd = new FormData(e.currentTarget);
     const res = await addAddress(fd);
+    doneProgress();
     setBusy(false);
     if (!res.ok) {
       setError(res.error);
@@ -94,8 +97,10 @@ export default function CheckoutForm({
     e.preventDefault();
     setError("");
     setBusy(true);
+    startProgress();
     const fd = new FormData(e.currentTarget);
     const res = await updateAddress(fd);
+    doneProgress();
     setBusy(false);
     if (!res.ok) {
       setError(res.error);
@@ -129,6 +134,7 @@ export default function CheckoutForm({
     }
     setError("");
     setBusy(true);
+    startProgress();
     const fd = new FormData();
     fd.set("product_id", productId);
     fd.set("address_id", selectedId);
@@ -142,6 +148,7 @@ export default function CheckoutForm({
     fd.set("id_card_path", selectedIdCardPath);
     const res = await createBooking(fd);
     if (!res.ok) {
+      doneProgress();
       setBusy(false);
       setError(res.error);
       return;

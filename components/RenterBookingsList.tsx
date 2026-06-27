@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useTransition, useRef } from "react";
 import Link from "next/link";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
+import PaymentCountdown from "@/components/PaymentCountdown";
 import { fmtThaiShort } from "@/lib/date-th";
 import { RENTER_TABS, RENTER_PAGE_SIZE, type RenterTabKey } from "@/lib/renter-booking-tabs";
 import { fetchRenterBookingsPage } from "@/app/actions/renter-bookings";
@@ -106,11 +107,11 @@ export default function RenterBookingsList({ initialRows, initialTotal, statusCo
                 role="tab"
                 aria-selected={active}
                 onClick={(event) => switchTab(tab.key, event.currentTarget)}
-                className={`-mb-0.5 shrink-0 cursor-pointer whitespace-nowrap border-b-2 border-transparent bg-transparent px-[18px] py-3 text-[13.5px] font-normal text-ink-2 transition-colors duration-150 hover:text-ink max-[900px]:snap-start max-[900px]:px-3.5 max-[900px]:py-2.5 max-[900px]:text-[13px]${active ? " border-accent font-semibold text-accent" : ""}`}
+                className={`-mb-0.5 shrink-0 cursor-pointer whitespace-nowrap border-b-2 border-transparent bg-transparent px-[18px] py-3 text-[13px] font-normal text-ink-2 transition-colors duration-150 hover:text-ink max-[900px]:snap-start max-[900px]:px-3.5 max-[900px]:py-2.5 max-[900px]:text-[13px]${active ? " border-accent font-medium text-accent" : ""}`}
               >
                 {tab.label}
                 {count > 0 && (
-                  <span className={`ml-1 text-[11px] font-semibold${active ? " text-accent" : " text-ink-3"}`}>({count})</span>
+                  <span className={`ml-1 text-[11px] font-normal${active ? " text-accent" : " text-ink-3"}`}>{count}</span>
                 )}
               </button>
             );
@@ -195,8 +196,13 @@ export default function RenterBookingsList({ initialRows, initialTotal, statusCo
                     </div>
                     <BookingStatusBadge status={b.status} />
                   </div>
-                  <div className="text-[var(--ink-3)] text-xs mt-1">
-                    {fmtThaiShort(b.start_date)} – {fmtThaiShort(b.end_date)}
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-[var(--ink-3)] text-xs">
+                      {fmtThaiShort(b.start_date)} – {fmtThaiShort(b.end_date)}
+                    </span>
+                    {b.status === "waiting_for_payment" && b.current_due_at && (
+                      <PaymentCountdown dueAt={b.current_due_at} variant="inline" />
+                    )}
                   </div>
                   <div className="text-sm font-semibold mt-1.5">
                     ฿{(b.rental_total + b.deposit + (b.shipping_fee ?? 0)).toLocaleString()}

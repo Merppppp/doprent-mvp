@@ -36,6 +36,7 @@ export default async function EditProductPage({ params }: { params: { id: string
         images: { orderBy: { sortOrder: "asc" }, select: { url: true } },
         priceTiers: { orderBy: { minDays: "asc" }, select: { variantId: true, minDays: true, pricePerDay: true } },
         productTags: {
+          where: { tag: { isActive: true } },
           select: {
             tag: {
               select: {

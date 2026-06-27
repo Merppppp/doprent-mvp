@@ -13,6 +13,7 @@ import { type AdsTier, type Color, type PriceTier } from "@/lib/types";
 import { resolveTagSelections } from "@/lib/tag-groups";
 import { allocateStaffLoginCode } from "@/lib/staff-login-code";
 import { syncVariantUnits } from "@/lib/product-units";
+import { parseBusinessHours } from "@/lib/hours";
 import {
   type DbSize,
   type VariantInput,
@@ -335,7 +336,7 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
 
   const shop = await db.shop.findUnique({
     where: { id: shopId },
-    select: { ownerId: true, name: true, lineUrl: true, kycStatus: true, adsTier: true, promptpayId: true, bankAccountNumber: true },
+    select: { ownerId: true, name: true, lineUrl: true, kycStatus: true, adsTier: true, promptpayId: true, bankAccountNumber: true, hours: true },
   });
   if (!shop || shop.ownerId !== user.id) return { ok: false, error: "ไม่มีสิทธิ์เพิ่มสินค้าในร้านนี้" };
   if (shop.kycStatus === "none" || shop.kycStatus === "rejected") {
@@ -344,6 +345,11 @@ export async function createProduct(formData: FormData): Promise<{ ok: boolean; 
   // HARD-BLOCK: shop must have at least one payment channel before listing products
   if (!shop.promptpayId && !shop.bankAccountNumber) {
     return { ok: false, error: "กรุณาตั้งค่าช่องทางรับชำระเงิน (PromptPay หรือบัญชีธนาคาร) ก่อนลงขายสินค้า" };
+  }
+  // HARD-BLOCK: shop must configure business hours before listing — they drive
+  // the booking calendar + same-day express timing (see createBooking gating).
+  if (!parseBusinessHours(shop.hours)) {
+    return { ok: false, error: "กรุณาตั้งค่าเวลาทำการของร้านก่อนลงขายสินค้า" };
   }
 
   // Enforce per-plan listing quota.

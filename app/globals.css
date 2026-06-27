@@ -487,6 +487,34 @@ select:focus-visible {
 .account-grid > main {
   min-width: 0;
 }
+/* Booking detail: 2-col on desktop (content | timeline sidebar) */
+.booking-detail-grid {
+  display: flex;
+  flex-direction: column;
+}
+.booking-detail-main {
+  min-width: 0;
+}
+.booking-detail-aside {
+  margin-top: 12px;
+}
+@media (min-width: 1060px) {
+  .account-grid:has(.booking-detail-grid),
+  .seller-main:has(.booking-detail-grid) .booking-detail-grid {
+    max-width: 1100px;
+  }
+  .booking-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 24px;
+    align-items: start;
+  }
+  .booking-detail-aside {
+    margin-top: 0;
+    position: sticky;
+    top: 24px;
+  }
+}
 .account-nav-item {
   display: flex;
   align-items: center;
@@ -921,6 +949,11 @@ select:focus-visible {
   line-height: 1;
   border: 1px solid transparent;
   will-change: transform;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 /* Shared press feedback — never animates layout, only transform */
 .btn:active {

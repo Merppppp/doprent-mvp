@@ -7,9 +7,13 @@ import TrustBadge from "@/components/TrustBadge";
 import { ProductArt } from "@/components/ProductArt";
 import {
   BOOKING_TABS,
+  BOOKING_GROUPS,
   DAYS_BACK_OPTIONS,
   SELLER_BOOKINGS_PAGE_SIZE,
   type BookingTabKey,
+  type BookingGroupKey,
+  type BookingFilterKey,
+  groupForStatus,
 } from "@/lib/seller-booking-tabs";
 import {
   fetchSellerBookingsPage,
@@ -25,28 +29,102 @@ type Props = {
   initialStatus?: string;
 };
 
-function statusToTab(status: string | undefined): BookingTabKey {
-  if (!status) return "all";
-  for (const t of BOOKING_TABS) {
-    if (t.statuses?.includes(status as never)) return t.key;
-  }
-  return "all";
+// ─── selection model ──────────────────────────────────────────────────────────
+
+type Zone = "todo" | "browse";
+
+interface Selection {
+  zone: Zone;
+  group: BookingGroupKey;
+  sub: BookingTabKey | null;
 }
+
+function resolveFilterKey(sel: Selection): BookingFilterKey {
+  if (sel.sub !== null) return sel.sub;
+  if (sel.zone === "todo") return "todo";
+  return sel.group;
+}
+
+// ─── count helpers ────────────────────────────────────────────────────────────
 
 function countForTab(key: BookingTabKey, counts: Record<string, number>): number {
   if (key === "cancelled_shop") return counts["_cancelled_shop"] || 0;
   if (key === "cancelled_renter") return counts["_cancelled_renter"] || 0;
   if (key === "all") {
-    const special = (counts["_cancelled_shop"] || 0) + (counts["_cancelled_renter"] || 0);
-    const raw = Object.entries(counts)
+    return Object.entries(counts)
       .filter(([k]) => !k.startsWith("_"))
       .reduce((s, [, v]) => s + v, 0);
-    return raw;
   }
   const tab = BOOKING_TABS.find((t) => t.key === key);
   if (!tab || !tab.statuses) return 0;
   return tab.statuses.reduce((sum, s) => sum + (counts[s] || 0), 0);
 }
+
+function countForGroup(groupKey: BookingGroupKey, counts: Record<string, number>): number {
+  if (groupKey === "all") return countForTab("all", counts);
+  if (groupKey === "done") return countForTab("completed", counts);
+  if (groupKey === "todo") {
+    return (
+      countForTab("booking_pending", counts) +
+      countForTab("payment_review", counts) +
+      countForTab("returned", counts)
+    );
+  }
+  if (groupKey === "active") {
+    return (
+      countForTab("waiting_for_payment", counts) +
+      countForTab("confirmed", counts) +
+      countForTab("renting", counts) +
+      countForTab("awaiting_return", counts)
+    );
+  }
+  if (groupKey === "cancelled") {
+    return countForTab("cancelled_shop", counts) + countForTab("cancelled_renter", counts);
+  }
+  return 0;
+}
+
+// ─── label helpers ────────────────────────────────────────────────────────────
+
+function labelForTab(key: BookingTabKey): string {
+  return BOOKING_TABS.find((t) => t.key === key)?.label ?? key;
+}
+
+function labelForGroup(key: BookingGroupKey): string {
+  return BOOKING_GROUPS.find((g) => g.key === key)?.label ?? key;
+}
+
+function nowViewingLabel(sel: Selection): string {
+  if (sel.zone === "todo") {
+    if (sel.sub !== null) return labelForTab(sel.sub);
+    return "งานที่ต้องทำ";
+  }
+  if (sel.sub !== null) return labelForTab(sel.sub);
+  return labelForGroup(sel.group);
+}
+
+// ─── initial selection ────────────────────────────────────────────────────────
+
+function initialSelection(
+  statusCounts: Record<string, number>,
+  initialStatus: string | undefined,
+): Selection {
+  if (initialStatus) {
+    const { group, sub } = groupForStatus(initialStatus);
+    const zone: Zone = group === "todo" ? "todo" : "browse";
+    return { zone, group, sub };
+  }
+  const todoTotal =
+    countForTab("booking_pending", statusCounts) +
+    countForTab("payment_review", statusCounts) +
+    countForTab("returned", statusCounts);
+  if (todoTotal > 0) {
+    return { zone: "todo", group: "todo", sub: null };
+  }
+  return { zone: "browse", group: "all", sub: null };
+}
+
+// ─── component ────────────────────────────────────────────────────────────────
 
 export default function SellerBookingsList({
   initialRows,
@@ -54,7 +132,9 @@ export default function SellerBookingsList({
   statusCounts = {},
   initialStatus,
 }: Props) {
-  const [tab, setTab] = useState<BookingTabKey>(() => statusToTab(initialStatus));
+  const [sel, setSel] = useState<Selection>(() =>
+    initialSelection(statusCounts, initialStatus),
+  );
   const [sinceDays, setSinceDays] = useState<number | null>(null);
 
   const [items, setItems] = useState<SellerBookingCardWithTrust[]>(initialRows);
@@ -65,34 +145,43 @@ export default function SellerBookingsList({
 
   const hasMore = items.length < total;
 
+  // Derived counts
+  const todoTotal =
+    countForTab("booking_pending", statusCounts) +
+    countForTab("payment_review", statusCounts) +
+    countForTab("returned", statusCounts);
+
+  const applyFilter = useCallback(
+    async (nextSel: Selection, nextDays: number | null) => {
+      const reqId = ++reqRef.current;
+      setLoading(true);
+      try {
+        const key = resolveFilterKey(nextSel);
+        const res = await fetchSellerBookingsPage(key, nextDays, 0);
+        if (reqRef.current !== reqId) return;
+        setItems(res.rows);
+        setTotal(res.total);
+      } finally {
+        if (reqRef.current === reqId) setLoading(false);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (didInit.current) return;
     didInit.current = true;
-    if (initialStatus) {
-      const t = statusToTab(initialStatus);
-      if (t !== "all") {
-        applyFilter(t, null);
-      }
+    const initSel = initialSelection(statusCounts, initialStatus);
+    const key = resolveFilterKey(initSel);
+    if (key !== "all") {
+      setSel(initSel);
+      applyFilter(initSel, null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const applyFilter = useCallback(async (nextTab: BookingTabKey, nextDays: number | null) => {
-    const reqId = ++reqRef.current;
-    setLoading(true);
-    try {
-      const res = await fetchSellerBookingsPage(nextTab, nextDays, 0);
-      if (reqRef.current !== reqId) return;
-      setItems(res.rows);
-      setTotal(res.total);
-    } finally {
-      if (reqRef.current === reqId) setLoading(false);
-    }
-  }, []);
-
-  function onTab(next: BookingTabKey) {
-    if (next === tab) return;
-    setTab(next);
+  function onSelect(next: Selection) {
+    setSel(next);
     setItems([]);
     applyFilter(next, sinceDays);
   }
@@ -101,7 +190,7 @@ export default function SellerBookingsList({
     if (next === sinceDays) return;
     setSinceDays(next);
     setItems([]);
-    applyFilter(tab, next);
+    applyFilter(sel, next);
   }
 
   const loadMore = useCallback(async () => {
@@ -109,7 +198,8 @@ export default function SellerBookingsList({
     const reqId = ++reqRef.current;
     setLoading(true);
     try {
-      const res = await fetchSellerBookingsPage(tab, sinceDays, items.length);
+      const key = resolveFilterKey(sel);
+      const res = await fetchSellerBookingsPage(key, sinceDays, items.length);
       if (reqRef.current !== reqId) return;
       setItems((prev) => {
         const seen = new Set(prev.map((p) => p.id));
@@ -120,7 +210,7 @@ export default function SellerBookingsList({
     } finally {
       if (reqRef.current === reqId) setLoading(false);
     }
-  }, [loading, items.length, total, tab, sinceDays]);
+  }, [loading, items.length, total, sel, sinceDays]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -136,72 +226,290 @@ export default function SellerBookingsList({
     return () => io.disconnect();
   }, [hasMore, loadMore]);
 
+  // ─── browse group helper ────────────────────────────────────────────────────
+  const browseGroups = BOOKING_GROUPS.filter((g) => g.key !== "todo");
+  const selectedBrowseGroup = BOOKING_GROUPS.find((g) => g.key === sel.group);
+  const browseSubTabs =
+    sel.zone === "browse" && selectedBrowseGroup && selectedBrowseGroup.memberTabs.length > 0
+      ? selectedBrowseGroup.memberTabs
+      : [];
+
   return (
     <div>
-      {/* ── Tabs — horizontally scrollable, equal sizing ── */}
-      <div
-        style={{
-          display: "flex",
-          overflowX: "auto",
-          borderBottom: "2px solid var(--line)",
-          marginBottom: 16,
-          WebkitOverflowScrolling: "touch",
-          scrollbarWidth: "none",
-        }}
-      >
-        {BOOKING_TABS.map((t) => {
-          const active = tab === t.key;
-          const count = countForTab(t.key, statusCounts);
-          const isActionable = ["booking_pending", "payment_review", "awaiting_return", "returned"].includes(t.key) && count > 0;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => onTab(t.key)}
-              style={{
-                position: "relative",
-                padding: "12px 10px 10px",
-                background: "none",
-                border: "none",
-                borderBottom: `2px solid ${active ? "var(--accent)" : "transparent"}`,
-                marginBottom: -2,
-                cursor: "pointer",
-                textAlign: "center",
-                fontSize: 13,
-                fontWeight: active ? 700 : 500,
-                color: active ? "var(--accent)" : "var(--ink-2)",
-                transition: "color 0.15s, border-color 0.15s",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-              }}
-            >
-              {t.label}
-              {count > 0 ? (
+      {/* ════════════════════════════════════════════════════════════════════
+          TIER 1 — Action card "ต้องทำตอนนี้"
+          ════════════════════════════════════════════════════════════════════ */}
+      {todoTotal > 0 ? (
+        <div
+          style={{
+            background: "var(--warn-soft)",
+            border: "0.5px solid var(--warn)",
+            borderRadius: 14,
+            padding: "12px 13px",
+            marginBottom: 16,
+          }}
+        >
+          {/* Header row — selects todo-whole */}
+          {(() => {
+            const todoWholeActive = sel.zone === "todo" && sel.sub === null;
+            return (
+              <button
+                type="button"
+                onClick={() => onSelect({ zone: "todo", group: "todo", sub: null })}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  width: "100%",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  marginBottom: 10,
+                  gap: 7,
+                }}
+              >
+                {/* dot */}
                 <span
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginLeft: 5,
-                    minWidth: 18,
-                    height: 18,
-                    padding: "0 5px",
-                    borderRadius: 999,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    background: isActionable ? "var(--danger, #e53e3e)" : active ? "var(--accent)" : "var(--line)",
-                    color: isActionable || active ? "var(--on-dark)" : "var(--ink-2)",
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: todoWholeActive ? "var(--accent)" : "var(--warn-ink)",
+                    flexShrink: 0,
+                  }}
+                />
+                {/* label */}
+                <span
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: todoWholeActive ? "var(--accent)" : "var(--warn-ink)",
+                    borderBottom: todoWholeActive ? "2px solid var(--accent)" : "2px solid transparent",
+                    paddingBottom: 1,
+                    lineHeight: 1.3,
                   }}
                 >
-                  {count}
+                  ต้องทำตอนนี้
                 </span>
-              ) : null}
-            </button>
-          );
-        })}
+                {/* count — right-aligned */}
+                <span style={{ marginLeft: "auto", display: "flex", alignItems: "baseline", gap: 3 }}>
+                  <span
+                    style={{
+                      fontSize: 19,
+                      fontWeight: 500,
+                      color: "var(--warn-ink)",
+                    }}
+                  >
+                    {todoTotal}
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--warn-ink)" }}> รายการ</span>
+                </span>
+              </button>
+            );
+          })()}
+
+          {/* Sub-group chips */}
+          <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+            {(
+              [
+                { tabKey: "booking_pending" as BookingTabKey, label: "รอยืนยัน" },
+                { tabKey: "payment_review" as BookingTabKey, label: "ตรวจสลิป" },
+                { tabKey: "returned" as BookingTabKey, label: "รอตรวจคืน" },
+              ] as const
+            ).map(({ tabKey, label }) => {
+              const count = countForTab(tabKey, statusCounts);
+              const isActive = sel.zone === "todo" && sel.sub === tabKey;
+              const borderColor = isActive
+                ? "var(--accent)"
+                : count > 0
+                  ? "var(--warn)"
+                  : "var(--line)";
+              const bgColor = isActive ? "var(--surface)" : "transparent";
+              const textColor = isActive
+                ? "var(--accent)"
+                : count > 0
+                  ? "var(--warn-ink)"
+                  : "var(--ink-3)";
+              return (
+                <button
+                  key={tabKey}
+                  type="button"
+                  onClick={() => onSelect({ zone: "todo", group: "todo", sub: tabKey })}
+                  style={{
+                    padding: "5px 11px",
+                    borderRadius: 999,
+                    border: `1px solid ${borderColor}`,
+                    background: bgColor,
+                    color: textColor,
+                    fontSize: 12.5,
+                    fontWeight: isActive ? 500 : 400,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {label}
+                  {count > 0 && (
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        fontSize: 12,
+                        color: textColor,
+                      }}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* Calm success card — not selectable */
+        <div
+          style={{
+            background: "var(--surface)",
+            border: "0.5px solid var(--line)",
+            borderRadius: 14,
+            padding: "12px 13px",
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <span style={{ fontSize: 20, color: "var(--success)" }}>✓</span>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: "var(--success)" }}>
+              เคลียร์หมดแล้ว
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 2 }}>
+              ไม่มีงานค้างต้องทำตอนนี้
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════
+          TIER 2 — "ดูย้อนหลัง" browse
+          ════════════════════════════════════════════════════════════════════ */}
+      <div style={{ marginBottom: sel.zone === "browse" && browseSubTabs.length > 0 ? 0 : 16 }}>
+        {/* Muted label */}
+        <div style={{ fontSize: 11, color: "var(--ink-3)", marginBottom: 6 }}>ดูย้อนหลัง</div>
+
+        {/* Underline tab row */}
+        <div
+          style={{
+            display: "flex",
+            overflowX: "auto",
+            borderBottom: "2px solid var(--line)",
+            WebkitOverflowScrolling: "touch",
+            scrollbarWidth: "none",
+          }}
+        >
+          {browseGroups.map((grp) => {
+            const active = sel.zone === "browse" && sel.group === grp.key;
+            const count = countForGroup(grp.key, statusCounts);
+            return (
+              <button
+                key={grp.key}
+                type="button"
+                onClick={() =>
+                  onSelect({ zone: "browse", group: grp.key, sub: null })
+                }
+                style={{
+                  position: "relative",
+                  padding: "10px 12px 8px",
+                  background: "none",
+                  border: "none",
+                  borderBottom: `2px solid ${active ? "var(--accent)" : "transparent"}`,
+                  marginBottom: -2,
+                  cursor: "pointer",
+                  textAlign: "center",
+                  fontSize: 13,
+                  fontWeight: active ? 500 : 400,
+                  color: active ? "var(--accent)" : "var(--ink-2)",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 4,
+                }}
+              >
+                <span>{grp.shortLabel ?? grp.label}</span>
+                {count > 0 && (
+                  <span style={{ fontSize: 11, color: active ? "var(--accent)" : "var(--ink-3)" }}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Sub-chip row — only when browse zone and group has member tabs */}
+        {sel.zone === "browse" && browseSubTabs.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              overflowX: "auto",
+              WebkitOverflowScrolling: "touch",
+              scrollbarWidth: "none",
+              gap: 7,
+              padding: "10px 0 10px",
+            }}
+          >
+            {/* "ทั้งหมด·groupCount" chip — selects whole group */}
+            {(() => {
+              const groupCount = sel.group !== "all" && sel.group !== "done" && sel.group !== "todo"
+                ? countForGroup(sel.group, statusCounts)
+                : 0;
+              const isActive = sel.zone === "browse" && sel.sub === null;
+              return (
+                <button
+                  key="__group_all"
+                  type="button"
+                  onClick={() =>
+                    onSelect({ zone: "browse", group: sel.group, sub: null })
+                  }
+                  style={subChipStyle(isActive)}
+                >
+                  ทั้งหมด
+                  {groupCount > 0 && (
+                    <span style={{ fontSize: 11, marginLeft: 3 }}>{groupCount}</span>
+                  )}
+                </button>
+              );
+            })()}
+            {browseSubTabs.map((tabKey) => {
+              const count = countForTab(tabKey, statusCounts);
+              const isActive = sel.zone === "browse" && sel.sub === tabKey;
+              return (
+                <button
+                  key={tabKey}
+                  type="button"
+                  onClick={() =>
+                    onSelect({ zone: "browse", group: sel.group, sub: tabKey })
+                  }
+                  style={subChipStyle(isActive)}
+                >
+                  {labelForTab(tabKey)}
+                  {count > 0 && (
+                    <span style={{ fontSize: 11, marginLeft: 3 }}>{count}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Days-back filter + count */}
+      {/* ════════════════════════════════════════════════════════════════════
+          Days-back filter + NOW-VIEWING line
+          ════════════════════════════════════════════════════════════════════ */}
       <div
         style={{
           display: "flex",
@@ -210,11 +518,30 @@ export default function SellerBookingsList({
           gap: 12,
           flexWrap: "wrap",
           marginBottom: 18,
+          marginTop: sel.zone === "browse" && browseSubTabs.length > 0 ? 0 : 16,
         }}
       >
-        <span style={{ fontSize: 13.5, color: "var(--ink-2)" }}>
-          พบ <b>{total}</b> รายการ
-        </span>
+        {/* Now-viewing line */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span
+            style={{
+              background: "var(--accent-soft)",
+              color: "var(--accent)",
+              borderRadius: 999,
+              fontSize: 11,
+              padding: "3px 9px",
+              fontWeight: 500,
+              whiteSpace: "nowrap",
+            }}
+          >
+            กำลังดู: {nowViewingLabel(sel)}
+          </span>
+          <span style={{ fontSize: 13.5, color: "var(--ink-2)" }}>
+            พบ <b>{total}</b> รายการ
+          </span>
+        </div>
+
+        {/* Days-back chips */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {DAYS_BACK_OPTIONS.map((o) => (
             <button
@@ -229,6 +556,9 @@ export default function SellerBookingsList({
         </div>
       </div>
 
+      {/* ════════════════════════════════════════════════════════════════════
+          Booking card list — UNCHANGED markup
+          ════════════════════════════════════════════════════════════════════ */}
       {items.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 0", color: "var(--ink-2)" }}>
           {loading ? "กำลังโหลด…" : "ไม่มีการจองในหมวดนี้"}
@@ -348,6 +678,8 @@ export default function SellerBookingsList({
   );
 }
 
+// ─── style helpers ────────────────────────────────────────────────────────────
+
 function daysUntil(ymd: string): number | null {
   const d = new Date(ymd + "T00:00:00+07:00");
   if (isNaN(d.getTime())) return null;
@@ -381,6 +713,23 @@ function chipBtn(active: boolean): React.CSSProperties {
     fontSize: 12.5,
     fontWeight: active ? 600 : 400,
     cursor: "pointer",
+  };
+}
+
+function subChipStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: "5px 12px",
+    borderRadius: 999,
+    border: `1px solid ${active ? "var(--accent)" : "var(--line)"}`,
+    background: active ? "var(--accent-soft)" : "var(--surface)",
+    color: active ? "var(--accent-2)" : "var(--ink-2)",
+    fontSize: 12.5,
+    fontWeight: active ? 600 : 400,
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   };
 }
 

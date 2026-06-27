@@ -1208,6 +1208,16 @@ model Booking {
   /// ลิงก์ติดตามการจัดส่ง (กรอกตอนร้านส่งชุด)
   trackingUrl     String? @map("tracking_url")
 
+  /// ── ข้อมูลการส่งคืนจากลูกค้า (ขากลับ) ──
+  /// ผู้ให้บริการขนส่งที่ลูกค้าใช้ส่งคืน
+  returnCarrier        String?   @map("return_carrier")
+  /// เลขพัสดุขากลับ
+  returnTrackingNumber String?   @map("return_tracking_number")
+  /// ลิงก์ติดตามขากลับ
+  returnTrackingUrl    String?   @map("return_tracking_url")
+  /// เวลาที่ลูกค้ากดส่งข้อมูลการส่งคืน (null = ยังไม่ได้ส่ง)
+  returnShippedAt      DateTime? @map("return_shipped_at") @db.Timestamptz(6)
+
   /// เวลาที่ส่งแจ้งเตือน "ถึงกำหนดคืน" แล้ว (กันส่งซ้ำจาก cron sweep)
   returnReminderSentAt  DateTime? @map("return_reminder_sent_at") @db.Timestamptz(6)
   /// เวลาที่ส่งแจ้งเตือน "เกินกำหนดคืน" แล้ว (กันส่งซ้ำจาก cron sweep)
@@ -1218,6 +1228,8 @@ model Booking {
   returnCondition       String?   @map("return_condition")
   /// รายละเอียดความเสียหายที่ร้านระบุ (เมื่อ returnCondition = "damaged")
   returnDamageNote      String?   @map("return_damage_note")
+  /// จำนวนมัดจำที่หัก (บาท) — ร้านกรอกตอนบันทึก damaged (null = ยังไม่ระบุ, 0 = ไม่หัก)
+  deductionAmount       Int?      @map("deduction_amount")
   /// เวลาที่เข้าสถานะ payment_review (ลูกค้าอัปสลิป) — ใช้นับชั่วโมงร้านเปิดเพื่อแสดง badge ด่วน
   /// รีเซตทุกครั้งที่ลูกค้าอัปสลิปใหม่ (เช่น หลัง slip_disputed)
   paymentReviewAt       DateTime? @map("payment_review_at") @db.Timestamptz(6)

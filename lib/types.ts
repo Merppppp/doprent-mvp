@@ -346,6 +346,14 @@ export type Booking = {
   tracking_number: string | null;
   /** Tracking URL the shop entered when shipping. */
   tracking_url: string | null;
+  /** Return carrier the renter used when shipping back. */
+  return_carrier: string | null;
+  /** Return parcel tracking number. */
+  return_tracking_number: string | null;
+  /** Return tracking URL. */
+  return_tracking_url: string | null;
+  /** When the renter submitted return tracking (ISO string). Null = not yet shipped back. */
+  return_shipped_at: string | null;
   address_id: string | null;
   recipient_name: string | null; // snapshot at booking time
   phone: string | null;
@@ -420,6 +428,8 @@ export type BookingDetail = Booking & {
   return_condition: string | null;
   /** รายละเอียดความเสียหายที่ร้านระบุ (เมื่อ return_condition = "damaged"). */
   return_damage_note: string | null;
+  /** จำนวนมัดจำที่หัก (บาท) — ร้านกรอกตอน damaged. */
+  deduction_amount: number | null;
   /** Private R2 key ของภาพบัตรประชาชนที่ใช้ในการจองนี้ (null = ไม่ได้แนบ). */
   id_card_path: string | null;
   /** Phase 2: item rows sourced from BookingItem child table. */

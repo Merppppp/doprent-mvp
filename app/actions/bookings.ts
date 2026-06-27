@@ -400,8 +400,15 @@ export async function createBooking(formData: FormData): Promise<Result<{ id: st
           ok: false,
           error: "ส่งพัสดุไม่สามารถจัดส่งภายในวันได้ กรุณาเลือกส่งด่วน หรือเลือกวันรับชุดเป็นวันอื่น",
         };
-      const minsToClose = minutesUntilCloseBkk(parseBusinessHours(firstProduct.shop.hours));
-      if (firstProduct.shop.isOpen === false || minsToClose == null || minsToClose <= 60)
+      // Express same-day eligibility:
+      //   • manual "ปิดร้านชั่วคราว" toggle (isOpen === false) always blocks
+      //   • hours NOT configured (parse → null) → unknown → allow (fail-open)
+      //   • hours configured but closed today → minsToClose null → block
+      //   • hours configured & open today → require > 60 min before closing
+      const hours = parseBusinessHours(firstProduct.shop.hours);
+      const minsToClose = hours ? minutesUntilCloseBkk(hours) : null;
+      const expressTooLate = hours != null && (minsToClose == null || minsToClose <= 60);
+      if (firstProduct.shop.isOpen === false || expressTooLate)
         return {
           ok: false,
           error: "เลยเวลาส่งด่วนสำหรับวันนี้แล้ว กรุณาเลือกวันรับชุดเป็นวันอื่น",
@@ -1153,23 +1160,107 @@ export async function markRenting(
 
 export type ReturnCondition = "complete" | "damaged" | "not_returned";
 
+/* ------------------------------ renter return ------------------------------ */
+
+/**
+ * Renter submits return shipping info (tracking number / URL / carrier).
+ * Only allowed when status is renting or awaiting_return.
+ * After this, seller can mark the return.
+ */
+export async function submitReturnTracking(
+  bookingId: string,
+  opts: { carrier?: string; trackingNumber?: string; trackingUrl?: string },
+): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
+
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: { id: true, renterId: true, status: true, returnShippedAt: true },
+  });
+  if (!booking) return { ok: false, error: "ไม่พบการจอง" };
+  if (booking.renterId !== user.id)
+    return { ok: false, error: "ไม่มีสิทธิ์จัดการการจองนี้" };
+  if (booking.status !== "renting" && booking.status !== "awaiting_return")
+    return { ok: false, error: "สถานะไม่ถูกต้องสำหรับการส่งคืน" };
+
+  const carrier = opts.carrier?.trim() || null;
+  const trackingNumber = opts.trackingNumber?.trim() || null;
+  const trackingUrl = opts.trackingUrl?.trim() || null;
+
+  if (!trackingNumber && !trackingUrl)
+    return { ok: false, error: "กรุณากรอกเลขพัสดุ หรือ ลิงก์ติดตาม อย่างน้อย 1 อย่าง" };
+  if (trackingUrl && !/^https?:\/\//i.test(trackingUrl))
+    return { ok: false, error: "ลิงก์ติดตามต้องขึ้นต้นด้วย http:// หรือ https://" };
+
+  const res = await withActor(user.id, () =>
+    db.booking.updateMany({
+      where: {
+        id: bookingId,
+        renterId: user.id,
+        status: { in: ["renting", "awaiting_return"] },
+      },
+      data: {
+        returnCarrier: carrier,
+        returnTrackingNumber: trackingNumber,
+        returnTrackingUrl: trackingUrl,
+        returnShippedAt: new Date(),
+      },
+    }),
+  );
+  if (res.count === 0) return { ok: false, error: "สถานะเปลี่ยนไปแล้ว ลองรีเฟรช" };
+
+  revalidatePath(`/account/bookings/${bookingId}`);
+  revalidatePath(`/sell/bookings/${bookingId}`);
+  revalidatePath("/account/bookings");
+  revalidatePath("/sell/bookings");
+  return { ok: true };
+}
+
+/* ------------------------------ seller return ------------------------------ */
+
 /**
  * Seller records the physical return:
- *   complete     → returned       (ชุดสมบูรณ์)
+ *   complete     → completed      (ชุดสมบูรณ์ — จบรายการทันที)
  *   damaged      → returned       (มีความเสียหาย — ต้องระบุรายละเอียด, ตั้ง refund=required)
  *   not_returned → not_returned   (ลูกค้าไม่ส่งคืน — ตั้ง refund=required)
+ *
+ * GUARD: condition complete/damaged requires renter to have submitted return
+ * tracking first (returnShippedAt must be set). not_returned bypasses this
+ * guard because the customer hasn't shipped anything.
  */
 export async function markReturned(
   bookingId: string,
   condition: ReturnCondition,
-  damageNote?: string
+  damageNote?: string,
+  deductionAmount?: number,
 ): Promise<Result> {
   if (condition === "damaged" && !damageNote?.trim())
     return { ok: false, error: "กรุณาระบุความเสียหายที่พบ" };
-  const to: BookingStatus = condition === "not_returned" ? "not_returned" : "returned";
+  if (condition === "damaged" && deductionAmount != null) {
+    if (!Number.isFinite(deductionAmount) || deductionAmount < 0)
+      return { ok: false, error: "จำนวนมัดจำที่หักต้องเป็นตัวเลขที่ถูกต้อง" };
+  }
+
+  // Guard: complete/damaged requires renter to have shipped the return first.
+  if (condition !== "not_returned") {
+    const bk = await db.booking.findUnique({
+      where: { id: bookingId },
+      select: { returnShippedAt: true },
+    });
+    if (!bk) return { ok: false, error: "ไม่พบการจอง" };
+    if (!bk.returnShippedAt)
+      return { ok: false, error: "ลูกค้ายังไม่ได้ส่งคืนสินค้า ไม่สามารถรับคืนได้" };
+  }
+
+  const to: BookingStatus =
+    condition === "not_returned" ? "not_returned" :
+    condition === "complete" ? "completed" :
+    "returned";
   return sellerSimpleMove(bookingId, to, undefined, undefined, {
     condition,
     damageNote: condition === "damaged" ? damageNote!.trim() : undefined,
+    deductionAmount: condition === "damaged" ? (deductionAmount ?? null) : null,
     requireRefund: condition === "damaged",
     forfeitDeposit: condition === "not_returned",
   });
@@ -1185,7 +1276,7 @@ async function sellerSimpleMove(
   to: BookingStatus,
   reason?: string,
   shipping?: { carrier?: string; trackingNumber?: string; trackingUrl?: string },
-  returnInfo?: { condition: ReturnCondition; damageNote?: string; requireRefund: boolean; forfeitDeposit?: boolean }
+  returnInfo?: { condition: ReturnCondition; damageNote?: string; deductionAmount?: number | null; requireRefund: boolean; forfeitDeposit?: boolean }
 ): Promise<Result> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "ยังไม่ได้เข้าสู่ระบบ" };
@@ -1209,12 +1300,13 @@ async function sellerSimpleMove(
             ...(shipping?.carrier ? { deliveryCarrier: shipping.carrier } : {}),
             ...(shipping?.trackingNumber ? { trackingNumber: shipping.trackingNumber } : {}),
             ...(shipping?.trackingUrl ? { trackingUrl: shipping.trackingUrl } : {}),
-            ...(to === "returned" ? { returnedAt: new Date() } : {}),
+            ...(to === "returned" || (to === "completed" && returnInfo) ? { returnedAt: new Date() } : {}),
             ...(to === "rejected" || to === "cancel_requested" ? { cancelledBy: "shop" } : {}),
             ...(returnInfo
               ? {
                   returnCondition: returnInfo.condition,
                   returnDamageNote: returnInfo.damageNote ?? null,
+                  ...(returnInfo.deductionAmount != null ? { deductionAmount: Math.round(returnInfo.deductionAmount) } : {}),
                   ...(returnInfo.requireRefund ? { refundStatus: "required" } : {}),
                   ...(returnInfo.forfeitDeposit ? { refundStatus: "forfeited" } : {}),
                 }
@@ -1225,6 +1317,7 @@ async function sellerSimpleMove(
           // Physical unit status follows the rental lifecycle:
           //   renting       → 'rented'    (dress is out the door)
           //   returned      → 'available' (back in stock, ready to rent again)
+          //   completed     → 'available' (complete condition skips returned, units back in stock)
           //   rejected      → 'available' (hold dropped; harmless if it wasn't rented)
           //   not_returned  → 'lost'      (customer didn't return — mark unit lost with booking ref)
           const itemUnitIds = booking.items.map((i) => i.unitId).filter((x): x is string => !!x);
@@ -1236,7 +1329,7 @@ async function sellerSimpleMove(
                 where: { id: { in: itemUnitIds } },
                 data: { status: "lost", lostFromBookingId: bookingId, note: "สูญหาย — ลูกค้าไม่คืนของ" },
               });
-            } else if (to === "returned" || to === "rejected") {
+            } else if (to === "returned" || to === "completed" || to === "rejected") {
               await tx.productUnit.updateMany({ where: { id: { in: itemUnitIds } }, data: { status: "available" } });
             }
           }

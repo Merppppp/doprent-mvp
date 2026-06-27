@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addAddress, updateAddress, createBooking } from "@/app/actions/bookings";
+import { startProgress, doneProgress } from "@/lib/progress";
 import type { Address } from "@/lib/types";
 import type { BusinessHours } from "@/lib/hours";
 import type { IdCardItem } from "@/app/actions/id-cards";
@@ -95,8 +96,10 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
     e.preventDefault();
     setError("");
     setBusy(true);
+    startProgress();
     const fd = new FormData(e.currentTarget);
     const res = await addAddress(fd);
+    doneProgress();
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
     const newAddr: Address = {
@@ -118,8 +121,10 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
     e.preventDefault();
     setError("");
     setBusy(true);
+    startProgress();
     const fd = new FormData(e.currentTarget);
     const res = await updateAddress(fd);
+    doneProgress();
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
     const id = String(fd.get("id") ?? "");
@@ -147,6 +152,7 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
     if (!selectedIdCardPath) { setError("กรุณาแนบรูปถ่ายบัตรประชาชน"); return; }
     setError("");
     setBusy(true);
+    startProgress();
 
     const itemsPayload = group.items.map((i) => ({
       productId: i.productId,
@@ -168,7 +174,7 @@ export default function CartCheckoutForm({ groupKey, addresses: initialAddresses
     if (firstWithTimes?.endTime) fd.set("end_time", firstWithTimes.endTime);
 
     const res = await createBooking(fd);
-    if (!res.ok) { setBusy(false); setError(res.error); return; }
+    if (!res.ok) { doneProgress(); setBusy(false); setError(res.error); return; }
     clearGroup(groupKey);
     router.push(`/account/bookings/${res.id}`);
   }

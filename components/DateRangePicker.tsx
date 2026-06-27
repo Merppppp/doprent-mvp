@@ -84,6 +84,13 @@ type Props = {
   variants?: VariantOption[];
   /** Today's shop closing time as "HH:MM" (e.g. "19:00"). Null when shop is closed today or hours unknown. */
   shopClosingTime?: string | null;
+  /**
+   * Whether the shop has real weekly business hours configured. When false the
+   * shop never set hours, so same-day express is allowed (fail-open) rather than
+   * blocked. When true and shopClosingTime is null, the shop is closed today
+   * (express blocked). Mirrors the server rule in createBooking.
+   */
+  shopHoursConfigured?: boolean;
   /** Whether the shop is currently open (manual toggle). */
   shopIsOpen?: boolean | null;
 };
@@ -179,6 +186,7 @@ export default function DateRangePicker({
   isLoggedIn,
   variants,
   shopClosingTime,
+  shopHoursConfigured = false,
   shopIsOpen,
   shopName,
   productName,
@@ -308,9 +316,13 @@ export default function DateRangePicker({
 
   // Same-day-start delivery gating (mirrors the server rule in createBooking):
   //   • standard outbound can never ship same-day
-  //   • express outbound needs the shop open with > 60 min before closing
+  //   • manual "ปิดร้านชั่วคราว" toggle (shopIsOpen === false) always blocks
+  //   • hours NOT configured → unknown → allow express same-day (fail-open)
+  //   • hours configured → require the shop open today with > 60 min before close
   const sameDayStart = !!start && start === TODAY;
-  const expressTodayOk = shopIsOpen !== false && minsToClose != null && minsToClose > 60;
+  const expressTodayOk =
+    shopIsOpen !== false &&
+    (!shopHoursConfigured || (minsToClose != null && minsToClose > 60));
   const standardOutboundDisabled = sameDayStart;
   const expressOutboundDisabled = sameDayStart && !expressTodayOk;
 
@@ -484,6 +496,11 @@ export default function DateRangePicker({
         <div style={{ padding: "10px 12px", background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.4)", borderRadius: 6, fontSize: 13, color: "var(--warn-ink)", marginBottom: 12, lineHeight: 1.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 15 }}>⏰</span>
           ร้านใกล้จะปิด (ปิด {shopClosingTime} น.) — มีโอกาสที่จะถูกปฏิเสธการจอง
+        </div>
+      ) : !shopHoursConfigured ? (
+        <div style={{ padding: "10px 12px", background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 6, fontSize: 12.5, color: "var(--ink-2)", marginBottom: 12, lineHeight: 1.5, display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <span style={{ fontSize: 14, flexShrink: 0 }}>ℹ️</span>
+          <span>ร้านนี้ยังไม่ได้ตั้งเวลาทำการ — เวลาจัดส่งและรับชุดขึ้นอยู่กับการตอบกลับของร้าน</span>
         </div>
       ) : null}
 

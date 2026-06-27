@@ -4,6 +4,7 @@ import type { Address, BookingDetail, BookingItemDetail, BookingStatus } from "@
 import { ymdUtc } from "@/lib/date-th";
 import { BOOKING_STATUS_META, PAYMENT_REVIEW_ESCALATE_OPEN_HOURS } from "@/lib/bookings";
 import { parseBusinessHours, defaultBusinessHours, paymentReviewEscalated } from "@/lib/hours";
+import { resolveEffectivePolicy, type EffectivePolicy } from "@/lib/booking-policy";
 
 /** Prisma include that hydrates the items[] + shop fields a BookingDetail needs. */
 const BOOKING_INCLUDE = {
@@ -47,6 +48,10 @@ type PrismaBookingWithJoins = {
   deliveryCarrier: string | null;
   trackingNumber: string | null;
   trackingUrl: string | null;
+  returnCarrier: string | null;
+  returnTrackingNumber: string | null;
+  returnTrackingUrl: string | null;
+  returnShippedAt: Date | null;
   addressId: string | null;
   recipientName: string | null;
   phone: string | null;
@@ -70,6 +75,7 @@ type PrismaBookingWithJoins = {
   refundSlipPath: string | null;
   returnCondition: string | null;
   returnDamageNote: string | null;
+  deductionAmount: number | null;
   idCardPath: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -142,6 +148,10 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     delivery_carrier: b.deliveryCarrier ?? null,
     tracking_number: b.trackingNumber ?? null,
     tracking_url: b.trackingUrl ?? null,
+    return_carrier: b.returnCarrier ?? null,
+    return_tracking_number: b.returnTrackingNumber ?? null,
+    return_tracking_url: b.returnTrackingUrl ?? null,
+    return_shipped_at: b.returnShippedAt ? b.returnShippedAt.toISOString() : null,
     address_id: b.addressId,
     recipient_name: b.recipientName,
     phone: b.phone,
@@ -165,6 +175,7 @@ export function toBookingDetail(b: PrismaBookingWithJoins): BookingDetail {
     refund_slip_path: b.refundSlipPath ?? null,
     return_condition: b.returnCondition ?? null,
     return_damage_note: b.returnDamageNote ?? null,
+    deduction_amount: b.deductionAmount ?? null,
     id_card_path: b.idCardPath ?? null,
     created_at: b.createdAt.toISOString(),
     updated_at: b.updatedAt.toISOString(),
@@ -403,6 +414,47 @@ export async function getBookingForView(id: string): Promise<BookingDetail | nul
   return toBookingDetail(b as unknown as PrismaBookingWithJoins);
 }
 
+/**
+ * The effective booking policy (shop base + first product's override) that
+ * governs a booking — used to compute shipping/transit windows for display.
+ * Returns null when the booking or its shop is missing.
+ */
+export async function getBookingEffectivePolicy(bookingId: string): Promise<EffectivePolicy | null> {
+  const b = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      shopId: true,
+      items: { take: 1, orderBy: { createdAt: "asc" as const }, select: { productId: true } },
+    },
+  });
+  if (!b) return null;
+  const shop = await db.shop.findUnique({
+    where: { id: b.shopId },
+    select: {
+      leadTimeDays: true, minRentalDays: true, maxRentalDays: true, returnWindowDays: true,
+      bufferDaysAfter: true, bufferDaysBefore: true, cleaningDays: true, closedWeekdays: true,
+    },
+  });
+  if (!shop) return null;
+  const productId = b.items[0]?.productId;
+  const product = productId
+    ? await db.product.findUnique({
+        where: { id: productId },
+        select: {
+          policyOverride: true, leadTimeDays: true, minRentalDays: true, maxRentalDays: true,
+          returnWindowDays: true, bufferDaysAfter: true, bufferDaysBefore: true, cleaningDays: true,
+        },
+      })
+    : null;
+  return resolveEffectivePolicy(
+    shop,
+    product ?? {
+      policyOverride: false, leadTimeDays: null, minRentalDays: null, maxRentalDays: null,
+      returnWindowDays: null, bufferDaysAfter: null, bufferDaysBefore: null, cleaningDays: null,
+    },
+  );
+}
+
 /** Counts for the nav notification badges:
  *  renter = bookings waiting on the renter to pay;
  *  seller = bookings waiting on the shop (new request or slip to review). */
@@ -478,6 +530,8 @@ export type RenterBookingCard = {
   shipping_fee: number | null;
   status: BookingStatus;
   created_at: string;
+  /** Payment deadline (ISO) — drives the waiting_for_payment countdown. */
+  current_due_at: string | null;
   /** Phase 2: number of BookingItems (for "+N ชุด" display in future UI). */
   item_count: number;
 };
@@ -522,6 +576,7 @@ export async function getRenterBookingsPage(
         shippingFee: true,
         status: true,
         createdAt: true,
+        currentDueAt: true,
         items: {
           orderBy: { createdAt: "asc" as const },
           select: {
@@ -563,6 +618,7 @@ export async function getRenterBookingsPage(
         shipping_fee: b.shippingFee,
         status: b.status as BookingStatus,
         created_at: b.createdAt.toISOString(),
+        current_due_at: b.currentDueAt ? b.currentDueAt.toISOString() : null,
         item_count: b.items.length,
       };
     }),
@@ -601,31 +657,85 @@ export type BookingEvent = {
 };
 
 export async function getBookingTimeline(bookingId: string): Promise<BookingEvent[]> {
-  const logs = await base.auditLog.findMany({
-    where: { entityType: "Booking", entityId: bookingId, action: "UPDATE" },
-    orderBy: { createdAt: "asc" },
-    select: { before: true, after: true, createdAt: true },
-  });
+  // Fetch both formats:
+  // 1) New format: entityId = bookingId (single-entity updateMany after db.ts fix)
+  // 2) Old format: entityId = null, bulk updateMany with where.id in after payload
+  const [logs, booking] = await Promise.all([
+    base.auditLog.findMany({
+      where: {
+        entityType: "Booking",
+        action: "UPDATE",
+        OR: [
+          { entityId: bookingId },
+          { entityId: null },
+        ],
+      },
+      orderBy: { createdAt: "asc" },
+      select: { entityId: true, before: true, after: true, createdAt: true },
+    }),
+    db.booking.findUnique({
+      where: { id: bookingId },
+      select: { returnShippedAt: true },
+    }),
+  ]);
 
   const events: BookingEvent[] = [];
 
   for (const log of logs) {
-    const before = log.before as Record<string, unknown> | null;
     const after = log.after as Record<string, unknown> | null;
     if (!after) continue;
 
-    const oldStatus = before?.status as string | undefined;
-    const newStatus = after.status as string | undefined;
+    let oldStatus: string | undefined;
+    let newStatus: string | undefined;
+    let cancelReason: string | undefined;
+
+    if (log.entityId === bookingId) {
+      // New format: direct before/after with status field
+      const before = log.before as Record<string, unknown> | null;
+      oldStatus = before?.status as string | undefined;
+      newStatus = after.status as string | undefined;
+      cancelReason = after.cancelReason as string | undefined;
+    } else if (after.bulk === "updateMany") {
+      // Old format: { bulk, count, where: { id, status, ... }, data: { status, ... } }
+      const where = after.where as Record<string, unknown> | undefined;
+      const data = after.data as Record<string, unknown> | undefined;
+      if (!where || !data) continue;
+      if (where.id !== bookingId) continue;
+      oldStatus = where.status as string | undefined;
+      newStatus = data.status as string | undefined;
+      cancelReason = data.cancelReason as string | undefined;
+    } else {
+      continue;
+    }
+
     if (!newStatus || newStatus === oldStatus) continue;
 
     const meta = BOOKING_STATUS_META[newStatus as BookingStatus];
-    const note = newStatus === "slip_disputed" ? ((after.cancelReason as string | undefined) ?? null) : null;
+    const note = newStatus === "slip_disputed" ? (cancelReason ?? null) : null;
     events.push({
       status: newStatus,
       label: meta?.label ?? newStatus,
       at: log.createdAt.toISOString(),
       note,
     });
+  }
+
+  // Inject "ลูกค้าส่งคืนสินค้า" event from returnShippedAt (not a status change,
+  // so it doesn't appear in the audit log — add it chronologically).
+  if (booking?.returnShippedAt) {
+    const returnShippedIso = booking.returnShippedAt.toISOString();
+    const evt: BookingEvent = {
+      status: "return_shipped",
+      label: "ลูกค้าส่งคืนสินค้า",
+      at: returnShippedIso,
+    };
+    // Insert in chronological order
+    const idx = events.findIndex((e) => e.at > returnShippedIso);
+    if (idx === -1) {
+      events.push(evt);
+    } else {
+      events.splice(idx, 0, evt);
+    }
   }
 
   return events;

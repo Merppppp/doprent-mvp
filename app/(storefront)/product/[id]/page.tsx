@@ -222,6 +222,10 @@ export default async function DressPage({ params }: { params: Params }) {
   const todayDow = new Date().getDay(); // 0=Sun
   const todayHours = businessHours?.[todayDow] ?? null;
   const shopClosingTime = todayHours?.open ? todayHours.to : null;
+  // Whether the shop has real weekly hours set. Lets the picker distinguish
+  // "hours unknown" (→ allow same-day express, fail-open) from "closed today"
+  // (shopClosingTime null but hours configured → block). Mirrors createBooking.
+  const shopHoursConfigured = businessHours != null;
 
   // Separate product-wide blackouts (variantId null) from variant-specific ones
   const productWideBlackouts = blackouts.filter((b) => b.variantId === null).map((b) => b.date);
@@ -603,6 +607,7 @@ export default async function DressPage({ params }: { params: Params }) {
             loginNext={`/product/${dress.slug}`}
             variants={variantOptions.length > 0 ? variantOptions : undefined}
             shopClosingTime={shopClosingTime}
+            shopHoursConfigured={shopHoursConfigured}
             shopIsOpen={boutique?.is_open ?? null}
             shopName={dress.shop_name}
             productName={dress.name}

@@ -811,7 +811,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
-          <Labeled label="จองล่วงหน้าขั้นต่ำ (วัน)">
+          <Labeled label="จองล่วงหน้า (วัน)">
             <input
               type="number"
               name="lead_time_days"
@@ -829,7 +829,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
               className="input input-surface"
             />
           </Labeled>
-          <Labeled label="เช่าสูงสุด (วัน, ว่าง = ไม่จำกัด)">
+          <Labeled label="เช่าสูงสุด (วัน)">
             <input
               type="number"
               name="max_rental_days"
@@ -848,7 +848,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
               className="input input-surface"
             />
           </Labeled>
-          <Labeled label="บัฟเฟอร์ก่อนเช่า (วัน, ส่งด่วนไม่ใช้)">
+          <Labeled label="ขนส่งก่อนเช่า (วัน)">
             <input
               type="number"
               name="buffer_days_before"
@@ -857,7 +857,7 @@ export default function EditBoutiqueForm({ areas, boutique }: Props) {
               className="input input-surface"
             />
           </Labeled>
-          <Labeled label="บัฟเฟอร์หลังเช่า (วัน)">
+          <Labeled label="ขนส่งหลังเช่า (วัน)">
             <input
               type="number"
               name="buffer_days_after"

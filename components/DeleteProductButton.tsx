@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteProduct } from "@/app/actions/seller";
+import { startProgress, doneProgress } from "@/lib/progress";
 
 export default function DeleteProductButton({
   productId,
@@ -18,13 +19,18 @@ export default function DeleteProductButton({
 
   function handleDelete() {
     setError(null);
+    startProgress();
     startTransition(async () => {
-      const res = await deleteProduct(productId);
-      if (res.ok) {
-        setConfirming(false);
-        router.refresh();
-      } else {
-        setError(res.error ?? "ลบไม่สำเร็จ");
+      try {
+        const res = await deleteProduct(productId);
+        if (res.ok) {
+          setConfirming(false);
+          router.refresh();
+        } else {
+          setError(res.error ?? "ลบไม่สำเร็จ");
+        }
+      } finally {
+        doneProgress();
       }
     });
   }
